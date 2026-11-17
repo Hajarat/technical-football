@@ -86,7 +86,7 @@ public class RoundTests
     [Fact]
     public void ReleaseWithTheBallOutOfReachBuffersThenDrops()
     {
-        var sc = WithClock(null, s => { s.Attacker.X = 30f; });
+        var sc = WithClock(null, s => { s.Attacker.X = 8f; });
         var w = new World(new Tuning(), sc, TestData.Player("striker_a"), TestData.Player("the_wall"), 1);
         w.Begin();
         var a = Shoot(w, 20, new Vector2(1, 0));
@@ -104,10 +104,10 @@ public class RoundTests
     [Fact]
     public void BufferedShootStrikesIfTheBallComesIntoReachInTime()
     {
-        var sc = WithClock(null, s => { s.Attacker.X = 40.0f; });
+        var sc = WithClock(null, s => { s.Attacker.X = 15.0f; });
         var w = new World(new Tuning(), sc, TestData.Player("striker_a"), TestData.Player("the_wall"), 1);
         w.Begin();
-        w.Ball.Position = new Vector3(43.0f, 0.11f, 0f);        // 3 m away: out of reach at release
+        w.Ball.Position = new Vector3(18.0f, 0.11f, 0f);        // 3 m away: out of reach at release
         var a = Shoot(w, 20, new Vector2(1, 0));
         Assert.Equal(RoundState.Live, w.State);
         for (int i = 0; i < 10; i++) w.Step(a);
@@ -194,39 +194,47 @@ public class RoundTests
     }
 
     [Fact]
-    public void ShotWideOfThePostIsWide()
+    public void ShotWideOfThePostComesBackOffTheBoardsAndPlayGoesOn()
     {
         var w = FindRound(x =>
         {
             var a = Shoot(x, 30, new Vector2(1f, 0.45f));
-            StepUntil(x, a, y => y.State is RoundState.Outcome or RoundState.Report);
-            return x.Outcome == Outcome.Wide;
+            StepUntil(x, a, y => y.State is RoundState.Outcome or RoundState.Report || y.Events.Any(e => e.Kind == EventKind.BoardHit));
+            return x.Events.Any(e => e.Kind == EventKind.BoardHit) && !x.Pitch.IsOverContact(x.Events.First(e => e.Kind == EventKind.BoardHit).Position, x.Ball.Radius);
         });
-        Assert.Equal(Outcome.Wide, w.Outcome);
+        Assert.Equal(RoundState.Live, w.State);
+        Assert.Equal(Outcome.None, w.Outcome);
     }
 
     [Fact]
-    public void HighChipIsOver()
+    public void HighChipHitsTheWallAboveTheBarAndPlayGoesOn()
     {
         var w = FindRound(x =>
         {
             var a = Shoot(x, 80, new Vector2(1f, 0f), chip: true);
-            StepUntil(x, a, y => y.State is RoundState.Outcome or RoundState.Report);
-            return x.Outcome == Outcome.Over;
+            StepUntil(x, a, y => y.State is RoundState.Outcome or RoundState.Report || y.Events.Any(e => e.Kind == EventKind.BoardHit));
+            return x.Events.Any(e => e.Kind == EventKind.BoardHit && x.Pitch.IsOverContact(e.Position, x.Ball.Radius));
         });
-        Assert.Equal(Outcome.Over, w.Outcome);
+        Assert.Equal(RoundState.Live, w.State);
+        Assert.Equal(Outcome.None, w.Outcome);
+        Assert.True(w.Ball.Velocity.X < 0f, "the ball comes back off the end wall");
     }
 
     [Fact]
-    public void BallLeavingTheTouchlineIsOut()
+    public void BallRollingIntoTheSideBoardComesBackIntoPlay()
     {
         var w = TestData.Live("edge_of_box");
-        w.Ball.Position = new Vector3(30f, 0.11f, w.Pitch.HalfWidth - 0.1f);
+        w.Ball.Position = new Vector3(15f, 0.11f, w.Pitch.HalfWidth - 0.3f);
         w.Ball.Velocity = new Vector3(0, 0, 6f);
         var buf = Buf(w);
-        StepUntil(w, buf, x => x.State == RoundState.Outcome, 400);
-        Assert.Equal(Outcome.Out, w.Outcome);
-        Assert.Contains(w.Events, e => e.Kind == EventKind.OutOfPlay);
+        StepUntil(w, buf, x => x.Events.Any(e => e.Kind == EventKind.BoardHit), 400);
+        Assert.Contains(w.Events, e => e.Kind == EventKind.BoardHit);
+        Assert.Equal(RoundState.Live, w.State);
+        Assert.True(w.Ball.Velocity.Z < 0f);
+        for (int i = 0; i < 240; i++) w.Step(buf);
+        Assert.Equal(RoundState.Live, w.State);
+        Assert.True(MathF.Abs(w.Ball.Position.Z) <= w.Pitch.HalfWidth - w.Ball.Radius + 1e-3f);
+        Assert.DoesNotContain(w.Events, e => e.Kind == EventKind.OutOfPlay);
     }
 
     [Fact]
@@ -309,7 +317,8 @@ public class RoundTests
     public void BallSittingOnTheGoalLineKeepsTheRoundLive()
     {
         var w = TestData.Live("penalty");
-        w.Ball.Position = new Vector3(w.Pitch.GoalLineX + 0.05f, w.Ball.Radius, 0f);
+        // Inside the mouth near a post, out of the keeper's reach (he would claim a still ball next to him).
+        w.Ball.Position = new Vector3(w.Pitch.GoalLineX + 0.05f, w.Ball.Radius, 3f);
         var buf = Buf(w);
         for (int i = 0; i < 120; i++) w.Step(buf);
         Assert.Equal(RoundState.Live, w.State);

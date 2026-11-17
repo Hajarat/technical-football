@@ -102,7 +102,7 @@ static class DribbleProbe
         var sc = new Scenario
         {
             Id = "probe",
-            Pitch = new PitchSpec { HalfLength = 400f, Width = 200f },
+            Pitch = new PitchSpec { Length = 400f, Width = 200f },
             Ball = new StartSpot { X = 150.5f, Z = 0f },
             Attacker = new StartSpot { X = 150f, Z = 0f },
         };

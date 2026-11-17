@@ -62,7 +62,7 @@ public sealed class World
         _attackerSheet = attacker;
         _keeperSheet = keeper;
         _dt = tuning.Dt;
-        Pitch = new Pitch(scenario.Pitch, tuning.Frame);
+        Pitch = new Pitch(scenario.Pitch, tuning.Frame, tuning.Arena);
         Ball = new Ball(tuning.Ball);
         _rng = new SimRng(seed);
         Seed = seed;
@@ -83,7 +83,7 @@ public sealed class World
     public Tuning Tuning { get; }
     /// <summary>The scenario this world was built from.</summary>
     public Scenario Scenario { get; }
-    /// <summary>The half pitch and goal.</summary>
+    /// <summary>The arena and goal.</summary>
     public Pitch Pitch { get; }
     /// <summary>The ball: Position, Velocity and Spin are System.Numerics vectors.</summary>
     public Ball Ball { get; }
@@ -195,15 +195,20 @@ public sealed class World
     /// <summary>The keeper's start: his set spot, or the scenario's distance off the line on the same ball-to-goal line.</summary>
     Vector3 KeeperStart()
     {
-        if (Scenario.KeeperOffLine is not float off) return Core.Keeper.SetSpot(Ball.Position, Pitch, Tuning, Scenario.KeeperOnLine);
+        if (Scenario.KeeperOffLine is not float off) return ClampToPitch(Core.Keeper.SetSpot(Ball.Position, Pitch, Tuning, Scenario.KeeperOnLine));
         float x = Pitch.GoalLineX - off;
         float dx = Pitch.GoalLineX - Ball.Position.X;
         float z = dx > 1e-3f ? Ball.Position.Z * off / dx : 0f;
-        return new Vector3(x, 0f, Math.Clamp(z, -Pitch.GoalHalfWidth, Pitch.GoalHalfWidth));
+        return ClampToPitch(new Vector3(x, 0f, Math.Clamp(z, -Pitch.GoalHalfWidth, Pitch.GoalHalfWidth)));
     }
 
-    Vector3 ClampToPitch(Vector3 v) =>
-        new(Math.Clamp(v.X, Pitch.MinX, Pitch.GoalLineX), 0f, Math.Clamp(v.Z, -Pitch.HalfWidth, Pitch.HalfWidth));
+    Vector3 ClampToPitch(Vector3 v)
+    {
+        var p = new Vector3(v.X, 0f, v.Z);
+        var vel = Vector3.Zero;
+        Pitch.ClampPlayer(ref p, ref vel);
+        return p;
+    }
 
     static void ResetPlayer(PlayerState p)
     {
@@ -293,7 +298,7 @@ public sealed class World
         // 3. Keeper.
         _brain.Update(_dt, Ball, _rng);
 
-        // 4. Ball, with the frame and the keeper's hands as obstacles.
+        // 4. Ball, with the frame, the arena boards and the keeper's hands as obstacles.
         Vector3 prev = Ball.Position;
         var res = Ball.Step(_dt, Pitch, _brain.HandsSphere);
         float speed = Ball.Velocity.Length();
@@ -303,6 +308,18 @@ public sealed class World
             _events.Add(new SimEvent(EventKind.FrameHit, res.FramePoint, speed));
             if (State == RoundState.Flight) State = RoundState.Live;
         }
+        if (res.BoardHit)
+        {
+            _events.Add(new SimEvent(EventKind.BoardHit, res.BoardPoint, res.BoardSpeed));
+            // A shot that reaches the goal-end wall beside or above the goal records where it got there, like a shot that
+            // crosses the goal line.
+            if (_lastShot != null && float.IsNaN(_lastShot.Landed.X) && res.BoardPoint.X >= Pitch.GoalLineX - Ball.Radius - 1e-3f)
+                _lastShot.Landed = new Vector2(res.BoardPoint.Z, res.BoardPoint.Y);
+            // Off the boards the shot is over and the ball is in play again.
+            if (State == RoundState.Flight) State = RoundState.Live;
+        }
+        // A shot that dies before it reaches anything (it comes to rest) is over too, so the clock runs again.
+        if (State == RoundState.Flight && Ball.OnGround && Ball.Velocity == Vector3.Zero) State = RoundState.Live;
         TrackLanding(prev, Ball.Position);
         _brain.ObservePlane(prev, Ball.Position);
         if (res.SphereHit)
@@ -314,6 +331,15 @@ public sealed class World
             SetController(held ? Keeper : null);
             if (held) { EndRound(Outcome.Held); return; }
             if (State == RoundState.Flight) State = RoundState.Live;
+        }
+        else if (_controller == null && State is RoundState.Live or RoundState.Flight && !Pitch.IsGoal(Ball.Position, Ball.Radius)
+                 && _brain.TryClaimLooseBall(Ball))
+        {
+            // Placeholder: the keeper picks up a slow loose ball within reach (see KeeperBrain.TryClaimLooseBall).
+            _events.Add(new SimEvent(EventKind.Save, Ball.Position, speed, true));
+            SetController(Keeper);
+            EndRound(Outcome.Held);
+            return;
         }
 
         // Possession is lost when the ball stays beyond the lose distance for long enough.
@@ -338,16 +364,12 @@ public sealed class World
             EndRound(Outcome.Out);
             return;
         }
-        var judged = Pitch.Judge(Ball.Position, Ball.Radius);
-        if (judged != Outcome.None)
+        // The arena keeps the ball in play, so a round ends only on a goal, the keeper holding the ball, or the clock.
+        if (Pitch.IsGoal(Ball.Position, Ball.Radius))
         {
-            if (judged == Outcome.Goal)
-            {
-                _events.Add(new SimEvent(EventKind.Goal, Ball.Position, speed));
-                Ball.Velocity *= Tuning.Frame.NetSpeedKept;
-            }
-            else _events.Add(new SimEvent(EventKind.OutOfPlay, Ball.Position, speed));
-            EndRound(judged);
+            _events.Add(new SimEvent(EventKind.Goal, Ball.Position, speed));
+            Ball.Velocity *= Tuning.Frame.NetSpeedKept;
+            EndRound(Outcome.Goal);
             return;
         }
         if (State == RoundState.Live)
@@ -552,11 +574,12 @@ public sealed class World
         Movement.Step(Attacker, idle, _dt, SimTime, false, Tuning, Pitch);
         _brain.Update(_dt, Ball, _rng);
         if (Outcome == Outcome.Held) Ball.Position = Keeper.HandPosition;
-        else
+        else if (Outcome == Outcome.Goal)
         {
             Ball.Step(_dt, null, null);
-            if (Outcome == Outcome.Goal) ConstrainToNet();
+            ConstrainToNet();
         }
+        else Ball.Step(_dt, Pitch, null); // the boards still hold a dead ball
         _outcomeLeft -= _dt;
         if (_outcomeLeft <= 0f) FinishRound();
     }

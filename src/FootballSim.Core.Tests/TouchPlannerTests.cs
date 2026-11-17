@@ -26,7 +26,7 @@ public class TouchPlannerTests
         var sc = new Scenario
         {
             Id = "lab",
-            Pitch = new PitchSpec { HalfLength = 300f, Width = 200f },
+            Pitch = new PitchSpec { Length = 300f, Width = 200f },
             Ball = new StartSpot { X = 2.5f },
             Attacker = new StartSpot { X = 2.0f },
         };

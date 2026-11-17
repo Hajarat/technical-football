@@ -139,7 +139,7 @@ public static class DataLoader
         s.Pitch ??= new PitchSpec();
         s.Ball ??= new StartSpot();
         s.Attacker ??= new StartSpot();
-        s.Pitch.HalfLength = Fix(s.Pitch.HalfLength, 10f, 200f, "pitch.half_length");
+        s.Pitch.Length = Fix(s.Pitch.Length, 10f, 200f, "pitch.length");
         s.Pitch.Width = Fix(s.Pitch.Width, 10f, 200f, "pitch.width");
         s.Pitch.GoalWidth = Fix(s.Pitch.GoalWidth, 1f, 20f, "pitch.goal_width");
         s.Pitch.GoalHeight = Fix(s.Pitch.GoalHeight, 0.5f, 6f, "pitch.goal_height");
@@ -148,9 +148,9 @@ public static class DataLoader
             w.Add(new LoadWarning(fileLabel, "team_size", $"{s.TeamSize} is outside 1..11; clamped"));
             s.TeamSize = Math.Clamp(s.TeamSize, 1, 11);
         }
-        if (s.KeeperOffLine is float kol && (float.IsNaN(kol) || kol < 0f || kol > s.Pitch.HalfLength))
+        if (s.KeeperOffLine is float kol && (float.IsNaN(kol) || kol < 0f || kol > s.Pitch.Length))
         {
-            w.Add(new LoadWarning(fileLabel, "keeper_off_line", $"{kol} is outside 0..{s.Pitch.HalfLength}; using the set spot"));
+            w.Add(new LoadWarning(fileLabel, "keeper_off_line", $"{kol} is outside 0..{s.Pitch.Length}; using the set spot"));
             s.KeeperOffLine = null;
         }
         if (s.ClockLimit is <= 0f)

@@ -62,12 +62,12 @@ public class WorldTests
         Assert.Equal(RoundState.Setup, w.State);
         Assert.Equal(Outcome.None, w.Outcome);
         Assert.Null(w.Report);
-        Assert.Equal(new Vector3(41.5f, 0.11f, 0f), w.Ball.Position);
+        Assert.Equal(new Vector3(19f, 0.11f, 0f), w.Ball.Position);
         Assert.Equal(0f, w.Clock);
         Assert.Equal(0f, w.ShotCharge);
         Assert.Equal(PlayerRole.Outfield, w.Attacker.Role);
         Assert.Equal(KeeperAction.Set, w.Keeper.KeeperAction);
-        Assert.Equal(w.Pitch.GoalLineX, w.Keeper.Position.X, 3);    // penalty: on the line
+        Assert.Equal(w.Pitch.GoalLineX - Pitch.PlayerRadius, w.Keeper.Position.X, 3);    // penalty: on the line, a body radius off the wall
         Assert.Equal("striker_a", w.Attacker.Sheet.Id);
         Assert.Empty(w.Events);
     }
@@ -120,7 +120,7 @@ public class WorldTests
     public void KeeperStaysInsideTheGoalWidthWhileTrackingTheBall()
     {
         var w = TestData.Live("tight_angle");
-        w.Ball.Position = new Vector3(40.5f, 0.11f, 30f);
+        w.Ball.Position = new Vector3(24f, 0.11f, 9.5f); // wide, by the chamfer
         var buf = new TickIntent[2];
         for (int i = 0; i < 400; i++) w.Step(buf);
         Assert.InRange(MathF.Abs(w.Keeper.Position.Z), 0f, w.Pitch.GoalHalfWidth);
@@ -152,7 +152,7 @@ public class WorldTests
         Assert.Equal(w.Pitch.GoalLineX - 8f, w.Keeper.Position.X, 3);
         Assert.Equal(0f, w.Keeper.Position.Z, 3);
         var h = TestData.Live("halfway_run");
-        Assert.Equal(w.Pitch.GoalLineX, h.Keeper.Position.X, 3);   // on his line
+        Assert.Equal(w.Pitch.GoalLineX - Pitch.PlayerRadius, h.Keeper.Position.X, 3);   // on his line, a body radius off the wall
         var a = TestData.Live("angled_run");
         float angle = MathF.Atan2(a.Ball.Position.Z, a.Pitch.GoalLineX - a.Ball.Position.X) * 180f / MathF.PI;
         Assert.InRange(angle, 28f, 32f);

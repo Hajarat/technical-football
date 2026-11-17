@@ -123,6 +123,23 @@ public sealed class FrameTuning
     public float NetDepth { get; set; } = 2.0f;
 }
 
+/// <summary>The walled arena's shape and its boards. Length, width and goal size are in the scenario's pitch.</summary>
+public sealed class ArenaTuning
+{
+    /// <summary>Radius of the two rounded corners at the attacker's end, metres.</summary>
+    public float CornerRadius { get; set; } = 6f;
+    /// <summary>The goal-end corners are cut by a straight board starting this far along each wall from the corner, metres.</summary>
+    public float GoalCornerChamfer { get; set; } = 4f;
+    /// <summary>Height of the drawn boards, metres. The ball meets an invisible wall above them, up to the ceiling.</summary>
+    public float BoardHeight { get; set; } = 1.0f;
+    /// <summary>Height of the ceiling, metres.</summary>
+    public float Ceiling { get; set; } = 8.0f;
+    /// <summary>Fraction of the speed into a board that the ball keeps coming off it.</summary>
+    public float BoardRestitution { get; set; } = 0.70f;
+    /// <summary>Coulomb friction coefficient between the ball and a board (the same bounce-friction model as the ground).</summary>
+    public float BoardFriction { get; set; } = 0.30f;
+}
+
 /// <summary>Attacker speed, acceleration, turning, balance and weight.</summary>
 public sealed class MovementTuning
 {
@@ -474,6 +491,7 @@ public sealed class Tuning
     public float AimAssist { get; set; } = 0.3f;
     public BallTuning Ball { get; set; } = new();
     public FrameTuning Frame { get; set; } = new();
+    public ArenaTuning Arena { get; set; } = new();
     public MovementTuning Movement { get; set; } = new();
     public TouchTuning Touch { get; set; } = new();
     public PossessionTuning Possession { get; set; } = new();

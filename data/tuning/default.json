@@ -27,6 +27,14 @@
     "net_speed_kept": 0.1,
     "net_depth": 2
   },
+  "arena": {
+    "corner_radius": 6,
+    "goal_corner_chamfer": 4,
+    "board_height": 1,
+    "ceiling": 8,
+    "board_restitution": 0.7,
+    "board_friction": 0.3
+  },
   "movement": {
     "sprint_speed": {
       "at1": 6,

@@ -11,7 +11,9 @@ public static class RoundRunner
 
     /// <summary>
     /// Plays one round with a <see cref="ScriptedAttacker"/> until the first shot is resolved: a goal, a save, a miss, a
-    /// rebound back into play, or the clock. Stops early, so it does not wait for the report.
+    /// rebound back into play, or the clock. Stops early, so it does not wait for the report. In the arena a miss does not end
+    /// the round, so a first shot that reaches a board (or the ceiling) before the keeper or the goal is scored here as Wide,
+    /// or as Over when it met the goal-end wall above the bar or the ceiling.
     /// </summary>
     public static Result RunFirstShot(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, ulong seed,
         ScriptedAttacker? script = null)
@@ -22,18 +24,21 @@ public static class RoundRunner
         var buf = new TickIntent[world.PlayerCount];
         int cap = (int)((tuning.Round.MaxSeconds + 10f) * tuning.TickRate);
         bool shot = false;
+        ShotEnd? missed = null;
         for (int i = 0; i < cap; i++)
         {
             buf[0] = script.Next(world);
             world.Step(buf);
             if (world.Shots.Count > 0) shot = true;
             if (world.State is RoundState.Outcome or RoundState.Report) break;
+            if (shot && BoardMiss(world) is ShotEnd m) { missed = m; break; } // off the boards: a miss
             if (shot && world.State == RoundState.Live) break; // rebound or parry: the shot is over
         }
         var kr = world.KeeperReport;
         var s = world.Shots.Count > 0 ? world.Shots[0] : null;
         ShotEnd end;
-        if (!shot) end = ShotEnd.NoShot; // the round ended without a strike (dribbled out, dribbled in, or timed out)
+        if (!shot) end = ShotEnd.NoShot; // the round ended without a strike (dribbled in, claimed, or timed out)
+        else if (missed is ShotEnd me) end = me;
         else if (world.State is RoundState.Outcome or RoundState.Report)
         {
             end = world.Outcome switch
@@ -51,7 +56,19 @@ public static class RoundRunner
         return new Result(end, s, kr, world.Outcome);
     }
 
-    /// <summary>Plays a whole round with the scripted attacker until the report, optionally recording a replay.</summary>
+    /// <summary>Wide or Over if the ball met a board this tick, else null.</summary>
+    static ShotEnd? BoardMiss(World w)
+    {
+        foreach (var e in w.Events)
+            if (e.Kind == EventKind.BoardHit)
+                return w.Pitch.IsOverContact(e.Position, w.Ball.Radius) ? ShotEnd.Over : ShotEnd.Wide;
+        return null;
+    }
+
+    /// <summary>
+    /// Plays a whole round with the scripted attacker until the report (a goal, the keeper holding the ball, or the clock),
+    /// optionally recording a replay.
+    /// </summary>
     public static RoundReport RunToReport(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, ulong seed,
         out Replay replay, ScriptedAttacker? script = null)
     {

@@ -178,13 +178,19 @@ public class PlayerSheetTests
             Assert.True(File.Exists(Path.Combine(TestData.DataDir, "players", r.Value.DefaultKeeper + ".json")));
         }
         Assert.True(TestData.Scenario("penalty").KeeperOnLine);
-        Assert.Null(TestData.Scenario("penalty").ClockLimit);
-        Assert.Equal(15f, TestData.Scenario("breakaway").ClockLimit);
-        Assert.Equal(38f, 52.5f - TestData.Scenario("breakaway").Ball.X, 2);
-        Assert.Equal(20f, 52.5f - TestData.Scenario("edge_of_box").Ball.X, 2);
-        Assert.Equal(11f, 52.5f - TestData.Scenario("penalty").Ball.X, 2);
-        Assert.Equal(14f, TestData.Scenario("tight_angle").Ball.Z);
-        Assert.Equal(12f, 52.5f - TestData.Scenario("tight_angle").Ball.X, 2);
+        foreach (var id in new[] { "penalty", "breakaway", "edge_of_box", "tight_angle", "angled_run", "halfway_run", "keeper_rush" })
+        {
+            var sc = TestData.Scenario(id);
+            Assert.Equal(20f, sc.ClockLimit);
+            Assert.Equal(30f, sc.Pitch.Length);
+            Assert.Equal(20f, sc.Pitch.Width);
+        }
+        // Distances from the goal centre (30, 0) in the arena.
+        Assert.Equal(11f, 30f - TestData.Scenario("penalty").Ball.X, 2);
+        Assert.Equal(20f, 30f - TestData.Scenario("edge_of_box").Ball.X, 2);
+        Assert.Equal(25.5f, 30f - TestData.Scenario("breakaway").Ball.X, 2);
+        var tight = TestData.Scenario("tight_angle").Ball;
+        Assert.Equal(61f, MathF.Atan2(tight.Z, 30f - tight.X) * 180f / MathF.PI, 0);
     }
 
     [Fact]

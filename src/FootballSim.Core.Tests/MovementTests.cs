@@ -146,6 +146,6 @@ public class MovementTests
         var p = TestData.Outfield(TestData.Sheet(99), 52f, 0f);
         float now = 0;
         for (int i = 0; i < 600; i++) { now += Dt; Movement.Step(p, new TickIntent { MoveX = 1, Sprint = 1 }, Dt, now, false, T, pitch); }
-        Assert.Equal(pitch.GoalLineX, p.Position.X);
+        Assert.Equal(pitch.GoalLineX - Pitch.PlayerRadius, p.Position.X, 4);
     }
 }

@@ -11,11 +11,19 @@ public enum KeeperAction { Set, Reacting, Diving, Holding }
 /// <summary>The round state machine ("Round contract" in the spec).</summary>
 public enum RoundState { Setup, Live, Strike, Flight, Outcome, Report }
 
-/// <summary>How a round ended. <see cref="None"/> while it is still running. Claimed is reserved and not produced yet.</summary>
+/// <summary>
+/// How a round ended. <see cref="None"/> while it is still running. In the arena a round ends only as Goal, Held or TimeUp;
+/// Wide and Over are kept for scripted shot results and older reports, Out only marks a round stopped because a value became
+/// not-a-number. Claimed is reserved and not produced yet.
+/// </summary>
 public enum Outcome { None, Goal, Held, Wide, Over, Claimed, Out, TimeUp }
 
 /// <summary>Kinds of event raised during one <c>World.Step</c>.</summary>
-public enum EventKind { Touch, Strike, Bounce, FrameHit, Save, Goal, OutOfPlay, PossessionGained, PossessionLost }
+/// <remarks>
+/// OutOfPlay is no longer raised: the arena's boards keep the ball in play. BoardHit is the ball meeting a board or the ceiling
+/// (position = ball centre at contact, speed = arriving speed).
+/// </remarks>
+public enum EventKind { Touch, Strike, Bounce, FrameHit, Save, Goal, OutOfPlay, PossessionGained, PossessionLost, BoardHit }
 
 /// <summary>Shot flavour chosen by the bumpers.</summary>
 public enum ShotType { Normal, Finesse, Chip }

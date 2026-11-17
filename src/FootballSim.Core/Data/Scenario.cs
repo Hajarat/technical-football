@@ -1,9 +1,12 @@
 namespace FootballSim.Core;
 
-/// <summary>Pitch size and goal size, as data. The pitch is a half: X runs from 0 to <see cref="HalfLength"/> (the goal line).</summary>
+/// <summary>
+/// Arena size and goal size, as data. X runs from the back wall (0) to <see cref="Length"/> (the goal line, in the goal-end wall);
+/// Z spans <see cref="Width"/> centred on 0. The corner shapes and boards are in the tuning's arena block.
+/// </summary>
 public sealed class PitchSpec
 {
-    public float HalfLength { get; set; } = 52.5f;
+    public float Length { get; set; } = 52.5f;
     public float Width { get; set; } = 68f;
     public float GoalWidth { get; set; } = 7.32f;
     public float GoalHeight { get; set; } = 2.44f;

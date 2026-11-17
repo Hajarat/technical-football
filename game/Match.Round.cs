@@ -129,6 +129,10 @@ public partial class Match
         if (newRound) _round++;
 
         World = new World(_data.Tuning, sc, att, kee, _seed);
+        Pitch.Build(World.Pitch);
+        // Left edge at the back wall; right edge may reach 0.5 m past the back of the net so the whole goal shows; the bottom
+        // edge stops at the near boards.
+        Camera.SetLimits(World.Pitch.MinX, World.Pitch.GoalLineX + World.Pitch.NetDepth + 0.5f, World.Pitch.HalfWidth);
         World.Recorder = new ReplayRecorder(World, att.Id, kee.Id, sc.Id);
         _flightTicks = 0; _liveTicks = 0; _beganReplay = false;
         _log?.Write("round_setup", ("round", _round), ("scenario", sc.Id), ("attacker", att.Id), ("keeper", kee.Id),
