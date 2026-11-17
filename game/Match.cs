@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace FootballSim.Game;
@@ -53,6 +54,7 @@ public partial class Match : Node3D
         Pad = new InputReader { Name = "Input" }; AddChild(Pad);
 
         Attacker.SetTeamColor(new Color(0.85f, 0.1f, 0.1f));
+        if (_args.Figure == "skinned") UseSkinnedFigures();
         Attacker.Figure.Stats = FootStats; Attacker.Figure.StatsName = "attacker";
         Keeper.Figure.Stats = FootStats; Keeper.Figure.StatsName = "keeper";
         Overlay.Enabled = true; // default on for now
@@ -64,6 +66,20 @@ public partial class Match : Node3D
                      $"screen={DisplayServer.WindowGetCurrentScreen()} screen_size={DisplayServer.ScreenGetSize()} scale={DisplayServer.ScreenGetScale()} screens={DisplayServer.GetScreenCount()}");
 
         if (!StartSession()) { _quitting = true; GetTree().Quit(1); }
+    }
+
+    string _figureWarning = "";
+
+    /// <summary>Swaps the primitive figures for the rigged models; a missing or broken model leaves the primitives and shows a HUD warning.</summary>
+    void UseSkinnedFigures()
+    {
+        var problems = new List<string>();
+        if (!Attacker.Figure.TryUseSkinned("res://assets/characters/player.glb", out string e1)) problems.Add(e1);
+        if (!Keeper.Figure.TryUseSkinned("res://assets/characters/keeper.glb", out string e2)
+            && !Keeper.Figure.TryUseSkinned("res://assets/characters/player.glb", out _)) problems.Add(e2);
+        if (problems.Count == 0) return;
+        _figureWarning = "Skinned figures unavailable, using procedural: " + string.Join("; ", problems);
+        GD.PushWarning(_figureWarning);
     }
 
     public override void _PhysicsProcess(double delta)
