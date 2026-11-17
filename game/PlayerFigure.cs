@@ -62,19 +62,41 @@ public partial class PlayerFigure : Node3D
     public FigureStats? Stats;
     public string StatsName = "";
 
-    // ---- colours ----
-    readonly StandardMaterial3D _shirt = MeshKit.Lit(Colors.Red), _shorts = MeshKit.Lit(Colors.White), _socks = MeshKit.Lit(Colors.Red),
-        _skin = MeshKit.Lit(new Color(0.85f, 0.65f, 0.5f)), _boots = MeshKit.Lit(new Color(0.08f, 0.08f, 0.08f)), _gloves = MeshKit.Lit(new Color(0.1f, 0.9f, 0.9f));
-
-    public void SetColors(Color shirt, Color shorts, Color socks)
+    // ---- kit ----
+    readonly FigureMaterials _mat = new()
     {
-        _shirt.AlbedoColor = shirt; _shorts.AlbedoColor = shorts; _socks.AlbedoColor = socks;
+        Shirt = MeshKit.Shaded(Colors.Red, 0.85f), Shorts = MeshKit.Shaded(Colors.White, 0.85f), Socks = MeshKit.Shaded(Colors.Red, 0.9f),
+        Skin = MeshKit.Shaded(Colors.White, 0.6f, 0.3f, 0.6f), Boots = MeshKit.Shaded(Colors.Black, 0.4f, 0.3f, 0.2f),
+        Gloves = MeshKit.Shaded(Colors.White, 0.55f), Hair = MeshKit.Shaded(Colors.Black, 0.7f, 0.3f, 0.3f),
+        Sole = MeshKit.Shaded(new Color(0.9f, 0.9f, 0.9f), 0.5f, 0.2f), Cuff = MeshKit.Shaded(new Color(0.95f, 0.95f, 0.95f), 0.8f),
+        Eye = MeshKit.Shaded(new Color(0.05f, 0.05f, 0.05f), 0.4f, 0f),
+    };
+    FigureKit _kit = FigureKit.Attacker;
+    Label3D _number = null!;
+
+    /// <summary>Colours, skin tone and shirt number; assign any time (the default is the attacker kit; KeeperView sets the keeper's).</summary>
+    public FigureKit Kit
+    {
+        get => _kit;
+        set { _kit = value; ApplyKit(); }
+    }
+
+    /// <summary>Skin tone only.</summary>
+    public Color SkinTone { get => _kit.Skin; set => Kit = _kit with { Skin = value }; }
+
+    public void SetColors(Color shirt, Color shorts, Color socks) => Kit = _kit with { Shirt = shirt, Shorts = shorts, Socks = socks };
+
+    void ApplyKit()
+    {
+        _mat.Shirt.AlbedoColor = _kit.Shirt; _mat.Shorts.AlbedoColor = _kit.Shorts; _mat.Socks.AlbedoColor = _kit.Socks;
+        _mat.Skin.AlbedoColor = _kit.Skin; _mat.Boots.AlbedoColor = _kit.Boots; _mat.Gloves.AlbedoColor = _kit.Gloves; _mat.Hair.AlbedoColor = _kit.Hair;
+        if (_number != null) { _number.Text = _kit.Number.ToString(); _number.Modulate = _kit.NumberColor; }
     }
 
     // ---- parts ----
-    MeshInstance3D _pelvis = null!, _torso = null!, _head = null!;
-    readonly MeshInstance3D[] _thigh = new MeshInstance3D[2], _shin = new MeshInstance3D[2], _foot = new MeshInstance3D[2], _knee = new MeshInstance3D[2],
-        _upper = new MeshInstance3D[2], _fore = new MeshInstance3D[2], _hand = new MeshInstance3D[2], _elbow = new MeshInstance3D[2];
+    MeshInstance3D _pelvis = null!, _torso = null!, _head = null!, _neck = null!;
+    readonly MeshInstance3D[] _thigh = new MeshInstance3D[2], _shin = new MeshInstance3D[2], _foot = new MeshInstance3D[2], _shoulder = new MeshInstance3D[2],
+        _upper = new MeshInstance3D[2], _fore = new MeshInstance3D[2], _hand = new MeshInstance3D[2];
 
     // ---- dimensions (functions of height) ----
     float H = 1.8f, Leg, AnkleH, FootLen, FootW, FootH, HipW, TorsoLen, ShoulderW, ArmUp, ArmLow, Instep;
@@ -110,22 +132,35 @@ public partial class PlayerFigure : Node3D
 
     public override void _Ready()
     {
-        _pelvis = Box("Pelvis", _shorts);
-        _torso = Box("Torso", _shirt);
-        _head = Sph("Head", _skin);
+        bool sleeves = IsKeeper;
+        _pelvis = Part("Pelvis", FigureMeshes.Pelvis(_mat));
+        _torso = Part("Torso", FigureMeshes.Torso(_mat));
+        _neck = Part("Neck", FigureMeshes.Neck(_mat));
+        _head = Part("Head", FigureMeshes.Head(_mat));
         for (int i = 0; i < 2; i++)
         {
-            _thigh[i] = Cyl($"Thigh{i}", _shorts); _shin[i] = Cyl($"Shin{i}", _socks); _knee[i] = Sph($"Knee{i}", _socks);
-            _foot[i] = Box($"Foot{i}", _boots);
-            _upper[i] = Cyl($"Upper{i}", _shirt); _fore[i] = Cyl($"Fore{i}", IsKeeper ? _shirt : _skin);
-            _elbow[i] = Sph($"Elbow{i}", IsKeeper ? _shirt : _skin); _hand[i] = Sph($"Hand{i}", IsKeeper ? _gloves : _skin);
+            _thigh[i] = Part($"Thigh{i}", FigureMeshes.Thigh(_mat)); _shin[i] = Part($"Shin{i}", FigureMeshes.Shin(_mat));
+            _foot[i] = Part($"Foot{i}", FigureMeshes.Boot(_mat));
+            _shoulder[i] = Part($"Shoulder{i}", FigureMeshes.Shoulder(_mat));
+            _upper[i] = Part($"Upper{i}", FigureMeshes.UpperArm(_mat, sleeves)); _fore[i] = Part($"Fore{i}", FigureMeshes.Forearm(_mat, sleeves));
+            _hand[i] = Part($"Hand{i}", FigureMeshes.Hand(_mat, IsKeeper));
         }
+        _number = new Label3D
+        {
+            Name = "Number", PixelSize = 0.0016f, FontSize = 150, OutlineSize = 0, Shaded = false, DoubleSided = false,
+            AlphaCut = Label3D.AlphaCutMode.Discard, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(_number);
+        ApplyKit();
         SetDims(1.8f);
     }
 
-    MeshInstance3D Box(string n, Material m) { var mi = new MeshInstance3D { Name = n, Mesh = new BoxMesh { Size = Vector3.One }, MaterialOverride = m }; AddChild(mi); return mi; }
-    MeshInstance3D Sph(string n, Material m) { var mi = new MeshInstance3D { Name = n, Mesh = new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 8, Rings = 4 }, MaterialOverride = m }; AddChild(mi); return mi; }
-    MeshInstance3D Cyl(string n, Material m) { var mi = new MeshInstance3D { Name = n, Mesh = new CylinderMesh { TopRadius = 0.5f, BottomRadius = 0.5f, Height = 1f, RadialSegments = 8, Rings = 1 }, MaterialOverride = m }; AddChild(mi); return mi; }
+    MeshInstance3D Part(string n, Mesh mesh)
+    {
+        var mi = new MeshInstance3D { Name = n, Mesh = mesh, CastShadow = GeometryInstance3D.ShadowCastingSetting.On };
+        AddChild(mi);
+        return mi;
+    }
 
     void SetDims(float h)
     {
@@ -668,42 +703,44 @@ public partial class PlayerFigure : Node3D
 
     void RenderBody(Vector3 pel, Basis B, Vector3 shoulderC, Vector3[] knee, Vector3[] ankle, Vector3[] dir, Vector3[] handT, Vector3[] elbowPole)
     {
+        float k = H / 1.8f;
         // torso and pelvis
-        SetBox(_pelvis, pel, B, new Vector3(0.15f * H, 0.085f * H, 2f * HipW + 0.045f * H));
+        _pelvis.Transform = new Transform3D(B.Scaled(Vector3.One * k), pel);
         Vector3 torsoC = pel + B * new Vector3(0, 0.035f * H + TorsoLen * 0.5f, 0);
-        SetBox(_torso, torsoC, B, new Vector3(0.17f * H, TorsoLen, 0.30f * H));
+        _torso.Transform = new Transform3D(B.Scaled(Vector3.One * k), torsoC);
         Vector3 neck = pel + B * new Vector3(0, 0.035f * H + TorsoLen + 0.02f * H, 0);
         Vector3 headC = neck + B.Y * (0.078f * H + 0.012f * H);
-        SetSph(_head, headC, 0.155f * H);
+        SetSeg(_neck, pel + B.Y * (0.30f * H), pel + B.Y * (0.43f * H), FigureMeshes.NeckLen, k);
+        _head.Transform = new Transform3D(B.Scaled(Vector3.One * k), headC);
+        // number on the upper back: faces -forward (the label's +Z maps to -B.X)
+        _number.Transform = new Transform3D(B * new Basis(Vector3.Up, -Mathf.Pi * 0.5f) * Basis.FromScale(Vector3.One * k), torsoC + B * (new Vector3(-0.158f, 0.07f, 0) * k));
 
         for (int i = 0; i < 2; i++)
         {
             float side = i == 0 ? -1f : 1f;
             Vector3 hip = pel + B * new Vector3(0, -0.01f * H, side * HipW);
-            SetSeg(_thigh[i], hip, knee[i], 0.118f * H);
-            SetSeg(_shin[i], knee[i], ankle[i], 0.092f * H);
-            SetSph(_knee[i], knee[i], 0.100f * H);
+            SetSeg(_thigh[i], hip, knee[i], FigureMeshes.RefLen, k);
+            SetSeg(_shin[i], knee[i], ankle[i], FigureMeshes.RefLen, k);
             Vector3 fd = dir[i]; fd.Y = 0; fd = fd.LengthSquared() > 1e-6f ? fd.Normalized() : Vector3.Right;
             Vector3 fr = new(-fd.Z, 0, fd.X);
             Vector3 fc = ankle[i] + fd * (0.4f * FootLen) + new Vector3(0, -AnkleH + FootH * 0.5f, 0);
-            SetBox(_foot[i], fc, new Basis(fd, Vector3.Up, fr), new Vector3(FootLen, FootH, FootW));
+            _foot[i].Transform = new Transform3D(new Basis(fd, Vector3.Up, fr).Scaled(Vector3.One * k), fc);
 
             Vector3 sh = shoulderC + B * new Vector3(0, 0, side * ShoulderW);
             SolveArm(sh, handT[i], elbowPole[i], out var elbow, out var hand);
-            SetSeg(_upper[i], sh, elbow, 0.078f * H);
-            SetSeg(_fore[i], elbow, hand, 0.064f * H);
-            SetSph(_elbow[i], elbow, 0.072f * H);
-            SetSph(_hand[i], hand, (IsKeeper ? 0.105f : 0.068f) * H);
+            _shoulder[i].Transform = new Transform3D(Basis.FromScale(Vector3.One * k), sh);
+            SetSeg(_upper[i], sh, elbow, FigureMeshes.RefArmUp, k);
+            SetSeg(_fore[i], elbow, hand, FigureMeshes.RefArmLow, k);
+            // hand: +Y along the forearm, palm facing the body (thickness along the body's lateral axis), thumb forward
+            Vector3 hy = (hand - elbow); hy = hy.LengthSquared() > 1e-8f ? hy.Normalized() : Vector3.Down;
+            Vector3 hz = B.Z - hy * B.Z.Dot(hy);
+            hz = hz.LengthSquared() > 1e-6f ? hz.Normalized() : Vector3.Back;
+            _hand[i].Transform = new Transform3D(new Basis(hy.Cross(hz), hy, hz).Scaled(Vector3.One * k), hand);
         }
     }
 
-    static void SetBox(MeshInstance3D m, Vector3 c, Basis orient, Vector3 size) =>
-        m.Transform = new Transform3D(orient * Basis.FromScale(size), c);
-
-    static void SetSph(MeshInstance3D m, Vector3 c, float diameter) =>
-        m.Transform = new Transform3D(Basis.FromScale(Vector3.One * diameter), c);
-
-    static void SetSeg(MeshInstance3D m, Vector3 a, Vector3 b, float diameter)
+    /// <summary>Stretches a limb mesh (centred on its midpoint, +Y distal, built for <paramref name="refLen"/> metres plus end caps) between two joints.</summary>
+    static void SetSeg(MeshInstance3D m, Vector3 a, Vector3 b, float refLen, float k)
     {
         Vector3 d = b - a;
         float len = d.Length();
@@ -714,6 +751,7 @@ public partial class PlayerFigure : Node3D
         if (Math.Abs(y.Dot(x)) > 0.9f) x = Vector3.Back;
         x = (x - y * x.Dot(y)).Normalized();
         Vector3 z = x.Cross(y);
-        m.Transform = new Transform3D(new Basis(x * diameter, y * (len + 0.02f), z * diameter), (a + b) * 0.5f);
+        float sy = len / (refLen * k);   // the mesh is in metres for a 1.8 m figure
+        m.Transform = new Transform3D(new Basis(x * k, y * (k * sy), z * k), (a + b) * 0.5f);
     }
 }

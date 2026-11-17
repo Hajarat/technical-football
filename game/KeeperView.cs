@@ -11,7 +11,7 @@ public partial class KeeperView : Node3D
 
     public override void _Ready()
     {
-        _figure.SetColors(new Color(0.95f, 0.85f, 0.1f), new Color(0.12f, 0.12f, 0.12f), new Color(0.12f, 0.12f, 0.12f));
+        _figure.Kit = FigureKit.Keeper;
         AddChild(_figure);
     }
 
