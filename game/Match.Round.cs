@@ -239,6 +239,7 @@ public partial class Match
     {
         MoveX = p.MoveX, MoveZ = p.MoveZ, Sprint = p.Sprint, CloseControl = p.CloseControl,
         ShootHeld = p.ShootHeld, Finesse = p.Finesse, Chip = p.Chip, KnockOn = p.KnockOn,
+        RightX = p.RightX, RightZ = p.RightZ, Cancel = p.Cancel, SkillKey = p.SkillKey,
     };
 
     /// <summary>The round reached Report: save its replay into the session folder, log it, print one console line.</summary>

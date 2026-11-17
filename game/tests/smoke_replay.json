@@ -4,7 +4,7 @@
   "attacker_id": "striker_a",
   "keeper_id": "the_wall",
   "scenario_id": "breakaway",
-  "tuning_hash": "8b405763ecbcb984",
+  "tuning_hash": "65554a36a80f5cb1",
   "players_per_tick": 2,
   "intents": [
     {

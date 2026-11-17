@@ -11,6 +11,9 @@ using FootballSim.Core;
 //   ... --dump-tuning                           prints the built-in tuning as JSON (the format of data/tuning/default.json)
 //   ... --probe dribble [--seeds 50] [--ratings 1,50,99] [--exact 1] [--only straight_jog,...]
 //                                               runs the nine dribble probes (no keeper involved) and prints their metrics
+//   ... --skill-probe [--seeds 50] [--ratings 1,50,99] [--only step_over,...]
+//                                               runs the skill-move probes (scripted right-stick traces) and prints their metrics
+//   ... --write-skill-replays <dir>             writes one replay per skill move (edge_of_box start) for game screenshots
 
 return Cli.Run(args);
 
@@ -23,7 +26,7 @@ static class Cli
         {
             if (!args[i].StartsWith("--")) { Console.Error.WriteLine($"Unexpected argument '{args[i]}'"); return 2; }
             string key = args[i][2..];
-            if (key == "dump-tuning") { opts[key] = "1"; continue; }
+            if (key is "dump-tuning" or "skill-probe") { opts[key] = "1"; continue; }
             if (i + 1 >= args.Length) { Console.Error.WriteLine($"Missing value for --{key}"); return 2; }
             opts[key] = args[++i];
         }
@@ -40,6 +43,8 @@ static class Cli
         var tuning = tr.Value!;
 
         if (opts.TryGetValue("replay", out var replayPath)) return RunReplay(replayPath, dataDir, tuning);
+        if (opts.ContainsKey("skill-probe")) return SkillProbe.Run(opts, dataDir, tuning);
+        if (opts.TryGetValue("write-skill-replays", out var skillDir)) return SkillProbe.WriteReplays(skillDir, dataDir, tuning);
         if (opts.TryGetValue("probe", out var probe))
         {
             if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble)"); return 2; }

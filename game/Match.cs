@@ -58,7 +58,8 @@ public partial class Match : Node3D
         Attacker.Figure.Stats = FootStats; Attacker.Figure.StatsName = "attacker";
         Keeper.Figure.Stats = FootStats; Keeper.Figure.StatsName = "keeper";
         Overlay.Enabled = true; // default on for now
-        if (_args.CloseCam) Camera.UseCloseUp();
+        if (_args.TopCam) Camera.UseTopDown();
+        else if (_args.CloseCam) Camera.UseCloseUp();
         if (_args.ShotDir != null) _shots = new ShotTool(this, _args.ShotDir);
 
         if (_args.FrameTimes)
@@ -111,11 +112,31 @@ public partial class Match : Node3D
             if (_args.BurstCount > 0 && _tick >= _args.BurstStart && (_tick - _args.BurstStart) % _args.BurstStep == 0 && (_tick - _args.BurstStart) / _args.BurstStep < _args.BurstCount)
                 _shots.Request($"burst{_tick:D4}");
             foreach (var moment in _args.ShotOn)
-                if (MomentReached(moment)) _shots.Request(moment);
+            {
+                if (moment == "skill") SkillShots();
+                else if (MomentReached(moment)) _shots.Request(moment);
+            }
         }
         if (_shots?.InFlight > 0) return;
         bool done = (_args.QuitAfterTicks > 0 && _tick >= _args.QuitAfterTicks) || (_args.QuitAfterRound && ReportReached);
         if (done) Finish();
+    }
+
+    bool _skillSeen;
+
+    /// <summary>--shot-on skill: six frames evenly across the move (skill0..skill5) and one just after it ends (skill6).</summary>
+    void SkillShots()
+    {
+        if (World.Attacker.Action is { IsSkill: true, Phase: not FootballSim.Core.ActionPhase.Done } a)
+        {
+            _skillSeen = true;
+            // a step-over or feint's close-in before its own motion is ordinary running: the frames start where the motion does
+            int from = a.Kind is FootballSim.Core.ActionKind.StepOver or FootballSim.Core.ActionKind.BodyFeint ? a.ExecuteTick : a.StartTick;
+            int span = System.Math.Max(1, a.EndTick - from);
+            int idx = System.Math.Clamp(6 * (World.Attacker.CurrentTick - from) / span, 0, 5);
+            _shots!.Request($"skill{idx}");
+        }
+        else if (_skillSeen) _shots!.Request("skill6");
     }
 
     void Finish()
@@ -135,6 +156,7 @@ public partial class Match : Node3D
             GD.Print(FootStats.PoseLine());
             GD.Print(FootStats.SlideLine());
             GD.Print(FootStats.ContactBallLine());
+            GD.Print(FootStats.SkillLine());
             GD.Print(FootStats.TouchFootLine());
             GD.Print(FootStats.TouchMissLine());
             if (Attacker.Figure.IsSkinned) GD.Print(FootStats.SkinLine());

@@ -39,6 +39,8 @@ public sealed class World
     float _awayFor;            // seconds the ball has been beyond the controller's lose distance
     bool _softPending;         // shoot pressed in possession: the soft touch is still to be made
     Foot _strikeFoot;          // foot decided at the press, kept through the strike
+    int _shotStartTick = -1;   // tick shoot was pressed for the shot under way (for the fake shot), or -1
+    bool _shotCancelled;       // the shot was turned into a fake: the rest of this press of shoot is ignored
 
     struct PendingShot
     {
@@ -163,6 +165,7 @@ public sealed class World
         _pending = default; _buffered = default; _bufferLeft = 0f; _strikeLeft = 0f; _outcomeLeft = 0f;
         _liveSeconds = 0f; _endTick = 0; _endClock = 0f; _lastShot = null;
         _controller = null; _awayFor = 0f; _softPending = false; _strikeFoot = Foot.Right;
+        _shotStartTick = -1; _shotCancelled = false;
 
         float r = Tuning.Ball.Radius;
         Ball.Position = new Vector3(Scenario.Ball.X, r, Scenario.Ball.Z);
@@ -249,6 +252,8 @@ public sealed class World
         p.KnockOnUntil = -100f;
         p.KnockOnDirection = Vector2.Zero;
         p.MoveTime = 0f;
+        GestureReader.Reset(p);
+        SkillMoves.Reset(p);
     }
 
     // ---- stepping ----
@@ -387,23 +392,40 @@ public sealed class World
         var tuning = Tuning;
         _lastStick = it.Move;
         bool inPossession = _controller == p;
+
+        // Skill gestures are read every tick so their timing runs on through every state. A fake shot aborts the shot under
+        // way and asks for its move; a knock-on flick asks for a knock-on like the knock-on button.
+        var gesture = GestureReader.Read(p, it, Tick, tuning);
+        bool shotUnderWay = State == RoundState.Strike && _pending.Active
+            || State == RoundState.Live && (_shootWasHeld || _buffered.Active);
+        var fake = GestureReader.ReadFakeShot(p, it, Tick, _shotStartTick, shotUnderWay, tuning);
+        if (fake.Kind != Gesture.None) { AbortShot(it.ShootHeld); gesture = fake; }
+        if (!it.ShootHeld) _shotCancelled = false;
+        bool shootHeld = it.ShootHeld && !_shotCancelled;
+        bool knockGesture = gesture.Kind == Gesture.KnockOn;
+        if (gesture.Kind is not (Gesture.None or Gesture.KnockOn)) SkillMoves.Request(p, gesture, Tick);
+        if (State == RoundState.Live && !shootHeld && !_buffered.Active
+            && SkillMoves.TryStart(p, Ball, inPossession, Tick, SimTime, tuning) is SimEvent started)
+            _events.Add(started);
+
         var assist = TouchPlanner.BeginTick(p, it, Ball, inPossession, State == RoundState.Live, Tick, SimTime, tuning, Pitch, out var legs);
         Movement.Step(p, legs, _dt, SimTime, assist, tuning, Pitch);
 
         // Other players on both teams stand still (no behaviour yet).
         if (State != RoundState.Live)
         {
-            _shootWasHeld = it.ShootHeld;
+            _shootWasHeld = shootHeld;
             ShotCharge = 0f;
             return;
         }
 
-        if (it.KnockOn && inPossession) TouchPlanner.RequestKnockOn(p);
+        if ((it.KnockOn || knockGesture) && inPossession) TouchPlanner.RequestKnockOn(p);
 
-        if (it.ShootHeld)
+        if (shootHeld)
         {
             if (!_shootWasHeld)
             {
+                _shotStartTick = Tick;
                 _charge = 0f;
                 _latchFinesse = _latchChip = false;
                 _buffered = default;
@@ -446,11 +468,11 @@ public sealed class World
                 else if (_bufferLeft <= 0f) _buffered = default; // dropped: no strike, no report
             }
         }
-        _shootWasHeld = it.ShootHeld;
+        _shootWasHeld = shootHeld;
 
         // Dribble touches are blocked while shoot is held (only the soft touch) and while a released shot waits for the ball.
         if (State != RoundState.Live) return;
-        var mode = it.ShootHeld
+        var mode = shootHeld
             ? (_softPending && _controller == p ? TouchStepMode.SoftOnly : TouchStepMode.None)
             : (_buffered.Active ? TouchStepMode.None : TouchStepMode.Normal);
         TryTouch(p, it, mode);
@@ -508,8 +530,26 @@ public sealed class World
         }
     }
 
+    /// <summary>
+    /// A fake shot: the shot under way (charging, waiting for the ball, or released and waiting out the strike delay) is
+    /// abandoned without a strike; with shoot still held, the rest of that press is ignored.
+    /// </summary>
+    void AbortShot(bool shootHeld)
+    {
+        _shotCancelled = shootHeld;
+        _shootWasHeld = false;
+        _shotStartTick = -1;
+        _charge = 0f; ShotCharge = 0f;
+        _latchFinesse = _latchChip = false;
+        _softPending = false;
+        _buffered = default; _bufferLeft = 0f;
+        TouchPlanner.OnShotAborted(Attacker);
+        if (State == RoundState.Strike) { _pending = default; _strikeLeft = 0f; State = RoundState.Live; }
+    }
+
     void BeginStrike(PendingShot shot)
     {
+        SkillMoves.Abort(Attacker);
         _pending = shot;
         _strikeLeft = Tuning.Round.StrikeDelay;
         State = RoundState.Strike;

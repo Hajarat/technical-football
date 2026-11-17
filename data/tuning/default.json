@@ -289,5 +289,62 @@
     "outcome_seconds": 1.5,
     "max_seconds": 120
   },
+  "skill": {
+    "min_actuation": 0.5,
+    "angle_tolerance_deg": 60,
+    "step_over_side_tolerance_deg": 30,
+    "gesture_gap": 0.08,
+    "step_over_window": 0.25,
+    "feint_max_hold": 0.1,
+    "roll_min_hold": 0.1,
+    "knock_on_actuation": 0.85,
+    "knock_on_wait": 0.15,
+    "fake_shot_window": 0.1,
+    "frame_min_speed": 1,
+    "key_side_threshold": 0.2,
+    "buffer_seconds": 0.3,
+    "meet_wait_seconds": 1.5,
+    "step_over_radius": 1,
+    "execution_radius": 0.75,
+    "max_ball_height": 0.3,
+    "step_over_max_ahead": 0.5,
+    "sole_reach_max": 0.1,
+    "sole_reach_tolerance": 0.3,
+    "sole_reach_steer": 2.5,
+    "step_over_seconds": 0.25,
+    "step_over_still_seconds": 0.15,
+    "still_ball_speed": 0.1,
+    "pace_match_ahead": 0.25,
+    "body_feint_seconds": 0.25,
+    "ball_roll_first_seconds": 0.3,
+    "ball_roll_chain_seconds": 0.2,
+    "ball_roll_distance": [[0, 0.6], [4, 1]],
+    "ball_roll_follow": 0.5,
+    "drag_back_seconds": 0.25,
+    "drag_back_cooldown": 0.2,
+    "drag_back_distance": 1,
+    "drag_back_step_back": 0.3,
+    "fake_seconds": 0.1,
+    "fake_stop_ahead": 0.25,
+    "fake_cut_distance": 1.2,
+    "fake_cut_time": 0.5,
+    "chain_window": 2,
+    "chain_multiplier": 0.8,
+    "burst": {
+      "at1": 0,
+      "at99": 0.7
+    },
+    "burst_duration": {
+      "at1": 0.2,
+      "at99": 0.9
+    },
+    "burst_speed_cap": {
+      "at1": 0,
+      "at99": 0.03
+    },
+    "sided_exit_burst": [[-90, 0], [0, 0.7], [90, 1]],
+    "straight_exit_burst": [[0, 0.8], [90, 0.88]],
+    "step_over_no_burst_toward_deg": 45
+  },
   "dt": 0.008333334
 }

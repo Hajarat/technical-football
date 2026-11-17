@@ -12,7 +12,7 @@ public sealed class ToolArgs
     public string? ShotDir;
     public readonly List<int> ShotTicks = new();
     public readonly List<string> ShotOn = new();
-    public bool FrameTimes, CloseCam, CloseKeeper;
+    public bool FrameTimes, CloseCam, CloseKeeper, TopCam;
     public int BurstStart, BurstCount, BurstStep = 1;
     public string? DataDir;
     public string? ReplayPath;
@@ -34,6 +34,7 @@ public sealed class ToolArgs
                 case "--background": a.Background = true; break;
                 case "--frame-times": a.FrameTimes = true; break;
                 case "--close-cam": a.CloseCam = true; break;
+                case "--top-cam": a.TopCam = true; break;
                 case "--close-keeper": a.CloseCam = true; a.CloseKeeper = true; break;
                 case "--data": a.DataDir = Next(); break;
                 case "--replay": a.ReplayPath = Next(); break;

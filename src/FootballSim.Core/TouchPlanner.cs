@@ -219,6 +219,14 @@ public static class TouchPlanner
             return new MoveAssist(Movement.TopSpeed(p.Sheet, t), 1f + t.Possession.OffBallTurnBonus, Vector2.Zero);
         }
 
+        // A skill move owns the legs while it lasts; on the tick it ends, the planner takes over at once.
+        if (p.SkillAction is { } skill)
+        {
+            if (tick < skill.EndTick) return SkillMoves.BeginTick(p, ball, tick, t, out legs);
+            SkillMoves.Finish(p, intent, ball, tick, now, t);
+            UpdatePhases(p, tick, t);
+        }
+
         if (live && p.Action is { Pending: true } a0) ReviewPlan(p, a0, intent, ball, tick, now, t, pitch);
         UpdatePhases(p, tick, t);
 
@@ -643,9 +651,20 @@ public static class TouchPlanner
         p.SoftWaitAction = p.Action is { Pending: true, Phase: ActionPhase.PreWindup or ActionPhase.Windup } a ? a : null;
     }
 
+    /// <summary>
+    /// The shot was turned into a fake: a waiting soft touch (planned for the strike, never reviewed against the stick) is
+    /// dropped so the next touch is planned afresh for the dribble.
+    /// </summary>
+    internal static void OnShotAborted(PlayerState p)
+    {
+        p.SoftWaitAction = null;
+        if (p.Action is { Pending: true, Kind: ActionKind.Soft } a) Drop(p, a);
+    }
+
     /// <summary>The player no longer controls the ball: any waiting touch is dropped.</summary>
     internal static void OnPossessionLost(PlayerState p)
     {
+        SkillMoves.Abort(p);
         if (p.Action is { Pending: true } a) Drop(p, a);
         p.Replanning = false;
         p.EarlyTurnTick = -1;
@@ -665,6 +684,8 @@ public static class TouchPlanner
     internal static TouchResult? Step(PlayerState p, in TickIntent intent, Ball ball, bool inPossession, TouchStepMode mode,
         int tick, float now, Tuning t, Pitch? pitch, SimRng rng)
     {
+        // A skill move under way plays the ball itself, whatever the shoot button does.
+        if (inPossession && p.SkillAction != null) return SkillMoves.Step(p, ball, tick, now, t);
         if (mode == TouchStepMode.None) return null;
         if (!inPossession) return mode == TouchStepMode.Normal ? FirstTouch(p, intent, ball, tick, now, t, pitch, rng) : null;
         UpdatePhases(p, tick, t);
@@ -695,6 +716,17 @@ public static class TouchPlanner
             return null;
         }
 
+        // The tick a skill move ended: with the stick pushed and the ball in foot reach, the exit touch is made at once toward
+        // the stick (an early touch, like a first touch), so the move flows into the run instead of waiting for a stride.
+        if (p.SkillExitTick == tick && a is not { Pending: true } && intent.Move.Length() >= t.Touch.StickThreshold && TouchModel.InReach(p, ball, t))
+        {
+            p.SkillExitTick = -1;
+            p.Replanning = false;
+            var exit = new BallAction { Kind = ModeKind(TouchModel.ModeFor(intent, t)), PlanTick = tick, ContactTick = tick, Legs = LegsMode.Stick };
+            exit.Foot = p.IsStepping ? p.SwingFoot : TouchModel.ChooseFoot(p.Sheet, p.Position, p.Facing, ball.Position, t);
+            Install(p, exit, tick, t);
+            return Execute(p, exit, intent, ball, tick, now, t, pitch, rng, immediate: true);
+        }
         if (a is not { Pending: true }) FreshPlan(p, intent, ball, tick, now, t, pitch, null);
         return null;
     }
@@ -987,6 +1019,7 @@ public static class TouchPlanner
                     p.TouchBoostFrom = now;
                     p.TouchBoostUntil = now + k.TouchBoostDuration;
                     p.TouchBoostFactor = TouchModel.TouchBoostFactor(p.Sheet, turnDeg, t);
+                    SkillMoves.ApplyExitBurst(p, now);
                     if (hasMeet) hasMeet = FindMeet(p, intent, steps, 0, now, t, pitch, out meet);
                     if (hasMeet) target = meet.Cp;
                 }
@@ -1008,6 +1041,7 @@ public static class TouchPlanner
             }
         }
 
+        SkillMoves.ApplyExitBurst(p, now); // an exit touch of a kind without the touch boost still starts the burst
         p.LastTouchKind = kind;
         p.KnockOnRequested = false;
         ball.Velocity = v;

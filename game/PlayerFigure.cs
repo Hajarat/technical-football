@@ -36,6 +36,33 @@ public struct FigureAction
     /// <summary>Distance from the ball to <see cref="ContactPoint"/> at the contact (NaN before it).</summary>
     public float ContactMiss;
     public bool Made;
+    /// <summary>A skill move: the figure draws it from <see cref="FigureFrame.Skill"/>, not as a dribble touch.</summary>
+    public bool IsSkill;
+}
+
+/// <summary>The simulation's skill moves, in the order of its ActionKind from StepOver on.</summary>
+public enum SkillKind { StepOver, BodyFeint, DragBack, BallRoll, FakeStop, FakeCut }
+
+/// <summary>A skill move under way as plain values: the figure draws the pose for its elapsed time and decides no timing.</summary>
+public struct FigureSkill
+{
+    public bool Valid;
+    public SkillKind Kind;
+    /// <summary>The tick the move started on; identifies the move.</summary>
+    public int Id;
+    /// <summary>-1 left, +1 right, 0 none (relative to the running direction).</summary>
+    public float Side;
+    /// <summary>The foot the move is drawn with, and the part of it that meets the ball.</summary>
+    public bool Right;
+    public BootSurface Surface;
+    /// <summary>Seconds since the move started (the reach or close-in begins), and its whole length.</summary>
+    public float Elapsed, Duration;
+    /// <summary>Seconds since the move's own motion began (negative during the reach or close-in), and the length of that motion.</summary>
+    public float ExecElapsed, ExecDuration;
+    /// <summary>Seconds since the sole landed (negative during the reach), and the length of the reach (0 without one).</summary>
+    public float ContactElapsed, ReachSpan;
+    /// <summary>Ball centre at the sole's first contact (fixed once made), and the ball velocity applied then.</summary>
+    public Vector3 ContactPoint, OutVelocity;
 }
 
 /// <summary>Plain-value input for one figure for one physics tick. The figure never sees the simulation types.</summary>
@@ -52,6 +79,9 @@ public struct FigureFrame
     public float BallRadius;
     /// <summary>A touch / strike happened this tick; BallPos is the ball at contact and BallVel its velocity just after.</summary>
     public bool TouchEvent, StrikeEvent, EventRight;
+    /// <summary>The skill move under way (a touch event it raises is <see cref="SkillTouch"/>, never <see cref="TouchEvent"/>).</summary>
+    public FigureSkill Skill;
+    public bool SkillTouch;
     /// <summary>The simulation's stride clock (false when the frame carries none): phase 0..2 ([0,1) the right foot swings, [1,2) the left), steps per second,
     /// the swing foot, progress through its swing (0.5 = swing middle) and each foot's own phase (swing during [0, 0.5)).</summary>
     public bool HasGait, IsStepping, SwingRight;
@@ -77,6 +107,16 @@ public struct FigureFrame
 /// <summary>Foot-contact, foot-slide and pose-limit measurements collected by figures (replay mode prints them on quit).</summary>
 public sealed class FigureStats
 {
+    public readonly List<float> SkillContact = new();
+    /// <summary>Lowest pelvis ratio and largest |lean| (degrees) while a skill move is drawn.</summary>
+    public float SkillMinPelvisRatio = float.MaxValue, SkillLeanMaxDeg;
+    /// <summary>
+    /// Largest per-tick move of the playing foot during a move and the three ticks after it: relative to the body, and in the world;
+    /// and the largest sole-to-ball distance from the landing to the start of the move's hand-back.
+    /// </summary>
+    public float SkillFootJumpBody, SkillFootJumpWorld, SkillSoleMaxErr;
+    /// <summary>The same per-tick foot move (body-relative, either foot) outside skill moves, for scale: ordinary running and touches.</summary>
+    public float PlainFootJumpBody;
     public readonly List<float> Contact = new(), ContactTouch = new(), ContactStrike = new(), Slide = new(), Skin = new(), TouchMiss = new(), ContactBall = new();
     public float MinPelvisRatio = float.MaxValue, MinKneeM = float.MaxValue, MinLimbYM = float.MaxValue, LeanMinDeg = float.MaxValue, LeanMaxDeg = float.MinValue;
     /// <summary>Running only (speed above 2 m/s, no shot under way): lowest pelvis ratio (close control apart), lowest in close control, largest |lean|, largest per-step bob.</summary>
@@ -90,6 +130,7 @@ public sealed class FigureStats
     public string SlideLine() => Line("FOOT_SLIDE", Slide);
     public string ContactBallLine() => Line("FOOT_CONTACT_BALL", ContactBall);
     public string SkinLine() => Line("SKIN_CONTACT", Skin);
+    public string SkillLine() => Line("SKILL_CONTACT", SkillContact) + $" skill_min_pelvis_ratio={F(SkillMinPelvisRatio)} skill_lean_max_deg={SkillLeanMaxDeg:F1} foot_jump_body_m={SkillFootJumpBody:F3} foot_jump_world_m={SkillFootJumpWorld:F3} plain_foot_jump_body_m={PlainFootJumpBody:F3} sole_max_err_m={SkillSoleMaxErr:F3}";
     public string TouchMissLine() => Line("TOUCH_MISS", TouchMiss);
     public string TouchFootLine() => $"TOUCH_FOOT n={Touches} mismatches={FootMismatches}";
     public string PoseLine() =>
@@ -212,6 +253,10 @@ public partial class PlayerFigure : Node3D
     // per-tick kick plan
     float _kW; int _kFoot; Vector3 _kAnkle, _kDir; bool _pinOn; int _pinFoot; Vector3 _pinTarget; float _leanExtra; bool _seq;
     float _leanExtraS; bool _pinWas; Vector3 _pinLock;
+    // skill moves: the move being drawn, where the foot was when it started (relative to the body), body offsets for this tick, last frame's final ankles
+    int _skId = int.MinValue; Vector3 _skFromRel; bool _skActive, _skSoleLogged, _skInLogged; int _skFoot, _skTail; bool _skJumpValid; readonly Vector3[] _prevAnkWorld = new Vector3[2];
+    Vector3 _skPelOff, _skShoulderOff;
+    readonly Vector3[] _prevAnkRel = new Vector3[2];
     // bob measurement: extremes of the pelvis height above its commanded height within one step
     int _bobStep = -1; float _bobMin, _bobMax;
 
@@ -267,7 +312,7 @@ public partial class PlayerFigure : Node3D
     public void Teleport(in FigureFrame f)
     {
         _init = false;
-        _strikeT = -1f; _windT = 0; _lastCharge = 0; _lean = 0; _leanExtraS = 0; _stActive = false; _pinWas = false;
+        _strikeT = -1f; _windT = 0; _lastCharge = 0; _lean = 0; _leanExtraS = 0; _stActive = false; _pinWas = false; _skId = int.MinValue; _skJumpValid = false;
         _accFS = 0; _runPrev = float.NaN; _ratioS = 0.9945f; _bobStep = -1;
         foreach (var t in _tf) { t.Id = t.ContactId = int.MinValue; }
         Update(f);
@@ -345,7 +390,8 @@ public partial class PlayerFigure : Node3D
 
         // ---- pelvis: sim position; reach assist toward a shot target (capped: at most 0.25 m of translation, never below 0.85 of standing height) ----
         Vector3 pel = new(pos.X, desiredY, pos.Z);
-        float floorY = IsKeeper ? 0.5f * StandY : 0.85f * StandY;
+        pel += _skPelOff;
+        float floorY = IsKeeper ? 0.5f * StandY : (_skActive ? 0.91f : 0.85f) * StandY;
         if (_kW > 0f)
         {
             Vector3 hip = pel + right * (_kFoot == 0 ? -HipW : HipW);
@@ -361,7 +407,7 @@ public partial class PlayerFigure : Node3D
                 float sh = Math.Min(over, 0.25f) * _kW;
                 pel += dh / dhLen * sh;
                 dhLen -= sh;
-                _leanExtra += 0.22f * Math.Min(1f, sh / 0.25f);
+                _leanExtra += (_skActive ? 0.05f : 0.22f) * Math.Min(1f, sh / 0.25f);
                 float needV = Mathf.Sqrt(Math.Max(0f, lim * lim - dhLen * dhLen));
                 float drop = Math.Max(0f, vert - needV) * _kW;
                 pel.Y = Math.Max(floorY, pel.Y - drop);
@@ -505,7 +551,7 @@ public partial class PlayerFigure : Node3D
         }
 
         // ---- arms: each swings against the leg on its own side (forward when the opposite foot lands) ----
-        Vector3 shoulderC = pel + B * new Vector3(0, 0.035f * H + TorsoLen - 0.03f * H, 0);
+        Vector3 shoulderC = pel + B * new Vector3(0, 0.035f * H + TorsoLen - 0.03f * H, 0) + _skShoulderOff;
         var handT = new Vector3[2]; var elbowPole = new Vector3[2];
         float amp = 0.15f + 0.45f * sfs;
         for (int i = 0; i < 2; i++)
@@ -522,6 +568,27 @@ public partial class PlayerFigure : Node3D
             elbowPole[i] = (B * new Vector3(-1f, -0.2f, side * 0.5f)).Normalized();
         }
         RenderBody(pel, B, shoulderC, knee, ankEff, dir, handT, elbowPole);
+        var posFlat = new Vector3(pos.X, 0, pos.Z);
+        // the playing foot's per-tick move (body-relative and world), during the move and the three ticks after it
+        if (!IsKeeper && Stats != null && (f.Skill.Valid || _skTail > 0))
+        {
+            if (f.Skill.Valid) { _skFoot = f.Skill.Right ? 1 : 0; _skTail = 3; } else _skTail--;
+            Vector3 rel = ankEff[_skFoot] - posFlat; rel.Y = ankEff[_skFoot].Y;
+            if (_skJumpValid)
+            {
+                Stats.SkillFootJumpBody = Math.Max(Stats.SkillFootJumpBody, (rel - _prevAnkRel[_skFoot]).Length());
+                Stats.SkillFootJumpWorld = Math.Max(Stats.SkillFootJumpWorld, (ankEff[_skFoot] - _prevAnkWorld[_skFoot]).Length());
+            }
+        }
+        if (!IsKeeper && Stats != null && !f.Skill.Valid && _skTail <= 0 && _skJumpValid)
+            for (int i = 0; i < 2; i++)
+            {
+                Vector3 relI = ankEff[i] - posFlat; relI.Y = ankEff[i].Y;
+                Stats.PlainFootJumpBody = Math.Max(Stats.PlainFootJumpBody, (relI - _prevAnkRel[i]).Length());
+            }
+        _skJumpValid = true;
+        _prevAnkWorld[0] = ankEff[0]; _prevAnkWorld[1] = ankEff[1];
+        for (int i = 0; i < 2; i++) { _prevAnkRel[i] = ankEff[i] - posFlat; _prevAnkRel[i].Y = ankEff[i].Y; }
 
         // ---- measurements (on the pose just produced; nothing is corrected afterwards) ----
         TrackSlide(planted, ankEff);
@@ -534,6 +601,7 @@ public partial class PlayerFigure : Node3D
                 Stats.MinLimbYM = Math.Min(Stats.MinLimbYM, Math.Min(knee[i].Y, Math.Min(ankEff[i].Y - AnkleH, pel.Y)));
             }
             float deg = lean * 180f / Mathf.Pi;
+            if (f.Skill.Valid) { Stats.SkillMinPelvisRatio = Math.Min(Stats.SkillMinPelvisRatio, pel.Y / StandY); Stats.SkillLeanMaxDeg = Math.Max(Stats.SkillLeanMaxDeg, Math.Abs(deg)); }
             Stats.LeanMinDeg = Math.Min(Stats.LeanMinDeg, deg); Stats.LeanMaxDeg = Math.Max(Stats.LeanMaxDeg, deg);
             bool running = stepping && speed > 2f && !_seq && _strikeT < 0f && _leanExtraS < 0.01f && f.ShotCharge <= 0.001f;
             if (running)
@@ -550,6 +618,7 @@ public partial class PlayerFigure : Node3D
             }
             else _bobStep = -1;
         }
+        if (!IsKeeper && f.Skill.Valid) LogSkillFoot(f, ankEff, dir);
         if (!IsKeeper && Stats != null && (f.TouchEvent || f.StrikeEvent))
         {
             // the touch just made is the current action, or the previous one when the next touch was planned on the same tick
@@ -636,7 +705,7 @@ public partial class PlayerFigure : Node3D
         for (int n = 0; n < 2; n++)
         {
             FigureAction a = n == 0 ? f.Action : f.PrevAction;
-            if (!a.Valid || (a.Right ? 1 : 0) != i) continue;
+            if (!a.Valid || a.IsSkill || (a.Right ? 1 : 0) != i) continue;
             if (a.Phase is TouchPhase.Planned or TouchPhase.PreWindup or TouchPhase.Done) continue;
             var tf = _tf[i];
             float tau = a.ContactEta;
@@ -776,7 +845,15 @@ public partial class PlayerFigure : Node3D
     void PlanKick(in FigureFrame f, Vector3 pos, Vector3 fwd, Vector3 right, Vector3 fm, float dt, float desiredY, float hmax)
     {
         _kW = 0f; _pinOn = false; _leanExtra = 0f; _seq = false; _backswing = 0f;
+        _skActive = false; _skPelOff = Vector3.Zero; _skShoulderOff = Vector3.Zero;
         float k = H / 1.8f;
+        if (!IsKeeper && f.Skill.Valid)
+        {
+            // a skill move owns the legs and body until it ends; a shot sequence under way is over (the core dropped it)
+            _strikeT = -1f; _stActive = false; _windT = 0f; _lastCharge = 0f;
+            if (PlanSkill(f, pos, fwd, right, k)) return;
+        }
+        _skId = int.MinValue;
         float r = f.BallRadius;
         Vector3 posXZ = new(pos.X, 0, pos.Z);
         Vector3 ballXZ = new(f.BallPos.X, 0, f.BallPos.Z);
@@ -849,6 +926,165 @@ public partial class PlayerFigure : Node3D
                 _kW = Smooth(_windT / 0.15f);
             }
         }
+    }
+
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // skill moves
+
+    /// <summary>
+    /// Poses the legs and body for a skill move from its elapsed time. The foot starts from where it was (so nothing pops), is drawn
+    /// to the move's pose, and hands back to the stride over the last part of the move. The ball is read live, so a foot on the
+    /// ball stays on it while the core rolls it.
+    /// </summary>
+    bool PlanSkill(in FigureFrame f, Vector3 pos, Vector3 fwd, Vector3 right, float k)
+    {
+        var s = f.Skill;
+        int fi = s.Right ? 1 : 0;
+        bool sole = s.Kind is SkillKind.DragBack or SkillKind.BallRoll or SkillKind.FakeStop;
+        // a step-over or feint's close-in before its own motion is ordinary running
+        if (!sole && s.ExecElapsed < 0f) return false;
+        Vector3 posXZ = new(pos.X, 0, pos.Z);
+        if (s.Id != _skId)
+        {
+            _skId = s.Id; _skFromRel = _prevAnkRel[fi]; _skSoleLogged = _skInLogged = false;
+        }
+        Vector3 from = posXZ + new Vector3(_skFromRel.X, 0, _skFromRel.Z); from.Y = _skFromRel.Y;
+        float D = Math.Max(s.ExecDuration, 0.06f), t = Mathf.Clamp(s.ExecElapsed, 0f, D);
+        float u = t / D, sd = s.Side;
+        float inT = s.Kind is SkillKind.StepOver or SkillKind.BodyFeint ? Math.Min(0.10f, 0.4f * D) : s.Kind == SkillKind.FakeCut ? 0.05f : 0f;
+        float outT = Math.Min(sole ? 0.08f : 0.07f, 0.5f * D);
+        float inW = inT > 0f ? Smooth(t / inT) : 1f;
+        float outW = 1f - Smooth((t - (D - outT)) / outT);
+        float e = Mathf.Sin(Mathf.Pi * u);                  // 0 -> 1 -> 0 over the move
+        float body = Smooth(t / 0.06f) * outW;              // the body's share of the pose
+        float r = f.BallRadius;
+        Vector3 ball = new(f.BallPos.X, 0, f.BallPos.Z);
+        // during a sole move's reach the foot goes to where the ball will be at the landing (the core's prediction)
+        bool reaching = sole && s.ContactElapsed < 0f && s.ReachSpan > 0f;
+        float ur = reaching ? Mathf.Clamp(1f + s.ContactElapsed / s.ReachSpan, 0f, 1f) : 1f;
+        if (reaching) ball = new Vector3(s.ContactPoint.X, 0, s.ContactPoint.Z);
+        Vector3 target = from, fd = fwd;
+
+        switch (s.Kind)
+        {
+            case SkillKind.StepOver:
+            {
+                // the foot circles over the ball from its inside to its outside: across the ball's top, a little ahead of its centre
+                float lat = Mathf.Lerp(-0.20f, 0.28f, Smooth(u));
+                target = ball + fwd * ((-0.04f + 0.13f * e) * k) + right * (sd * lat * k);
+                target.Y = AnkleH + (0.25f * k) * Mathf.Pow(e, 0.7f);
+                fd = (fwd * Mathf.Cos(0.5f * e) + right * sd * Mathf.Sin(0.5f * e)).Normalized();
+                _skPelOff = right * (sd * 0.05f * k * e * body) + Vector3.Down * (0.02f * k * e * body);
+                _skShoulderOff = right * (sd * 0.12f * k * e * body) - fwd * (0.03f * k * e * body);
+                break;
+            }
+            case SkillKind.BodyFeint:
+            {
+                // hips and shoulders go toward the side and come back; the side foot makes a short drop step out to that side
+                target = posXZ + right * (sd * (HipW * 0.9f + 0.20f * k * e)) + fwd * (0.06f * k * e);
+                target.Y = AnkleH + 0.05f * k * Mathf.Sin(2f * Mathf.Pi * u) * (u < 0.5f ? 1f : 0.4f);
+                target.Y = Math.Max(AnkleH, target.Y);
+                _skPelOff = right * (sd * 0.11f * k * e * body) + Vector3.Down * (0.025f * k * e * body) - fwd * (0.03f * k * e * body);
+                _skShoulderOff = right * (sd * 0.17f * k * e * body) - fwd * (0.04f * k * e * body);
+                _leanExtra = -0.04f * e * body;
+                break;
+            }
+            case SkillKind.BallRoll:
+            {
+                // the far foot's sole on top of the ball, drawing it across the body toward the side; toes turned to where it goes
+                fd = (fwd * Mathf.Cos(0.6f) + right * sd * Mathf.Sin(0.6f)).Normalized();
+                target = SoleAnkle(s, ball, fd, r, fi);
+                _skPelOff = right * (sd * 0.04f * k * e * body) + Vector3.Down * (0.015f * k * e * body);
+                _skShoulderOff = right * (sd * 0.08f * k * e * body);
+                break;
+            }
+            case SkillKind.DragBack:
+            case SkillKind.FakeStop:
+            {
+                // sole on top of the ball, pulling it back (drag-back) or stopping it (fake stop); the body rocks back
+                target = SoleAnkle(s, ball, fwd, r, fi);
+                float back = s.Kind == SkillKind.DragBack ? 1f : 0.5f;
+                _skPelOff = -fwd * (0.05f * k * back * e * body) + Vector3.Down * (0.02f * k * e * body);
+                _skShoulderOff = -fwd * (0.08f * k * back * e * body);
+                _leanExtra = -0.03f * back * e * body;
+                break;
+            }
+            default: // fake cut
+            {
+                // the boot hooks the ball toward the cut with the inside or outside, then follows through along the push
+                Vector3 d = new(s.OutVelocity.X, 0, s.OutVelocity.Z);
+                d = d.LengthSquared() > 0.04f ? d.Normalized() : fwd;
+                fd = SurfaceDir(s.Surface, fi, d);
+                Vector3 rv = new(-fd.Z, 0, fd.X);
+                Vector3 off = Off(fi, s.Surface);
+                Vector3 centre = new(s.ContactPoint.X, 0, s.ContactPoint.Z);
+                Vector3 c0 = centre - d * r - (fd * off.X + rv * off.Z); c0.Y = r - off.Y;
+                target = c0 + d * (0.22f * k * Smooth(t / 0.08f)); target.Y = c0.Y + 0.06f * k * Smooth(t / 0.08f);
+                _skPelOff = d * (0.04f * k * e * body);
+                _skShoulderOff = d * (0.07f * k * e * body);
+                break;
+            }
+        }
+        if (reaching)
+        {
+            // from where the foot was, up and over onto the ball: lifted on the way, arriving flat on top of it
+            float rs = ur;   // linear: the reach can be only a few ticks long, and an eased one would peak at 1.5 times the mean pace
+            Vector3 p = from.Lerp(target, rs);
+            p.Y += 0.12f * k * Mathf.Sin(Mathf.Pi * rs);
+            target = p;
+            fd = (fwd * (1f - rs) + fd * rs).Normalized();
+            _skPelOff = Vector3.Zero; _skShoulderOff = Vector3.Zero; _leanExtra = 0f;
+            inW = 1f;
+        }
+        target.Y = Math.Max(target.Y, AnkleH);
+        _kFoot = fi; _kDir = fd; _seq = true; _skActive = true;
+        _kAnkle = from.Lerp(target, inW);
+        _kW = outW;
+        return true;
+    }
+
+    /// <summary>The ankle that puts the foot's sole on the very top of the ball, toes along <paramref name="fd"/>.</summary>
+    Vector3 SoleAnkle(in FigureSkill s, Vector3 ballXZ, Vector3 fd, float r, int foot)
+    {
+        Vector3 off = Off(foot, BootSurface.Sole);
+        Vector3 rv = new(-fd.Z, 0, fd.X);
+        Vector3 a = ballXZ - (fd * off.X + rv * off.Z);
+        a.Y = 2f * r - off.Y;
+        return a;
+    }
+
+    /// <summary>
+    /// Prints how far the sole's (or the hooking surface's) point is from the ball surface at the move's first contact tick and once
+    /// the foot has had time to arrive; the same distances feed the SKIN_CONTACT line when a skinned body is worn.
+    /// </summary>
+    void LogSkillFoot(in FigureFrame f, Vector3[] ank, Vector3[] dir)
+    {
+        var s = f.Skill;
+        if (s.Kind is SkillKind.StepOver or SkillKind.BodyFeint) return;
+        if (s.Kind != SkillKind.FakeCut && s.ContactElapsed >= 0f && Stats != null)
+        {
+            // sole on the ball from the landing until the hand-back at the end begins
+            int fj = s.Right ? 1 : 0;
+            Vector3 o = Off(fj, BootSurface.Sole);
+            Vector3 d0 = dir[fj]; d0.Y = 0; d0 = d0.Normalized();
+            Vector3 q = ank[fj] + d0 * o.X + Vector3.Up * o.Y + new Vector3(-d0.Z, 0, d0.X) * o.Z;
+            float er = Math.Abs((q - f.BallPos).Length() - f.BallRadius);
+            if (s.Elapsed < s.Duration - Math.Min(0.08f, 0.5f * Math.Max(s.ExecDuration, 0.06f))) Stats.SkillSoleMaxErr = Math.Max(Stats.SkillSoleMaxErr, er);
+        }
+        bool atContact = f.SkillTouch && !_skSoleLogged;
+        bool arrived = s.ContactElapsed >= 0.04f && !_skInLogged;
+        if (!atContact && !arrived) return;
+        int fi = s.Right ? 1 : 0;
+        Vector3 off = Off(fi, s.Surface);
+        Vector3 fd = dir[fi]; fd.Y = 0; fd = fd.Normalized();
+        Vector3 fr = new(-fd.Z, 0, fd.X);
+        Vector3 pt = ank[fi] + fd * off.X + Vector3.Up * off.Y + fr * off.Z;
+        float err = Math.Abs((pt - f.BallPos).Length() - f.BallRadius);
+        if (atContact) _skSoleLogged = true;
+        if (arrived) _skInLogged = true;
+        GD.Print($"SKILL_FOOT kind={s.Kind} {(atContact ? "contact" : "arrived")} t={s.Elapsed:F3} err_m={err:F3}");
+        if (atContact && Stats != null) Stats.SkillContact.Add(err);
     }
 
     // ---------------------------------------------------------------------------------------------------------------

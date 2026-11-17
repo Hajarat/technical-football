@@ -21,9 +21,10 @@ public enum Outcome { None, Goal, Held, Wide, Over, Claimed, Out, TimeUp }
 /// <summary>Kinds of event raised during one <c>World.Step</c>.</summary>
 /// <remarks>
 /// OutOfPlay is no longer raised: the arena's boards keep the ball in play. BoardHit is the ball meeting a board or the ceiling
-/// (position = ball centre at contact, speed = arriving speed).
+/// (position = ball centre at contact, speed = arriving speed). SkillMove is a skill move starting (position = ball centre,
+/// speed = the player's speed, <see cref="SimEvent.Skill"/> = the move); a move's sole contact also raises a Touch.
 /// </remarks>
-public enum EventKind { Touch, Strike, Bounce, FrameHit, Save, Goal, OutOfPlay, PossessionGained, PossessionLost, BoardHit }
+public enum EventKind { Touch, Strike, Bounce, FrameHit, Save, Goal, OutOfPlay, PossessionGained, PossessionLost, BoardHit, SkillMove }
 
 /// <summary>Shot flavour chosen by the bumpers.</summary>
 public enum ShotType { Normal, Finesse, Chip }
@@ -39,7 +40,9 @@ public enum Foot { Left, Right }
 /// <param name="Foot">For Touch and Strike: the foot that made contact.</param>
 /// <param name="Team">For player events (Touch, Strike, PossessionGained, PossessionLost): the player's team, else -1.</param>
 /// <param name="PlayerIndex">For player events: the player's index in the team, else -1.</param>
-public readonly record struct SimEvent(EventKind Kind, Vector3 Position, float Speed, bool Held = false, Foot Foot = Foot.Right, int Team = -1, int PlayerIndex = -1);
+/// <param name="Skill">For <see cref="EventKind.SkillMove"/>: the move that started; null otherwise.</param>
+public readonly record struct SimEvent(EventKind Kind, Vector3 Position, float Speed, bool Held = false, Foot Foot = Foot.Right, int Team = -1,
+    int PlayerIndex = -1, ActionKind? Skill = null);
 
 /// <summary>Helpers for <see cref="Outcome"/>.</summary>
 public static class OutcomeExtensions

@@ -10,7 +10,7 @@ public sealed class PlayerSheet
     public static readonly IReadOnlyList<string> RatingNames = new[]
     {
         "acceleration", "sprint_speed", "agility", "balance",
-        "dribbling", "ball_control", "first_touch",
+        "dribbling", "ball_control", "first_touch", "skill_moves",
         "finishing", "long_shots", "shot_power", "curve", "composure", "weak_foot",
         "reflexes", "diving", "reach", "positioning", "handling", "rushing_out",
     };
@@ -32,6 +32,8 @@ public sealed class PlayerSheet
     public int Dribbling { get; set; } = RatingDefault;
     public int BallControl { get; set; } = RatingDefault;
     public int FirstTouch { get; set; } = RatingDefault;
+    /// <summary>Skill moves: their exit burst and how much survives a chain. A file without it uses <see cref="Dribbling"/>.</summary>
+    public int SkillMoves { get; set; } = RatingDefault;
     public int Finishing { get; set; } = RatingDefault;
     public int LongShots { get; set; } = RatingDefault;
     public int ShotPower { get; set; } = RatingDefault;
@@ -53,7 +55,7 @@ public sealed class PlayerSheet
     public int GetRating(string name) => name switch
     {
         "acceleration" => Acceleration, "sprint_speed" => SprintSpeed, "agility" => Agility, "balance" => Balance,
-        "dribbling" => Dribbling, "ball_control" => BallControl, "first_touch" => FirstTouch,
+        "dribbling" => Dribbling, "ball_control" => BallControl, "first_touch" => FirstTouch, "skill_moves" => SkillMoves,
         "finishing" => Finishing, "long_shots" => LongShots, "shot_power" => ShotPower, "curve" => Curve,
         "composure" => Composure, "weak_foot" => WeakFoot,
         "reflexes" => Reflexes, "diving" => Diving, "reach" => Reach, "positioning" => Positioning,
@@ -74,6 +76,7 @@ public sealed class PlayerSheet
             case "dribbling": Dribbling = v; break;
             case "ball_control": BallControl = v; break;
             case "first_touch": FirstTouch = v; break;
+            case "skill_moves": SkillMoves = v; break;
             case "finishing": Finishing = v; break;
             case "long_shots": LongShots = v; break;
             case "shot_power": ShotPower = v; break;
