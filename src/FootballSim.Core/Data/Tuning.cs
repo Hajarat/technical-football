@@ -370,18 +370,41 @@ public sealed class PossessionTuning
 /// <summary>Shot model constants.</summary>
 public sealed class ShotTuning
 {
-    public float BaseSigmaDeg { get; set; } = 7.0f;
-    public float SigmaSkillSlope { get; set; } = 6.2f;
+    public float BaseSigmaDeg { get; set; } = 4.9f;
+    public float SigmaSkillSlope { get; set; } = 4.34f;
     public float VerticalRatio { get; set; } = 0.7f;
     public float SpeedNoise { get; set; } = 0.04f;
     /// <summary>Inside this distance the finishing rating applies.</summary>
     public float FinishingRange { get; set; } = 18f;
     /// <summary>Beyond this distance the long_shots rating applies.</summary>
     public float LongShotRange { get; set; } = 25f;
-    public RatingRange Power { get; set; } = new(22f, 36f);
-    public float ChargeBaseSpeed { get; set; } = 0.45f;
-    public float ChargeSpeedSlope { get; set; } = 0.55f;
-    public float ChargeSeconds { get; set; } = 0.9f;
+    public RatingRange Power { get; set; } = new(26f, 43f);
+    public float ChargeBaseSpeed { get; set; } = 0.3f;
+    public float ChargeSpeedSlope { get; set; } = 0.7f;
+    /// <summary>Seconds of holding shoot that fill the charge from 0 to 1.</summary>
+    public float ChargeSeconds { get; set; } = 0.3f;
+    /// <summary>The strike's contact comes no sooner than this after the press, seconds (the wind-up).</summary>
+    public float WindupSeconds { get; set; } = 0.45f;
+    /// <summary>... and no sooner than this after the release, seconds.</summary>
+    public float ReleaseLeadSeconds { get; set; } = 0.12f;
+    /// <summary>A stick at rest at the release aims along its last pushed direction if that push was this recent, seconds.</summary>
+    public float AimLockSeconds { get; set; } = 0.5f;
+    /// <summary>The shot action's follow-through after contact, seconds.</summary>
+    public float RecoverySeconds { get; set; } = 0.25f;
+    /// <summary>
+    /// The charge a perfectly judged shot uses, by distance from the ball to the goal centre (metres). Missing it moves the
+    /// shot vertically (or, for a chip, in depth).
+    /// </summary>
+    public Curve IdealCharge { get; set; } = new((6f, 0.30f), (11f, 0.45f), (16f, 0.62f), (22f, 0.76f), (30f, 0.90f));
+    /// <summary>Mean vertical error per unit of charge above the ideal, degrees: over-charging rises, under-charging drives low.</summary>
+    public float ChargeMissPitchDeg { get; set; } = 14f;
+    /// <summary>A chip's launch speed is multiplied by 1 + this times (charge - ideal): over-charged chips go deeper.</summary>
+    public float ChipChargeMissSpeed { get; set; } = 0.2f;
+    /// <summary>After a strike the shooter's speed cap is <see cref="StunSpeedFraction"/> of top speed for this long ...</summary>
+    public float StunBaseSeconds { get; set; } = 0.15f;
+    /// <summary>... plus this times the charge, seconds; no touches meanwhile.</summary>
+    public float StunChargeSeconds { get; set; } = 0.35f;
+    public float StunSpeedFraction { get; set; } = 0.4f;
 
     public float SpeedMultiplierSlope { get; set; } = 0.5f;
     public float AngleFreeDeg { get; set; } = 30f;
@@ -395,19 +418,36 @@ public sealed class ShotTuning
     public float PowerMaxMultiplier { get; set; } = 1.5f;
     public float AirHeight { get; set; } = 0.15f;
     public float AirMultiplier { get; set; } = 1.3f;
-    public float NormalTypeMultiplier { get; set; } = 1.0f;
+    public float PowerTypeMultiplier { get; set; } = 1.0f;
     public float FinesseTypeMultiplier { get; set; } = 0.8f;
     public float ChipTypeMultiplier { get; set; } = 1.1f;
+    public float DrivenTypeMultiplier { get; set; } = 1.1f;
+    public float LowFinesseTypeMultiplier { get; set; } = 0.85f;
 
-    public float NormalElevationBaseDeg { get; set; } = 4f;
-    public float NormalElevationChargeDeg { get; set; } = 14f;
-    public float NormalSpinMaxRev { get; set; } = 2f;
-    public float FinesseSpeedFraction { get; set; } = 0.75f;
-    public float FinesseElevationBaseDeg { get; set; } = 6f;
-    public float FinesseElevationChargeDeg { get; set; } = 10f;
-    /// <summary>Finesse sidespin, revolutions per second (curve rating).</summary>
+    /// <summary>Side spin grows with launch speed: the rated spin applies at this speed, m/s, in proportion below and above it.</summary>
+    public float SpinReferenceSpeed { get; set; } = 25f;
+    /// <summary>
+    /// Power shot loft before the charge miss, degrees: base plus this times the charge. Harder shots fly flatter, so the
+    /// charge slope is slightly negative; over-charging still lifts the shot through the charge miss.
+    /// </summary>
+    public float PowerElevationBaseDeg { get; set; } = 10f;
+    public float PowerElevationChargeDeg { get; set; } = -3f;
+    /// <summary>Power shot side spin (a light curl to a random side), revolutions per second at the reference speed (curve rating).</summary>
+    public RatingRange PowerSpinRev { get; set; } = new(0.5f, 2f);
+    public float DrivenSpeedFactor { get; set; } = 1.05f;
+    public float DrivenElevationBaseDeg { get; set; } = 3.5f;
+    public float DrivenElevationChargeDeg { get; set; } = 1.5f;
+    /// <summary>Driven shot side spin (little, to a random side), revolutions per second at the reference speed (curve rating).</summary>
+    public RatingRange DrivenSpinRev { get; set; } = new(0.2f, 0.6f);
+    public float FinesseSpeedFraction { get; set; } = 0.8f;
+    public float FinesseElevationBaseDeg { get; set; } = 15f;
+    public float FinesseElevationChargeDeg { get; set; } = -3f;
+    /// <summary>Finesse (and low finesse) side spin, revolutions per second at the reference speed (curve rating).</summary>
     public RatingRange FinesseSpinRev { get; set; } = new(4f, 10f);
-    public float ChipSpeedFraction { get; set; } = 0.55f;
+    public float LowFinesseSpeedFraction { get; set; } = 0.8f;
+    public float LowFinesseElevationBaseDeg { get; set; } = 1f;
+    public float LowFinesseElevationChargeDeg { get; set; } = 3f;
+    public float ChipSpeedFraction { get; set; } = 0.5f;
     public float ChipElevationBaseDeg { get; set; } = 28f;
     public float ChipElevationChargeDeg { get; set; } = 12f;
     public float ChipBackspinMinRev { get; set; } = 4f;
@@ -600,8 +640,8 @@ public sealed class SkillTuning
 /// <summary>Round state machine timings.</summary>
 public sealed class RoundTuning
 {
+    /// <summary>A released shot whose contact tick finds the ball out of reach waits this long for it, then is dropped, seconds.</summary>
     public float ShootBuffer { get; set; } = 0.25f;
-    public float StrikeDelay { get; set; } = 0.10f;
     public float OutcomeSeconds { get; set; } = 1.5f;
     /// <summary>Safety cap on a round's running time when the scenario has no clock, seconds.</summary>
     public float MaxSeconds { get; set; } = 120f;

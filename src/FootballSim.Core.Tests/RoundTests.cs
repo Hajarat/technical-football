@@ -49,48 +49,88 @@ public class RoundTests
     }
 
     [Fact]
-    public void ChargeBuildsOverNineTenthsOfASecondAndResetsOnRelease()
+    public void ChargeBuildsOverThreeTenthsOfASecondAndResetsOnRelease()
     {
         var w = TestData.Live();
         var a = Buf(w);
-        for (int i = 0; i < 54; i++) { a[0] = new TickIntent { ShootHeld = true }; w.Step(a); }
+        for (int i = 0; i < 18; i++) { a[0] = new TickIntent { ShootHeld = true }; w.Step(a); }
         Assert.InRange(w.ShotCharge, 0.49f, 0.51f);
-        for (int i = 0; i < 100; i++) { a[0] = new TickIntent { ShootHeld = true }; w.Step(a); }
+        for (int i = 0; i < 17; i++) { a[0] = new TickIntent { ShootHeld = true }; w.Step(a); }
+        Assert.True(w.ShotCharge < 1f);
+        a[0] = new TickIntent { ShootHeld = true };
+        w.Step(a);
+        Assert.Equal(1f, w.ShotCharge, 4);                   // 36 ticks = 0.3 s
+        for (int i = 0; i < 50; i++) { a[0] = new TickIntent { ShootHeld = true }; w.Step(a); }
         Assert.Equal(1f, w.ShotCharge);
         a[0] = default;
         w.Step(a);
         Assert.Equal(0f, w.ShotCharge);
     }
 
-    [Fact]
-    public void ReleaseWithTheBallInReachStrikesAfterTheStrikeDelay()
+    /// <summary>Holds shoot for <paramref name="hold"/> ticks from Live, releases, and returns the press tick, release tick and strike tick.</summary>
+    static (int Press, int Release, int Strike) StrikeTiming(int hold)
     {
         var w = TestData.Live();
         var a = Buf(w);
-        for (int i = 0; i < 40; i++) { a[0] = new TickIntent { ShootHeld = true }; w.Step(a); }
+        int press = w.Tick + 1;
+        for (int i = 0; i < hold; i++) { a[0] = new TickIntent { ShootHeld = true }; w.Step(a); }
         Assert.Equal(RoundState.Live, w.State);
         a[0] = new TickIntent { MoveX = 1 };
         w.Step(a);
+        int release = w.Tick;
         Assert.Equal(RoundState.Strike, w.State);
         Assert.Empty(w.Shots);
+        Assert.True(w.Attacker.Action is { IsShot: true, Released: true, Made: false, Phase: ActionPhase.Windup });
+        int expected = w.Attacker.Action!.ContactTick;
         a[0] = default;
-        int ticks = 1;
-        while (w.State == RoundState.Strike && ticks < 40) { w.Step(a); ticks++; }
+        while (w.State == RoundState.Strike && w.Tick < release + 200) w.Step(a);
         Assert.Equal(RoundState.Flight, w.State);
-        Assert.InRange(ticks, 12, 13);                       // 0.10 s at 120 ticks per second
-        Assert.Contains(w.Events, e => e.Kind == EventKind.Strike);
         Assert.Single(w.Shots);
-        Assert.True(w.Ball.Velocity.Length() > 15f);
+        Assert.Equal(expected, w.Tick);
+        Assert.Equal(w.Tick, w.Shots[0].Tick);
+        return (press, release, w.Tick);
     }
 
     [Fact]
-    public void ReleaseWithTheBallOutOfReachBuffersThenDrops()
+    public void ContactComesNoSoonerThanTheWindupAfterThePress()
+    {
+        // A short press: the wind-up (0.45 s = 54 ticks after the press) decides.
+        var (press, release, strike) = StrikeTiming(10);
+        Assert.Equal(press + 10, release);
+        Assert.Equal(press + 54, strike);
+    }
+
+    [Fact]
+    public void ContactComesNoSoonerThanTheLeadAfterTheRelease()
+    {
+        // A long press: the lead after the release (0.12 s = 14 ticks) decides.
+        var (press, release, strike) = StrikeTiming(80);
+        Assert.Equal(release + 14, strike);
+        Assert.True(strike > press + 54);
+        // A release just before the wind-up ends still gets the full lead.
+        var (p2, r2, s2) = StrikeTiming(50);
+        Assert.Equal(p2 + 50, r2);
+        Assert.Equal(r2 + 14, s2);
+    }
+
+    [Fact]
+    public void ChargeIsFrozenAtTheRelease()
+    {
+        var w = TestData.Live();
+        var a = Shoot(w, 12, new Vector2(1, 0));
+        while (w.State == RoundState.Strike) w.Step(a);
+        Assert.Equal(12f * w.Tuning.Dt / w.Tuning.Shot.ChargeSeconds, Assert.Single(w.Shots).Charge, 4);
+    }
+
+    [Fact]
+    public void ReleaseWithTheBallOutOfReachWaitsThenDrops()
     {
         var sc = WithClock(null, s => { s.Attacker.X = 8f; });
         var w = new World(new Tuning(), sc, TestData.Player("striker_a"), TestData.Player("the_wall"), 1);
         w.Begin();
         var a = Shoot(w, 20, new Vector2(1, 0));
-        for (int i = 0; i < 60; i++)
+        Assert.Equal(RoundState.Strike, w.State);
+        for (int i = 0; i < 120; i++)
         {
             w.Step(a);
             Assert.DoesNotContain(w.Events, e => e.Kind == EventKind.Strike);
@@ -99,22 +139,27 @@ public class RoundTests
         Assert.Empty(w.Shots);
         Assert.Null(w.Report);
         Assert.Equal(Outcome.None, w.Outcome);
+        Assert.True(w.Attacker.Action is not { IsShot: true });
     }
 
     [Fact]
-    public void BufferedShootStrikesIfTheBallComesIntoReachInTime()
+    public void AReleasedShotStrikesIfTheBallComesIntoReachBeforeTheDeadline()
     {
         var sc = WithClock(null, s => { s.Attacker.X = 15.0f; });
         var w = new World(new Tuning(), sc, TestData.Player("striker_a"), TestData.Player("the_wall"), 1);
         w.Begin();
-        w.Ball.Position = new Vector3(18.0f, 0.11f, 0f);        // 3 m away: out of reach at release
+        w.Ball.Position = new Vector3(18.0f, 0.11f, 0f);        // 3 m away: out of reach at the contact tick
         var a = Shoot(w, 20, new Vector2(1, 0));
-        Assert.Equal(RoundState.Live, w.State);
-        for (int i = 0; i < 10; i++) w.Step(a);
-        Assert.Equal(RoundState.Live, w.State);
-        w.Ball.Position = new Vector3(w.Attacker.Position.X + 0.4f, 0.11f, 0f); // heavy touch brings it back
-        w.Step(a);
+        int contact = w.Attacker.Action!.ContactTick;
+        while (w.Tick < contact + 10) w.Step(a);
         Assert.Equal(RoundState.Strike, w.State);
+        Assert.Empty(w.Shots);
+        w.Ball.Position = new Vector3(w.Attacker.Position.X + 0.4f, 0.11f, 0f); // heavy touch brings it back
+        w.Ball.Velocity = Vector3.Zero;
+        w.Step(a);
+        Assert.Equal(RoundState.Flight, w.State);
+        Assert.Single(w.Shots);
+        Assert.Equal(contact + 11, w.Attacker.Action!.ContactTick);
     }
 
     [Fact]
@@ -183,7 +228,7 @@ public class RoundTests
     [Fact]
     public void HeldOutcomeKeepsTheBallInTheHands()
     {
-        var w = FindRound(x => PlayUntil(x, y => y.Outcome == Outcome.Held), maxSeeds: 600);
+        var w = FindRound(x => PlayUntil(x, y => y.Outcome == Outcome.Held && y.KeeperReport.Action == KeeperResult.Held), scenario: "tight_angle", maxSeeds: 600);
         Assert.Equal(KeeperResult.Held, w.KeeperReport.Action);
         Assert.Equal(KeeperAction.Holding, w.Keeper.KeeperAction);
         var buf = Buf(w);
@@ -211,9 +256,10 @@ public class RoundTests
     {
         var w = FindRound(x =>
         {
-            var a = Shoot(x, 80, new Vector2(1f, 0f), chip: true);
+            var a = Shoot(x, 32, new Vector2(1f, 0f), chip: true);
             StepUntil(x, a, y => y.State is RoundState.Outcome or RoundState.Report || y.Events.Any(e => e.Kind == EventKind.BoardHit));
-            return x.Events.Any(e => e.Kind == EventKind.BoardHit && x.Pitch.IsOverContact(e.Position, x.Ball.Radius));
+            return x.Events.Any(e => e.Kind == EventKind.BoardHit && x.Pitch.IsOverContact(e.Position, x.Ball.Radius)
+                                     && e.Position.X >= x.Pitch.GoalLineX - x.Ball.Radius - 0.01f);
         });
         Assert.Equal(RoundState.Live, w.State);
         Assert.Equal(Outcome.None, w.Outcome);

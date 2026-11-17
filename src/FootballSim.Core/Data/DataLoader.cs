@@ -194,9 +194,11 @@ public static class DataLoader
             if (t.Ball == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: ball: must be an object (default tuning in use)" };
             if (t.Touch == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: touch: must be an object (default tuning in use)" };
             if (t.Skill == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: skill: must be an object (default tuning in use)" };
+            if (t.Shot == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: shot: must be an object (default tuning in use)" };
             foreach (var (field, curve) in new[] { ("ball.drag_curve", t.Ball.DragCurve), ("ball.lift_curve", t.Ball.LiftCurve), ("ball.restitution_curve", t.Ball.RestitutionCurve),
                 ("touch.early_execution", t.Touch.EarlyExecution), ("skill.ball_roll_distance", t.Skill.BallRollDistance),
-                ("skill.sided_exit_burst", t.Skill.SidedExitBurst), ("skill.straight_exit_burst", t.Skill.StraightExitBurst) })
+                ("skill.sided_exit_burst", t.Skill.SidedExitBurst), ("skill.straight_exit_burst", t.Skill.StraightExitBurst),
+                ("shot.ideal_charge", t.Shot.IdealCharge) })
             {
                 string? bad = curve == null ? "must be an array of [x, y] pairs" : curve.Validate();
                 if (bad != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: {field}: {bad} (default tuning in use)" };

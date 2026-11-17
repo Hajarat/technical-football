@@ -7,6 +7,10 @@ namespace FootballSim.Game;
 public partial class Hud : CanvasLayer
 {
     ProgressBar _power = null!;
+    ColorRect _ideal = null!;
+    Label _shotType = null!;
+    float _shotTypeLeft;
+    const float PowerBarWidth = 400f;
     Label _clock = null!, _spot = null!, _notice = null!, _warning = null!, _title = null!, _body = null!, _toast = null!;
     float _toastLeft;
     PanelContainer _report = null!;
@@ -37,6 +41,12 @@ public partial class Hud : CanvasLayer
         _power = new ProgressBar { MinValue = 0, MaxValue = 1, Value = 0, ShowPercentage = false, MouseFilter = Control.MouseFilterEnum.Ignore };
         BottomCentre(_power, -48, -26, 400);
         root.AddChild(_power);
+        // the ideal-charge marker: a thin bright tick across the bar, so the player learns where to release
+        _ideal = new ColorRect { Color = new Color(1f, 0.9f, 0.2f), Size = new Vector2(4, 30), Position = new Vector2(0, -4), MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+        _power.AddChild(_ideal);
+        _shotType = MakeLabel(root, 30, HorizontalAlignment.Center);
+        BottomCentre(_shotType, -160, -120, 400);
+        _shotType.Visible = false;
 
         _warning = MakeLabel(root, 18, HorizontalAlignment.Left);
         _warning.AnchorTop = _warning.AnchorBottom = 1;
@@ -69,6 +79,7 @@ public partial class Hud : CanvasLayer
     public override void _Process(double delta)
     {
         if (_toastLeft > 0f && (_toastLeft -= (float)delta) <= 0f) _toast.Visible = false;
+        if (_shotTypeLeft > 0f && (_shotTypeLeft -= (float)delta) <= 0f) _shotType.Visible = false;
     }
 
     /// <summary>A short confirmation in the bottom-right corner, hidden after the given seconds.</summary>
@@ -81,6 +92,21 @@ public partial class Hud : CanvasLayer
 
     /// <summary>Shot power, 0..1.</summary>
     public void SetPower(float value) => _power.Value = Mathf.Clamp(value, 0f, 1f);
+
+    /// <summary>Marks the ideal charge (0..1) on the power bar, or hides the marker.</summary>
+    public void SetIdealMarker(float ideal, bool visible)
+    {
+        _ideal.Visible = visible;
+        _ideal.Position = new Vector2(Mathf.Clamp(ideal, 0f, 1f) * (PowerBarWidth - _ideal.Size.X), _ideal.Position.Y);
+    }
+
+    /// <summary>Names the shot type (for example "DRIVEN") above the power bar for a moment.</summary>
+    public void ShowShotType(string name, float seconds = 0.9f)
+    {
+        _shotType.Text = name;
+        _shotType.Visible = true;
+        _shotTypeLeft = seconds;
+    }
 
     /// <summary>Clock in seconds, shown as "11.4 s".</summary>
     public void SetClock(float seconds) => _clock.Text = seconds.ToString("0.0", CultureInfo.InvariantCulture) + " s";

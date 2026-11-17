@@ -91,7 +91,8 @@ public partial class Match : Node3D
         Tick(pad);
         Present();
         // The ball has been placed above; only now follow it.
-        Camera.Follow(_args.CloseKeeper ? new Vector3(World.Keeper.Position.X, 0, World.Keeper.Position.Z) : Ball.Position, delta);
+        Camera.Follow(_args.CloseKeeper ? new Vector3(World.Keeper.Position.X, 0, World.Keeper.Position.Z)
+            : _args.CloseAttacker ? new Vector3(World.Attacker.Position.X + 0.6f, 0, World.Attacker.Position.Z) : Ball.Position, delta);
         HandleTools();
     }
 
@@ -114,6 +115,7 @@ public partial class Match : Node3D
             foreach (var moment in _args.ShotOn)
             {
                 if (moment == "skill") SkillShots();
+                else if (moment == "shot") ShotShots();
                 else if (MomentReached(moment)) _shots.Request(moment);
             }
         }
@@ -137,6 +139,29 @@ public partial class Match : Node3D
             _shots!.Request($"skill{idx}");
         }
         else if (_skillSeen) _shots!.Request("skill6");
+    }
+
+    int _shotFrames, _shotLastTick = -1, _shotAfter;
+
+    /// <summary>
+    /// --shot-on shot: frames across one shot, numbered in order (shot00_...): every 10 ticks from the press while the shoot button is held,
+    /// every 2 ticks in the last 10 ticks before the contact, then every 6 ticks from the contact through the recovery, and one after it.
+    /// </summary>
+    void ShotShots()
+    {
+        var w = World; int now = w.Attacker.CurrentTick;
+        if (now == _shotLastTick) return;
+        _shotLastTick = now;
+        if (w.Attacker.Action is { Kind: >= FootballSim.Core.ActionKind.Power, Phase: not FootballSim.Core.ActionPhase.Done } a)
+        {
+            string? label = null;
+            int since = now - a.PlanTick;
+            if (a.Made) { int c = now - a.ContactTick; if (c % 6 == 0) label = $"contact{c:D2}"; }
+            else if (w.ShotCharge > 0.001f) { if (since % 10 == 0) label = $"wind{since:D3}"; }
+            else { int eta = a.ContactTick - now; if (eta <= 10 && eta % 2 == 0) label = $"swing{eta:D2}"; else if (since % 10 == 0) label = $"wind{since:D3}"; }
+            if (label != null) _shots!.Request($"shot{_shotFrames++:D2}_{label}");
+        }
+        else if (_shotFrames > 0 && _shotAfter++ % 6 == 0 && _shotAfter < 14) _shots!.Request($"shot{_shotFrames++:D2}_after");
     }
 
     void Finish()

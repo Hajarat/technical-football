@@ -29,17 +29,20 @@ public sealed class IntentRecord
     /// <summary>Skill key pressed on this tick.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public SkillKey Skill { get; set; }
+    /// <summary>Driven-shot modifier held. Absent in older replays (read as false) and left out of the file while released.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Driven { get; set; }
 
     public static IntentRecord From(in TickIntent i) => new()
     {
         Mx = i.MoveX, Mz = i.MoveZ, Sprint = i.Sprint, Close = i.CloseControl, Shoot = i.ShootHeld, Finesse = i.Finesse, Chip = i.Chip, Knock = i.KnockOn,
-        Rx = i.RightX, Rz = i.RightZ, Cancel = i.Cancel, Skill = i.SkillKey,
+        Rx = i.RightX, Rz = i.RightZ, Cancel = i.Cancel, Skill = i.SkillKey, Driven = i.Driven,
     };
 
     public TickIntent ToIntent() => new()
     {
         MoveX = Mx, MoveZ = Mz, Sprint = Sprint, CloseControl = Close, ShootHeld = Shoot, Finesse = Finesse, Chip = Chip, KnockOn = Knock,
-        RightX = Rx, RightZ = Rz, Cancel = Cancel, SkillKey = Skill,
+        RightX = Rx, RightZ = Rz, Cancel = Cancel, SkillKey = Skill, Driven = Driven,
     };
 }
 

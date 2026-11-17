@@ -216,7 +216,8 @@ public class KeeperTests
         {
             var w = TestData.Live("penalty", seed: seed);
             var a = new TickIntent[2];
-            for (int i = 0; i < 54; i++) { a[0] = new TickIntent { ShootHeld = true }; w.Step(a); }
+            // Held 0.15 s: a charge of 0.5, near the ideal from the spot, so the shot is neither skied nor scuffed.
+            for (int i = 0; i < 18; i++) { a[0] = new TickIntent { ShootHeld = true }; w.Step(a); }
             a[0] = new TickIntent { MoveX = 1, MoveZ = 0 };
             w.Step(a);
             bool saved = false;

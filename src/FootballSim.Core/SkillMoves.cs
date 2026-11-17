@@ -112,7 +112,7 @@ public static class SkillMoves
     {
         var k = t.Skill;
         if (p.SkillBufTick < 0) return null;
-        var meet = p.Action is { Pending: true } pa && pa.ContactTick - p.SkillBufTick <= Ticks(k.MeetWaitSeconds, t) ? pa : null;
+        var meet = p.TouchAction is { Pending: true } pa && pa.ContactTick - p.SkillBufTick <= Ticks(k.MeetWaitSeconds, t) ? pa : null;
         if (tick - p.SkillBufTick > Ticks(meet != null ? k.MeetWaitSeconds : k.BufferSeconds, t)) { p.SkillBufTick = -1; return null; }
         if (!inPossession || p.SkillAction != null || now < p.SkillCooldownUntil) return null;
         var kind = KindOf(p.SkillBufKind);
@@ -190,7 +190,7 @@ public static class SkillMoves
         p.SkillBurstUntil = -100f;
 
         // The waiting touch is dropped; the move owns the ball until it ends.
-        if (p.Action is { Pending: true } waiting) waiting.Phase = ActionPhase.Done;
+        if (p.TouchAction is { Pending: true } waiting) waiting.Phase = ActionPhase.Done;
         p.Replanning = false;
         p.EarlyTurnTick = -1;
         p.SoftWaitAction = null;
@@ -240,10 +240,10 @@ public static class SkillMoves
             SkillCut = cut,
             SkillEffective = p.SkillEffective,
         };
-        if (p.Action is { Made: true } prev && prev.PhaseAt(tick, TouchPlanner.PreWindupTicks(t), TouchPlanner.WindupTicks(t)) != ActionPhase.Done)
-            p.PreviousAction = prev;
-        else p.PreviousAction = null;
-        p.Action = a;
+        if (p.TouchAction is { Made: true } prev && prev.PhaseAt(tick, TouchPlanner.PreWindupTicks(t), TouchPlanner.WindupTicks(t)) != ActionPhase.Done)
+            p.PrevTouchAction = prev;
+        else p.PrevTouchAction = null;
+        p.TouchAction = a;
         p.SkillAction = a;
         TouchPlanner.UpdatePhases(p, tick, t);
         return a;

@@ -3,8 +3,7 @@ using System.Numerics;
 namespace FootballSim.Core;
 
 /// <summary>
-/// What an action does: touches, skill moves, and the shot kinds reserved for a later phase so the view contract does not
-/// change when they arrive.
+/// What an action does: touches, skill moves and shots.
 /// </summary>
 public enum ActionKind
 {
@@ -46,8 +45,17 @@ public enum ActionKind
     /// <summary>A shot aborted into a cut: the ball is hooked toward the left stick.</summary>
     FakeCut,
 
-    // ---- shots (phase C, not produced yet) ----
-    Power, Finesse, Chip, Driven, LowFinesse,
+    // ---- shots (see World): one action from the shoot press to the end of the follow-through ----
+    /// <summary>A power shot, struck with the laces.</summary>
+    Power,
+    /// <summary>A finesse shot, curled with the inside of the foot.</summary>
+    Finesse,
+    /// <summary>A chip, lofted with backspin.</summary>
+    Chip,
+    /// <summary>A driven shot: low and flat, laces.</summary>
+    Driven,
+    /// <summary>A low finesse shot: curled along the ground with the inside of the foot.</summary>
+    LowFinesse,
 }
 
 /// <summary>Where an action is in time. Phases advance by ticks, so they are a pure function of the world tick.</summary>
@@ -149,6 +157,22 @@ public sealed class BallAction
     /// sole move (ball roll, drag-back, fake stop). -1 for touches.
     /// </summary>
     public int ExecuteTick { get; internal set; } = -1;
+    // ---- shots ----
+    /// <summary>
+    /// True for a shot (<see cref="ActionKind.Power"/> to <see cref="ActionKind.LowFinesse"/>). A shot is
+    /// <see cref="ActionPhase.Windup"/> from the shoot press (<see cref="PlanTick"/>) until contact; its
+    /// <see cref="ContactTick"/> is the earliest possible strike while shoot is held, fixed at the release, and final at contact
+    /// (later when the ball is not yet in reach then). <see cref="Kind"/> follows the modifiers held until the release. Then
+    /// Contact, Recovery until <see cref="EndTick"/>, and Done. A shot dropped (faked, or the ball never came into reach) goes
+    /// to Done with <see cref="Made"/> false.
+    /// </summary>
+    public bool IsShot => Kind >= ActionKind.Power;
+    /// <summary>
+    /// For a shot: true once shoot was released (charge, type and aim fixed, <see cref="ContactTick"/> final unless the ball is
+    /// still out of reach then); false while shoot is held. Always false for touches and skill moves.
+    /// </summary>
+    public bool Released { get; internal set; }
+
     /// <summary>For a skill move, the unit ground direction (X, Z) the player was running in when it started; zero for touches.</summary>
     public Vector2 RunDirection => IsSkill ? HoldDirection : Vector2.Zero;
 
@@ -184,6 +208,12 @@ public sealed class BallAction
             if (Phase == ActionPhase.Done || tick >= EndTick) return ActionPhase.Done;
             return tick < ContactTick ? ActionPhase.Windup : tick == ContactTick ? ActionPhase.Contact : ActionPhase.Recovery;
         }
+        if (IsShot)
+        {
+            if (Phase == ActionPhase.Done) return ActionPhase.Done;
+            if (!Made) return ActionPhase.Windup;
+            return tick <= ContactTick ? ActionPhase.Contact : tick < EndTick ? ActionPhase.Recovery : ActionPhase.Done;
+        }
         if (Made) return tick <= ContactTick ? ActionPhase.Contact : tick < EndTick ? ActionPhase.Recovery : ActionPhase.Done;
         if (Phase == ActionPhase.Done) return ActionPhase.Done;
         if (tick >= ContactTick) return ActionPhase.Contact;
@@ -192,6 +222,6 @@ public sealed class BallAction
         return ActionPhase.Planned;
     }
 
-    /// <summary>True while a touch waits for its contact. Never true for a skill move.</summary>
-    public bool Pending => !Made && Phase != ActionPhase.Done && !IsSkill;
+    /// <summary>True while a touch waits for its contact. Never true for a skill move or a shot.</summary>
+    public bool Pending => !Made && Phase != ActionPhase.Done && !IsSkill && !IsShot;
 }

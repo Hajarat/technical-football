@@ -76,15 +76,29 @@ public sealed class PlayerState
     }
 
     /// <summary>
-    /// The current action: the planned touch waiting for its contact if there is one, otherwise the latest touch (in its
-    /// recovery, or done). Null before the first. Its <see cref="BallAction.Phase"/> is updated every tick.
+    /// The current action. While a shot is under way (from the shoot press to the end of its recovery) it is the shot, of kind
+    /// Power, Finesse, Chip, Driven or LowFinesse. Otherwise the planned touch waiting for its contact if there is one, or the
+    /// latest touch or skill move (in its recovery, or done). Null before the first. Its <see cref="BallAction.Phase"/> is
+    /// updated every tick.
     /// </summary>
-    public BallAction? Action { get; internal set; }
+    public BallAction? Action => ShotAction ?? TouchAction;
     /// <summary>
     /// The touch made before <see cref="Action"/> when that one is still waiting, so its follow-through can be drawn while the
-    /// next touch winds up; otherwise null.
+    /// next touch winds up; otherwise null. Always null while a shot is under way.
     /// </summary>
-    public BallAction? PreviousAction { get; internal set; }
+    public BallAction? PreviousAction => ShotAction != null ? null : PrevTouchAction;
+    /// <summary>
+    /// The touch planner's and skill moves' action, whatever <see cref="Action"/> shows: the touch waiting for its contact, or
+    /// the latest touch or skill move (in its recovery, or done). A shot never goes here. While a shot winds up this is where
+    /// its soft touch (kind Soft) is seen, from its plan through its recovery, so the view can draw that kick inside the shot.
+    /// </summary>
+    public BallAction? TouchAction { get; internal set; }
+    /// <summary>The touch before <see cref="TouchAction"/> still in its follow-through, or null.</summary>
+    internal BallAction? PrevTouchAction;
+    /// <summary>The shot under way, from the press to the end of its recovery, or null. Shown as <see cref="Action"/>.</summary>
+    internal BallAction? ShotAction;
+    /// <summary>Simulation seconds until which the shooter is stunned after a strike: slowed, and no touches.</summary>
+    internal float StunUntil = -100f;
     /// <summary>Seconds from now to <see cref="Action"/>'s contact while it waits, else NaN.</summary>
     public float ActionContactEta { get; internal set; } = float.NaN;
     /// <summary>The steering correction added to the velocity on the latest tick to bring the ball into the contact zone, m/s.</summary>
@@ -209,7 +223,7 @@ public sealed class PlayerState
         KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed;
-        LastTouchKind = o.LastTouchKind;
+        LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction;
         GZone = o.GZone; GPrevZone = o.GPrevZone; GZoneStart = o.GZoneStart; GFwdLastTick = o.GFwdLastTick;
         GSideConsumed = o.GSideConsumed; GKnockUsed = o.GKnockUsed; GKnockWaitTick = o.GKnockWaitTick; GPrevCancel = o.GPrevCancel;
         LastGesture = o.LastGesture; LastGestureTick = o.LastGestureTick; SkillEffective = o.SkillEffective; SkillChainCount = o.SkillChainCount;

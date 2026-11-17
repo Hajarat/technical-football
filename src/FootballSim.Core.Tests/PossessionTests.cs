@@ -346,7 +346,9 @@ public class PossessionTests
         Assert.Equal(0, strike.Value.PlayerIndex);
         Assert.Equal(p.Shots[0].Foot, strike.Value.Foot);
         Assert.Equal(p.Shots[0].Foot, p.Attacker.StrikeFoot);
-        Assert.InRange(strikeEta, 0.05f, 0.1f);
+        // StrikeEta counts down from the release to the contact: the wind-up after the press bounds it from above, the lead
+        // after the release from below.
+        Assert.InRange(strikeEta, p.Tuning.Shot.ReleaseLeadSeconds - 0.01f, p.Tuning.Shot.WindupSeconds);
         Assert.True(float.IsNaN(p.Attacker.StrikeEta));
     }
 

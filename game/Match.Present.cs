@@ -8,6 +8,7 @@ public partial class Match
 {
     System.Numerics.Vector3 _strikeOrigin;
     bool _hasStrike;
+    int _shotId = int.MinValue;   // press tick of the shot whose type the HUD last named
     int _shotsSeen;
 
     int _strikeTicks, _touchCount;
@@ -45,6 +46,15 @@ public partial class Match
             else if (e.Kind == EventKind.Strike) { f.StrikeEvent = true; f.EventRight = e.Foot == Foot.Right; f.BallPos = G(e.Position); }
         }
         FillGait(ref f, p);
+        if (p.Action is { Kind: >= ActionKind.Power, Phase: not ActionPhase.Done } sa)
+            f.Shot = new FigureShot
+            {
+                Valid = true, Kind = (ShotKind)((int)sa.Kind - (int)ActionKind.Power), Right = sa.Foot == Foot.Right, Surface = (BootSurface)(int)sa.Surface,
+                Id = sa.PlanTick, Phase = (TouchPhase)(int)sa.Phase,
+                Elapsed = (p.CurrentTick - sa.PlanTick) * f.Dt, ContactEta = sa.ContactEta(p.CurrentTick, f.Dt), RecoverySeconds = (sa.EndTick - sa.ContactTick) * f.Dt,
+                ContactPoint = G(sa.ContactPoint), BallOutVelocity = G(sa.BallOutVelocity), Made = sa.Made,
+                Held = !sa.Released,
+            };
         f.NextTouchEta = p.NextTouchEta; f.NextTouchRight = p.NextTouchFoot == Foot.Right; f.NextTouchPoint = G(p.NextTouchPoint);
         f.ShotCharge = w.ShotCharge;
         // The core counts StrikeEta down through the strike delay and fixes StrikeFoot at the button press.
@@ -75,13 +85,13 @@ public partial class Match
         f.GaitPhase = p.GaitPhase; f.StepFrequency = p.StepFrequency; f.SwingProgress = p.SwingProgress;
         f.RightFootPhase = p.RightFootPhase; f.LeftFootPhase = p.LeftFootPhase;
         f.RunSpeed = p.RunSpeed;
-        f.Action = ActionFrame(p.Action, p, dt);
+        f.Action = ActionFrame(p.TouchAction, p, dt);   // the touch planner's slot: the soft touch at a shot's press is drawn under the shot windup
         f.PrevAction = ActionFrame(p.PreviousAction, p, dt);
     }
 
     static FigureAction ActionFrame(BallAction? a, PlayerState p, float dt)
     {
-        if (a == null) return default;
+        if (a == null || a.Kind >= ActionKind.Power) return default;   // a shot is drawn from FigureFrame.Shot
         return new FigureAction
         {
             Valid = true, Kind = (int)a.Kind, Phase = (TouchPhase)(int)a.Phase, Right = a.Foot == Foot.Right, Surface = (BootSurface)(int)a.Surface,
@@ -97,11 +107,11 @@ public partial class Match
     /// <summary>A new world was built: snap every view to it and clear the overlay.</summary>
     void ResetPresentation()
     {
-        _hasStrike = false;
+        _hasStrike = false; _shotId = int.MinValue;
         _shotsSeen = 0;
         Overlay.ClearWedge(); Overlay.ClearAimed(); Overlay.ClearLanded(); Overlay.ClearKeeperReach();
         Hud.HideReport();
-        Hud.SetPower(0);
+        Hud.SetPower(0); Hud.SetIdealMarker(0, false);
         _strikeTicks = 0; _touchCount = 0;
         Ball.Teleport(G(World.Ball.Position));
         Ball.SetPossession(false);
@@ -128,6 +138,12 @@ public partial class Match
         }
 
         Hud.SetPower(w.ShotCharge);
+        Hud.SetIdealMarker(w.IdealCharge, w.ShotCharge > 0.001f);
+        if (w.Attacker.Action is { Kind: >= ActionKind.Power } shot && shot.PlanTick != _shotId)
+        {
+            _shotId = shot.PlanTick;
+            Hud.ShowShotType(shot.Kind switch { ActionKind.Finesse => "FINESSE", ActionKind.Chip => "CHIP", ActionKind.Driven => "DRIVEN", ActionKind.LowFinesse => "LOW FINESSE", _ => "POWER" });
+        }
         Hud.SetClock(w.Clock);
         if (w.State == RoundState.Report && w.Report != null)
             Hud.ShowReport(ReportText.Title(w.Report), ReportText.Lines(w.Report));

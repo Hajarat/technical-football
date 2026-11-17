@@ -40,13 +40,13 @@ public static class TouchPlanner
     internal static void UpdatePhases(PlayerState p, int tick, Tuning t)
     {
         int pre = PreWindupTicks(t), win = WindupTicks(t);
-        if (p.Action is { } a) a.Phase = a.PhaseAt(tick, pre, win);
-        if (p.PreviousAction is { } b)
+        if (p.TouchAction is { } a) a.Phase = a.PhaseAt(tick, pre, win);
+        if (p.PrevTouchAction is { } b)
         {
             b.Phase = b.PhaseAt(tick, pre, win);
-            if (b.Phase == ActionPhase.Done) p.PreviousAction = null;
+            if (b.Phase == ActionPhase.Done) p.PrevTouchAction = null;
         }
-        p.ActionContactEta = p.Action is { Pending: true } c ? c.ContactEta(tick, t.Dt) : float.NaN;
+        p.ActionContactEta = p.TouchAction is { Pending: true } c ? c.ContactEta(tick, t.Dt) : float.NaN;
     }
 
     // ---- geometry ----
@@ -78,6 +78,14 @@ public static class TouchPlanner
         float mag = Math.Clamp(p.RunSpeed / MathF.Max(cap, 1e-3f), 0f, 1f);
         return new TickIntent { MoveX = dir.X * mag, MoveZ = dir.Y * mag, Sprint = 1f };
     }
+
+    /// <summary>
+    /// The legs while a shot winds up with no touch waiting: with the stick at rest the run holds its speed along the facing,
+    /// so a ball rolling with the shooter (after the soft touch) stays at the striking foot until contact; with the stick pushed
+    /// they follow it.
+    /// </summary>
+    internal static TickIntent ShotWindupLegs(PlayerState p, in TickIntent legs, Tuning t) =>
+        legs.Move.Length() >= t.Touch.StickThreshold ? legs : HoldIntent(p, FacingDir(p), t);
 
     /// <summary>
     /// Run to the ball (the recovery run): toward where it will be, at the ball's own speed away plus the gap over the speed
@@ -216,7 +224,10 @@ public static class TouchPlanner
         {
             p.Recovering = false;
             legs = intent;
-            return new MoveAssist(Movement.TopSpeed(p.Sheet, t), 1f + t.Possession.OffBallTurnBonus, Vector2.Zero);
+            float top = Movement.TopSpeed(p.Sheet, t);
+            return Stunned(p, now)
+                ? new MoveAssist(top * t.Shot.StunSpeedFraction, 1f + t.Possession.OffBallTurnBonus, Vector2.Zero, HardCap: top * t.Shot.StunSpeedFraction)
+                : new MoveAssist(top, 1f + t.Possession.OffBallTurnBonus, Vector2.Zero);
         }
 
         // A skill move owns the legs while it lasts; on the tick it ends, the planner takes over at once.
@@ -227,10 +238,10 @@ public static class TouchPlanner
             UpdatePhases(p, tick, t);
         }
 
-        if (live && p.Action is { Pending: true } a0) ReviewPlan(p, a0, intent, ball, tick, now, t, pitch);
+        if (live && p.TouchAction is { Pending: true } a0) ReviewPlan(p, a0, intent, ball, tick, now, t, pitch);
         UpdatePhases(p, tick, t);
 
-        var a = p.Action is { Pending: true } pa ? pa : null;
+        var a = p.TouchAction is { Pending: true } pa ? pa : null;
         Vector2 steer = Vector2.Zero;
         if (a != null)
         {
@@ -240,8 +251,16 @@ public static class TouchPlanner
         }
         else legs = p.Recovering && live ? ChaseIntent(p, ball, t) : intent;
         float cap = Possession.SpeedCap(p, true, p.Recovering && a == null, t);
+        if (Stunned(p, now))
+        {
+            float stun = Movement.TopSpeed(p.Sheet, t) * t.Shot.StunSpeedFraction;
+            return new MoveAssist(MathF.Min(cap, stun), 1f, steer, HardCap: stun);
+        }
         return new MoveAssist(cap, 1f, steer);
     }
+
+    /// <summary>True during the stun after a strike: the shooter is slowed and makes no touches.</summary>
+    internal static bool Stunned(PlayerState p, float now) => now < p.StunUntil;
 
     /// <summary>
     /// Drops a waiting plan (no contact); the planner plans again at once, and that replan may pick a swing as close as the
@@ -616,8 +635,8 @@ public static class TouchPlanner
 
     static void Install(PlayerState p, BallAction a, int tick, Tuning t)
     {
-        if (p.Action is { Made: true } prev && prev.PhaseAt(tick, PreWindupTicks(t), WindupTicks(t)) != ActionPhase.Done) p.PreviousAction = prev;
-        p.Action = a;
+        if (p.TouchAction is { Made: true } prev && prev.PhaseAt(tick, PreWindupTicks(t), WindupTicks(t)) != ActionPhase.Done) p.PrevTouchAction = prev;
+        p.TouchAction = a;
         UpdatePhases(p, tick, t);
     }
 
@@ -641,14 +660,14 @@ public static class TouchPlanner
     internal static void RequestKnockOn(PlayerState p)
     {
         p.KnockOnRequested = true;
-        if (p.Action is { Pending: true } a && Pushable(a.Kind)) a.Kind = ActionKind.KnockOn;
+        if (p.TouchAction is { Pending: true } a && Pushable(a.Kind)) a.Kind = ActionKind.KnockOn;
     }
 
     /// <summary>Shoot was pressed in possession: a touch already winding up is made first, then the soft touch.</summary>
     internal static void OnShootPressed(PlayerState p, int tick, Tuning t)
     {
         UpdatePhases(p, tick, t);
-        p.SoftWaitAction = p.Action is { Pending: true, Phase: ActionPhase.PreWindup or ActionPhase.Windup } a ? a : null;
+        p.SoftWaitAction = p.TouchAction is { Pending: true, Phase: ActionPhase.PreWindup or ActionPhase.Windup } a ? a : null;
     }
 
     /// <summary>
@@ -658,14 +677,14 @@ public static class TouchPlanner
     internal static void OnShotAborted(PlayerState p)
     {
         p.SoftWaitAction = null;
-        if (p.Action is { Pending: true, Kind: ActionKind.Soft } a) Drop(p, a);
+        if (p.TouchAction is { Pending: true, Kind: ActionKind.Soft } a) Drop(p, a);
     }
 
     /// <summary>The player no longer controls the ball: any waiting touch is dropped.</summary>
     internal static void OnPossessionLost(PlayerState p)
     {
         SkillMoves.Abort(p);
-        if (p.Action is { Pending: true } a) Drop(p, a);
+        if (p.TouchAction is { Pending: true } a) Drop(p, a);
         p.Replanning = false;
         p.EarlyTurnTick = -1;
         p.Recovering = false;
@@ -690,7 +709,7 @@ public static class TouchPlanner
         if (!inPossession) return mode == TouchStepMode.Normal ? FirstTouch(p, intent, ball, tick, now, t, pitch, rng) : null;
         UpdatePhases(p, tick, t);
 
-        var a = p.Action;
+        var a = p.TouchAction;
         if (a is { Pending: true } && tick >= a.ContactTick)
         {
             if (mode == TouchStepMode.SoftOnly && a != p.SoftWaitAction) a.Kind = ActionKind.Soft;
@@ -699,7 +718,7 @@ public static class TouchPlanner
             if (r != null) return r;
         }
 
-        a = p.Action;
+        a = p.TouchAction;
         if (mode == TouchStepMode.SoftOnly)
         {
             if (a is { Pending: true } && a == p.SoftWaitAction) return null;
@@ -1063,8 +1082,8 @@ public static class TouchPlanner
             a.NextMeetPoint = meet.Cp;
             a.NextMeetFoot = meet.Foot;
         }
-        p.Action = a;
-        p.PreviousAction = null;
+        p.TouchAction = a;
+        p.PrevTouchAction = null;
         if (next != null) Install(p, next, tick, t);
         return new TouchResult(kind, foot, ball.Position, v, errDeg);
     }
@@ -1116,8 +1135,8 @@ public static class TouchPlanner
         if (!stickActive && rel < k.FirstTouchMinRelativeSpeed) return null; // a still ball and no stick: stand by it
         var a = new BallAction { Kind = ActionKind.First, PlanTick = tick, ContactTick = tick, Legs = LegsMode.Stick };
         a.Foot = p.IsStepping ? p.SwingFoot : TouchModel.ChooseFoot(p.Sheet, p.Position, p.Facing, ball.Position, t);
-        p.Action = a;
-        p.PreviousAction = null;
+        p.TouchAction = a;
+        p.PrevTouchAction = null;
         p.Recovering = false;
         return Execute(p, a, intent, ball, tick, now, t, pitch, rng, immediate: true);
     }
