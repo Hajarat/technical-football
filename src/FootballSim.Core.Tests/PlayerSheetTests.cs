@@ -162,7 +162,7 @@ public class PlayerSheetTests
         Assert.True(partial.Ok);
         Assert.Equal(2f, partial.Value!.ErrorScale);
         Assert.Equal(5f, partial.Value.Shot.BaseSigmaDeg);
-        Assert.Equal(6.2f, partial.Value.Shot.SigmaSkillSlope);
+        Assert.Equal(new Tuning().Shot.SigmaSkillSlope, partial.Value.Shot.SigmaSkillSlope);
     }
 
     [Fact]

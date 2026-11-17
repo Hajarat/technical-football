@@ -61,7 +61,8 @@ public class TouchPlannerTests
     {
         if (!w.Events.Any(e => e.Kind == EventKind.Touch && e.Team == 0)) yield break;
         var p = w.Attacker;
-        yield return p.PreviousAction is { Made: true } pa && pa.ContactTick == w.Tick ? pa : p.Action!;
+        // During a shot the touch (the soft touch) is seen through TouchAction; Action shows the shot.
+        yield return p.PrevTouchAction is { Made: true } pa && pa.ContactTick == w.Tick ? pa : p.TouchAction!;
     }
 
     [Fact]

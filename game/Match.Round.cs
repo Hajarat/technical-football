@@ -238,7 +238,7 @@ public partial class Match
     static TickIntent FromPad(in PadSnapshot p) => new()
     {
         MoveX = p.MoveX, MoveZ = p.MoveZ, Sprint = p.Sprint, CloseControl = p.CloseControl,
-        ShootHeld = p.ShootHeld, Finesse = p.Finesse, Chip = p.Chip, KnockOn = p.KnockOn,
+        ShootHeld = p.ShootHeld, Finesse = p.Finesse, Chip = p.Chip, Driven = p.Driven, KnockOn = p.KnockOn,
         RightX = p.RightX, RightZ = p.RightZ, Cancel = p.Cancel, SkillKey = p.SkillKey,
     };
 

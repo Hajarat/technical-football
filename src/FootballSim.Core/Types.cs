@@ -22,8 +22,12 @@ public struct TickIntent
     public bool CloseControl;
     /// <summary>True while the shoot button is held. Power charges while held; release strikes.</summary>
     public bool ShootHeld;
+    /// <summary>Held: finesse shot (with <see cref="Driven"/>, a low finesse shot).</summary>
     public bool Finesse;
+    /// <summary>Held: chip shot. Wins over every other modifier.</summary>
     public bool Chip;
+    /// <summary>Held: driven shot (with <see cref="Finesse"/>, a low finesse shot).</summary>
+    public bool Driven;
     /// <summary>True on the tick a knock-on (a heavy touch far ahead) is asked for; one tick per press.</summary>
     public bool KnockOn;
     /// <summary>Raw right stick along world X, -1..1, on the same axes as <see cref="MoveX"/>. Read for skill-move gestures.</summary>

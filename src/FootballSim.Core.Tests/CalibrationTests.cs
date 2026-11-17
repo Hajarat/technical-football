@@ -5,13 +5,13 @@ using Xunit.Abstractions;
 namespace FootballSim.Core.Tests;
 
 /// <summary>
-/// The three hard requirements from the spec, at about 2,000 shots per case. The provisional percentage bands
-/// (penalty 72 to 86%, and so on) are not asserted; the measured rates are written to the test output instead.
+/// The three hard requirements from the spec, at about 2,000 shots per case, and the scoring rate of every scenario
+/// (striker_a against the_wall, the scripted attacker) held inside a band around its measured value.
 /// </summary>
 public class CalibrationTests
 {
     const int N = 2000;
-    static readonly string[] Scenarios = { "penalty", "breakaway", "edge_of_box", "tight_angle" };
+    static readonly string[] Scenarios = { "penalty", "edge_of_box", "tight_angle", "breakaway", "halfway_run", "angled_run", "keeper_rush" };
     readonly ITestOutputHelper _out;
 
     public CalibrationTests(ITestOutputHelper output) { _out = output; }
@@ -123,7 +123,11 @@ public class CalibrationTests
         return shots;
     }
 
-    static float Expected(float r01, float m) => (7.0f - 6.2f * r01) * m;
+    static float Expected(float r01, float m)
+    {
+        var k = new Tuning().Shot;
+        return (k.BaseSigmaDeg - k.SigmaSkillSlope * r01) * m;
+    }
 
     [Theory]
     [InlineData(1)]
@@ -134,7 +138,7 @@ public class CalibrationTests
     {
         var s = TestData.Sheet(60); s.Finishing = finishing;
         var p = TestData.Outfield(s, 41.5f, 0f);
-        var shots = Draw(p, new Vector3(42f, 0.11f, 0f), ShotType.Normal, 0.5f);
+        var shots = Draw(p, new Vector3(42f, 0.11f, 0f), ShotType.Power, 0.5f);
         var (sd, mean) = YawError(shots);
         double expected = Expected(Rating.R01(finishing), 1f);
         _out.WriteLine($"finishing {finishing}: measured {sd:F3} deg, formula {expected:F3} deg, mean error {mean:F3}");
@@ -150,13 +154,13 @@ public class CalibrationTests
         var keeper = new PlayerState(1, 0, PlayerRole.Keeper, TestData.Sheet(50)) { Position = new Vector3(42.5f, 0f, 0f) };
         var cases = new (string Name, Func<ShotResult[]> Run, float M)[]
         {
-            ("run", () => { var p = TestData.Outfield(s, 41f, 0f); p.Velocity = new Vector3(Movement.TopSpeed(s, new Tuning()), 0, 0); return Draw(p, new Vector3(41.5f, 0.11f, 0f), ShotType.Normal, 0.5f); }, 1.5f),
+            ("run", () => { var p = TestData.Outfield(s, 41f, 0f); p.Velocity = new Vector3(Movement.TopSpeed(s, new Tuning()), 0, 0); return Draw(p, new Vector3(41.5f, 0.11f, 0f), ShotType.Power, 0.5f); }, 1.5f),
             ("finesse", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.11f, 0f), ShotType.Finesse, 0.5f), 0.8f),
             ("chip", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.11f, 0f), ShotType.Chip, 0.5f), 1.1f),
-            ("power", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.11f, 0f), ShotType.Normal, 0.9f), 1.25f),
-            ("air", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.45f, 0f), ShotType.Normal, 0.5f), 1.3f),
-            ("pressure", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.11f, 0f), ShotType.Normal, 0.5f, keeper: keeper), 1.0f + 0.6f * (1f - 0f) * (1f - (1.5f - 1f) / 3f)),
-            ("weak foot", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.11f, -0.4f), ShotType.Normal, 0.5f), 1.72f),
+            ("power", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.11f, 0f), ShotType.Power, 0.9f), 1.25f),
+            ("air", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.45f, 0f), ShotType.Power, 0.5f), 1.3f),
+            ("pressure", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.11f, 0f), ShotType.Power, 0.5f, keeper: keeper), 1.0f + 0.6f * (1f - 0f) * (1f - (1.5f - 1f) / 3f)),
+            ("weak foot", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.11f, -0.4f), ShotType.Power, 0.5f), 1.72f),
         };
         foreach (var c in cases)
         {
@@ -171,7 +175,7 @@ public class CalibrationTests
     public void VerticalSpreadIsSeventyPercentOfTheSideways()
     {
         var s = TestData.Sheet(60); s.Finishing = 50;
-        var shots = Draw(TestData.Outfield(s, 41.5f, 0f), new Vector3(42f, 0.11f, 0f), ShotType.Normal, 0.5f);
+        var shots = Draw(TestData.Outfield(s, 41.5f, 0f), new Vector3(42f, 0.11f, 0f), ShotType.Power, 0.5f);
         var errs = shots.Select(x => (double)x.PitchErrorDeg).ToArray();
         double mean = errs.Average();
         double sd = Math.Sqrt(errs.Sum(e => (e - mean) * (e - mean)) / (errs.Length - 1));
@@ -183,12 +187,13 @@ public class CalibrationTests
     [InlineData("edge_of_box")]
     public void SpreadMeasuredThroughTheFullWorldMatchesTheFormula(string scenario)
     {
-        // Real rounds, the scripted attacker, the real input path. The shooter stands still, so M = 1 except for nothing else.
+        // Real rounds, the scripted attacker, the real input path. The shooter stands still and charges a fixed 0.5 (under the
+        // power multiplier's threshold), so M = 1.
         var sc = TestData.Scenario(scenario);
         var att = TestData.Player("striker_a");
         var kee = TestData.Player("the_wall");
         var shots = new ShotResult?[N];
-        Parallel.For(0, N, i => shots[i] = RoundRunner.RunFirstShot(new Tuning(), sc, att, kee, 3000 + (ulong)i).Shot);
+        Parallel.For(0, N, i => shots[i] = RoundRunner.RunFirstShot(new Tuning(), sc, att, kee, 3000 + (ulong)i, new ScriptedAttacker { Charge = 0.5f }).Shot);
         var list = shots.Where(s => s != null).Select(s => s!).ToArray();
         Assert.True(list.Length > N * 0.99);
         var (sd, mean) = YawError(list);
@@ -198,6 +203,30 @@ public class CalibrationTests
         double expected = Expected((float)r01, 1f);
         _out.WriteLine($"{scenario}: distance {distance:F1} m, measured {sd:F3} deg, formula {expected:F3} deg");
         Assert.InRange(sd / expected, 0.95, 1.05);
+    }
+
+    // ---- scoring bands ----
+
+    /// <summary>
+    /// The scoring rate of each scenario over 2,000 scripted rounds from seed 1 stays in its band. Penalty and edge of the
+    /// box are held to the shooting targets (72-80%, 6-14%; 10,000 rounds measured 76.8 and 8.2%). The others are bands of
+    /// about four points around their measured values (10,000 rounds: tight angle 20.1, breakaway 39.5, halfway run 65.5,
+    /// angled run 51.1, keeper rush 96.8%); they depend on the keeper (and the running ones on the dribbling) as much as on
+    /// the shot, and move when either changes.
+    /// </summary>
+    [Theory]
+    [InlineData("penalty", 72.0, 80.0)]
+    [InlineData("edge_of_box", 6.0, 14.0)]
+    [InlineData("tight_angle", 16.0, 24.0)]
+    [InlineData("breakaway", 35.5, 43.5)]
+    [InlineData("halfway_run", 61.5, 69.5)]
+    [InlineData("angled_run", 47.0, 55.0)]
+    [InlineData("keeper_rush", 93.5, 100.0)]
+    public void ScoringRateStaysInItsBand(string scenario, double lo, double hi)
+    {
+        var r = TestData.Rate(TestData.Scenario(scenario), TestData.Player("striker_a"), TestData.Player("the_wall"), N, 1);
+        _out.WriteLine($"{scenario}: {Pct(r):F1}% (band {lo}-{hi})");
+        Assert.InRange(Pct(r), lo, hi);
     }
 
     // ---- reported, not asserted ----

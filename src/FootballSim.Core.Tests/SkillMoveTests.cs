@@ -279,7 +279,7 @@ public class SkillMoveTests
         var ball = new Ball(t.Ball) { Position = new Vector3(2f, t.Ball.Radius, 0f) };
         // A touch planned 1.25 s after the gesture: longer than the 0.3 s buffer, inside the meet wait.
         var touch = new BallAction { Kind = ActionKind.Sprint, PlanTick = 90, ContactTick = 250 };
-        p.Action = touch;
+        p.TouchAction = touch;
         SkillMoves.Request(p, new GestureRead(Gesture.DragBack, SkillSide.None, Vector2.Zero), 100);
         for (int tick = 100; tick < 250; tick++) Assert.Null(SkillMoves.TryStart(p, ball, true, tick, tick * t.Dt, t));
         // At the meet the ball arrives at the foot (here just outside the radius, inside the contact zone's slack).
@@ -290,7 +290,7 @@ public class SkillMoveTests
 
         // A meet beyond the wait: the plain 0.3 s buffer applies.
         var q = TestData.Outfield();
-        q.Action = new BallAction { Kind = ActionKind.Sprint, PlanTick = 90, ContactTick = 100 + 200 };
+        q.TouchAction = new BallAction { Kind = ActionKind.Sprint, PlanTick = 90, ContactTick = 100 + 200 };
         ball.Position = new Vector3(2f, t.Ball.Radius, 0f);
         SkillMoves.Request(q, new GestureRead(Gesture.DragBack, SkillSide.None, Vector2.Zero), 100);
         for (int tick = 100; tick <= 136; tick++) Assert.Null(SkillMoves.TryStart(q, ball, true, tick, tick * t.Dt, t));
@@ -472,8 +472,8 @@ public class SkillMoveTests
             if (i is >= 0 and < 15) { it.ShootHeld = true; it.Cancel = i is >= 6 and < 8; }
             buf[0] = it;
             w.Step(buf);
-            if (i == 5) soft = p.Action is { Pending: true, Kind: ActionKind.Soft } a ? a : null;
-            if (i == 6 && soft != null) Assert.NotEqual(soft, p.Action is { Pending: true } q ? q : null);
+            if (i == 5) soft = p.TouchAction is { Pending: true, Kind: ActionKind.Soft } a ? a : null;
+            if (i == 6 && soft != null) Assert.NotEqual(soft, p.TouchAction is { Pending: true } q ? q : null);
         }
         Assert.True(p.InPossession);
     }

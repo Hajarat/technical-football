@@ -48,8 +48,8 @@ A fresh checkout needs `godot-mono --headless --path game --import` once.
 | Left stick | Run (stick right = toward the goal) and aim |
 | Right trigger | Sprint |
 | Left trigger (past half) | Close control |
-| B / Circle (hold, release) | Shoot: power builds while held |
-| Right bumper / left bumper | Finesse / chip shot (hold while shooting) |
+| B / Circle (hold, release) | Shoot: power builds while held (full in 0.3 s) |
+| Right bumper / left bumper / X / Square | Finesse / chip / driven shot (hold while shooting; driven + finesse is a low finesse) |
 | Right stick flick (past 0.7) | Knock-on: a heavy touch ahead to sprint onto, caught about 1.3-1.8 s later (one per flick) |
 | A / Cross | Start the round; at the report, next round (new seed) |
 | Y / Triangle | At the report, retry with the same seed |
@@ -59,6 +59,37 @@ A fresh checkout needs `godot-mono --headless --path game --import` once.
 | View / Share / Back | Flag the most recent finished round (a `flag` line in the session log) |
 | Menu / Options / Start | Pause |
 | Keyboard `B` | Swap face buttons (A with B, X with Y) for the active pad. On by default for Nintendo / Switch / Pro Controller pads; the choice is saved per pad name |
+
+## Shooting
+
+Five shot types share one model; the modifiers held at any point during the press pick the type at the release: chip if chip
+was held, else driven + finesse is a low finesse, then driven, finesse, and power with none.
+
+| Type | Flight | Foot |
+| --- | --- | --- |
+| Power | Loft by charge, a light curl to a random side | Laces |
+| Finesse | Curls away from the striking foot, slower | Inside |
+| Driven | Flat (about 3.5-5 degrees), 5% faster, a little less accurate, little spin | Laces |
+| Low finesse | Finesse curl kept low (1-4 degrees) | Inside |
+| Chip | High loft with backspin | Inside |
+
+- Charge fills 0 to 1 in 0.3 s while shoot is held and is frozen at the release (or at 1). Contact comes no sooner than 0.45 s
+  after the press (the wind-up) and 0.12 s after the release; a ball still out of reach then is struck as soon as it is in
+  reach, or the shot is dropped after `round.shoot_buffer`. In possession the ball is kept at the striking foot through the
+  wind-up by a soft touch.
+- Aim is the left stick at the release; a stick at rest then uses its last pushed direction if that was within 0.5 s. It is
+  locked from the release to the contact. Aim assist still applies.
+- Each distance to the goal centre has an ideal charge (`shot.ideal_charge`; the HUD marks it from `World.IdealCharge`).
+  Charging past it lifts the shot and charging short keeps it low, `shot.charge_miss_pitch_deg` degrees per unit of charge;
+  a chip's miss changes how far it carries instead (`shot.chip_charge_miss_speed`). Speed grows with charge and `shot_power`.
+- Side spin grows with launch speed and the `curve` rating (`shot.spin_reference_speed`, `*_spin_rev`).
+- After the strike the shooter is stunned for 0.15 + 0.35 x charge seconds: speed capped at 40% of top speed, no touches.
+- The shot is the attacker's `Action` from the press to the end of its 0.25 s follow-through (kind Power, Finesse, Chip,
+  Driven or LowFinesse; Windup, Contact, Recovery; `Released` once shoot is let go). The soft touch made inside the wind-up
+  is on `TouchAction`.
+- The scripted attacker charges like a human: the ideal charge for the ball's distance at the press plus a normal error of
+  0.12, drawn from its own generator seeded from the round's seed.
+- Every number is in the `shot` section of `data/tuning/default.json`.
 
 Player, tuning and scenario files are re-read every time a round is set up, so editing a JSON file in `data/` shows up next round.
 A file that fails to load keeps its last good version and the HUD warning line names the file and field.
@@ -73,7 +104,7 @@ Works alongside a gamepad (the larger stick value wins) and when none is detecte
 | Left Shift | Sprint |
 | Left Ctrl or Alt | Close control |
 | Space (hold, release) | Shoot |
-| E / Q | Finesse / chip (hold while shooting) |
+| E / Q / C | Finesse / chip / driven (hold while shooting; C + E is a low finesse) |
 | X | Knock-on |
 | Enter | Start the round; at the report, next round |
 | R | At the report, retry with the same seed |

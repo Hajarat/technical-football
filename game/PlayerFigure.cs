@@ -40,6 +40,32 @@ public struct FigureAction
     public bool IsSkill;
 }
 
+/// <summary>The simulation's shot kinds, in the order of its ActionKind from Power on.</summary>
+public enum ShotKind { Power, Finesse, Chip, Driven, LowFinesse }
+
+/// <summary>A shot under way (from the press to the end of its recovery) as plain values: the figure draws the pose and decides no timing.</summary>
+public struct FigureShot
+{
+    public bool Valid;
+    public ShotKind Kind;
+    public bool Right;
+    public BootSurface Surface;
+    /// <summary>The tick the shot was pressed on; identifies the shot.</summary>
+    public int Id;
+    public TouchPhase Phase;
+    /// <summary>Seconds since the press.</summary>
+    public float Elapsed;
+    /// <summary>Seconds from now to the contact (negative once it has passed); the core can move it until the contact.</summary>
+    public float ContactEta;
+    /// <summary>Seconds from the contact to the end of the recovery.</summary>
+    public float RecoverySeconds;
+    /// <summary>Ball centre at the contact (the prediction until the contact, then fixed) and the ball velocity applied then (zero before it).</summary>
+    public Vector3 ContactPoint, BallOutVelocity;
+    public bool Made;
+    /// <summary>Shoot not released yet: the contact tick is then only the earliest possible one.</summary>
+    public bool Held;
+}
+
 /// <summary>The simulation's skill moves, in the order of its ActionKind from StepOver on.</summary>
 public enum SkillKind { StepOver, BodyFeint, DragBack, BallRoll, FakeStop, FakeCut }
 
@@ -81,6 +107,8 @@ public struct FigureFrame
     public bool TouchEvent, StrikeEvent, EventRight;
     /// <summary>The skill move under way (a touch event it raises is <see cref="SkillTouch"/>, never <see cref="TouchEvent"/>).</summary>
     public FigureSkill Skill;
+    /// <summary>The shot under way (a touch event it raises is the strike event).</summary>
+    public FigureShot Shot;
     public bool SkillTouch;
     /// <summary>The simulation's stride clock (false when the frame carries none): phase 0..2 ([0,1) the right foot swings, [1,2) the left), steps per second,
     /// the swing foot, progress through its swing (0.5 = swing middle) and each foot's own phase (swing during [0, 0.5)).</summary>
@@ -248,6 +276,8 @@ public partial class PlayerFigure : Node3D
     float _strikeT = -1f, _windT, _lastCharge;
     bool _strikeRight, _backswingRight;
     float _backswing;
+    // the shot being drawn: its press tick, the highest charge seen since, the foot's body-relative start and its ankle at the contact
+    int _shId = int.MinValue; float _shCharge, _shSwingT; bool _shReleased; Vector3 _shFromRel; bool _shContactSet; Vector3 _shRelC;
     bool _stActive; Vector3 _stRel0; int _stFoot;
     Vector3 _contactAnkle, _contactDir, _followAnkle;
     // per-tick kick plan
@@ -644,6 +674,18 @@ public partial class PlayerFigure : Node3D
                 Stats.Touches++;
                 if (a.Right != f.EventRight || (f.HasGait && f.IsStepping && f.SwingRight != a.Right) || tw[fi] < 0.999f) Stats.FootMismatches++;
             }
+            else if (f.StrikeEvent && f.Shot.Valid)
+            {
+                // the boot's contact surface of the shot's foot against the ball surface, aimed at the action's contact point
+                int fi = f.Shot.Right ? 1 : 0;
+                Vector3 off = Off(fi, f.Shot.Surface);
+                Vector3 fd = dir[fi]; fd.Y = 0; fd = fd.Normalized();
+                Vector3 fr = new(-fd.Z, 0, fd.X);
+                Vector3 pt = ankEff[fi] + fd * off.X + Vector3.Up * off.Y + fr * off.Z;
+                float err = Math.Abs((pt - f.Shot.ContactPoint).Length() - f.BallRadius);
+                Stats.Contact.Add(err); Stats.ContactStrike.Add(err);
+                LastContactError = err;
+            }
             else
             {
                 // the instep point of the striking foot (or, if no kick was planned, the nearer foot) to the ball surface
@@ -857,6 +899,9 @@ public partial class PlayerFigure : Node3D
         float r = f.BallRadius;
         Vector3 posXZ = new(pos.X, 0, pos.Z);
         Vector3 ballXZ = new(f.BallPos.X, 0, f.BallPos.Z);
+        // a shot action owns the striking leg and the body from the press to the end of its recovery
+        if (!IsKeeper && f.Shot.Valid) { PlanShot(f, pos, fwd, right, k, hmax); return; }
+        _shId = int.MinValue;
         bool strikePending = !float.IsNaN(f.StrikeEta);
         float c = f.ShotCharge;
 
@@ -928,6 +973,114 @@ public partial class PlayerFigure : Node3D
         }
     }
 
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // shots
+
+    /// <summary>The ball-surface angle each shot is struck at, radians below the ball's centre (negative = above it).</summary>
+    static float StrikeAngle(ShotKind k) => k switch { ShotKind.Driven => -0.30f, ShotKind.Chip => 0.45f, ShotKind.Power => 0.12f, _ => 0.05f };
+
+    /// <summary>
+    /// Poses the striking leg and body for the shot action: the foot is drawn back over the windup (further for more charge), swings
+    /// through in the last part before the contact tick, meets the ball with the action's surface at its contact point on that tick and follows
+    /// through during the recovery. Timing is read from the action; nothing here decides when the ball is struck.
+    /// </summary>
+    void PlanShot(in FigureFrame f, Vector3 pos, Vector3 fwd, Vector3 right, float k, float hmax)
+    {
+        var sh = f.Shot;
+        int fi = sh.Right ? 1 : 0;
+        float side = fi == 1 ? 1f : -1f;
+        float r = f.BallRadius;
+        Vector3 posXZ = new(pos.X, 0, pos.Z);
+        if (sh.Id != _shId)
+        {
+            _shId = sh.Id; _shCharge = 0f; _shContactSet = false; _shReleased = false;
+            _shFromRel = _prevAnkRel[fi];
+        }
+        _shCharge = Math.Max(_shCharge, f.ShotCharge);
+        float cb = Mathf.Clamp(_shCharge, 0f, 1f);
+        // while the button is held the contact tick is only the earliest possible one, so the foot waits drawn back; after the release the
+        // tick is fixed, and the swing takes what is left of it (at most the kind's own swing time). A contact that cannot happen yet
+        // (ball out of reach) holds the foot at the ball until the core makes it.
+        float tau = sh.Made ? sh.ContactEta : Math.Max(sh.ContactEta, 0f);
+        float s = sh.Made ? Math.Max(0f, -tau) : 0f;     // seconds since the contact
+        float rec = Math.Max(sh.RecoverySeconds, 0.08f);
+        bool inside = sh.Kind is ShotKind.Finesse or ShotKind.LowFinesse or ShotKind.Chip;
+
+        // the direction the ball leaves in: the launch once made, else straight ahead
+        Vector3 d = new(sh.BallOutVelocity.X, 0, sh.BallOutVelocity.Z);
+        d = sh.Made && d.LengthSquared() > 0.04f ? d.Normalized() : fwd;
+        Vector3 fd = SurfaceDir(sh.Surface, fi, d);
+        Vector3 rv = new(-fd.Z, 0, fd.X);
+        Vector3 off = Off(fi, sh.Surface);
+        // the boot's surface point on the ball: behind it along the leave direction, higher or lower on it per kind
+        float th = StrikeAngle(sh.Kind);
+        Vector3 centre = sh.ContactPoint;
+        Vector3 p = centre - d * (r * Mathf.Cos(th)) - Vector3.Up * (r * Mathf.Sin(th));
+        Vector3 c0 = p - (fd * off.X + Vector3.Up * off.Y + rv * off.Z);
+
+        // wind-up pose: the foot drawn back behind the hip and lifted; a finesse foot also goes out to its side, a chip stays low
+        float b = 0.35f + 0.65f * cb;
+        float back = sh.Kind switch { ShotKind.Chip => 0.10f + 0.12f * b, ShotKind.Driven => 0.14f + 0.26f * b, ShotKind.Power => 0.16f + 0.30f * b, _ => 0.12f + 0.20f * b };
+        float lift = sh.Kind switch { ShotKind.Chip => 0.10f + 0.12f * b, ShotKind.Driven => 0.14f + 0.30f * b, ShotKind.Power => 0.22f + 0.50f * b, _ => 0.14f + 0.28f * b };
+        float outw = inside && sh.Kind != ShotKind.Chip ? 0.14f + 0.10f * b : 0f;
+        Vector3 wind = posXZ + right * (side * (HipW + outw * k)) - fwd * (back * k);
+        wind.Y = AnkleH + lift * k;
+
+        float swingT = sh.Kind switch { ShotKind.Driven => 0.12f, ShotKind.Chip => 0.14f, ShotKind.Power => 0.14f, _ => 0.17f };
+        if (!sh.Held && !_shReleased) { _shReleased = true; _shSwingT = Mathf.Clamp(tau, 0.04f, swingT); }
+        float sw = sh.Held && !sh.Made ? 0f : Mathf.Clamp(1f - tau / Math.Max(_shSwingT, 0.04f), 0f, 1f);
+        float draw = Smooth(sh.Elapsed / 0.16f);
+        Vector3 from = posXZ + new Vector3(_shFromRel.X, 0, _shFromRel.Z); from.Y = _shFromRel.Y;
+        Vector3 drawn = from.Lerp(wind, draw);
+
+        Vector3 ankle; Vector3 dirUse = fwd;
+        if (!sh.Made)
+        {
+            ankle = drawn.Lerp(c0, sw * sw);
+            dirUse = fwd.Lerp(fd, sw).Normalized();
+        }
+        else
+        {
+            // the contact tick and the recovery: the foot follows through from where it met the ball, relative to the body
+            if (!_shContactSet) { _shContactSet = true; _shRelC = c0 - posXZ; }
+            var (len, up, across, tf) = sh.Kind switch
+            {
+                ShotKind.Driven => (0.45f, 0.08f, 0f, 0.08f),
+                ShotKind.Chip => (0.26f, 0.26f, 0f, 0.09f),
+                ShotKind.Finesse => (0.34f, 0.16f, 0.26f, 0.14f),
+                ShotKind.LowFinesse => (0.42f, 0.04f, 0.22f, 0.12f),
+                _ => (0.42f + 0.15f * cb, 0.30f + 0.18f * cb, 0f, 0.14f),
+            };
+            float x = Mathf.Clamp(s / tf, 0f, 1f), u = 1f - (1f - x) * (1f - x);   // the foot leaves the ball fast and slows as the leg runs out
+            ankle = posXZ + _shRelC + d * (len * k * u) - right * (side * across * k * u);
+            ankle.Y = _shRelC.Y + up * k * u;
+            dirUse = fd;
+        }
+        _kFoot = fi; _kDir = dirUse; _seq = true; _kAnkle = ankle;
+        _kW = Math.Min(Smooth(sh.Elapsed / 0.10f), 1f - Smooth((s - 0.45f * rec) / (0.55f * rec)));
+
+        // the support foot plants beside where the ball will be, as far forward as the leg reaches, for the strike
+        if (!sh.Held && tau < 0.14f && s < 0.12f)
+        {
+            Vector3 pt = new Vector3(centre.X, 0, centre.Z) + right * (-side * 0.22f * k) - fwd * (0.05f * k);
+            Vector3 dv = pt - posXZ;
+            float maxD = hmax + 0.25f;
+            if (dv.Length() > maxD) pt = posXZ + dv.Normalized() * maxD;
+            _pinOn = true; _pinFoot = 1 - fi; _pinTarget = pt;
+        }
+
+        // body: leans back a little in the windup (more for power), over the ball for a driven shot, opened toward the target for a finesse
+        float wind01 = Smooth(sh.Elapsed / 0.2f) * (!sh.Made ? 1f : 1f - Smooth(s / 0.06f));
+        float fol = !sh.Made ? 0f : 1f - Smooth((s - 0.05f) / (rec - 0.05f));
+        float fwdLean = sh.Kind switch { ShotKind.Driven => 0.26f, ShotKind.Power => 0.18f, ShotKind.Chip => 0.08f, _ => 0.10f };
+        _leanExtra = (fwdLean + 0.05f * b) * fol;   // no backward lean here: the shoulders' offset shows the wind-up and the decel lean may already be at its limit
+        float open = inside && sh.Kind != ShotKind.Chip ? 1f : 0f;
+        float bodyW = Math.Max(wind01 * (!sh.Made ? 1f : 0f), fol);
+        _skShoulderOff = right * (side * 0.12f * k * open * bodyW) - fwd * (0.05f * k * open * bodyW)
+            + (sh.Kind == ShotKind.Power ? -fwd * (0.04f * k * b * wind01) : Vector3.Zero);
+        _skPelOff = right * (side * 0.04f * k * open * bodyW);
+    }
 
     // ---------------------------------------------------------------------------------------------------------------
     // skill moves

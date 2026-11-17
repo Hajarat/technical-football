@@ -98,6 +98,8 @@ public static class Movement
         // A skill move sets the running speed itself (it paces the player against the ball); otherwise it eases to the target.
         if (float.IsNaN(assist.RunSpeed)) speed += (target - speed) / tau * dt;
         else speed = assist.RunSpeed;
+        // The stun after a strike holds the running speed under its cap at once: the strike plants the shooter.
+        speed = MathF.Min(speed, assist.HardCap);
 
         float facing = p.Facing;
         if (mag > 0f)
@@ -144,6 +146,8 @@ public static class Movement
 
 /// <summary>
 /// Per-tick movement modifiers: the speed cap, a turn-rate scale, a steering correction velocity (world X, Z) and, for a skill
-/// move, the running speed to use this tick (NaN: the legs ease toward the stick's target as usual).
+/// move, the running speed to use this tick (NaN: the legs ease toward the stick's target as usual), and a running speed never
+/// exceeded this tick (the post-strike stun).
 /// </summary>
-internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Steer, float RunSpeed = float.NaN);
+internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Steer, float RunSpeed = float.NaN,
+    float HardCap = float.PositiveInfinity);

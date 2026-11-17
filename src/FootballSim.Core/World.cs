@@ -22,12 +22,11 @@ public sealed class World
     // Shoot input.
     bool _shootWasHeld;
     float _charge;
-    bool _latchFinesse, _latchChip;
+    bool _latchFinesse, _latchChip, _latchDriven;
     Vector2 _lastStick;
-    PendingShot _pending;      // a release waiting out the strike delay
-    PendingShot _buffered;     // a release waiting for the ball to come into reach
-    float _bufferLeft;
-    float _strikeLeft;
+    Vector2 _lastPushedStick;  // the latest left stick outside the dead zone, for the aim lock
+    int _lastPushedTick;
+    PendingShot _pending;      // a released shot waiting for its contact tick (and the ball in reach)
     float _outcomeLeft;
     float _liveSeconds;
     int _endTick;
@@ -49,6 +48,10 @@ public sealed class World
         public Vector2 Stick;
         public ShotType Type;
         public Foot Foot;
+        /// <summary>The earliest contact: the wind-up after the press and the lead after the release.</summary>
+        public int ContactTick;
+        /// <summary>Past this tick with the ball still out of reach, the shot is dropped.</summary>
+        public int DeadlineTick;
     }
 
     /// <summary>Creates a world in the Setup state, with the ball, attacker and keeper placed per the scenario.</summary>
@@ -99,6 +102,11 @@ public sealed class World
     public float Clock { get; private set; }
     /// <summary>0..1 while shoot is held; 0 otherwise.</summary>
     public float ShotCharge { get; private set; }
+    /// <summary>
+    /// The ideal charge (0..1) for a shot from the ball's current distance to the goal centre, for the HUD's marker. Charging
+    /// past it lifts the shot, short of it keeps it low (a chip goes deeper or shorter instead).
+    /// </summary>
+    public float IdealCharge { get; private set; }
     /// <summary>Ticks stepped since Begin.</summary>
     public int Tick { get; private set; }
     /// <summary>Simulation seconds since Begin (all states except Setup and Report).</summary>
@@ -137,8 +145,8 @@ public sealed class World
         if (State != RoundState.Live || !_shootWasHeld || ShotCharge <= 0f) return null;
         var ctx = new ShotContext
         {
-            Shooter = Attacker, Keeper = Keeper, BallPosition = Ball.Position, Stick = _lastStick, Charge = _charge,
-            Type = _latchChip ? ShotType.Chip : _latchFinesse ? ShotType.Finesse : ShotType.Normal, Foot = _strikeFoot,
+            Shooter = Attacker, Keeper = Keeper, BallPosition = Ball.Position, Stick = AimStick(_lastStick), Charge = _charge,
+            Type = ShotModel.TypeFor(_latchFinesse, _latchChip, _latchDriven), Foot = _strikeFoot,
         };
         return ShotModel.Preview(ctx, Pitch, Tuning);
     }
@@ -161,8 +169,9 @@ public sealed class World
         Clock = 0f; ShotCharge = 0f; Tick = 0; SimTime = 0f;
         Report = null;
         _events.Clear(); _shots.Clear(); _diagnostics.Clear();
-        _shootWasHeld = false; _charge = 0f; _latchFinesse = _latchChip = false; _lastStick = default;
-        _pending = default; _buffered = default; _bufferLeft = 0f; _strikeLeft = 0f; _outcomeLeft = 0f;
+        _shootWasHeld = false; _charge = 0f; _latchFinesse = _latchChip = _latchDriven = false; _lastStick = default;
+        _lastPushedStick = default; _lastPushedTick = int.MinValue / 2;
+        _pending = default; _outcomeLeft = 0f;
         _liveSeconds = 0f; _endTick = 0; _endClock = 0f; _lastShot = null;
         _controller = null; _awayFor = 0f; _softPending = false; _strikeFoot = Foot.Right;
         _shotStartTick = -1; _shotCancelled = false;
@@ -193,6 +202,7 @@ public sealed class World
             ResetPlayer(p);
         }
         _brain = new KeeperBrain(Keeper, Pitch, Tuning, Scenario.KeeperOnLine);
+        IdealCharge = ShotModel.IdealCharge(ShotModel.GoalDistance(Ball.Position, Pitch), Tuning);
     }
 
     /// <summary>The keeper's start: his set spot, or the scenario's distance off the line on the same ball-to-goal line.</summary>
@@ -236,8 +246,10 @@ public sealed class World
         p.SwingMiddleCrossed = null;
         p.SteerVelocity = Vector3.Zero;
         p.RunSpeed = 0f;
-        p.Action = null;
-        p.PreviousAction = null;
+        p.TouchAction = null;
+        p.PrevTouchAction = null;
+        p.ShotAction = null;
+        p.StunUntil = -100f;
         p.ActionContactEta = float.NaN;
         p.Recovering = false;
         p.LastTouchKind = ActionKind.First;
@@ -293,11 +305,11 @@ public sealed class World
         // 1. Attacker: movement, shoot input, touches.
         StepAttacker(atk);
 
-        // 2. Strike timer.
-        if (State == RoundState.Strike)
+        // 2. The released shot: contact on its tick if the ball is in reach, else as soon as it is, until the deadline.
+        if (State == RoundState.Strike && _pending.Active && Tick >= _pending.ContactTick)
         {
-            _strikeLeft -= _dt;
-            if (_strikeLeft <= 0f) ExecuteStrike();
+            if (ShotModel.CanStrike(Attacker, Ball, Tuning)) ExecuteStrike();
+            else if (Tick >= _pending.DeadlineTick) DropShot();
         }
 
         // 3. Keeper.
@@ -386,96 +398,144 @@ public sealed class World
 
     static bool IsFinite(Vector3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
 
+    int Ticks(float seconds) => Math.Max(0, (int)MathF.Round(seconds * Tuning.TickRate));
+
     void StepAttacker(in TickIntent it)
     {
         var p = Attacker;
         var tuning = Tuning;
         _lastStick = it.Move;
+        if (it.Move.Length() >= tuning.Movement.StickDeadZone) { _lastPushedStick = it.Move; _lastPushedTick = Tick; }
         bool inPossession = _controller == p;
 
         // Skill gestures are read every tick so their timing runs on through every state. A fake shot aborts the shot under
         // way and asks for its move; a knock-on flick asks for a knock-on like the knock-on button.
         var gesture = GestureReader.Read(p, it, Tick, tuning);
-        bool shotUnderWay = State == RoundState.Strike && _pending.Active
-            || State == RoundState.Live && (_shootWasHeld || _buffered.Active);
+        bool shotUnderWay = State == RoundState.Strike && _pending.Active || State == RoundState.Live && _shootWasHeld;
         var fake = GestureReader.ReadFakeShot(p, it, Tick, _shotStartTick, shotUnderWay, tuning);
         if (fake.Kind != Gesture.None) { AbortShot(it.ShootHeld); gesture = fake; }
         if (!it.ShootHeld) _shotCancelled = false;
         bool shootHeld = it.ShootHeld && !_shotCancelled;
         bool knockGesture = gesture.Kind == Gesture.KnockOn;
         if (gesture.Kind is not (Gesture.None or Gesture.KnockOn)) SkillMoves.Request(p, gesture, Tick);
-        if (State == RoundState.Live && !shootHeld && !_buffered.Active
+        if (State == RoundState.Live && !shootHeld
             && SkillMoves.TryStart(p, Ball, inPossession, Tick, SimTime, tuning) is SimEvent started)
             _events.Add(started);
 
-        var assist = TouchPlanner.BeginTick(p, it, Ball, inPossession, State == RoundState.Live, Tick, SimTime, tuning, Pitch, out var legs);
+        // A released shot waiting for its contact still steers the ball into the striking foot's zone (the soft touch).
+        bool windup = State == RoundState.Live && shootHeld || State == RoundState.Strike && _pending.Active;
+        var assist = TouchPlanner.BeginTick(p, it, Ball, inPossession, State == RoundState.Live || windup, Tick, SimTime, tuning, Pitch, out var legs);
+        if (windup && inPossession && p.SkillAction == null && p.TouchAction is not { Pending: true }) legs = TouchPlanner.ShotWindupLegs(p, legs, tuning);
         Movement.Step(p, legs, _dt, SimTime, assist, tuning, Pitch);
 
         // Other players on both teams stand still (no behaviour yet).
-        if (State != RoundState.Live)
+        if (State == RoundState.Live)
         {
-            _shootWasHeld = shootHeld;
-            ShotCharge = 0f;
-            return;
-        }
+            if ((it.KnockOn || knockGesture) && inPossession) TouchPlanner.RequestKnockOn(p);
 
-        if ((it.KnockOn || knockGesture) && inPossession) TouchPlanner.RequestKnockOn(p);
-
-        if (shootHeld)
-        {
-            if (!_shootWasHeld)
+            if (shootHeld)
             {
-                _shotStartTick = Tick;
-                _charge = 0f;
-                _latchFinesse = _latchChip = false;
-                _buffered = default;
-                _bufferLeft = 0f;
-                // In possession the next touch is a soft one, so the ball stays strikable through the charge. A touch already
-                // winding up is made first.
-                _softPending = inPossession;
-                if (_softPending) TouchPlanner.OnShootPressed(p, Tick, tuning);
-                _strikeFoot = ShotModel.StrikingFoot(p, Ball.Position, tuning);
-                p.StrikeFoot = _strikeFoot;
-            }
-            _charge = MathF.Min(1f, _charge + _dt / tuning.Shot.ChargeSeconds);
-            _latchFinesse |= it.Finesse;
-            _latchChip |= it.Chip;
-            ShotCharge = _charge;
-        }
-        else
-        {
-            ShotCharge = 0f;
-            _softPending = false;
-            if (_shootWasHeld)
-            {
-                var shot = new PendingShot
+                if (!_shootWasHeld) PressShoot(p, inPossession);
+                _charge = MathF.Min(1f, _charge + _dt / tuning.Shot.ChargeSeconds);
+                _latchFinesse |= it.Finesse;
+                _latchChip |= it.Chip;
+                _latchDriven |= it.Driven;
+                ShotCharge = _charge;
+                if (p.ShotAction is { } shot)
                 {
-                    Active = true,
-                    Charge = _charge,
-                    Stick = it.Move,
-                    Type = _latchChip ? ShotType.Chip : _latchFinesse ? ShotType.Finesse : ShotType.Normal,
-                    Foot = _strikeFoot,
-                };
-                _charge = 0f;
-                _latchFinesse = _latchChip = false;
-                if (ShotModel.CanStrike(p, Ball, tuning)) BeginStrike(shot);
-                else { _buffered = shot; _bufferLeft = tuning.Round.ShootBuffer; }
+                    var type = ShotModel.TypeFor(_latchFinesse, _latchChip, _latchDriven);
+                    shot.Kind = ShotModel.KindFor(type);
+                    shot.Surface = ShotModel.SurfaceFor(type);
+                    // The earliest contact if shoot were released on the next tick.
+                    shot.ContactTick = Math.Max(_shotStartTick + Ticks(tuning.Shot.WindupSeconds), Tick + 1 + Ticks(tuning.Shot.ReleaseLeadSeconds));
+                }
             }
-            else if (_buffered.Active)
+            else
             {
-                _bufferLeft -= _dt;
-                if (ShotModel.CanStrike(p, Ball, tuning)) { var s = _buffered; _buffered = default; BeginStrike(s); }
-                else if (_bufferLeft <= 0f) _buffered = default; // dropped: no strike, no report
+                ShotCharge = 0f;
+                if (_shootWasHeld) ReleaseShoot(p, it);
             }
         }
+        else ShotCharge = 0f;
         _shootWasHeld = shootHeld;
 
-        // Dribble touches are blocked while shoot is held (only the soft touch) and while a released shot waits for the ball.
-        if (State != RoundState.Live) return;
-        var mode = shootHeld
+        // While the shot winds up only the soft touch is made; during the stun after a strike none at all.
+        if (!windup && State != RoundState.Live) return;
+        var mode = windup
             ? (_softPending && _controller == p ? TouchStepMode.SoftOnly : TouchStepMode.None)
-            : (_buffered.Active ? TouchStepMode.None : TouchStepMode.Normal);
+            : TouchStepMode.Normal;
+        if (TouchPlanner.Stunned(p, SimTime)) mode = TouchStepMode.None;
         TryTouch(p, it, mode);
+    }
+
+    /// <summary>
+    /// The left stick that aims a shot released now: the stick itself, or, at rest, its last pushed direction if that push was
+    /// within the aim lock. At rest and older than that it stays at rest (the shot goes where the shooter faces).
+    /// </summary>
+    Vector2 AimStick(Vector2 stick)
+    {
+        if (stick.Length() >= Tuning.Movement.StickDeadZone) return stick;
+        return Tick - _lastPushedTick <= Ticks(Tuning.Shot.AimLockSeconds) ? _lastPushedStick : stick;
+    }
+
+    /// <summary>
+    /// Shoot pressed in Live: the shot action starts winding up. In possession the next touch is a soft one, so the ball stays
+    /// strikable through the wind-up (a touch already winding up is made first). A skill move under way ends here.
+    /// </summary>
+    void PressShoot(PlayerState p, bool inPossession)
+    {
+        var tuning = Tuning;
+        _shotStartTick = Tick;
+        _charge = 0f;
+        _latchFinesse = _latchChip = _latchDriven = false;
+        SkillMoves.Abort(p);
+        _softPending = inPossession;
+        if (_softPending) TouchPlanner.OnShootPressed(p, Tick, tuning);
+        _strikeFoot = ShotModel.StrikingFoot(p, Ball.Position, tuning);
+        p.StrikeFoot = _strikeFoot;
+        p.ShotAction = new BallAction
+        {
+            Kind = ActionKind.Power,
+            Phase = ActionPhase.Windup,
+            Foot = _strikeFoot,
+            Surface = FootSurface.Laces,
+            PlanTick = Tick,
+            ContactTick = Tick + Ticks(tuning.Shot.WindupSeconds),
+            ContactPoint = new Vector3(Ball.Position.X, Ball.Radius, Ball.Position.Z),
+        };
+    }
+
+    /// <summary>
+    /// Shoot released: the charge, type and aim are fixed, and the contact is set no sooner than the wind-up after the press
+    /// and the lead after the release. The round goes to Strike until then.
+    /// </summary>
+    void ReleaseShoot(PlayerState p, in TickIntent it)
+    {
+        var k = Tuning.Shot;
+        var type = ShotModel.TypeFor(_latchFinesse, _latchChip, _latchDriven);
+        int contact = Math.Max(_shotStartTick + Ticks(k.WindupSeconds), Tick + Ticks(k.ReleaseLeadSeconds));
+        _pending = new PendingShot
+        {
+            Active = true,
+            Charge = _charge,
+            Stick = AimStick(it.Move),
+            Type = type,
+            Foot = _strikeFoot,
+            ContactTick = contact,
+            DeadlineTick = contact + Ticks(Tuning.Round.ShootBuffer),
+        };
+        _charge = 0f;
+        _latchFinesse = _latchChip = _latchDriven = false;
+        if (p.ShotAction is { } shot)
+        {
+            shot.Kind = ShotModel.KindFor(type);
+            shot.Surface = ShotModel.SurfaceFor(type);
+            shot.ContactTick = contact;
+            shot.Released = true;
+        }
+        SkillMoves.Abort(p);
+        State = RoundState.Strike;
+        ShotCharge = 0f;
     }
 
     /// <summary>Lets a player touch the ball and raises the Touch event; a first contact with a loose ball gains possession.</summary>
@@ -521,7 +581,20 @@ public sealed class World
                 TouchPlanner.UpdatePhases(p, Tick, Tuning);
             }
         var a = Attacker;
-        if (State == RoundState.Strike && _pending.Active) a.StrikeEta = MathF.Max(0f, _strikeLeft);
+        if (a.ShotAction is { } shot)
+        {
+            shot.Phase = shot.PhaseAt(Tick, 0, 0);
+            if (shot.Phase == ActionPhase.Done) a.ShotAction = null;
+            else if (!shot.Made)
+            {
+                // The latest prediction of where the ball is met: the ball rolled on to the contact tick.
+                float eta = MathF.Max(0f, (shot.ContactTick - Tick) * _dt);
+                var at = Ball.Position + new Vector3(Ball.Velocity.X, 0f, Ball.Velocity.Z) * eta;
+                shot.ContactPoint = new Vector3(at.X, Ball.Radius, at.Z);
+            }
+        }
+        IdealCharge = ShotModel.IdealCharge(ShotModel.GoalDistance(Ball.Position, Pitch), Tuning);
+        if (State == RoundState.Strike && _pending.Active) a.StrikeEta = MathF.Max(0f, (_pending.ContactTick - Tick) * _dt);
         if (State == RoundState.Live && _controller == a)
         {
             var f = Possession.PredictNextTouch(a, Tick, true, Tuning);
@@ -540,20 +613,27 @@ public sealed class World
         _shootWasHeld = false;
         _shotStartTick = -1;
         _charge = 0f; ShotCharge = 0f;
-        _latchFinesse = _latchChip = false;
+        _latchFinesse = _latchChip = _latchDriven = false;
         _softPending = false;
-        _buffered = default; _bufferLeft = 0f;
         TouchPlanner.OnShotAborted(Attacker);
-        if (State == RoundState.Strike) { _pending = default; _strikeLeft = 0f; State = RoundState.Live; }
+        EndShotAction();
+        if (State == RoundState.Strike) { _pending = default; State = RoundState.Live; }
     }
 
-    void BeginStrike(PendingShot shot)
+    /// <summary>The released shot never found the ball in reach: no strike, no report, and play goes on.</summary>
+    void DropShot()
     {
-        SkillMoves.Abort(Attacker);
-        _pending = shot;
-        _strikeLeft = Tuning.Round.StrikeDelay;
-        State = RoundState.Strike;
-        ShotCharge = 0f;
+        _pending = default;
+        _softPending = false;
+        TouchPlanner.OnShotAborted(Attacker);
+        EndShotAction();
+        State = RoundState.Live;
+    }
+
+    /// <summary>A shot action not struck (faked, dropped, or the round ended) is done at once.</summary>
+    void EndShotAction()
+    {
+        if (Attacker.ShotAction is { Made: false } s) { s.Phase = ActionPhase.Done; Attacker.ShotAction = null; }
     }
 
     void ExecuteStrike()
@@ -569,6 +649,24 @@ public sealed class World
             Foot = _pending.Foot,
         };
         var result = ShotModel.Compute(ctx, Pitch, Tuning, _rng, Tick);
+        var a = Attacker;
+        if (a.ShotAction is { } shot)
+        {
+            shot.Kind = ShotModel.KindFor(result.Type);
+            shot.Surface = ShotModel.SurfaceFor(result.Type);
+            shot.Foot = result.Foot;
+            shot.Made = true;
+            shot.ContactTick = Tick;
+            shot.ContactPoint = Ball.Position;
+            shot.ContactMiss = 0f;
+            shot.BallOutVelocity = result.Launch;
+            shot.BallOutSpin = result.Spin;
+            shot.EndTick = Tick + Ticks(Tuning.Shot.RecoverySeconds);
+            shot.Phase = ActionPhase.Contact;
+        }
+        // The strike plants the shooter: slowed and without touches for a moment, longer after a harder shot.
+        a.StunUntil = SimTime + Tuning.Shot.StunBaseSeconds + Tuning.Shot.StunChargeSeconds * result.Charge;
+        _softPending = false;
         Ball.Velocity = result.Launch;
         Ball.Spin = result.Spin;
         Attacker.LastTouchTime = SimTime;
@@ -603,8 +701,8 @@ public sealed class World
         _endClock = Clock;
         ShotCharge = 0f;
         _pending = default;
-        _buffered = default;
         _softPending = false;
+        EndShotAction();
         if (outcome != Outcome.Held) SetController(null); // the ball is dead; a held ball stays the keeper's
     }
 

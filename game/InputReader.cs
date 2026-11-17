@@ -11,6 +11,7 @@ public struct PadSnapshot
     public bool ShootHeld;         // B / Circle
     public bool Finesse;           // right bumper
     public bool Chip;              // left bumper
+    public bool Driven;            // X / Square or keyboard C, held
     public bool KnockOn;           // keyboard X: true from the press for a short window (see InputReader); the pad's knock-on is a right-stick gesture read by the core
     public float RightX, RightZ;   // -1..1, radial dead zone applied; stick right = +RightX, stick up = -RightZ (read by the core's gesture reader)
     public bool Cancel;            // A / Cross or G held: a shot cancelled within the core's window becomes a fake
@@ -33,7 +34,7 @@ public partial class InputReader : Node
 {
     const float DeadZone = 0.15f;
     const string Left = "pad_left", Right = "pad_right", Up = "pad_up", Down = "pad_down",
-        SprintA = "pad_sprint", CloseA = "pad_close", Shoot = "pad_shoot", Fin = "pad_finesse", ChipA = "pad_chip",
+        SprintA = "pad_sprint", CloseA = "pad_close", Shoot = "pad_shoot", Fin = "pad_finesse", ChipA = "pad_chip", DrivenA = "pad_driven",
         Overlay = "pad_overlay", Next = "pad_next", Prev = "pad_prev", Confirm = "pad_confirm", Retry = "pad_retry",
         Flag = "pad_flag", Pause = "pad_pause", NextAtk = "pad_next_attacker", NextKeep = "pad_next_keeper",
         RLeft = "pad_rs_left", RRight = "pad_rs_right", RUp = "pad_rs_up", RDown = "pad_rs_down";
@@ -111,8 +112,8 @@ public partial class InputReader : Node
 
     void BindFaceButtons()
     {
-        foreach (var a in new[] { Shoot, Confirm, Retry }) { if (InputMap.HasAction(a)) InputMap.ActionEraseEvents(a); }
-        Btn(Shoot, Face(JoyButton.B)); Btn(Confirm, Face(JoyButton.A)); Btn(Retry, Face(JoyButton.Y));
+        foreach (var a in new[] { Shoot, Confirm, Retry, DrivenA }) { if (InputMap.HasAction(a)) InputMap.ActionEraseEvents(a); }
+        Btn(Shoot, Face(JoyButton.B)); Btn(Confirm, Face(JoyButton.A)); Btn(Retry, Face(JoyButton.Y)); Btn(DrivenA, Face(JoyButton.X));
     }
 
     /// <summary>Notices a new or changed pad and picks its swap setting: the saved choice if there is one, else the default.</summary>
@@ -170,7 +171,7 @@ public partial class InputReader : Node
     }
 
     static bool PadTouched(in PadSnapshot p) =>
-        p.MoveX != 0 || p.MoveZ != 0 || p.Sprint > 0.05f || p.CloseControl || p.ShootHeld || p.Finesse || p.Chip || p.KnockOn ||
+        p.MoveX != 0 || p.MoveZ != 0 || p.Sprint > 0.05f || p.CloseControl || p.ShootHeld || p.Finesse || p.Chip || p.Driven || p.KnockOn ||
         p.RightX != 0 || p.RightZ != 0 || p.Cancel || p.SkillKey != FootballSim.Core.SkillKey.None ||
         p.OverlayToggle || p.NextSpot || p.PrevSpot || p.NextAttacker || p.NextKeeper || p.Confirm || p.Retry || p.Flag || p.Pause;
 
@@ -179,7 +180,7 @@ public partial class InputReader : Node
         var m = a;
         if (new Vector2(b.MoveX, b.MoveZ).LengthSquared() > new Vector2(a.MoveX, a.MoveZ).LengthSquared()) { m.MoveX = b.MoveX; m.MoveZ = b.MoveZ; }
         m.Sprint = Mathf.Max(a.Sprint, b.Sprint);
-        m.CloseControl |= b.CloseControl; m.ShootHeld |= b.ShootHeld; m.Finesse |= b.Finesse; m.Chip |= b.Chip; m.KnockOn |= b.KnockOn; m.Cancel |= b.Cancel;
+        m.CloseControl |= b.CloseControl; m.ShootHeld |= b.ShootHeld; m.Finesse |= b.Finesse; m.Chip |= b.Chip; m.Driven |= b.Driven; m.KnockOn |= b.KnockOn; m.Cancel |= b.Cancel;
         if (new Vector2(b.RightX, b.RightZ).LengthSquared() > new Vector2(a.RightX, a.RightZ).LengthSquared()) { m.RightX = b.RightX; m.RightZ = b.RightZ; }
         if (b.SkillKey != FootballSim.Core.SkillKey.None) m.SkillKey = b.SkillKey;
         m.OverlayToggle |= b.OverlayToggle; m.NextSpot |= b.NextSpot; m.PrevSpot |= b.PrevSpot;
@@ -202,6 +203,7 @@ public partial class InputReader : Node
             ShootHeld = Held(Key.Space),
             Finesse = Held(Key.E),
             Chip = Held(Key.Q),
+            Driven = Held(Key.C),
             KnockOn = Pressed(Key.X, Key.X),
             Cancel = Held(Key.G),
             SkillKey = SkillKeyPressed(),
@@ -246,6 +248,7 @@ public partial class InputReader : Node
             ShootHeld = Input.IsActionPressed(Shoot),
             Finesse = Input.IsActionPressed(Fin),
             Chip = Input.IsActionPressed(ChipA),
+            Driven = Input.IsActionPressed(DrivenA),
             RightX = r.X,
             RightZ = r.Y,
             // A / Cross doubles as confirm, but the round flow reads confirm only in Setup and Report, never while live.

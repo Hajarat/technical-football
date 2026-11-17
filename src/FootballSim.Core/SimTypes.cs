@@ -26,8 +26,11 @@ public enum Outcome { None, Goal, Held, Wide, Over, Claimed, Out, TimeUp }
 /// </remarks>
 public enum EventKind { Touch, Strike, Bounce, FrameHit, Save, Goal, OutOfPlay, PossessionGained, PossessionLost, BoardHit, SkillMove }
 
-/// <summary>Shot flavour chosen by the bumpers.</summary>
-public enum ShotType { Normal, Finesse, Chip }
+/// <summary>
+/// Shot flavour chosen by the modifiers held while shooting: chip wins; driven with finesse is a low finesse; then driven,
+/// finesse, and power when none is held.
+/// </summary>
+public enum ShotType { Power, Finesse, Chip, Driven, LowFinesse }
 
 /// <summary>Which foot strikes.</summary>
 public enum Foot { Left, Right }

@@ -61,7 +61,7 @@ public static class Possession
     /// </summary>
     public static TouchForecast PredictNextTouch(PlayerState p, int tick, bool inPossession, Tuning t)
     {
-        var a = p.Action;
+        var a = p.TouchAction;
         if (!inPossession || a == null || !a.Pending) return TouchForecast.None;
         return new TouchForecast(a.ContactEta(tick, t.Dt), a.Foot, a.ContactPoint);
     }

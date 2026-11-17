@@ -41,8 +41,15 @@ public sealed class ShotResult
     public float Charge { get; init; }
     /// <summary>Standard deviation of the sideways error, degrees.</summary>
     public float SigmaH { get; init; }
-    /// <summary>Standard deviation of the vertical error, degrees.</summary>
+    /// <summary>Standard deviation of the random part of the vertical error, degrees.</summary>
     public float SigmaV { get; init; }
+    /// <summary>The ideal charge for the shot's distance (see <see cref="ShotModel.IdealCharge"/>).</summary>
+    public float IdealCharge { get; init; }
+    /// <summary>
+    /// The mean vertical error from missing the ideal charge, degrees (positive rises). Zero for a chip, whose miss goes into
+    /// its speed instead.
+    /// </summary>
+    public float ChargeMissDeg { get; init; }
     /// <summary>The multipliers that make up M, by name: speed, angle, foot, pressure, power, air, type.</summary>
     public IReadOnlyList<ShotFactor> Factors { get; init; } = Array.Empty<ShotFactor>();
     /// <summary>Launch speed, m/s.</summary>
@@ -57,7 +64,7 @@ public sealed class ShotResult
     public float IntendedYaw { get; init; }
     /// <summary>The sideways error actually drawn, degrees (launch yaw minus intended yaw).</summary>
     public float YawErrorDeg { get; init; }
-    /// <summary>The vertical error actually drawn, degrees.</summary>
+    /// <summary>The vertical error, degrees: the charge miss plus the random part drawn.</summary>
     public float PitchErrorDeg { get; init; }
     /// <summary>Elevation before error, degrees.</summary>
     public float ElevationDeg { get; init; }
@@ -73,8 +80,8 @@ public sealed class ShotResult
 }
 
 /// <summary>
-/// The shot model: charge, target from the stick, aim assist, striking foot, the spread multipliers, the three shot types,
-/// the error draw, launch velocity and spin.
+/// The shot model: charge, target from the stick, aim assist, striking foot, the spread multipliers, the five shot types,
+/// the ideal charge, the error draw, launch velocity and spin.
 /// </summary>
 public static class ShotModel
 {
@@ -91,6 +98,33 @@ public static class ShotModel
 
     /// <summary>Charge after holding shoot for <paramref name="seconds"/>: 0 to 1 over the charge time.</summary>
     public static float ChargeAfter(float seconds, Tuning t) => Math.Clamp(seconds / t.Shot.ChargeSeconds, 0f, 1f);
+
+    /// <summary>The ideal charge for a shot from <paramref name="distance"/> metres from the goal centre.</summary>
+    public static float IdealCharge(float distance, Tuning t) => Math.Clamp(t.Shot.IdealCharge.Evaluate(distance), 0f, 1f);
+
+    /// <summary>Distance from a ball position to the goal centre on the goal line, metres (ground plane).</summary>
+    public static float GoalDistance(Vector3 ball, Pitch pitch) => new Vector2(pitch.GoalLineX - ball.X, ball.Z).Length();
+
+    /// <summary>The shot type for the modifiers held: chip wins; driven with finesse is a low finesse; then driven, finesse, power.</summary>
+    public static ShotType TypeFor(bool finesse, bool chip, bool driven) =>
+        chip ? ShotType.Chip
+        : driven && finesse ? ShotType.LowFinesse
+        : driven ? ShotType.Driven
+        : finesse ? ShotType.Finesse
+        : ShotType.Power;
+
+    /// <summary>The shot action kind for a shot type.</summary>
+    public static ActionKind KindFor(ShotType type) => type switch
+    {
+        ShotType.Finesse => ActionKind.Finesse,
+        ShotType.Chip => ActionKind.Chip,
+        ShotType.Driven => ActionKind.Driven,
+        ShotType.LowFinesse => ActionKind.LowFinesse,
+        _ => ActionKind.Power,
+    };
+
+    /// <summary>The part of the foot a shot type is struck with: laces for power and driven, the inside for the rest.</summary>
+    public static FootSurface SurfaceFor(ShotType type) => type is ShotType.Power or ShotType.Driven ? FootSurface.Laces : FootSurface.Inside;
 
     /// <summary>
     /// The striking foot: the preferred foot, unless the ball is more than 0.25 m to the other side of the facing line.
@@ -144,7 +178,7 @@ public static class ShotModel
         return fin + (lng - fin) * (distance - a) / (b - a);
     }
 
-    /// <summary>sigma_h = (7.0 - 6.2 * r01(skill)) * M * error_scale, degrees.</summary>
+    /// <summary>sigma_h = (base_sigma_deg - sigma_skill_slope * r01(skill)) * M * error_scale, degrees.</summary>
     public static float SigmaH(float skillR01, float m, Tuning t) =>
         (t.Shot.BaseSigmaDeg - t.Shot.SigmaSkillSlope * skillR01) * m * t.ErrorScale;
 
@@ -154,12 +188,14 @@ public static class ShotModel
     /// <summary>Intended launch speed, m/s, for a type and charge, before the speed noise.</summary>
     public static float IntendedSpeed(PlayerSheet s, ShotType type, float charge, Tuning t)
     {
-        float normal = MaxSpeed(s, t) * (t.Shot.ChargeBaseSpeed + t.Shot.ChargeSpeedSlope * charge);
+        float power = MaxSpeed(s, t) * (t.Shot.ChargeBaseSpeed + t.Shot.ChargeSpeedSlope * charge);
         return type switch
         {
-            ShotType.Finesse => normal * t.Shot.FinesseSpeedFraction,
-            ShotType.Chip => normal * t.Shot.ChipSpeedFraction,
-            _ => normal,
+            ShotType.Finesse => power * t.Shot.FinesseSpeedFraction,
+            ShotType.LowFinesse => power * t.Shot.LowFinesseSpeedFraction,
+            ShotType.Chip => power * t.Shot.ChipSpeedFraction,
+            ShotType.Driven => power * t.Shot.DrivenSpeedFactor,
+            _ => power,
         };
     }
 
@@ -167,8 +203,10 @@ public static class ShotModel
     public static float ElevationDeg(ShotType type, float charge, Tuning t) => type switch
     {
         ShotType.Finesse => t.Shot.FinesseElevationBaseDeg + t.Shot.FinesseElevationChargeDeg * charge,
+        ShotType.LowFinesse => t.Shot.LowFinesseElevationBaseDeg + t.Shot.LowFinesseElevationChargeDeg * charge,
         ShotType.Chip => t.Shot.ChipElevationBaseDeg + t.Shot.ChipElevationChargeDeg * charge,
-        _ => t.Shot.NormalElevationBaseDeg + t.Shot.NormalElevationChargeDeg * charge,
+        ShotType.Driven => t.Shot.DrivenElevationBaseDeg + t.Shot.DrivenElevationChargeDeg * charge,
+        _ => t.Shot.PowerElevationBaseDeg + t.Shot.PowerElevationChargeDeg * charge,
     };
 
     /// <summary>The spread multipliers M = speed * angle * foot * pressure * power * air * type, each by name.</summary>
@@ -202,8 +240,10 @@ public static class ShotModel
         float mType = c.Type switch
         {
             ShotType.Finesse => k.FinesseTypeMultiplier,
+            ShotType.LowFinesse => k.LowFinesseTypeMultiplier,
             ShotType.Chip => k.ChipTypeMultiplier,
-            _ => k.NormalTypeMultiplier,
+            ShotType.Driven => k.DrivenTypeMultiplier,
+            _ => k.PowerTypeMultiplier,
         };
 
         return new[]
@@ -238,9 +278,17 @@ public static class ShotModel
         float elev = ElevationDeg(c.Type, c.Charge, t);
         float vIntended = IntendedSpeed(p.Sheet, c.Type, c.Charge, t);
 
+        // Missing the ideal charge for the distance: too much rises, too little drives low. A chip's height is set by its
+        // loft, so its miss changes how far it carries instead.
+        float ideal = IdealCharge(distance, t);
+        float miss = c.Charge - ideal;
+        bool chip = c.Type == ShotType.Chip;
+        float missDeg = chip ? 0f : k.ChargeMissPitchDeg * miss;
+        float speedMiss = chip ? MathF.Max(0.1f, 1f + k.ChipChargeMissSpeed * miss) : 1f;
+
         float yawErr = rng.Normal(0f, sigmaH);
-        float pitchErr = rng.Normal(0f, sigmaV);
-        float speed = MathF.Max(0.1f, vIntended * rng.Normal(1f, k.SpeedNoise));
+        float pitchErr = missDeg + rng.Normal(0f, sigmaV);
+        float speed = MathF.Max(0.1f, vIntended * speedMiss * rng.Normal(1f, k.SpeedNoise));
 
         const float deg = MathF.PI / 180f;
         float yaw = yaw0 + yawErr * deg;
@@ -248,16 +296,19 @@ public static class ShotModel
         var dir = new Vector3(MathF.Cos(pitchRad) * MathF.Cos(yaw), MathF.Sin(pitchRad), MathF.Cos(pitchRad) * MathF.Sin(yaw));
         Vector3 launch = dir * speed;
 
+        // Side spin (about the axis that bends the ball sideways) grows with the launch speed and the curve rating.
         Vector3 spin;
         const float rev = 2f * MathF.PI;
+        float speedScale = speed / MathF.Max(0.1f, k.SpinReferenceSpeed);
+        var rightOfShot = new Vector3(-MathF.Sin(yaw), 0f, MathF.Cos(yaw));
         switch (c.Type)
         {
             case ShotType.Finesse:
+            case ShotType.LowFinesse:
             {
                 // Bends away from the striking foot's side: a right foot bends left. Force = spin x velocity, so spin = v x bend.
-                var rightOfShot = new Vector3(-MathF.Sin(yaw), 0f, MathF.Cos(yaw));
                 Vector3 bend = foot == Foot.Right ? -rightOfShot : rightOfShot;
-                spin = Vector3.Normalize(Vector3.Cross(dir, bend)) * (k.FinesseSpinRev.ForRating(p.Sheet.Curve) * rev);
+                spin = Vector3.Normalize(Vector3.Cross(dir, bend)) * (k.FinesseSpinRev.ForRating(p.Sheet.Curve) * speedScale * rev);
                 break;
             }
             case ShotType.Chip:
@@ -269,8 +320,10 @@ public static class ShotModel
             }
             default:
             {
-                Vector3 axis = rng.UnitVector();
-                spin = axis * (rng.Uniform(0f, k.NormalSpinMaxRev) * rev);
+                // Power: a light curl to either side; driven: barely any. Signed amount, so the side is part of the draw.
+                var range = c.Type == ShotType.Driven ? k.DrivenSpinRev : k.PowerSpinRev;
+                float amount = rng.Uniform(-1f, 1f) * range.ForRating(p.Sheet.Curve) * speedScale;
+                spin = Vector3.Normalize(Vector3.Cross(dir, rightOfShot)) * (amount * rev);
                 break;
             }
         }
@@ -288,6 +341,8 @@ public static class ShotModel
             Charge = c.Charge,
             SigmaH = sigmaH,
             SigmaV = sigmaV,
+            IdealCharge = ideal,
+            ChargeMissDeg = missDeg,
             Factors = factors,
             Speed = speed,
             Spin = spin,
