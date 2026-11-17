@@ -498,3 +498,6 @@ replays/
 
 # Per-launch session logs
 sessions/
+
+# Orca worktrees
+.worktrees/
