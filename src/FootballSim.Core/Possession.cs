@@ -15,19 +15,33 @@ public readonly record struct TouchForecast(float Eta, Foot Foot, Vector3 Point)
 /// </summary>
 public static class Possession
 {
-    /// <summary>Distance beyond which the ball counts as away from the player: 2.0 m at walking pace to 3.5 m at a sprint.</summary>
+    /// <summary>
+    /// Distance beyond which the ball counts as away from the player: 2.0 m at walking pace to 3.5 m at a sprint. While the
+    /// player chases a knock-on (see <see cref="ChasingKnockOn"/>) the ball is never away.
+    /// </summary>
     public static float LoseDistance(PlayerState p, Tuning t)
     {
+        if (ChasingKnockOn(p, t)) return float.PositiveInfinity;
         var k = t.Possession;
         float frac = Math.Clamp(p.Speed / Movement.TopSpeed(p.Sheet, t), 0f, 1f);
         return k.LoseDistanceSlow + (k.LoseDistanceFast - k.LoseDistanceSlow) * frac;
     }
 
-    /// <summary>The speed cap for a player: off-ball top speed off possession; in possession the with-ball cap, raised toward
-    /// 97% of top speed while the ball is ahead and out of reach.</summary>
-    internal static float SpeedCap(PlayerSheet s, Vector3 feet, float facing, Vector3 ball, bool inPossession, Tuning t)
+    /// <summary>
+    /// True while the player's last touch was a knock-on, its planned catch time plus the grace has not passed, and the player
+    /// still runs along it at knock_on_chase_min_speed or faster. The next touch, the grace running out, or easing off ends
+    /// the chase; then the normal lose distance applies.
+    /// </summary>
+    public static bool ChasingKnockOn(PlayerState p, Tuning t) =>
+        p.KnockOnFrom == p.LastTouchTime
+        && p.MoveTime < p.KnockOnUntil
+        && Vector2.Dot(new Vector2(p.Velocity.X, p.Velocity.Z), p.KnockOnDirection) >= t.Touch.KnockOnChaseMinSpeed;
+
+    /// <summary>The speed cap for a player: off-ball top speed off possession or while chasing a knock-on; in possession the
+    /// with-ball cap, raised toward 97% of top speed while the ball is ahead and out of reach.</summary>
+    internal static float SpeedCap(PlayerSheet s, Vector3 feet, float facing, Vector3 ball, bool inPossession, Tuning t, bool chasing = false)
     {
-        if (!inPossession) return Movement.TopSpeed(s, t);
+        if (!inPossession || chasing) return Movement.TopSpeed(s, t);
         float withBall = Movement.TopSpeedWithBall(s, t);
         var rel = new Vector2(ball.X - feet.X, ball.Z - feet.Z);
         float ahead = Vector2.Dot(rel, new Vector2(MathF.Cos(facing), MathF.Sin(facing)));
@@ -44,7 +58,7 @@ public static class Possession
     internal static MoveAssist Assist(PlayerState p, in TickIntent intent, Ball ball, bool inPossession, Tuning t)
     {
         var k = t.Possession;
-        float cap = SpeedCap(p.Sheet, p.Position, p.Facing, ball.Position, inPossession, t);
+        float cap = SpeedCap(p.Sheet, p.Position, p.Facing, ball.Position, inPossession, t, inPossession && ChasingKnockOn(p, t));
         if (!inPossession) return new MoveAssist(cap, 1f + k.OffBallTurnBonus, Vector2.Zero);
 
         Vector2 lateral = Vector2.Zero;
@@ -105,7 +119,7 @@ public static class Possession
 
     /// <summary>
     /// Predicts the next touch of a player in possession. The ball is integrated forward on its own (rolling, bouncing) and the
-    /// player along its facing with the speed easing toward the stick's target, until the ball is in reach and the touch timing
+    /// player along its facing with the speed easing toward the stick's target (touch boost included), until the ball is in reach and the touch timing
     /// allows it, up to the prediction horizon. Returns <see cref="TouchForecast.None"/> when no touch is expected: no
     /// possession, shoot held after the soft touch, or the stick released with the ball already settling at the feet.
     /// </summary>
@@ -132,14 +146,14 @@ public static class Possession
         float facing = p.Facing;
         var dir = new Vector3(MathF.Cos(facing), 0f, MathF.Sin(facing));
         float speed = MathF.Max(0f, Vector3.Dot(p.Velocity, dir));
-        float tau = MathF.Max(Movement.TimeConstant(sheet, t), dt);
         var m = t.Movement;
         float mag = MathF.Min(1f, intent.Move.Length());
         if (mag < m.StickDeadZone || shootHeld && !stickActive) mag = 0f;
         float mode = intent.CloseControl ? m.CloseControlFraction
             : m.JogFraction + (m.SprintFraction - m.JogFraction) * Math.Clamp(intent.Sprint, 0f, 1f);
         float withBall = Movement.TopSpeedWithBall(sheet, t);
-        float chase = MathF.Max(withBall, Movement.TopSpeed(sheet, t) * t.Possession.ChaseSpeedFraction);
+        float chase = ChasingKnockOn(p, t) ? Movement.TopSpeed(sheet, t)
+            : MathF.Max(withBall, Movement.TopSpeed(sheet, t) * t.Possession.ChaseSpeedFraction);
         float reach = TouchModel.FootReach(sheet, t);
         float reach2 = reach * reach;
         float carry = reach + t.Possession.ReachBallMargin;
@@ -179,7 +193,7 @@ public static class Possession
                 float l = MathF.Sqrt(d2);
                 dir = new Vector3(rx / l, 0f, rz / l);
             }
-            speed += (target - speed) / tau * dt;
+            speed += (target - speed) / MathF.Max(Movement.TimeConstantAt(p, now + j * dt, t), dt) * dt;
             feet += dir * (MathF.Max(speed, 0f) * dt);
             if (since0 + j * dt >= interval - 1e-5f && TouchModel.InReach(sheet, feet, bp, t))
                 return new TouchForecast(j * dt, TouchModel.ChooseFoot(sheet, feet, facing, bp, t), bp);

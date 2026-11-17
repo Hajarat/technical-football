@@ -234,7 +234,7 @@ public partial class Match
     static TickIntent FromPad(in PadSnapshot p) => new()
     {
         MoveX = p.MoveX, MoveZ = p.MoveZ, Sprint = p.Sprint, CloseControl = p.CloseControl,
-        ShootHeld = p.ShootHeld, Finesse = p.Finesse, Chip = p.Chip,
+        ShootHeld = p.ShootHeld, Finesse = p.Finesse, Chip = p.Chip, KnockOn = p.KnockOn,
     };
 
     /// <summary>The round reached Report: save its replay into the session folder, log it, print one console line.</summary>

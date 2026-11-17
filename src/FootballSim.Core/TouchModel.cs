@@ -2,15 +2,15 @@ using System.Numerics;
 
 namespace FootballSim.Core;
 
-/// <summary>How the player is moving the ball, which sets the touch cadence and overshoot.</summary>
+/// <summary>How the player is moving the ball, which sets the touch cadence and lead.</summary>
 public enum TouchMode { CloseControl, Jog, Sprint }
 
 /// <summary>What a touch did.</summary>
 public enum TouchKind
 {
-    /// <summary>An ordinary dribble touch: the ball leaves at the player's speed plus the overshoot.</summary>
+    /// <summary>An ordinary dribble touch, planned so the ball arrives a short lead ahead of the feet at the next touch.</summary>
     Dribble,
-    /// <summary>An early touch to follow a change of direction.</summary>
+    /// <summary>An early touch to follow a change of direction, planned like a dribble touch.</summary>
     Turn,
     /// <summary>A sharp turn at speed: the ball leaves in the new direction at the player's post-turn speed.</summary>
     Cut,
@@ -20,6 +20,8 @@ public enum TouchKind
     Soft,
     /// <summary>First contact with a loose ball (first_touch rating). The player gains possession.</summary>
     First,
+    /// <summary>A heavy touch far ahead to run onto (knock-on press); possession is kept while the player chases it.</summary>
+    KnockOn,
 }
 
 /// <summary>A touch as made: its kind, the foot, where the ball was, and the ball velocity it left with.</summary>
@@ -28,8 +30,9 @@ public readonly record struct TouchResult(TouchKind Kind, Foot Foot, Vector3 Con
 
 /// <summary>
 /// Touches. The ball stays a free physical object; a touch is a discrete event that sets its velocity relative to the
-/// player's. In possession the ball leaves at the player's speed along the stick times (1 + a small overshoot), so touches are
-/// small and frequent; off possession the first contact uses the first_touch rating. Models take a player and the ball.
+/// player's. In possession a dribble touch is planned: the ball is given the rolling speed that brings it, one cadence later,
+/// to a short lead ahead of where the feet will be, so touches are small and frequent; off possession the first contact uses
+/// the first_touch rating. Models take a player and the ball.
 /// </summary>
 public static class TouchModel
 {
@@ -54,13 +57,61 @@ public static class TouchModel
         _ => t.Touch.SprintCadence,
     };
 
-    /// <summary>Overshoot for a mode: the ball leaves at the player's speed times (1 + this). Sprint depends on dribbling.</summary>
+    /// <summary>First-touch overshoot for a mode: the ball leaves at the player's speed times (1 + this). Sprint depends on dribbling.</summary>
     public static float Overshoot(PlayerSheet s, TouchMode mode, Tuning t) => mode switch
     {
         TouchMode.CloseControl => t.Touch.CloseControlOvershoot,
         TouchMode.Jog => t.Touch.JogOvershoot,
         _ => t.Touch.SprintOvershoot.ForRating(s.Dribbling),
     };
+
+    /// <summary>How far ahead of the feet at the next touch a planned touch aims the ball, metres (dribbling).</summary>
+    public static float Lead(PlayerSheet s, TouchMode mode, Tuning t) => mode switch
+    {
+        TouchMode.CloseControl => t.Touch.CloseControlLead.ForRating(s.Dribbling),
+        TouchMode.Jog => t.Touch.JogLead.ForRating(s.Dribbling),
+        _ => t.Touch.SprintLead.ForRating(s.Dribbling),
+    };
+
+    /// <summary>Ticks from a touch to the first tick a mode's cadence allows the next ordinary touch.</summary>
+    public static int CadenceTicks(TouchMode mode, Tuning t) => Math.Max(1, (int)MathF.Ceiling(Cadence(mode, t) / t.Dt - 1e-3f));
+
+    /// <summary>
+    /// Ground speed that makes a ball rolling with constant deceleration <paramref name="decel"/> cover <paramref name="distance"/>
+    /// in <paramref name="time"/>: (d + a T^2 / 2) / T. When that would stop the ball before the time is up (v &lt; a T), the
+    /// speed that brings it to rest at the distance, sqrt(2 a d). Zero for a distance of zero or less. m/s.
+    /// </summary>
+    public static float RollSpeedFor(float distance, float time, float decel)
+    {
+        if (distance <= 0f) return 0f;
+        float v = (distance + 0.5f * decel * time * time) / time;
+        return v >= decel * time ? v : MathF.Sqrt(2f * decel * distance);
+    }
+
+    /// <summary>
+    /// The planned ball speed along <paramref name="dir"/>: the rolling speed that takes the ball from where it is to
+    /// <paramref name="lead"/> metres ahead of where the feet will be after <paramref name="ticks"/> ticks of running along
+    /// <paramref name="dir"/> toward the intent's target speed under <paramref name="cap"/> (Movement's model, touch boost included).
+    /// </summary>
+    internal static float PlannedSpeed(PlayerState p, in TickIntent intent, Ball ball, Vector3 dir, float now, int ticks, float cap,
+        float lead, Tuning t)
+    {
+        float v0 = Vector3.Dot(Flat(p.Velocity), dir);
+        float run = Movement.RunDistance(p, v0, Movement.TargetSpeed(intent, cap, t), now, ticks, t);
+        float d = run + lead - Vector3.Dot(Flat(ball.Position - p.Position), dir);
+        return RollSpeedFor(d, ticks * t.Dt, t.Ball.RollDeceleration);
+    }
+
+    /// <summary>Touch boost factor: 1 + touch_boost (dribbling) + the turn extra, linear in the turn angle up to its full angle.</summary>
+    public static float TouchBoostFactor(PlayerSheet s, float turnDeg, Tuning t)
+    {
+        var k = t.Touch;
+        float ramp = k.TouchBoostTurnFullDeg > 0f ? Math.Clamp(turnDeg / k.TouchBoostTurnFullDeg, 0f, 1f) : 1f;
+        return 1f + k.TouchBoost.ForRating(s.Dribbling) + k.TouchBoostTurnExtra * ramp;
+    }
+
+    /// <summary>Seconds after a knock-on at which the chasing player is planned to meet the ball (dribbling).</summary>
+    public static float KnockOnCatchTime(PlayerSheet s, Tuning t) => t.Touch.KnockOnCatchTime.ForRating(s.Dribbling);
 
     /// <summary>Smallest ball speed a touch gives, m/s.</summary>
     public static float MinPush(TouchMode mode, Tuning t) =>
@@ -181,6 +232,7 @@ public static class TouchModel
         var mode = ModeFor(intent, t);
 
         TouchKind kind;
+        float turnDeg = 0f;
         if (softOnly)
         {
             // The press is deliberate: the soft touch does not wait for the cadence, or a sprint touch just made would carry
@@ -194,6 +246,7 @@ public static class TouchModel
             if (!stickActive && relSpeed < k.FirstTouchMinRelativeSpeed) return false; // a still ball and no stick: stand by it
             kind = TouchKind.First;
         }
+        else if (intent.KnockOn && since >= k.TurnMinInterval) kind = TouchKind.KnockOn;
         else if (!stickActive)
         {
             if (since < k.TurnMinInterval || !NeedsTrap(p, p.Position, ball.Position, ball.Velocity, t)) return false;
@@ -201,9 +254,9 @@ public static class TouchModel
         }
         else
         {
-            float turn = TurnAngleDeg(p, ball, stick);
-            if (turn > k.TurnTriggerDeg && since >= k.TurnMinInterval)
-                kind = turn > k.CutDeg && p.Speed > k.CutMinSpeed ? TouchKind.Cut : TouchKind.Turn;
+            turnDeg = TurnAngleDeg(p, ball, stick);
+            if (turnDeg > k.TurnTriggerDeg && since >= k.TurnMinInterval)
+                kind = turnDeg > k.CutDeg && p.Speed > k.CutMinSpeed ? TouchKind.Cut : TouchKind.Turn;
             else if (since >= Cadence(mode, t)) kind = TouchKind.Dribble;
             else return false;
         }
@@ -214,6 +267,23 @@ public static class TouchModel
         float footK = FootErrorFactor(p.Sheet, foot, t);
         float sigmaSpeed = SpeedSigma(p.Sheet, speedFrac, t) * footK;
         float sigmaDir = DirectionSigmaDeg(p.Sheet, speedFrac, t) * footK;
+        if (kind == TouchKind.KnockOn)
+        {
+            // A knock-on errs like a touch at full sprint, made heavier by the error scale.
+            sigmaSpeed = SpeedSigma(p.Sheet, 1f, t) * footK * k.KnockOnErrorScale;
+            sigmaDir = DirectionSigmaDeg(p.Sheet, 1f, t) * footK * k.KnockOnErrorScale;
+        }
+
+        // The touch is made now: it ends any earlier boost or knock-on chase, and a dribble, turn or cut touch starts a boost
+        // that the planned speed below already counts on.
+        p.LastTouchTime = now;
+        p.LastTouchFoot = foot;
+        if (kind is TouchKind.Dribble or TouchKind.Turn or TouchKind.Cut)
+        {
+            p.TouchBoostFrom = now;
+            p.TouchBoostUntil = now + k.TouchBoostDuration;
+            p.TouchBoostFactor = TouchBoostFactor(p.Sheet, turnDeg, t);
+        }
 
         Vector3 v;
         float errDeg = 0f;
@@ -241,15 +311,46 @@ public static class TouchModel
                 if (kind == TouchKind.First)
                     sigmaDir = MathF.Sqrt(sigmaDir * sigmaDir + Sq(FirstTouchSigmaDeg(p.Sheet, relSpeed, t) * footK));
                 errDeg = rng.Normal(0f, sigmaDir);
-                float yaw = MathF.Atan2(stick.Y, stick.X) + errDeg * MathF.PI / 180f;
+                // A knock-on with the stick released goes along the facing.
+                float aim = kind == TouchKind.KnockOn && !stickActive ? p.Facing : MathF.Atan2(stick.Y, stick.X);
+                var aimDir = new Vector3(MathF.Cos(aim), 0f, MathF.Sin(aim));
+                float yaw = aim + errDeg * MathF.PI / 180f;
                 var dir = new Vector3(MathF.Cos(yaw), 0f, MathF.Sin(yaw));
                 float speed;
-                if (kind == TouchKind.Cut)
-                    speed = p.Speed * (1f - Movement.BalanceLoss(p.Sheet, t));
-                else
+                switch (kind)
                 {
-                    float along = Vector3.Dot(p.Velocity, dir);
-                    speed = MathF.Max(along, MinPush(mode, t)) * (1f + Overshoot(p.Sheet, mode, t));
+                    case TouchKind.Cut:
+                        speed = p.Speed * (1f - Movement.BalanceLoss(p.Sheet, t));
+                        break;
+                    case TouchKind.Dribble or TouchKind.Turn:
+                    {
+                        // Planned along the wanted direction; the drawn errors then spoil it.
+                        float planned = PlannedSpeed(p, intent, ball, aimDir, now, CadenceTicks(mode, t), Movement.TopSpeedWithBall(p.Sheet, t),
+                            Lead(p.Sheet, mode, t), t);
+                        speed = Math.Clamp(planned, MinPush(mode, t), MathF.Max(k.MaxPush, MinPush(mode, t)));
+                        break;
+                    }
+                    case TouchKind.KnockOn:
+                    {
+                        // Planned so the player, chasing without the dribble cap (off-ball top speed), meets the ball at the
+                        // catch time. Meeting it means the ball coming into foot reach, which is when the next touch happens, so
+                        // the ball is aimed at one foot reach ahead of the feet rather than at the feet themselves.
+                        float catchTime = KnockOnCatchTime(p.Sheet, t);
+                        int catchTicks = Math.Max(1, (int)MathF.Round(catchTime / t.Dt));
+                        float planned = PlannedSpeed(p, intent, ball, aimDir, now, catchTicks, Movement.TopSpeed(p.Sheet, t),
+                            FootReach(p.Sheet, t), t);
+                        speed = Math.Clamp(planned, MinPush(TouchMode.Sprint, t), MathF.Max(k.MaxPush, MinPush(TouchMode.Sprint, t)));
+                        p.KnockOnFrom = now;
+                        p.KnockOnUntil = now + catchTicks * t.Dt + k.KnockOnChaseGrace;
+                        p.KnockOnDirection = new Vector2(aimDir.X, aimDir.Z);
+                        break;
+                    }
+                    default:
+                    {
+                        float along = Vector3.Dot(p.Velocity, dir);
+                        speed = MathF.Max(along, MinPush(mode, t)) * (1f + Overshoot(p.Sheet, mode, t));
+                        break;
+                    }
                 }
                 v = dir * (speed * rng.Normal(1f, sigmaSpeed));
                 if (kind == TouchKind.First) v += relVel * FirstTouchSpeedKept(p.Sheet, t);
@@ -260,8 +361,6 @@ public static class TouchModel
         result = new TouchResult(kind, foot, ball.Position, v, errDeg);
         ball.Velocity = new Vector3(v.X, 0f, v.Z);
         ball.Spin = Vector3.Zero;
-        p.LastTouchTime = now;
-        p.LastTouchFoot = foot;
         return true;
     }
 

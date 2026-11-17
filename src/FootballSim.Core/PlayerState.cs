@@ -42,6 +42,22 @@ public sealed class PlayerState
     public float Speed => new Vector2(Velocity.X, Velocity.Z).Length();
 
     internal float LastTouchTime = -100f;
+    // The touch boost and the knock-on chase belong to the touch made at their *From time: they lapse as soon as the player
+    // touches (or strikes) again or the world resets LastTouchTime, so no other code has to clear them.
+    /// <summary>Simulation seconds at which the current touch boost ends.</summary>
+    internal float TouchBoostUntil = -100f;
+    /// <summary>The time constant is divided by this while the touch boost lasts.</summary>
+    internal float TouchBoostFactor = 1f;
+    /// <summary>Time of the touch that granted the boost.</summary>
+    internal float TouchBoostFrom = float.NaN;
+    /// <summary>Time of the most recent knock-on.</summary>
+    internal float KnockOnFrom = float.NaN;
+    /// <summary>Unit ground direction (X, Z) the knock-on was played along.</summary>
+    internal Vector2 KnockOnDirection;
+    /// <summary>Simulation seconds at which the knock-on chase ends if the ball has not been touched again.</summary>
+    internal float KnockOnUntil = -100f;
+    /// <summary>Simulation seconds of the player's most recent movement step (lets possession rules that get no clock see the time).</summary>
+    internal float MoveTime;
     internal float TurnRefHeading;
     internal float TurnRefTime;
 

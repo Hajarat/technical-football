@@ -12,15 +12,17 @@ public sealed class IntentRecord
     public bool Shoot { get; set; }
     public bool Finesse { get; set; }
     public bool Chip { get; set; }
+    /// <summary>Knock-on press. Absent in older replays, which read as false.</summary>
+    public bool Knock { get; set; }
 
     public static IntentRecord From(in TickIntent i) => new()
     {
-        Mx = i.MoveX, Mz = i.MoveZ, Sprint = i.Sprint, Close = i.CloseControl, Shoot = i.ShootHeld, Finesse = i.Finesse, Chip = i.Chip,
+        Mx = i.MoveX, Mz = i.MoveZ, Sprint = i.Sprint, Close = i.CloseControl, Shoot = i.ShootHeld, Finesse = i.Finesse, Chip = i.Chip, Knock = i.KnockOn,
     };
 
     public TickIntent ToIntent() => new()
     {
-        MoveX = Mx, MoveZ = Mz, Sprint = Sprint, CloseControl = Close, ShootHeld = Shoot, Finesse = Finesse, Chip = Chip,
+        MoveX = Mx, MoveZ = Mz, Sprint = Sprint, CloseControl = Close, ShootHeld = Shoot, Finesse = Finesse, Chip = Chip, KnockOn = Knock,
     };
 }
 
