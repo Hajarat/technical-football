@@ -29,7 +29,8 @@ public class CalibrationTests
     {
         var s = TestData.Scenario("edge_of_box");
         s.Id = "long_range";
-        s.Ball.X = 52.5f - 30f;
+        // The longest central shot the arena has room for, 28 m out.
+        s.Ball.X = s.Pitch.Length - 28f;
         s.Attacker.X = s.Ball.X - 0.6f;
         return s;
     }
@@ -211,7 +212,7 @@ public class CalibrationTests
             _out.WriteLine($"{scenario}: striker_a vs the_wall {Pct(r):F1}%   75 vs 75 {Pct(r75):F1}%");
         }
         var lr = TestData.Rate(LongRange(), Sheet75(true), Sheet75(false), N, 1);
-        _out.WriteLine($"long_range (30 m): 75 vs 75 {Pct(lr):F1}%");
+        _out.WriteLine($"long_range (28 m): 75 vs 75 {Pct(lr):F1}%");
     }
 
     static PlayerSheet Sheet75(bool attacker)

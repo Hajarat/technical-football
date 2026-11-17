@@ -33,7 +33,7 @@ public class PlannedTouchTests
         var sc = new Scenario
         {
             Id = "lab",
-            Pitch = new PitchSpec { HalfLength = 150f },
+            Pitch = new PitchSpec { Length = 150f },
             Ball = new StartSpot { X = 2.5f, Z = z },
             Attacker = new StartSpot { X = 2.0f, Z = z },
         };

@@ -5,7 +5,7 @@ namespace FootballSim.Core;
 /// <summary>
 /// The basic keeper's decision code: stand on the line from the ball to the goal centre, react to a strike after the reaction
 /// time, predict where the ball crosses his plane, dive toward it with a reach that grows over time, and on contact catch or parry.
-/// Not yet: rushing out, fingertip zone, positioning error, claiming loose balls.
+/// Not yet: rushing out, fingertip zone, positioning error. Loose balls are claimed by a simple placeholder rule.
 /// </summary>
 public sealed class KeeperBrain
 {
@@ -104,8 +104,13 @@ public sealed class KeeperBrain
         float len = d.Length();
         float step = _t.Keeper.SetMoveSpeed * dt;
         Vector3 move = len <= step ? d : d / len * step;
-        _k.Position += move;
-        _k.Velocity = move / dt;
+        var old = _k.Position;
+        var pos = old + move;
+        var vel = move / dt;
+        // On his line the set spot is at the goal-end wall itself; the keeper stops a body's radius in front of it.
+        if (_pitch.ClampPlayer(ref pos, ref vel)) vel = (pos - old) / dt;
+        _k.Position = pos;
+        _k.Velocity = vel;
         _k.Facing = MathF.PI;
     }
 
@@ -133,8 +138,11 @@ public sealed class KeeperBrain
 
         float bodyZ = _home.Z + _t.Keeper.BodyFollow * (hands.Z - _home.Z);
         var old = _k.Position;
-        _k.Position = new Vector3(old.X, 0f, bodyZ);
-        _k.Velocity = (_k.Position - old) / dt;
+        var pos = new Vector3(old.X, 0f, bodyZ);
+        var vel = Vector3.Zero;
+        _pitch.ClampPlayer(ref pos, ref vel);
+        _k.Position = pos;
+        _k.Velocity = (pos - old) / dt;
     }
 
     /// <summary>
@@ -159,6 +167,39 @@ public sealed class KeeperBrain
         Report.ReachM = reach;
         Report.MarginM = reach - needed;
         Report.Action = action;
+    }
+
+    // ---- loose-ball claim (placeholder) ----
+
+    /// <summary>A loose ball slower than this can be claimed, m/s.</summary>
+    const float PlaceholderClaimMaxSpeed = 3.0f;
+    /// <summary>A loose ball lower than this (its centre) can be claimed, metres.</summary>
+    const float PlaceholderClaimMaxHeight = 1.5f;
+
+    /// <summary>
+    /// Placeholder keeper claim, so a round in the arena can end with the keeper picking up a ball that is lying or rolling near
+    /// him (a parry that dies, a dribble lost, a miss that comes back off the boards). It is deliberately simple and will be
+    /// replaced by a real claiming model: a loose ball slower than 3 m/s, below 1.5 m, and within the keeper's catch zone
+    /// (the same reach as a held save, measured on the ground from his body) is taken at once. The caller has already checked
+    /// that nobody controls the ball. Returns true if the keeper now holds it.
+    /// </summary>
+    internal bool TryClaimLooseBall(Ball ball)
+    {
+        if (_phase == Phase.Held) return false;
+        // Written as "not inside the limit" so a not-a-number position or speed is never claimed (the referee reports it).
+        if (!(ball.Velocity.LengthSquared() < PlaceholderClaimMaxSpeed * PlaceholderClaimMaxSpeed)) return false;
+        if (!(ball.Position.Y < PlaceholderClaimMaxHeight)) return false;
+        float reach = _t.Keeper.CatchZoneFraction * Keeper.Stretch(_k.Sheet, _t);
+        if (!(TouchModel.HorizontalDistance(_k.Position, ball.Position) <= reach)) return false;
+        _active = false;
+        _phase = Phase.Held;
+        _k.KeeperAction = KeeperAction.Holding;
+        _hands = HomeFor(_k.Position);
+        _k.HandPosition = _hands;
+        ball.Velocity = Vector3.Zero;
+        ball.Spin = Vector3.Zero;
+        ball.Position = _hands;
+        return true;
     }
 
     /// <summary>

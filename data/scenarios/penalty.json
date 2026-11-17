@@ -5,20 +5,20 @@
   "default_keeper": "the_wall",
   "team_size": 1,
   "ball": {
-    "x": 41.5,
+    "x": 19.0,
     "z": 0
   },
   "attacker": {
-    "x": 40.9,
+    "x": 18.4,
     "z": 0,
     "facing_deg": 0
   },
   "keeper_on_line": true,
-  "clock_limit": null,
+  "clock_limit": 20,
   "shoot_distance": 0,
   "pitch": {
-    "half_length": 52.5,
-    "width": 68.0,
+    "length": 30.0,
+    "width": 20.0,
     "goal_width": 7.32,
     "goal_height": 2.44
   }

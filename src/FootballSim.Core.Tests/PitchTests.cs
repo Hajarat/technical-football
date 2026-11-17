@@ -12,9 +12,9 @@ public class PitchTests
     [Fact]
     public void GoalNeedsTheWholeBallOverTheLine()
     {
-        Assert.Equal(Outcome.Goal, P.Judge(new Vector3(P.GoalLineX + R + 0.01f, 1f, 0f), R));
-        Assert.Equal(Outcome.None, P.Judge(new Vector3(P.GoalLineX + R - 0.02f, 1f, 0f), R));
-        Assert.Equal(Outcome.None, P.Judge(new Vector3(P.GoalLineX + 0.0f, 1f, 0f), R)); // centre on the line
+        Assert.True(P.IsGoal(new Vector3(P.GoalLineX + R + 0.01f, 1f, 0f), R));
+        Assert.False(P.IsGoal(new Vector3(P.GoalLineX + R - 0.02f, 1f, 0f), R));
+        Assert.False(P.IsGoal(new Vector3(P.GoalLineX + 0.0f, 1f, 0f), R)); // centre on the line
     }
 
     [Fact]
@@ -24,30 +24,13 @@ public class PitchTests
     }
 
     [Fact]
-    public void GoalNeedsTheWholeBallBetweenThePosts()
+    public void GoalNeedsTheWholeBallBetweenThePostsAndUnderTheBar()
     {
         float x = P.GoalLineX + R + 0.05f;
-        Assert.Equal(Outcome.Goal, P.Judge(new Vector3(x, 1f, P.GoalHalfWidth - R - 0.01f), R));
-        Assert.Equal(Outcome.Wide, P.Judge(new Vector3(x, 1f, P.GoalHalfWidth - R + 0.02f), R));
-        Assert.Equal(Outcome.Wide, P.Judge(new Vector3(x, 1f, -(P.GoalHalfWidth + 1f)), R));
-    }
-
-    [Fact]
-    public void BallAboveTheBarIsOver()
-    {
-        float x = P.GoalLineX + R + 0.05f;
-        Assert.Equal(Outcome.Goal, P.Judge(new Vector3(x, P.BarHeight - R - 0.01f, 0f), R));
-        Assert.Equal(Outcome.Over, P.Judge(new Vector3(x, P.BarHeight - R + 0.02f, 0f), R));
-        Assert.Equal(Outcome.Over, P.Judge(new Vector3(x, 5f, 0f), R));
-    }
-
-    [Fact]
-    public void BallWhollyOutsideTheTouchlineOrBehindTheBackBoundaryIsOut()
-    {
-        Assert.Equal(Outcome.None, P.Judge(new Vector3(30f, R, P.HalfWidth + R - 0.02f), R));
-        Assert.Equal(Outcome.Out, P.Judge(new Vector3(30f, R, P.HalfWidth + R + 0.02f), R));
-        Assert.Equal(Outcome.Out, P.Judge(new Vector3(30f, R, -(P.HalfWidth + 0.5f)), R));
-        Assert.Equal(Outcome.Out, P.Judge(new Vector3(-R - 0.02f, R, 0f), R));
+        Assert.True(P.IsGoal(new Vector3(x, 1f, P.GoalHalfWidth - R - 0.01f), R));
+        Assert.False(P.IsGoal(new Vector3(x, 1f, P.GoalHalfWidth - R + 0.02f), R));
+        Assert.True(P.IsGoal(new Vector3(x, P.BarHeight - R - 0.01f, 0f), R));
+        Assert.False(P.IsGoal(new Vector3(x, P.BarHeight - R + 0.02f, 0f), R));
     }
 
     [Fact]
@@ -100,11 +83,11 @@ public class PitchTests
     [Fact]
     public void PitchSizeIsData()
     {
-        var spec = new PitchSpec { HalfLength = 30f, Width = 40f, GoalWidth = 5f, GoalHeight = 2f };
+        var spec = new PitchSpec { Length = 30f, Width = 40f, GoalWidth = 5f, GoalHeight = 2f };
         var p = new Pitch(spec, T.Frame);
         Assert.Equal(30f, p.GoalLineX);
         Assert.Equal(20f, p.HalfWidth);
-        Assert.Equal(Outcome.Goal, p.Judge(new Vector3(30.2f, 1f, 0f), R));
-        Assert.Equal(Outcome.Wide, p.Judge(new Vector3(30.2f, 1f, 2.6f), R));
+        Assert.True(p.IsGoal(new Vector3(30.2f, 1f, 0f), R));
+        Assert.False(p.IsGoal(new Vector3(30.2f, 1f, 2.6f), R));
     }
 }

@@ -25,7 +25,7 @@ public class PossessionTests
         var sc = new Scenario
         {
             Id = "lab",
-            Pitch = new PitchSpec { HalfLength = length },
+            Pitch = new PitchSpec { Length = length },
             Ball = new StartSpot { X = 2.5f, Z = z },
             Attacker = new StartSpot { X = 2.0f, Z = z },
         };

@@ -1,94 +1,160 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace FootballSim.Game;
 
-/// <summary>Static grey-box half pitch (X 0..52.5, Z -34..34) with run-off, markings and goal. Built in code.</summary>
+/// <summary>
+/// The walled arena, built in code from the simulation's arena: grass inside the outline, low boards all round (either side of
+/// the goal too), a few markings and the goal. Outside the boards a plain dark floor. The back corners are rounded (drawn as
+/// short straight pieces) and the goal-end corners cut by straight boards, matching the simulation's shape.
+/// </summary>
 public partial class Pitch : Node3D
 {
-    public const float GoalLineX = 52.5f;
-    public const float HalfWidth = 34f;
     const float LineW = 0.12f, LineY = 0.015f;
-    const float PostR = 0.06f, PostZ = 3.66f, BarY = 2.44f;
+    const float BoardThickness = 0.15f;
+    /// <summary>How far inside the boards the outline marking runs, metres.</summary>
+    const float OutlineInset = 0.3f;
+    const int ArcSegments = 12;
 
-    public override void _Ready()
+    FootballSim.Core.Pitch? _built;
+
+    /// <summary>
+    /// Builds (or rebuilds) the arena for the simulation's pitch. Called whenever a world is created; does nothing if the
+    /// arena has the same shape as the one already built.
+    /// </summary>
+    public void Build(FootballSim.Core.Pitch p)
     {
-        BuildGround();
-        BuildMarkings();
-        BuildGoal();
+        if (_built != null && SameShape(_built, p)) return;
+        _built = p;
+        foreach (var c in GetChildren()) { RemoveChild(c); c.QueueFree(); }
+        BuildGround(p);
+        BuildBoards(p);
+        BuildMarkings(p);
+        BuildGoal(p);
     }
 
-    void BuildGround()
+    static bool SameShape(FootballSim.Core.Pitch a, FootballSim.Core.Pitch b) =>
+        a.GoalLineX == b.GoalLineX && a.HalfWidth == b.HalfWidth && a.CornerRadius == b.CornerRadius && a.GoalChamfer == b.GoalChamfer
+        && a.BoardHeight == b.BoardHeight && a.GoalHalfWidth == b.GoalHalfWidth && a.BarHeight == b.BarHeight && a.PostRadius == b.PostRadius;
+
+    /// <summary>
+    /// The outline, moved <paramref name="inset"/> metres inward (negative = outward), as a closed loop of (x, z) points:
+    /// goal-end wall, +Z chamfer, +Z side, rounded back corner, back wall, rounded back corner, -Z side, -Z chamfer.
+    /// </summary>
+    static List<Vector2> Outline(FootballSim.Core.Pitch p, float inset)
     {
-        // Playing surface plus run-off: X -12..64.5, Z -40..40.
-        AddBox("Ground", new Vector3(76.5f, 0.1f, 80f), new Vector3(26.25f, -0.05f, 0), MeshKit.Lit(new Color(0.24f, 0.52f, 0.22f)), shadows: false);
-        // Wide darker surround so no void shows past the run-off.
-        AddBox("Surround", new Vector3(500f, 0.1f, 500f), new Vector3(26.25f, -0.1f, 0), MeshKit.Lit(new Color(0.17f, 0.38f, 0.17f)), shadows: false);
+        float L = p.GoalLineX, h = p.HalfWidth, R = p.CornerRadius, C = p.GoalChamfer;
+        float cut = inset * (Mathf.Sqrt2 - 1f); // a chamfer corner moves along the wall by this when the outline is inset
+        var pts = new List<Vector2>();
+        void Arc(float cz, float a0, float a1)
+        {
+            float r = Mathf.Max(0f, R - inset);
+            for (int i = 0; i <= ArcSegments; i++)
+            {
+                float a = Mathf.Lerp(a0, a1, i / (float)ArcSegments);
+                pts.Add(new Vector2(R + r * Mathf.Cos(a), cz + r * Mathf.Sin(a)));
+            }
+        }
+        pts.Add(new Vector2(L - inset, -(h - C - cut)));
+        pts.Add(new Vector2(L - inset, h - C - cut));
+        if (C > 0f) pts.Add(new Vector2(L - C - cut, h - inset));
+        if (R > 0f) Arc(h - R, Mathf.Pi / 2f, Mathf.Pi);
+        else { pts.Add(new Vector2(inset, h - inset)); }
+        if (R > 0f) Arc(-(h - R), Mathf.Pi, 1.5f * Mathf.Pi);
+        else { pts.Add(new Vector2(inset, -(h - inset))); }
+        if (C > 0f) pts.Add(new Vector2(L - C - cut, -(h - inset)));
+        return pts;
     }
 
-    void BuildMarkings()
+    void BuildGround(FootballSim.Core.Pitch p)
+    {
+        // Grass: a fan over the convex outline, just above the surround floor.
+        var grass = MeshKit.Lit(new Color(0.24f, 0.52f, 0.22f));
+        grass.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+        var st = MeshKit.BeginTriangles();
+        var loop = Outline(p, 0f);
+        var centre = new Vector3(p.GoalLineX / 2f, 0f, 0f);
+        for (int i = 0; i < loop.Count; i++)
+        {
+            Vector2 a = loop[i], b = loop[(i + 1) % loop.Count];
+            st.AddVertex(centre); st.AddVertex(new Vector3(a.X, 0f, a.Y)); st.AddVertex(new Vector3(b.X, 0f, b.Y));
+        }
+        AddMesh("Grass", st.Commit(), Vector3.Zero, grass);
+        // Plain dark floor all round, so nothing past the boards draws attention.
+        AddBox("Surround", new Vector3(400f, 0.1f, 400f), new Vector3(p.GoalLineX / 2f, -0.06f, 0), MeshKit.Lit(new Color(0.10f, 0.11f, 0.12f)), shadows: false);
+    }
+
+    void BuildBoards(FootballSim.Core.Pitch p)
+    {
+        var mat = MeshKit.Lit(new Color(0.86f, 0.87f, 0.9f));
+        float hgt = p.BoardHeight;
+        // Board centre line half a thickness outside the playing outline, so the inner face is the simulation's wall.
+        var loop = Outline(p, -BoardThickness / 2f);
+        int n = 0;
+        void Board(Vector2 a, Vector2 b)
+        {
+            Vector2 d = b - a;
+            float len = d.Length();
+            if (len < 1e-3f) return;
+            Vector2 mid = (a + b) / 2f;
+            // A box whose local X runs along the segment; a little overlap closes the joints between short pieces.
+            var basis = new Basis(Vector3.Up, -Mathf.Atan2(d.Y, d.X));
+            var mi = new MeshInstance3D { Name = $"Board{n++}", Mesh = new BoxMesh { Size = new Vector3(len + BoardThickness * 0.5f, hgt, BoardThickness) }, MaterialOverride = mat };
+            mi.Transform = new Transform3D(basis, new Vector3(mid.X, hgt / 2f, mid.Y));
+            AddChild(mi);
+        }
+        // The goal-end wall (the first edge) is split around the goal mouth.
+        float gx = loop[0].X, mouth = p.GoalHalfWidth + p.PostRadius;
+        Board(loop[0], new Vector2(gx, -mouth));
+        Board(new Vector2(gx, mouth), loop[1]);
+        for (int i = 1; i < loop.Count; i++) Board(loop[i], loop[(i + 1) % loop.Count]);
+    }
+
+    void BuildMarkings(FootballSim.Core.Pitch p)
     {
         var st = MeshKit.BeginTriangles();
-        void Seg(float x0, float z0, float x1, float z1) => MeshKit.AddSegment(st, new(x0, z0), new(x1, z1), LineW, LineY);
-        void Poly(System.Collections.Generic.List<Vector2> pts)
+        void Seg(Vector2 a, Vector2 b) => MeshKit.AddSegment(st, a, b, LineW, LineY);
+
+        // Outline just inside the boards.
+        var loop = Outline(p, OutlineInset);
+        for (int i = 0; i < loop.Count; i++) Seg(loop[i], loop[(i + 1) % loop.Count]);
+
+        // Goal area: 5.5 m deep, 18.32 m wide, its sides cut off where they meet the outline line (the arena is narrow).
+        float L = p.GoalLineX;
+        float boxX = L - 5.5f, boxZ = Mathf.Min(18.32f / 2f, p.HalfWidth - OutlineInset);
+        float chamferX = L + p.HalfWidth - p.GoalChamfer - OutlineInset * Mathf.Sqrt2 - boxZ; // where z = boxZ meets the chamfer line
+        float sideEnd = Mathf.Min(L - OutlineInset, chamferX);
+        Seg(new Vector2(boxX, -boxZ), new Vector2(boxX, boxZ));
+        if (sideEnd > boxX)
         {
-            for (int i = 0; i < pts.Count - 1; i++) MeshKit.AddSegment(st, pts[i], pts[i + 1], LineW, LineY);
+            Seg(new Vector2(boxX, -boxZ), new Vector2(sideEnd, -boxZ));
+            Seg(new Vector2(boxX, boxZ), new Vector2(sideEnd, boxZ));
         }
-
-        // Boundary: halfway line, touchlines, goal line.
-        Seg(0, -HalfWidth, 0, HalfWidth);
-        Seg(0, -HalfWidth, GoalLineX, -HalfWidth);
-        Seg(0, HalfWidth, GoalLineX, HalfWidth);
-        Seg(GoalLineX, -HalfWidth, GoalLineX, HalfWidth);
-
-        // Penalty area: 16.5 deep, 40.32 wide. Six-yard box: 5.5 deep, 18.32 wide.
-        float paX = GoalLineX - 16.5f, paZ = 40.32f / 2;
-        Seg(GoalLineX, -paZ, paX, -paZ); Seg(paX, -paZ, paX, paZ); Seg(paX, paZ, GoalLineX, paZ);
-        float sbX = GoalLineX - 5.5f, sbZ = 18.32f / 2;
-        Seg(GoalLineX, -sbZ, sbX, -sbZ); Seg(sbX, -sbZ, sbX, sbZ); Seg(sbX, sbZ, GoalLineX, sbZ);
-
-        // Half centre circle (radius 9.15) on the attacked side of the halfway line.
-        var cc = new System.Collections.Generic.List<Vector2>();
-        for (int i = 0; i <= 40; i++)
-        {
-            float a = Mathf.Lerp(-Mathf.Pi / 2, Mathf.Pi / 2, i / 40f);
-            cc.Add(new(9.15f * Mathf.Cos(a), 9.15f * Mathf.Sin(a)));
-        }
-        Poly(cc);
-
-        // Penalty arc: radius 9.15 around the spot (11 m), only the part outside the area.
-        float spotX = GoalLineX - 11f;
-        float a0 = Mathf.Acos((paX - spotX) / 9.15f);
-        var arc = new System.Collections.Generic.List<Vector2>();
-        for (int i = 0; i <= 24; i++)
-        {
-            float a = Mathf.Lerp(a0, Mathf.Tau - a0, i / 24f);
-            arc.Add(new(spotX + 9.15f * Mathf.Cos(a), 9.15f * Mathf.Sin(a)));
-        }
-        Poly(arc);
 
         AddMesh("Markings", st.Commit(), Vector3.Zero, MeshKit.Unshaded(Colors.White));
 
-        var spot = new MeshInstance3D { Name = "PenaltySpot", Mesh = MeshKit.Ring(0f, 0.22f, 16), Position = new(spotX, LineY, 0), MaterialOverride = MeshKit.Unshaded(Colors.White), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        var spot = new MeshInstance3D { Name = "PenaltySpot", Mesh = MeshKit.Ring(0f, 0.22f, 16), Position = new(L - 11f, LineY, 0), MaterialOverride = MeshKit.Unshaded(Colors.White), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         AddChild(spot);
     }
 
-    void BuildGoal()
+    void BuildGoal(FootballSim.Core.Pitch p)
     {
         var white = MeshKit.Lit(Colors.White);
+        float gx = p.GoalLineX, postZ = p.GoalHalfWidth, barY = p.BarHeight, postR = p.PostRadius;
         // Posts.
         foreach (float s in new[] { -1f, 1f })
-            AddCylinder($"Post{(s < 0 ? "Left" : "Right")}", PostR, BarY, new(GoalLineX, BarY / 2, s * PostZ), Basis.Identity, white);
+            AddCylinder($"Post{(s < 0 ? "Left" : "Right")}", postR, barY, new(gx, barY / 2, s * postZ), Basis.Identity, white);
         // Crossbar, along Z.
-        AddCylinder("Crossbar", PostR, PostZ * 2 + PostR * 2, new(GoalLineX, BarY, 0), Basis.FromEuler(new(Mathf.Pi / 2, 0, 0)), white);
+        AddCylinder("Crossbar", postR, postZ * 2 + postR * 2, new(gx, barY, 0), Basis.FromEuler(new(Mathf.Pi / 2, 0, 0)), white);
 
-        // Translucent net volume behind the goal line, about 2 m deep.
+        // Translucent net volume behind the goal line.
         var net = new StandardMaterial3D
         {
             AlbedoColor = new Color(1, 1, 1, 0.22f),
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
         };
-        AddBox("Net", new Vector3(2f, BarY, PostZ * 2), new(GoalLineX + 1f, BarY / 2, 0), net, shadows: false);
+        AddBox("Net", new Vector3(p.NetDepth, barY, postZ * 2), new(gx + p.NetDepth / 2f, barY / 2, 0), net, shadows: false);
     }
 
     void AddCylinder(string name, float r, float h, Vector3 pos, Basis basis, Material mat)

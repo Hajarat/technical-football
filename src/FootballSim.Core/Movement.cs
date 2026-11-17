@@ -128,8 +128,9 @@ public static class Movement
         Vector3 pos = p.Position + p.Velocity * dt;
         if (pitch != null)
         {
-            pos.X = Math.Clamp(pos.X, pitch.MinX, pitch.GoalLineX);
-            pos.Z = Math.Clamp(pos.Z, -pitch.HalfWidth, pitch.HalfWidth);
+            // The boards stop the player: he stays inside the arena outline and loses the part of his velocity into the board.
+            var v = p.Velocity;
+            if (pitch.ClampPlayer(ref pos, ref v)) p.Velocity = v;
         }
         p.Position = pos;
         p.HandPosition = pos;

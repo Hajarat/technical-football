@@ -13,7 +13,7 @@ public class TouchTests
         var sc = new Scenario
         {
             Id = "lab",
-            Pitch = new PitchSpec { HalfLength = 150f },
+            Pitch = new PitchSpec { Length = 150f },
             Ball = new StartSpot { X = 2.5f },
             Attacker = new StartSpot { X = 2.0f },
         };

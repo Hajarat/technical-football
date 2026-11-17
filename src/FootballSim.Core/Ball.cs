@@ -16,6 +16,12 @@ public struct BallStepResult
     /// <summary>The path met the supplied sphere; the ball stopped at <see cref="SpherePoint"/> and the caller decides what happens.</summary>
     public bool SphereHit;
     public Vector3 SpherePoint;
+    /// <summary>The ball met an arena board or the ceiling; the first contact of the tick is reported.</summary>
+    public bool BoardHit;
+    /// <summary>Ball centre at the first board contact.</summary>
+    public Vector3 BoardPoint;
+    /// <summary>Ball speed arriving at the first board contact, m/s.</summary>
+    public float BoardSpeed;
 }
 
 /// <summary>
@@ -144,7 +150,7 @@ public sealed class Ball
     }
 
     /// <summary>
-    /// Advances the ball one tick. <paramref name="pitch"/> supplies the goal frame (null = none). <paramref name="sphere"/> is an
+    /// Advances the ball one tick. <paramref name="pitch"/> supplies the goal frame and the arena boards (null = neither). <paramref name="sphere"/> is an
     /// extra obstacle such as the keeper's hands: the ball stops at the first contact and reports it.
     /// Movement is swept along the whole path, so a 36 m/s ball (0.3 m per tick) cannot skip a post or a hand.
     /// </summary>
@@ -160,13 +166,16 @@ public sealed class Ball
         for (int iter = 0; iter < 4 && remaining > 1e-4f; iter++)
         {
             Vector3 d = full * remaining;
-            float tFrame = float.MaxValue, tSphere = float.MaxValue;
+            float tFrame = float.MaxValue, tSphere = float.MaxValue, tBoard = float.MaxValue;
             FrameHit fh = default;
+            BoardHit bh = default;
             bool frame = pitch != null && pitch.SweepFrame(pos, pos + d, _t.Radius, out fh);
             if (frame) tFrame = fh.T;
+            bool board = pitch != null && pitch.SweepBoards(pos, pos + d, _t.Radius, out bh);
+            if (board) tBoard = bh.T;
             if (sphere is { } sp && SweepPointSphere(pos, d, sp, out float ts)) tSphere = ts;
 
-            if (tSphere < float.MaxValue && tSphere <= tFrame)
+            if (tSphere < float.MaxValue && tSphere <= tFrame && tSphere <= tBoard)
             {
                 pos += d * tSphere;
                 result.SphereHit = true;
@@ -175,13 +184,28 @@ public sealed class Ball
                 Velocity = vel;
                 return result;
             }
-            if (frame)
+            if (frame && tFrame <= tBoard)
             {
                 pos = fh.Point + fh.Normal * 1e-4f;
                 float vn = Vector3.Dot(vel, fh.Normal);
                 if (vn < 0f) vel -= (1f + pitch!.FrameRestitution) * vn * fh.Normal;
                 remaining *= 1f - fh.T;
+                // The rest of the tick continues along the new velocity.
+                full = vel * dt;
                 if (!result.FrameHit) { result.FrameHit = true; result.FramePoint = fh.Point; }
+                continue;
+            }
+            if (board)
+            {
+                pos = bh.Point + bh.Normal * 1e-4f;
+                float vn = Vector3.Dot(vel, bh.Normal);
+                if (vn < 0f)
+                {
+                    if (!result.BoardHit) { result.BoardHit = true; result.BoardPoint = bh.Point; result.BoardSpeed = vel.Length(); }
+                    vel = BoardBounce(vel, bh.Normal, vn, pitch!);
+                }
+                remaining *= 1f - bh.T;
+                full = vel * dt;
                 continue;
             }
             pos += d;
@@ -197,7 +221,7 @@ public sealed class Ball
                 float vIn = -vel.Y;
                 float vUp = vIn * _t.RestitutionCurve.Evaluate(vIn);
                 if (vUp < _t.MinBounceSpeed) vUp = 0f;
-                Spin = GroundFriction(vel, Spin, vIn + vUp, out var vt);
+                Spin = ContactFriction(new Vector3(vel.X, 0f, vel.Z), Spin, new Vector3(0f, -_t.Radius, 0f), _t.BounceFriction, vIn + vUp, out var vt);
                 vel = new Vector3(vt.X, vUp, vt.Z);
                 if (vIn >= _t.BounceEventSpeed)
                 {
@@ -213,22 +237,36 @@ public sealed class Ball
     }
 
     /// <summary>
-    /// Coulomb friction at a ground bounce. <paramref name="normalImpulse"/> is the vertical speed change (per unit mass). The contact
-    /// point's slip is u = v_t + spin x (0, -r, 0); friction acts against u, up to mu * normalImpulse, and never past the impulse that
-    /// stops the slip (the ball then leaves rolling). Returns the new spin; <paramref name="vt"/> is the new horizontal velocity.
+    /// A bounce off a board or the ceiling with unit normal <paramref name="n"/> (into the arena) and normal speed
+    /// <paramref name="vn"/> (negative, into the board): the normal speed comes back scaled by the board restitution, and the
+    /// same Coulomb friction as a ground bounce acts at the contact point on the board, changing the along-board speed and spin.
     /// </summary>
-    Vector3 GroundFriction(Vector3 vel, Vector3 spin, float normalImpulse, out Vector3 vt)
+    Vector3 BoardBounce(Vector3 vel, Vector3 n, float vn, Pitch pitch)
     {
-        vt = new Vector3(vel.X, 0f, vel.Z);
-        var contact = new Vector3(0f, -_t.Radius, 0f);
+        float e = pitch.BoardRestitution;
+        Vector3 tangential = vel - n * vn;
+        Spin = ContactFriction(tangential, Spin, n * -_t.Radius, pitch.BoardFriction, (1f + e) * -vn, out var vt);
+        return vt - n * (e * vn);
+    }
+
+    /// <summary>
+    /// Coulomb friction at a bounce, for any contact surface. <paramref name="vt"/> is the velocity along the surface,
+    /// <paramref name="contact"/> the offset from the ball's centre to the contact point (radius times minus the surface normal),
+    /// <paramref name="normalImpulse"/> the normal speed change (per unit mass). The contact point's slip is u = v_t + spin x
+    /// contact; friction acts against u, up to mu * normalImpulse, and never past the impulse that stops the slip (the ball then
+    /// leaves rolling along the surface). Returns the new spin; <paramref name="vtOut"/> is the new velocity along the surface.
+    /// </summary>
+    Vector3 ContactFriction(Vector3 vt, Vector3 spin, Vector3 contact, float mu, float normalImpulse, out Vector3 vtOut)
+    {
+        vtOut = vt;
         Vector3 u = vt + Vector3.Cross(spin, contact);
         float slip = u.Length();
         if (slip < 1e-6f) return spin;
         float k = _t.InertiaFactor;
         // Impulse per unit mass that brings the slip to zero: each unit cuts the slip by (1 + k) / k.
-        float j = MathF.Min(_t.BounceFriction * normalImpulse, slip * k / (1f + k));
+        float j = MathF.Min(mu * normalImpulse, slip * k / (1f + k));
         Vector3 impulse = u * (-j / slip);
-        vt += impulse;
+        vtOut += impulse;
         // Angular: delta omega = (r_contact x J) / I, with I = k m r^2 and J per unit mass.
         return spin + Vector3.Cross(contact, impulse) / (k * _t.Radius * _t.Radius);
     }
