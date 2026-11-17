@@ -45,6 +45,13 @@ public partial class CameraRig : Camera3D
         ClampToWalls = false;
     }
 
+    /// <summary>Debug framing for seeing sideways motion: a camera almost straight above the ball, following it.</summary>
+    public void UseTopDown()
+    {
+        UseCloseUp();
+        Height = 6f; Distance = 0.8f; Fov = 28f;
+    }
+
     /// <summary>
     /// Sets the limits of what the frame may show: its left edge stops at <paramref name="minX"/>, its right edge at
     /// <paramref name="maxX"/>, and its bottom edge at <paramref name="nearZ"/>.

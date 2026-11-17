@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace FootballSim.Core;
 
@@ -14,15 +15,31 @@ public sealed class IntentRecord
     public bool Chip { get; set; }
     /// <summary>Knock-on press. Absent in older replays, which read as false.</summary>
     public bool Knock { get; set; }
+    // The skill-move inputs. Absent in older replays (they read as at rest) and left out of the file while at rest, so a
+    // replay without skill input is written exactly as before.
+    /// <summary>Right stick X.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public float Rx { get; set; }
+    /// <summary>Right stick Z.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public float Rz { get; set; }
+    /// <summary>Cancel held.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Cancel { get; set; }
+    /// <summary>Skill key pressed on this tick.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public SkillKey Skill { get; set; }
 
     public static IntentRecord From(in TickIntent i) => new()
     {
         Mx = i.MoveX, Mz = i.MoveZ, Sprint = i.Sprint, Close = i.CloseControl, Shoot = i.ShootHeld, Finesse = i.Finesse, Chip = i.Chip, Knock = i.KnockOn,
+        Rx = i.RightX, Rz = i.RightZ, Cancel = i.Cancel, Skill = i.SkillKey,
     };
 
     public TickIntent ToIntent() => new()
     {
         MoveX = Mx, MoveZ = Mz, Sprint = Sprint, CloseControl = Close, ShootHeld = Shoot, Finesse = Finesse, Chip = Chip, KnockOn = Knock,
+        RightX = Rx, RightZ = Rz, Cancel = Cancel, SkillKey = Skill,
     };
 }
 

@@ -26,6 +26,25 @@ public struct TickIntent
     public bool Chip;
     /// <summary>True on the tick a knock-on (a heavy touch far ahead) is asked for; one tick per press.</summary>
     public bool KnockOn;
+    /// <summary>Raw right stick along world X, -1..1, on the same axes as <see cref="MoveX"/>. Read for skill-move gestures.</summary>
+    public float RightX;
+    /// <summary>Raw right stick along world Z, -1..1, on the same axes as <see cref="MoveZ"/> (negative is screen-up).</summary>
+    public float RightZ;
+    /// <summary>True while the cancel button is held. Pressed just after a shot starts, it turns the shot into a fake.</summary>
+    public bool Cancel;
+    /// <summary>
+    /// A skill move asked for directly (keyboard keys 1-4), on one tick per press; the side comes from the left stick. It skips
+    /// the right-stick gesture but obeys the same gap, execution radius and chain rules.
+    /// </summary>
+    public SkillKey SkillKey;
 
     public readonly Vector2 Move => new(MoveX, MoveZ);
+    /// <summary>The right stick as a ground vector (X, Z).</summary>
+    public readonly Vector2 Right => new(RightX, RightZ);
 }
+
+/// <summary>A skill move asked for by a key rather than a right-stick gesture.</summary>
+public enum SkillKey { None, StepOver, BodyFeint, BallRoll, DragBack }
+
+/// <summary>The side of a skill move, relative to the player's running direction.</summary>
+public enum SkillSide { None, Left, Right }

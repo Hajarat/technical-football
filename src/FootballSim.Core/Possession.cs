@@ -49,8 +49,10 @@ public static class Possession
     internal static float SpeedCap(PlayerState p, bool inPossession, bool recovering, Tuning t)
     {
         if (!inPossession || ChasingKnockOn(p, t)) return Movement.TopSpeed(p.Sheet, t);
-        if (recovering) return MathF.Max(Movement.TopSpeedWithBall(p.Sheet, t), Movement.TopSpeed(p.Sheet, t) * t.Possession.ChaseSpeedFraction);
-        return Movement.TopSpeedWithBall(p.Sheet, t);
+        // A skill move's exit burst lifts the with-ball cap a little while it lasts.
+        float burst = p.MoveTime < p.SkillBurstUntil ? Movement.TopSpeed(p.Sheet, t) * p.SkillBurstCap : 0f;
+        if (recovering) return MathF.Max(Movement.TopSpeedWithBall(p.Sheet, t) + burst, Movement.TopSpeed(p.Sheet, t) * t.Possession.ChaseSpeedFraction);
+        return Movement.TopSpeedWithBall(p.Sheet, t) + burst;
     }
 
     /// <summary>

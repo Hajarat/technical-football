@@ -69,6 +69,8 @@ public static class DataLoader
             s.Name = ReadString(root, "name", fileLabel, warnings, s.Id, warn: false);
             foreach (var n in PlayerSheet.RatingNames)
             {
+                // skill_moves came later than the other ratings: a sheet without it uses its dribbling, without a warning.
+                if (n == "skill_moves" && !root.TryGetProperty(n, out _)) { s.SkillMoves = s.Dribbling; continue; }
                 bool star = n == "weak_foot";
                 int lo = 1, hi = star ? 5 : 99, def = star ? 3 : PlayerSheet.RatingDefault;
                 s.SetRating(n, (int)MathF.Round(ReadNumber(root, n, fileLabel, warnings, def, lo, hi)));
@@ -191,8 +193,10 @@ public static class DataLoader
             if (t == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: empty file (default tuning in use)" };
             if (t.Ball == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: ball: must be an object (default tuning in use)" };
             if (t.Touch == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: touch: must be an object (default tuning in use)" };
+            if (t.Skill == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: skill: must be an object (default tuning in use)" };
             foreach (var (field, curve) in new[] { ("ball.drag_curve", t.Ball.DragCurve), ("ball.lift_curve", t.Ball.LiftCurve), ("ball.restitution_curve", t.Ball.RestitutionCurve),
-                ("touch.early_execution", t.Touch.EarlyExecution) })
+                ("touch.early_execution", t.Touch.EarlyExecution), ("skill.ball_roll_distance", t.Skill.BallRollDistance),
+                ("skill.sided_exit_burst", t.Skill.SidedExitBurst), ("skill.straight_exit_burst", t.Skill.StraightExitBurst) })
             {
                 string? bad = curve == null ? "must be an array of [x, y] pairs" : curve.Validate();
                 if (bad != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: {field}: {bad} (default tuning in use)" };

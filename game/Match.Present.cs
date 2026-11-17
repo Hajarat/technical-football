@@ -25,10 +25,23 @@ public partial class Match
         f.CloseControl = _closeControl;
         f.BallPos = G(w.Ball.Position); f.BallVel = G(w.Ball.Velocity); f.BallRadius = w.Ball.Radius;
         f.Dt = w.Tuning.Dt;
+        if (p.Action is { IsSkill: true } sk && sk.Phase != ActionPhase.Done)
+            f.Skill = new FigureSkill
+            {
+                Valid = true, Kind = (SkillKind)((int)sk.Kind - (int)ActionKind.StepOver), Id = sk.StartTick,
+                Side = sk.Side == SkillSide.Left ? -1f : sk.Side == SkillSide.Right ? 1f : 0f,
+                Right = sk.Foot == Foot.Right, Surface = (BootSurface)(int)sk.Surface,
+                Elapsed = (p.CurrentTick - sk.StartTick) * f.Dt, Duration = (sk.EndTick - sk.StartTick) * f.Dt,
+                ExecElapsed = (p.CurrentTick - sk.ExecuteTick) * f.Dt, ExecDuration = (sk.EndTick - sk.ExecuteTick) * f.Dt,
+                ContactElapsed = (p.CurrentTick - sk.ContactTick) * f.Dt, ReachSpan = (sk.ContactTick - sk.StartTick) * f.Dt,
+                ContactPoint = G(sk.ContactPoint), OutVelocity = G(sk.BallOutVelocity),
+            };
         foreach (var e in w.Events)
         {
             if (e.Team is not (-1 or 0) || e.PlayerIndex is not (-1 or 0)) continue;
-            if (e.Kind == EventKind.Touch) { f.TouchEvent = true; f.EventRight = e.Foot == Foot.Right; f.BallPos = G(e.Position); }
+            // a skill move's sole contact also raises a Touch: it is drawn by the move, never as a dribble touch
+            if (e.Kind == EventKind.Touch && f.Skill.Valid) f.SkillTouch = true;
+            else if (e.Kind == EventKind.Touch) { f.TouchEvent = true; f.EventRight = e.Foot == Foot.Right; f.BallPos = G(e.Position); }
             else if (e.Kind == EventKind.Strike) { f.StrikeEvent = true; f.EventRight = e.Foot == Foot.Right; f.BallPos = G(e.Position); }
         }
         FillGait(ref f, p);
@@ -75,7 +88,7 @@ public partial class Match
             Id = a.PlanTick, ContactTick = a.ContactTick, ContactEta = a.ContactEta(p.CurrentTick, dt), RecoverySeconds = (a.EndTick - a.ContactTick) * dt,
             ContactPoint = G(a.ContactPoint), BallOutVelocity = G(a.BallOutVelocity),
             NextMeetPoint = a.NextMeetTick >= 0 ? G(a.NextMeetPoint) : new Vector3(float.NaN, 0, 0),
-            ContactMiss = a.ContactMiss, Made = a.Made,
+            ContactMiss = a.ContactMiss, Made = a.Made, IsSkill = a.IsSkill,
         };
     }
 
@@ -194,6 +207,7 @@ public partial class Match
         "charge" => World.State == RoundState.Live && World.ShotCharge >= 0.5f,
         _ when name.StartsWith("touch") && int.TryParse(name[5..], out int n) => _touchCount >= n,
         "strike" => World.State == RoundState.Strike,
+        "skill" => World.Attacker.Action is { IsSkill: true },
         "flight" => World.State == RoundState.Flight && _flightTicks >= 24,
         "outcome" or "report" => World.State == RoundState.Report,
         _ => false,

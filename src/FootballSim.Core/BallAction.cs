@@ -3,8 +3,8 @@ using System.Numerics;
 namespace FootballSim.Core;
 
 /// <summary>
-/// What an action does. Touches are made in phase A; the skill and shot kinds are reserved for the later phases so the view
-/// contract does not change when they arrive.
+/// What an action does: touches, skill moves, and the shot kinds reserved for a later phase so the view contract does not
+/// change when they arrive.
 /// </summary>
 public enum ActionKind
 {
@@ -32,8 +32,19 @@ public enum ActionKind
     /// <summary>First contact with a loose ball (first_touch rating). The player gains possession.</summary>
     First,
 
-    // ---- skills (phase B, not produced yet) ----
-    StepOver, BodyFeint, DragBack, BallRoll, FakeStop, FakeCut,
+    // ---- skill moves (see SkillMoves) ----
+    /// <summary>A foot circles over the ball toward <see cref="BallAction.Side"/>; no ball contact.</summary>
+    StepOver,
+    /// <summary>The body dips toward <see cref="BallAction.Side"/>; no ball contact.</summary>
+    BodyFeint,
+    /// <summary>The sole pulls the ball back and the player steps back and stops.</summary>
+    DragBack,
+    /// <summary>The sole rolls the ball sideways across the body toward <see cref="BallAction.Side"/>.</summary>
+    BallRoll,
+    /// <summary>A shot aborted into a stop: the ball is stopped under the sole and the player stops.</summary>
+    FakeStop,
+    /// <summary>A shot aborted into a cut: the ball is hooked toward the left stick.</summary>
+    FakeCut,
 
     // ---- shots (phase C, not produced yet) ----
     Power, Finesse, Chip, Driven, LowFinesse,
@@ -117,6 +128,30 @@ public sealed class BallAction
     /// <summary>Horizontal distance from the ball centre to <see cref="ContactPoint"/> at contact, metres (NaN before).</summary>
     public float ContactMiss { get; internal set; } = float.NaN;
 
+    // ---- skill moves ----
+    /// <summary>True for a skill move (<see cref="ActionKind.StepOver"/> to <see cref="ActionKind.FakeCut"/>).</summary>
+    public bool IsSkill => Kind is >= ActionKind.StepOver and <= ActionKind.FakeCut;
+    /// <summary>
+    /// For a skill move, the side it goes to relative to the running direction (Left or Right); None for touches and for the
+    /// moves without a side (drag-back, fake stop). A fake cut's side is the side of the cut.
+    /// </summary>
+    public SkillSide Side { get; internal set; }
+    /// <summary>
+    /// For a skill move, the world tick it started on; -1 for touches. A skill move runs from here to <see cref="EndTick"/>;
+    /// its <see cref="ContactTick"/> is the tick the sole first meets the ball, or for a move without contact (step-over,
+    /// body feint) the middle of the move, with <see cref="Made"/> left false.
+    /// </summary>
+    public int StartTick { get; internal set; } = -1;
+    /// <summary>
+    /// For a skill move, the tick its own motion starts, after a reach: from <see cref="StartTick"/> to here the player closes
+    /// on the ball (a sole move's foot reaching for it, a step-over or feint closing in so the ball is within the leg's reach);
+    /// from here to <see cref="EndTick"/> the move itself. Equal to StartTick when there is no reach, and to ContactTick for a
+    /// sole move (ball roll, drag-back, fake stop). -1 for touches.
+    /// </summary>
+    public int ExecuteTick { get; internal set; } = -1;
+    /// <summary>For a skill move, the unit ground direction (X, Z) the player was running in when it started; zero for touches.</summary>
+    public Vector2 RunDirection => IsSkill ? HoldDirection : Vector2.Zero;
+
     // ---- planner state ----
     internal LegsMode Legs;
     /// <summary>Unit ground direction (X, Z) the legs hold for <see cref="LegsMode.Hold"/>.</summary>
@@ -127,6 +162,15 @@ public sealed class BallAction
     internal TouchMode PlanMode;
     /// <summary>The steering correction applied on the latest tick, m/s.</summary>
     internal Vector2 Steer;
+    // Skill move state (HoldDirection is the running direction the move started on).
+    /// <summary>Running speed along that direction when the move started, m/s.</summary>
+    internal float SkillEntry;
+    /// <summary>Where the ball was when the move started and where the sole leaves it.</summary>
+    internal Vector3 SkillBallFrom, SkillBallTo;
+    /// <summary>A fake cut's direction (unit X, Z).</summary>
+    internal Vector2 SkillCut;
+    /// <summary>The effective skill_moves rating the move was made with.</summary>
+    internal float SkillEffective;
 
     /// <summary>Seconds from world tick <paramref name="tick"/> to the contact (negative once it has passed).</summary>
     public float ContactEta(int tick, float dt) => (ContactTick - tick) * dt;
@@ -134,6 +178,12 @@ public sealed class BallAction
     /// <summary>The phase at <paramref name="tick"/> from the tick counts alone.</summary>
     internal ActionPhase PhaseAt(int tick, int preWindupTicks, int windupTicks)
     {
+        if (IsSkill)
+        {
+            // A skill move: wind-up from its start to the contact (or the middle), then recovery to its end.
+            if (Phase == ActionPhase.Done || tick >= EndTick) return ActionPhase.Done;
+            return tick < ContactTick ? ActionPhase.Windup : tick == ContactTick ? ActionPhase.Contact : ActionPhase.Recovery;
+        }
         if (Made) return tick <= ContactTick ? ActionPhase.Contact : tick < EndTick ? ActionPhase.Recovery : ActionPhase.Done;
         if (Phase == ActionPhase.Done) return ActionPhase.Done;
         if (tick >= ContactTick) return ActionPhase.Contact;
@@ -142,6 +192,6 @@ public sealed class BallAction
         return ActionPhase.Planned;
     }
 
-    /// <summary>True while the action waits for its contact.</summary>
-    public bool Pending => !Made && Phase != ActionPhase.Done;
+    /// <summary>True while a touch waits for its contact. Never true for a skill move.</summary>
+    public bool Pending => !Made && Phase != ActionPhase.Done && !IsSkill;
 }

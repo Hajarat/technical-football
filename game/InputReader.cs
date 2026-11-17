@@ -11,7 +11,10 @@ public struct PadSnapshot
     public bool ShootHeld;         // B / Circle
     public bool Finesse;           // right bumper
     public bool Chip;              // left bumper
-    public bool KnockOn;           // right stick flicked past 0.7 or X: true from the press for a short window (see InputReader)
+    public bool KnockOn;           // keyboard X: true from the press for a short window (see InputReader); the pad's knock-on is a right-stick gesture read by the core
+    public float RightX, RightZ;   // -1..1, radial dead zone applied; stick right = +RightX, stick up = -RightZ (read by the core's gesture reader)
+    public bool Cancel;            // A / Cross or G held: a shot cancelled within the core's window becomes a fake
+    public FootballSim.Core.SkillKey SkillKey; // keyboard 1-4: set for one poll per press
     // One-shot presses: true only on the tick the button went down.
     public bool OverlayToggle;     // right stick click
     public bool NextSpot, PrevSpot; // D-pad right / left
@@ -34,14 +37,11 @@ public partial class InputReader : Node
         Overlay = "pad_overlay", Next = "pad_next", Prev = "pad_prev", Confirm = "pad_confirm", Retry = "pad_retry",
         Flag = "pad_flag", Pause = "pad_pause", NextAtk = "pad_next_attacker", NextKeep = "pad_next_keeper",
         RLeft = "pad_rs_left", RRight = "pad_rs_right", RUp = "pad_rs_up", RDown = "pad_rs_down";
-    /// <summary>A right-stick deflection past this is a knock-on flick; the stick must drop below the re-arm value before the next.</summary>
-    const float FlickThreshold = 0.7f, FlickRearm = 0.5f;
     /// <summary>
-    /// A knock-on press stays in the snapshot this long, seconds, so it is not lost when the ball is out of reach on the tick of
-    /// the flick. The core makes at most one knock-on from it: the ball then leaves reach.
+    /// A knock-on key press stays in the snapshot this long, seconds, so it is not lost when the ball is out of reach on the tick of
+    /// the press. The core makes at most one knock-on from it: the ball then leaves reach.
     /// </summary>
     const float KnockOnHoldSeconds = 0.25f;
-    bool _flickArmed = true;
     int _knockOnLeft;
 
     public bool GamepadConnected => Input.GetConnectedJoypads().Count > 0;
@@ -171,6 +171,7 @@ public partial class InputReader : Node
 
     static bool PadTouched(in PadSnapshot p) =>
         p.MoveX != 0 || p.MoveZ != 0 || p.Sprint > 0.05f || p.CloseControl || p.ShootHeld || p.Finesse || p.Chip || p.KnockOn ||
+        p.RightX != 0 || p.RightZ != 0 || p.Cancel || p.SkillKey != FootballSim.Core.SkillKey.None ||
         p.OverlayToggle || p.NextSpot || p.PrevSpot || p.NextAttacker || p.NextKeeper || p.Confirm || p.Retry || p.Flag || p.Pause;
 
     static PadSnapshot Merge(in PadSnapshot a, in PadSnapshot b)
@@ -178,7 +179,9 @@ public partial class InputReader : Node
         var m = a;
         if (new Vector2(b.MoveX, b.MoveZ).LengthSquared() > new Vector2(a.MoveX, a.MoveZ).LengthSquared()) { m.MoveX = b.MoveX; m.MoveZ = b.MoveZ; }
         m.Sprint = Mathf.Max(a.Sprint, b.Sprint);
-        m.CloseControl |= b.CloseControl; m.ShootHeld |= b.ShootHeld; m.Finesse |= b.Finesse; m.Chip |= b.Chip; m.KnockOn |= b.KnockOn;
+        m.CloseControl |= b.CloseControl; m.ShootHeld |= b.ShootHeld; m.Finesse |= b.Finesse; m.Chip |= b.Chip; m.KnockOn |= b.KnockOn; m.Cancel |= b.Cancel;
+        if (new Vector2(b.RightX, b.RightZ).LengthSquared() > new Vector2(a.RightX, a.RightZ).LengthSquared()) { m.RightX = b.RightX; m.RightZ = b.RightZ; }
+        if (b.SkillKey != FootballSim.Core.SkillKey.None) m.SkillKey = b.SkillKey;
         m.OverlayToggle |= b.OverlayToggle; m.NextSpot |= b.NextSpot; m.PrevSpot |= b.PrevSpot;
         m.NextAttacker |= b.NextAttacker; m.NextKeeper |= b.NextKeeper;
         m.Confirm |= b.Confirm; m.Retry |= b.Retry; m.Flag |= b.Flag; m.Pause |= b.Pause;
@@ -200,6 +203,8 @@ public partial class InputReader : Node
             Finesse = Held(Key.E),
             Chip = Held(Key.Q),
             KnockOn = Pressed(Key.X, Key.X),
+            Cancel = Held(Key.G),
+            SkillKey = SkillKeyPressed(),
             OverlayToggle = Pressed(Key.O, Key.O),
             NextSpot = Pressed(Key.Bracketright, Key.Bracketright),
             PrevSpot = Pressed(Key.Bracketleft, Key.Bracketleft),
@@ -212,6 +217,14 @@ public partial class InputReader : Node
         };
     }
 
+    /// <summary>Keys 1-4 select a skill move directly (one poll per press); all four are polled every tick so their edge state stays current.</summary>
+    static FootballSim.Core.SkillKey SkillKeyOf(bool one, bool two, bool three, bool four) =>
+        four ? FootballSim.Core.SkillKey.DragBack : three ? FootballSim.Core.SkillKey.BallRoll :
+        two ? FootballSim.Core.SkillKey.BodyFeint : one ? FootballSim.Core.SkillKey.StepOver : FootballSim.Core.SkillKey.None;
+
+    FootballSim.Core.SkillKey SkillKeyPressed() =>
+        SkillKeyOf(Pressed(Key.Key1, Key.Key1, Key.Kp1), Pressed(Key.Key2, Key.Key2, Key.Kp2), Pressed(Key.Key3, Key.Key3, Key.Kp3), Pressed(Key.Key4, Key.Key4, Key.Kp4));
+
     PadSnapshot PollPad()
     {
         float x = Input.GetActionRawStrength(Right) - Input.GetActionRawStrength(Left);
@@ -219,12 +232,11 @@ public partial class InputReader : Node
         var v = new Vector2(x, y);
         float len = v.Length();
         v = len < DeadZone ? Vector2.Zero : v / len * Mathf.Min(1f, (len - DeadZone) / (1f - DeadZone));
-        // Knock-on: one press per flick of the right stick past the threshold (rising edge, re-armed once it is let back).
-        float rs = new Vector2(Input.GetActionRawStrength(RRight) - Input.GetActionRawStrength(RLeft),
-            Input.GetActionRawStrength(RDown) - Input.GetActionRawStrength(RUp)).Length();
-        bool flick = _flickArmed && rs > FlickThreshold;
-        if (rs > FlickThreshold) _flickArmed = false;
-        else if (rs < FlickRearm) _flickArmed = true;
+        // The right stick goes to the core raw (same axes and radial dead zone as the left); the core reads the gestures.
+        var r = new Vector2(Input.GetActionRawStrength(RRight) - Input.GetActionRawStrength(RLeft),
+            Input.GetActionRawStrength(RDown) - Input.GetActionRawStrength(RUp));
+        float rlen = r.Length();
+        r = rlen < DeadZone ? Vector2.Zero : r / rlen * Mathf.Min(1f, (rlen - DeadZone) / (1f - DeadZone));
         return new PadSnapshot
         {
             MoveX = v.X,
@@ -234,7 +246,10 @@ public partial class InputReader : Node
             ShootHeld = Input.IsActionPressed(Shoot),
             Finesse = Input.IsActionPressed(Fin),
             Chip = Input.IsActionPressed(ChipA),
-            KnockOn = flick,
+            RightX = r.X,
+            RightZ = r.Y,
+            // A / Cross doubles as confirm, but the round flow reads confirm only in Setup and Report, never while live.
+            Cancel = Input.IsActionPressed(Confirm),
             OverlayToggle = Input.IsActionJustPressed(Overlay),
             NextSpot = Input.IsActionJustPressed(Next),
             PrevSpot = Input.IsActionJustPressed(Prev),

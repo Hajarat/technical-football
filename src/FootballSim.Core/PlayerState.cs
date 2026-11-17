@@ -94,6 +94,19 @@ public sealed class PlayerState
     /// <summary>True while the player runs to a ball that no touch can be planned for yet (the recovery run).</summary>
     public bool Recovering { get; internal set; }
 
+    // ---- Skill moves (phase B). ----
+
+    /// <summary>The skill move under way (also <see cref="Action"/> while it lasts), or null.</summary>
+    public BallAction? SkillMove => SkillAction;
+    /// <summary>The most recent gesture recognised (right stick, skill key or fake shot), and its world tick.</summary>
+    public Gesture LastGesture { get; internal set; }
+    /// <summary>World tick of <see cref="LastGesture"/>.</summary>
+    public int LastGestureTick { get; internal set; } = int.MinValue / 2;
+    /// <summary>The effective skill_moves rating of the latest move (the rating times the chain multiplier per earlier move in the chain).</summary>
+    public float SkillEffective { get; internal set; }
+    /// <summary>How many moves came before the latest one in its chain (0 for the first).</summary>
+    public int SkillChainCount { get; internal set; }
+
     internal float LastTouchTime = -100f;
     // The touch boost and the knock-on chase belong to the touch made at their *From time: they lapse as soon as the player
     // touches (or strikes) again or the world resets LastTouchTime, so no other code has to clear them.
@@ -138,6 +151,50 @@ public sealed class PlayerState
     internal bool KnockOnRequested;
     /// <summary>Alternates the next-meet step count for even steps-per-touch so both feet play the ball.</summary>
     internal bool TouchRhythm;
+
+    // Gesture reader (see GestureReader).
+    internal GestureReader.Zone GZone, GPrevZone;
+    /// <summary>World tick the right stick entered its current zone.</summary>
+    internal int GZoneStart;
+    /// <summary>Latest world tick the right stick was forward.</summary>
+    internal int GFwdLastTick = int.MinValue / 2;
+    /// <summary>The side held now has already given a step-over or a roll.</summary>
+    internal bool GSideConsumed;
+    /// <summary>The forward push held now has already armed a knock-on.</summary>
+    internal bool GKnockUsed;
+    /// <summary>World tick a knock-on was armed and is waiting to fire, or -1.</summary>
+    internal int GKnockWaitTick = -1;
+    /// <summary>The cancel button on the previous tick.</summary>
+    internal bool GPrevCancel;
+
+    // Skill moves (see SkillMoves).
+    /// <summary>The move under way, or null.</summary>
+    internal BallAction? SkillAction;
+    /// <summary>A recognised move waiting for the ball to come into reach: kind, side, cut direction and the tick it was made (-1: none).</summary>
+    internal Gesture SkillBufKind;
+    internal SkillSide SkillBufSide;
+    internal Vector2 SkillBufCut;
+    internal int SkillBufTick = -1;
+    /// <summary>World tick a move ended on, when the touch planner may make the exit touch at once; -1 otherwise.</summary>
+    internal int SkillExitTick = -1;
+    /// <summary>Simulation seconds before which no move starts (the drag-back's cooldown).</summary>
+    internal float SkillCooldownUntil = -100f;
+    /// <summary>Simulation seconds until which a new move continues the chain.</summary>
+    internal float SkillChainUntil = -100f;
+    /// <summary>The exit burst of the latest move waits for the exit touch until this time ...</summary>
+    internal float SkillBoostUntil = -100f;
+    /// <summary>... then divides the time constant by this ...</summary>
+    internal float SkillBoostFactor = 1f;
+    /// <summary>... for this long, seconds ...</summary>
+    internal float SkillBoostDuration;
+    /// <summary>... and raises the with-ball speed cap by this fraction of top speed.</summary>
+    internal float SkillBoostCap;
+    /// <summary>The exit burst under way lasts until this time, through any touches made meanwhile ...</summary>
+    internal float SkillBurstUntil = -100f;
+    /// <summary>... dividing the time constant by this (or the touch boost's factor, if larger) ...</summary>
+    internal float SkillBurstFactor = 1f;
+    /// <summary>... and raising the with-ball speed cap by this fraction of top speed.</summary>
+    internal float SkillBurstCap;
     PlayerState? _scratch;
 
     /// <summary>A reusable copy of this player for predictions (never part of a world).</summary>
@@ -153,6 +210,13 @@ public sealed class PlayerState
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed;
         LastTouchKind = o.LastTouchKind;
+        GZone = o.GZone; GPrevZone = o.GPrevZone; GZoneStart = o.GZoneStart; GFwdLastTick = o.GFwdLastTick;
+        GSideConsumed = o.GSideConsumed; GKnockUsed = o.GKnockUsed; GKnockWaitTick = o.GKnockWaitTick; GPrevCancel = o.GPrevCancel;
+        LastGesture = o.LastGesture; LastGestureTick = o.LastGestureTick; SkillEffective = o.SkillEffective; SkillChainCount = o.SkillChainCount;
+        SkillAction = o.SkillAction; SkillBufKind = o.SkillBufKind; SkillBufSide = o.SkillBufSide; SkillBufCut = o.SkillBufCut;
+        SkillBufTick = o.SkillBufTick; SkillExitTick = o.SkillExitTick; SkillCooldownUntil = o.SkillCooldownUntil; SkillChainUntil = o.SkillChainUntil;
+        SkillBoostUntil = o.SkillBoostUntil; SkillBoostFactor = o.SkillBoostFactor; SkillBoostDuration = o.SkillBoostDuration;
+        SkillBoostCap = o.SkillBoostCap; SkillBurstUntil = o.SkillBurstUntil; SkillBurstFactor = o.SkillBurstFactor; SkillBurstCap = o.SkillBurstCap;
         return this;
     }
 

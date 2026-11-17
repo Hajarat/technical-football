@@ -22,6 +22,8 @@ public static class Movement
     public static float TimeConstantAt(PlayerState p, float now, Tuning t)
     {
         float tau = TimeConstant(p.Sheet, t);
+        // A skill move's exit burst runs on through later touches; a touch boost larger than it still wins.
+        if (now < p.SkillBurstUntil) return tau / (TouchBoostActive(p, now) ? MathF.Max(p.TouchBoostFactor, p.SkillBurstFactor) : p.SkillBurstFactor);
         return TouchBoostActive(p, now) ? tau / p.TouchBoostFactor : tau;
     }
 
@@ -93,7 +95,9 @@ public static class Movement
         var fwd0 = new Vector3(MathF.Cos(p.Facing), 0f, MathF.Sin(p.Facing));
         float speed = MathF.Max(0f, Vector3.Dot(p.Velocity - p.SteerVelocity, fwd0));
         float tau = MathF.Max(TimeConstantAt(p, now, t), dt);
-        speed += (target - speed) / tau * dt;
+        // A skill move sets the running speed itself (it paces the player against the ball); otherwise it eases to the target.
+        if (float.IsNaN(assist.RunSpeed)) speed += (target - speed) / tau * dt;
+        else speed = assist.RunSpeed;
 
         float facing = p.Facing;
         if (mag > 0f)
@@ -138,5 +142,8 @@ public static class Movement
     }
 }
 
-/// <summary>Per-tick movement modifiers: the speed cap, a turn-rate scale and a steering correction velocity (world X, Z).</summary>
-internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Steer);
+/// <summary>
+/// Per-tick movement modifiers: the speed cap, a turn-rate scale, a steering correction velocity (world X, Z) and, for a skill
+/// move, the running speed to use this tick (NaN: the legs ease toward the stick's target as usual).
+/// </summary>
+internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Steer, float RunSpeed = float.NaN);

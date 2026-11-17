@@ -469,6 +469,134 @@ public sealed class KeeperTuning
     public float FingertipMaxBendDeg { get; set; } = 25f;
 }
 
+/// <summary>
+/// Skill moves: the right-stick gestures that ask for them, when a move can start, each move's timing and geometry, the chain
+/// rule and the exit burst. Times are seconds (converted to ticks at the tick rate), distances metres, angles degrees.
+/// </summary>
+public sealed class SkillTuning
+{
+    // ---- gestures (GestureReader) ----
+    /// <summary>The right stick counts as pushed from this deflection; below it, it is neutral.</summary>
+    public float MinActuation { get; set; } = 0.5f;
+    /// <summary>
+    /// Default angle tolerance of a gesture direction around its forward, back or side direction. A pushed stick belongs to
+    /// its nearest of the four directions when within this of it, so at 45 or more every pushed stick has a direction.
+    /// </summary>
+    public float AngleToleranceDeg { get; set; } = 60f;
+    /// <summary>The step-over's side flick must be within this of the exact side.</summary>
+    public float StepOverSideToleranceDeg { get; set; } = 30f;
+    /// <summary>Two recognised gestures are at least this far apart; a gesture sooner than this is ignored.</summary>
+    public float GestureGap { get; set; } = 0.08f;
+    /// <summary>A step-over is forward then the side within this long.</summary>
+    public float StepOverWindow { get; set; } = 0.25f;
+    /// <summary>A body feint is a side flick from neutral that is back at neutral within this long.</summary>
+    public float FeintMaxHold { get; set; } = 0.1f;
+    /// <summary>A side held this long is a ball roll (shorter and released, a body feint).</summary>
+    public float RollMinHold { get; set; } = 0.1f;
+    /// <summary>A forward flick at least this far while sprinting asks for a knock-on.</summary>
+    public float KnockOnActuation { get; set; } = 0.85f;
+    /// <summary>The knock-on waits this long before it fires, so a step-over can start with the same forward flick.</summary>
+    public float KnockOnWait { get; set; } = 0.15f;
+    /// <summary>Cancel pressed within this long of the shot starting turns it into a fake shot.</summary>
+    public float FakeShotWindow { get; set; } = 0.1f;
+    /// <summary>Above this speed the gesture frame's forward is the running direction, below it the facing, m/s.</summary>
+    public float FrameMinSpeed { get; set; } = 1.0f;
+    /// <summary>A keyboard skill key takes its side from the left stick's sideways deflection beyond this (else right).</summary>
+    public float KeySideThreshold { get; set; } = 0.2f;
+
+    // ---- starting a move (SkillMoves) ----
+    /// <summary>A gesture made with the ball out of reach and no meet planned waits this long for it, then is dropped.</summary>
+    public float BufferSeconds { get; set; } = 0.3f;
+    /// <summary>
+    /// A gesture made with the ball out of reach while a push is in flight waits for the ball's planned meet with the foot,
+    /// if that meet comes within this long; at the meet the move starts instead of the touch.
+    /// </summary>
+    public float MeetWaitSeconds { get; set; } = 1.5f;
+    /// <summary>The step-over starts with the ball within this of the player.</summary>
+    public float StepOverRadius { get; set; } = 1.0f;
+    /// <summary>The other moves start with the ball within this of the player.</summary>
+    public float ExecutionRadius { get; set; } = 0.75f;
+    /// <summary>A move starts only with the ball centre lower than this.</summary>
+    public float MaxBallHeight { get; set; } = 0.3f;
+    /// <summary>
+    /// A step-over or body feint waits (while a meet is planned) until the ball is no more than this far ahead of the player,
+    /// so the leg can reach over it.
+    /// </summary>
+    public float StepOverMaxAhead { get; set; } = 0.5f;
+    /// <summary>
+    /// A sole move (ball roll, drag-back, fake stop) reaches for the ball for at most this long before the sole lands on it,
+    /// seconds; the ball is free until then.
+    /// </summary>
+    public float SoleReachMax { get; set; } = 0.1f;
+    /// <summary>The sole lands with the ball centre within this of the foot's contact point, metres.</summary>
+    public float SoleReachTolerance { get; set; } = 0.3f;
+    /// <summary>The largest steering velocity the reach may add to bring the foot to the ball, m/s.</summary>
+    public float SoleReachSteer { get; set; } = 2.5f;
+
+    // ---- the moves ----
+    public float StepOverSeconds { get; set; } = 0.25f;
+    /// <summary>The step-over over a still ball (slower than <see cref="StillBallSpeed"/>).</summary>
+    public float StepOverStillSeconds { get; set; } = 0.15f;
+    /// <summary>A ball slower than this counts as still, m/s.</summary>
+    public float StillBallSpeed { get; set; } = 0.1f;
+    /// <summary>
+    /// Step-over and body feint: the player eases to the ball's pace so it ends this far ahead of his foot (the contact zone's
+    /// lead ahead of him).
+    /// </summary>
+    public float PaceMatchAhead { get; set; } = 0.25f;
+    public float BodyFeintSeconds { get; set; } = 0.25f;
+    /// <summary>The ball roll when it is the first move of a chain.</summary>
+    public float BallRollFirstSeconds { get; set; } = 0.3f;
+    /// <summary>The ball roll later in a chain.</summary>
+    public float BallRollChainSeconds { get; set; } = 0.2f;
+    /// <summary>How far the ball is rolled sideways against the player's speed, m/s to metres.</summary>
+    public Curve BallRollDistance { get; set; } = new((0f, 0.6f), (4f, 1.0f));
+    /// <summary>The player moves sideways this fraction of the roll distance with the ball.</summary>
+    public float BallRollFollow { get; set; } = 0.5f;
+    public float DragBackSeconds { get; set; } = 0.25f;
+    /// <summary>No other move starts until this long after a drag-back.</summary>
+    public float DragBackCooldown { get; set; } = 0.2f;
+    /// <summary>How far the sole pulls the ball back.</summary>
+    public float DragBackDistance { get; set; } = 1.0f;
+    /// <summary>How far the player steps back (he ends standing).</summary>
+    public float DragBackStepBack { get; set; } = 0.3f;
+    /// <summary>Fake stop and fake cut.</summary>
+    public float FakeSeconds { get; set; } = 0.1f;
+    /// <summary>The fake stop leaves the ball at rest this far ahead of where the player stops.</summary>
+    public float FakeStopAhead { get; set; } = 0.25f;
+    /// <summary>The fake cut pushes the ball this far along the left stick ...</summary>
+    public float FakeCutDistance { get; set; } = 1.2f;
+    /// <summary>... in this long.</summary>
+    public float FakeCutTime { get; set; } = 0.5f;
+
+    // ---- chain and exit burst ----
+    /// <summary>A move starting within this long of the previous one's end is chained.</summary>
+    public float ChainWindow { get; set; } = 2.0f;
+    /// <summary>Each chained move uses this times the previous move's effective skill.</summary>
+    public float ChainMultiplier { get; set; } = 0.8f;
+    /// <summary>
+    /// After a move the speed time constant is divided by (1 + this * the exit-angle scale) for the burst duration (effective
+    /// skill_moves).
+    /// </summary>
+    public RatingRange Burst { get; set; } = new(0f, 0.7f);
+    /// <summary>How long the exit burst lasts from the exit touch, seconds (effective skill_moves).</summary>
+    public RatingRange BurstDuration { get; set; } = new(0.2f, 0.9f);
+    /// <summary>
+    /// While the exit burst lasts the with-ball speed cap rises by this fraction of top speed times the exit-angle scale
+    /// (effective skill_moves).
+    /// </summary>
+    public RatingRange BurstSpeedCap { get; set; } = new(0f, 0.03f);
+    /// <summary>
+    /// The burst scale of a move that sells a side (step-over, body feint) against the exit angle away from that side, degrees:
+    /// largest going away from it, none going toward it.
+    /// </summary>
+    public Curve SidedExitBurst { get; set; } = new((-90f, 0f), (0f, 0.7f), (90f, 1f));
+    /// <summary>The burst scale of a move that sells straight on (ball roll, drag-back, fakes) against the size of the exit angle.</summary>
+    public Curve StraightExitBurst { get; set; } = new((0f, 0.8f), (90f, 0.88f));
+    /// <summary>A step-over gives no burst at all for an exit more than this toward its sold side.</summary>
+    public float StepOverNoBurstTowardDeg { get; set; } = 45f;
+}
+
 /// <summary>Round state machine timings.</summary>
 public sealed class RoundTuning
 {
@@ -498,6 +626,7 @@ public sealed class Tuning
     public ShotTuning Shot { get; set; } = new();
     public KeeperTuning Keeper { get; set; } = new();
     public RoundTuning Round { get; set; } = new();
+    public SkillTuning Skill { get; set; } = new();
 
     /// <summary>Seconds per tick.</summary>
     public float Dt => 1f / TickRate;
