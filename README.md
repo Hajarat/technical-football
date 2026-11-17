@@ -33,6 +33,7 @@ In replay mode the game also prints `FOOT_EVENT` per touch/strike and, on quit, 
 | Left trigger (past half) | Close control |
 | B / Circle (hold, release) | Shoot: power builds while held |
 | Right bumper / left bumper | Finesse / chip shot (hold while shooting) |
+| Right stick flick (past 0.7) | Knock-on: a heavy touch ahead to sprint onto, caught about 1.3-1.8 s later (one per flick) |
 | A / Cross | Start the round; at the report, next round (new seed) |
 | Y / Triangle | At the report, retry with the same seed |
 | D-pad left / right | Previous / next start spot |
@@ -56,6 +57,7 @@ Works alongside a gamepad (the larger stick value wins) and when none is detecte
 | Left Ctrl or Alt | Close control |
 | Space (hold, release) | Shoot |
 | E / Q | Finesse / chip (hold while shooting) |
+| X | Knock-on |
 | Enter | Start the round; at the report, next round |
 | R | At the report, retry with the same seed |
 | `[` / `]` | Previous / next start spot |

@@ -24,6 +24,8 @@ public struct TickIntent
     public bool ShootHeld;
     public bool Finesse;
     public bool Chip;
+    /// <summary>True on the tick a knock-on (a heavy touch far ahead) is asked for; one tick per press.</summary>
+    public bool KnockOn;
 
     public readonly Vector2 Move => new(MoveX, MoveZ);
 }

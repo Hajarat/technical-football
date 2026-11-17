@@ -187,7 +187,10 @@ public class PossessionTests
         Assert.True(d40 > d60 && d60 > d80, $"mean max distance 40/60/80: {d40:F2} / {d60:F2} / {d80:F2}");
     }
 
-    /// <summary>Sprints, releases the stick while the ball is knocked ahead out of reach, and waits for PossessionLost.</summary>
+    /// <summary>
+    /// Sprints, releases the stick while the ball is knocked ahead out of reach, and waits for PossessionLost. Planned sprint
+    /// touches seldom leave the ball that far ahead, so after two seconds of sprinting the player knocks it on.
+    /// </summary>
     static bool LoseTheBall(World w)
     {
         var buf = new TickIntent[w.PlayerCount];
@@ -197,6 +200,7 @@ public class PossessionTests
             bool away = w.Attacker.InPossession && w.Attacker.Speed > 6f && BallDistance(w) > reach + w.Tuning.Possession.ReachBallMargin + 0.1f
                         && w.Ball.Velocity.X > w.Attacker.Velocity.X;
             buf[0] = away ? default : Sprint;
+            buf[0].KnockOn = !away && i >= 240 && w.Attacker.InPossession && w.Attacker.Speed > 6f;
             w.Step(buf);
             if (away) break;
         }

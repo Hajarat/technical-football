@@ -146,8 +146,9 @@ public sealed class MovementTuning
 }
 
 /// <summary>
-/// Touches. A touch sets the ball's speed relative to the player's: in possession the ball leaves at the player's speed along
-/// the stick plus a small overshoot, so touches are small and frequent and the ball stays at the feet.
+/// Touches. A touch sets the ball's speed relative to the player's: in possession a dribble touch is planned so the ball rolls
+/// to a point a short lead ahead of where the feet will be at the next touch, so touches are small and frequent and the ball
+/// stays at the feet.
 /// </summary>
 public sealed class TouchTuning
 {
@@ -170,14 +171,25 @@ public sealed class TouchTuning
     /// <summary>Minimum seconds between touches at a sprint.</summary>
     public float SprintCadence { get; set; } = 0.30f;
 
-    /// <summary>Ball speed after a touch is the player's speed along the touch times (1 + overshoot).</summary>
+    /// <summary>A first touch with the stick pushed sends the ball at the player's speed along the touch times (1 + overshoot).</summary>
     public float CloseControlOvershoot { get; set; } = 0.02f;
     public float JogOvershoot { get; set; } = 0.05f;
-    /// <summary>Sprint overshoot (dribbling rating).</summary>
+    /// <summary>Sprint overshoot for a first touch (dribbling rating).</summary>
     public RatingRange SprintOvershoot { get; set; } = new(0.22f, 0.06f);
+    /// <summary>
+    /// A dribble or turn touch aims the ball to arrive this far ahead of where the feet will be at the next touch, metres, in
+    /// close control (dribbling rating).
+    /// </summary>
+    public RatingRange CloseControlLead { get; set; } = new(0.40f, 0.30f);
+    /// <summary>Planned-touch lead at a jog, metres (dribbling rating).</summary>
+    public RatingRange JogLead { get; set; } = new(0.70f, 0.50f);
+    /// <summary>Planned-touch lead at a sprint, metres (dribbling rating). Beyond foot reach the touch waits for the player.</summary>
+    public RatingRange SprintLead { get; set; } = new(1.20f, 0.60f);
     /// <summary>Ball speed after a touch never falls below this, m/s (a touch from a standstill).</summary>
     public float MinPush { get; set; } = 2.0f;
     public float CloseControlMinPush { get; set; } = 1.2f;
+    /// <summary>A planned dribble or turn touch never sends the ball faster than this, m/s.</summary>
+    public float MaxPush { get; set; } = 12f;
     /// <summary>Standard deviation of the touch speed factor (dribbling), before the speed scaling.</summary>
     public RatingRange SpeedError { get; set; } = new(0.10f, 0.02f);
     /// <summary>Standard deviation of the touch direction, degrees (ball_control), before the speed scaling.</summary>
@@ -198,6 +210,33 @@ public sealed class TouchTuning
     public float CutDeg { get; set; } = 60f;
     /// <summary>Player speed above which a sharp turn is a cut, m/s.</summary>
     public float CutMinSpeed { get; set; } = 2.0f;
+
+    /// <summary>
+    /// After a dribble, turn or cut touch the speed time constant is divided by (1 + this + the turn extra) for the boost
+    /// duration, so the player accelerates harder out of the touch (dribbling rating).
+    /// </summary>
+    public RatingRange TouchBoost { get; set; } = new(0.15f, 0.35f);
+    /// <summary>How long the touch boost lasts after the touch, seconds.</summary>
+    public float TouchBoostDuration { get; set; } = 0.25f;
+    /// <summary>Extra boost for a touch that changes direction, reached at the full turn angle (linear from 0 degrees).</summary>
+    public float TouchBoostTurnExtra { get; set; } = 0.3f;
+    /// <summary>Turn angle at which the touch boost gets all of its turn extra, degrees.</summary>
+    public float TouchBoostTurnFullDeg { get; set; } = 90f;
+
+    /// <summary>
+    /// A knock-on is planned so the player, chasing at full top speed, meets the ball this long after the touch, seconds
+    /// (dribbling rating).
+    /// </summary>
+    public RatingRange KnockOnCatchTime { get; set; } = new(1.8f, 1.3f);
+    /// <summary>A knock-on's speed and direction errors are the sprint ones (full speed fraction) times this.</summary>
+    public float KnockOnErrorScale { get; set; } = 1.5f;
+    /// <summary>
+    /// After a knock-on the player chases it (no dribble speed cap, the ball is not lost by distance) while running along it at
+    /// least this fast, m/s.
+    /// </summary>
+    public float KnockOnChaseMinSpeed { get; set; } = 1.0f;
+    /// <summary>The chase ends this long after the planned catch time if the player has not touched the ball again, seconds.</summary>
+    public float KnockOnChaseGrace { get; set; } = 0.5f;
 
     /// <summary>A trap is made when the ball would come to rest more than this from where the player stops, metres.</summary>
     public float TrapTolerance { get; set; } = 0.25f;

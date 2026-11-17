@@ -11,6 +11,7 @@ public struct PadSnapshot
     public bool ShootHeld;         // B / Circle
     public bool Finesse;           // right bumper
     public bool Chip;              // left bumper
+    public bool KnockOn;           // right stick flicked past 0.7 or X: true from the press for a short window (see InputReader)
     // One-shot presses: true only on the tick the button went down.
     public bool OverlayToggle;     // right stick click
     public bool NextSpot, PrevSpot; // D-pad right / left
@@ -31,7 +32,17 @@ public partial class InputReader : Node
     const string Left = "pad_left", Right = "pad_right", Up = "pad_up", Down = "pad_down",
         SprintA = "pad_sprint", CloseA = "pad_close", Shoot = "pad_shoot", Fin = "pad_finesse", ChipA = "pad_chip",
         Overlay = "pad_overlay", Next = "pad_next", Prev = "pad_prev", Confirm = "pad_confirm", Retry = "pad_retry",
-        Flag = "pad_flag", Pause = "pad_pause", NextAtk = "pad_next_attacker", NextKeep = "pad_next_keeper";
+        Flag = "pad_flag", Pause = "pad_pause", NextAtk = "pad_next_attacker", NextKeep = "pad_next_keeper",
+        RLeft = "pad_rs_left", RRight = "pad_rs_right", RUp = "pad_rs_up", RDown = "pad_rs_down";
+    /// <summary>A right-stick deflection past this is a knock-on flick; the stick must drop below the re-arm value before the next.</summary>
+    const float FlickThreshold = 0.7f, FlickRearm = 0.5f;
+    /// <summary>
+    /// A knock-on press stays in the snapshot this long, seconds, so it is not lost when the ball is out of reach on the tick of
+    /// the flick. The core makes at most one knock-on from it: the ball then leaves reach.
+    /// </summary>
+    const float KnockOnHoldSeconds = 0.25f;
+    bool _flickArmed = true;
+    int _knockOnLeft;
 
     public bool GamepadConnected => Input.GetConnectedJoypads().Count > 0;
     /// <summary>False in replay mode: the keyboard must not affect a replay.</summary>
@@ -70,6 +81,8 @@ public partial class InputReader : Node
         Axis(Left, JoyAxis.LeftX, -1); Axis(Right, JoyAxis.LeftX, 1);
         Axis(Up, JoyAxis.LeftY, -1); Axis(Down, JoyAxis.LeftY, 1);
         Axis(SprintA, JoyAxis.TriggerRight, 1); Axis(CloseA, JoyAxis.TriggerLeft, 1);
+        Axis(RLeft, JoyAxis.RightX, -1); Axis(RRight, JoyAxis.RightX, 1);
+        Axis(RUp, JoyAxis.RightY, -1); Axis(RDown, JoyAxis.RightY, 1);
         BindFaceButtons();
         Btn(Fin, JoyButton.RightShoulder); Btn(ChipA, JoyButton.LeftShoulder);
         Btn(Overlay, JoyButton.RightStick); Btn(Next, JoyButton.DpadRight); Btn(Prev, JoyButton.DpadLeft); Btn(NextAtk, JoyButton.DpadUp); Btn(NextKeep, JoyButton.DpadDown);
@@ -139,16 +152,25 @@ public partial class InputReader : Node
         TrackPad();
         if (KeyboardEnabled && Pressed(Key.B, Key.B)) ToggleSwap();
         var pad = PollPad();
-        if (!KeyboardEnabled) { Source = PadTouched(pad) ? "gamepad" : Source; return pad; }
+        if (!KeyboardEnabled) { Source = PadTouched(pad) ? "gamepad" : Source; return HoldKnockOn(pad); }
         var key = PollKeyboard();
         bool padTouched = PadTouched(pad), keyTouched = PadTouched(key);
         if (keyTouched && !padTouched) Source = "keyboard";
         else if (padTouched) Source = "gamepad";
-        return Merge(pad, key);
+        return HoldKnockOn(Merge(pad, key));
+    }
+
+    /// <summary>Turns a knock-on press (true on one poll) into a short window of polls with KnockOn set.</summary>
+    PadSnapshot HoldKnockOn(PadSnapshot p)
+    {
+        if (p.KnockOn) _knockOnLeft = Mathf.Max(1, Mathf.RoundToInt(KnockOnHoldSeconds * Engine.PhysicsTicksPerSecond));
+        p.KnockOn = _knockOnLeft > 0;
+        if (_knockOnLeft > 0) _knockOnLeft--;
+        return p;
     }
 
     static bool PadTouched(in PadSnapshot p) =>
-        p.MoveX != 0 || p.MoveZ != 0 || p.Sprint > 0.05f || p.CloseControl || p.ShootHeld || p.Finesse || p.Chip ||
+        p.MoveX != 0 || p.MoveZ != 0 || p.Sprint > 0.05f || p.CloseControl || p.ShootHeld || p.Finesse || p.Chip || p.KnockOn ||
         p.OverlayToggle || p.NextSpot || p.PrevSpot || p.NextAttacker || p.NextKeeper || p.Confirm || p.Retry || p.Flag || p.Pause;
 
     static PadSnapshot Merge(in PadSnapshot a, in PadSnapshot b)
@@ -156,7 +178,7 @@ public partial class InputReader : Node
         var m = a;
         if (new Vector2(b.MoveX, b.MoveZ).LengthSquared() > new Vector2(a.MoveX, a.MoveZ).LengthSquared()) { m.MoveX = b.MoveX; m.MoveZ = b.MoveZ; }
         m.Sprint = Mathf.Max(a.Sprint, b.Sprint);
-        m.CloseControl |= b.CloseControl; m.ShootHeld |= b.ShootHeld; m.Finesse |= b.Finesse; m.Chip |= b.Chip;
+        m.CloseControl |= b.CloseControl; m.ShootHeld |= b.ShootHeld; m.Finesse |= b.Finesse; m.Chip |= b.Chip; m.KnockOn |= b.KnockOn;
         m.OverlayToggle |= b.OverlayToggle; m.NextSpot |= b.NextSpot; m.PrevSpot |= b.PrevSpot;
         m.NextAttacker |= b.NextAttacker; m.NextKeeper |= b.NextKeeper;
         m.Confirm |= b.Confirm; m.Retry |= b.Retry; m.Flag |= b.Flag; m.Pause |= b.Pause;
@@ -177,6 +199,7 @@ public partial class InputReader : Node
             ShootHeld = Held(Key.Space),
             Finesse = Held(Key.E),
             Chip = Held(Key.Q),
+            KnockOn = Pressed(Key.X, Key.X),
             OverlayToggle = Pressed(Key.O, Key.O),
             NextSpot = Pressed(Key.Bracketright, Key.Bracketright),
             PrevSpot = Pressed(Key.Bracketleft, Key.Bracketleft),
@@ -196,6 +219,12 @@ public partial class InputReader : Node
         var v = new Vector2(x, y);
         float len = v.Length();
         v = len < DeadZone ? Vector2.Zero : v / len * Mathf.Min(1f, (len - DeadZone) / (1f - DeadZone));
+        // Knock-on: one press per flick of the right stick past the threshold (rising edge, re-armed once it is let back).
+        float rs = new Vector2(Input.GetActionRawStrength(RRight) - Input.GetActionRawStrength(RLeft),
+            Input.GetActionRawStrength(RDown) - Input.GetActionRawStrength(RUp)).Length();
+        bool flick = _flickArmed && rs > FlickThreshold;
+        if (rs > FlickThreshold) _flickArmed = false;
+        else if (rs < FlickRearm) _flickArmed = true;
         return new PadSnapshot
         {
             MoveX = v.X,
@@ -205,6 +234,7 @@ public partial class InputReader : Node
             ShootHeld = Input.IsActionPressed(Shoot),
             Finesse = Input.IsActionPressed(Fin),
             Chip = Input.IsActionPressed(ChipA),
+            KnockOn = flick,
             OverlayToggle = Input.IsActionJustPressed(Overlay),
             NextSpot = Input.IsActionJustPressed(Next),
             PrevSpot = Input.IsActionJustPressed(Prev),

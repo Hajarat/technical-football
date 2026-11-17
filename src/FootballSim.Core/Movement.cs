@@ -15,6 +15,48 @@ public static class Movement
     /// <summary>Speed time constant, seconds (acceleration).</summary>
     public static float TimeConstant(PlayerSheet s, Tuning t) => t.Movement.TimeConstant.ForRating(s.Acceleration);
 
+    /// <summary>
+    /// Speed time constant at simulation time <paramref name="now"/>, seconds: divided by the touch boost while it lasts (from a
+    /// dribble, turn or cut touch until the boost runs out or the player touches the ball again).
+    /// </summary>
+    public static float TimeConstantAt(PlayerState p, float now, Tuning t)
+    {
+        float tau = TimeConstant(p.Sheet, t);
+        return TouchBoostActive(p, now) ? tau / p.TouchBoostFactor : tau;
+    }
+
+    /// <summary>True while the boost from the player's most recent touch lasts.</summary>
+    internal static bool TouchBoostActive(PlayerState p, float now) => p.TouchBoostFrom == p.LastTouchTime && now < p.TouchBoostUntil;
+
+    /// <summary>The speed the legs ease toward for an intent under a speed cap: cap * stick deflection * mode fraction, m/s.</summary>
+    internal static float TargetSpeed(in TickIntent intent, float top, Tuning t)
+    {
+        var m = t.Movement;
+        float mag = MathF.Min(1f, intent.Move.Length());
+        if (mag < m.StickDeadZone) mag = 0f;
+        float mode = intent.CloseControl
+            ? m.CloseControlFraction
+            : m.JogFraction + (m.SprintFraction - m.JogFraction) * Math.Clamp(intent.Sprint, 0f, 1f);
+        return top * mag * mode;
+    }
+
+    /// <summary>
+    /// Distance a player covers in <paramref name="ticks"/> ticks after <paramref name="start"/> running straight, with the speed
+    /// starting at <paramref name="v0"/> and easing toward <paramref name="target"/> exactly as <see cref="Step"/> does (touch
+    /// boost included), metres. Turning, the balance loss and the sideways assist are left out.
+    /// </summary>
+    internal static float RunDistance(PlayerState p, float v0, float target, float start, int ticks, Tuning t)
+    {
+        float dt = t.Dt, speed = MathF.Max(v0, 0f), dist = 0f;
+        for (int j = 1; j <= ticks; j++)
+        {
+            float tau = MathF.Max(TimeConstantAt(p, start + j * dt, t), dt);
+            speed = MathF.Max(speed + (target - speed) / tau * dt, 0f);
+            dist += speed * dt;
+        }
+        return dist;
+    }
+
     /// <summary>Turn rate in degrees per second before the speed penalty: agility, scaled by weight.</summary>
     public static float TurnRateDeg(PlayerSheet s, Tuning t)
     {
@@ -39,7 +81,7 @@ public static class Movement
 
     /// <summary>
     /// Moves a player one tick. Velocity points along the facing. Speed follows
-    /// dv/dt = (target - v) / time_constant; the facing turns toward the stick at the turn rate.
+    /// dv/dt = (target - v) / time_constant (shortened by a touch boost); the facing turns toward the stick at the turn rate.
     /// </summary>
     /// <param name="now">Simulation seconds, for the sharp-turn window.</param>
     /// <param name="hasBall">True if the player is in control of the ball (lowers top speed).</param>
@@ -65,7 +107,7 @@ public static class Movement
         float target = top * mag * mode;
         var fwd0 = new Vector3(MathF.Cos(p.Facing), 0f, MathF.Sin(p.Facing));
         float speed = MathF.Max(0f, Vector3.Dot(p.Velocity, fwd0));
-        float tau = MathF.Max(TimeConstant(p.Sheet, t), dt);
+        float tau = MathF.Max(TimeConstantAt(p, now, t), dt);
         speed += (target - speed) / tau * dt;
 
         float facing = p.Facing;
@@ -93,6 +135,7 @@ public static class Movement
         }
 
         speed = MathF.Max(speed, 0f);
+        p.MoveTime = now;
         p.Facing = facing;
         p.Velocity = new Vector3(MathF.Cos(facing) * speed + assist.Lateral.X, 0f, MathF.Sin(facing) * speed + assist.Lateral.Y);
         Vector3 pos = p.Position + p.Velocity * dt;
