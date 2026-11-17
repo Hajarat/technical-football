@@ -16,6 +16,59 @@ public sealed class RatingRange
     public float ForRating(float rating) => Lerp(Rating.R01(rating));
 }
 
+/// <summary>
+/// A piecewise-linear function y(x) through points sorted by x, held flat beyond the first and last point.
+/// In JSON it is an array of [x, y] pairs, e.g. [[0, 0.45], [9, 0.42]]. <see cref="Validate"/> checks a loaded curve.
+/// </summary>
+[System.Text.Json.Serialization.JsonConverter(typeof(CurveJsonConverter))]
+public sealed class Curve
+{
+    readonly float[] _x;
+    readonly float[] _y;
+
+    public Curve(params (float X, float Y)[] points)
+    {
+        _x = new float[points.Length];
+        _y = new float[points.Length];
+        for (int i = 0; i < points.Length; i++) { _x[i] = points[i].X; _y[i] = points[i].Y; }
+    }
+
+    /// <summary>A curve with the same value everywhere.</summary>
+    public static Curve Constant(float y) => new((0f, y));
+
+    public int Count => _x.Length;
+    public (float X, float Y) this[int i] => (_x[i], _y[i]);
+
+    /// <summary>The value at <paramref name="x"/>: linear between points, the end value outside them, 0 for an empty curve.</summary>
+    public float Evaluate(float x)
+    {
+        int n = _x.Length;
+        if (n == 0) return 0f;
+        if (x <= _x[0]) return _y[0];
+        for (int i = 1; i < n; i++)
+        {
+            if (x <= _x[i])
+            {
+                float f = (x - _x[i - 1]) / (_x[i] - _x[i - 1]);
+                return _y[i - 1] + (_y[i] - _y[i - 1]) * f;
+            }
+        }
+        return _y[n - 1];
+    }
+
+    /// <summary>Null when the curve is usable; otherwise what is wrong (no points, a non-finite value, x not strictly increasing).</summary>
+    public string? Validate()
+    {
+        if (_x.Length == 0) return "needs at least one [x, y] point";
+        for (int i = 0; i < _x.Length; i++)
+        {
+            if (!float.IsFinite(_x[i]) || !float.IsFinite(_y[i])) return $"point {i} is not a finite number";
+            if (i > 0 && !(_x[i] > _x[i - 1])) return $"x must be strictly increasing (point {i}: {_x[i]} after {_x[i - 1]})";
+        }
+        return null;
+    }
+}
+
 /// <summary>Ball flight and ground constants.</summary>
 public sealed class BallTuning
 {
@@ -23,14 +76,26 @@ public sealed class BallTuning
     public float Radius { get; set; } = 0.11f;
     public float CrossSection { get; set; } = 0.038f;
     public float AirDensity { get; set; } = 1.225f;
-    public float DragCoefficient { get; set; } = 0.25f;
-    public float MaxLiftCoefficient { get; set; } = 0.35f;
-    /// <summary>Fraction of spin lost per second in the air.</summary>
+    /// <summary>
+    /// Drag coefficient against airspeed, m/s (drag force is 0.5 * rho * Cd * A * v^2). The drop between about 9 and 14 m/s is the
+    /// drag crisis: a slow ball is subcritical (about 0.45), a fast one supercritical (about 0.2 to 0.25).
+    /// </summary>
+    public Curve DragCurve { get; set; } = new((0f, 0.45f), (9f, 0.42f), (14f, 0.22f), (40f, 0.24f));
+    /// <summary>
+    /// Magnus lift coefficient against the spin parameter S = radius * (spin across the velocity, rad/s) / speed (dimensionless).
+    /// The lift acts along spin x velocity.
+    /// </summary>
+    public Curve LiftCurve { get; set; } = new((0f, 0f), (0.1f, 0.15f), (0.3f, 0.28f), (0.6f, 0.35f));
+    /// <summary>Spin decay rate in the air, per second: spin is multiplied by exp(-this * t).</summary>
     public float SpinDecayPerSecond { get; set; } = 0.02f;
-    public float BounceRestitution { get; set; } = 0.60f;
-    public float BounceSidewaysKept { get; set; } = 0.75f;
-    /// <summary>Fraction of spin kept at each ground bounce (not in the spec; added so a bounce does not keep full spin).</summary>
-    public float BounceSpinKept { get; set; } = 0.5f;
+    /// <summary>Largest spin the ball can hold, rad/s (95 is about 15 revolutions per second).</summary>
+    public float MaxSpin { get; set; } = 95f;
+    /// <summary>Ground bounce restitution (outgoing over incoming vertical speed) against the incoming vertical speed, m/s.</summary>
+    public Curve RestitutionCurve { get; set; } = new((0f, 0.70f), (10f, 0.60f), (25f, 0.50f));
+    /// <summary>Ball-ground friction coefficient at a bounce (Coulomb, dimensionless).</summary>
+    public float BounceFriction { get; set; } = 0.55f;
+    /// <summary>Moment of inertia as a fraction of mass * radius^2 (a thin-shelled ball is about 0.66; a hollow shell is 2/3).</summary>
+    public float InertiaFactor { get; set; } = 0.66f;
     /// <summary>Rolling deceleration, m/s squared.</summary>
     public float RollDeceleration { get; set; } = 1.2f;
     public float Gravity { get; set; } = 9.81f;

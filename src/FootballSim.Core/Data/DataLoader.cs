@@ -184,6 +184,12 @@ public static class DataLoader
         {
             var t = JsonSerializer.Deserialize<Tuning>(json, Options);
             if (t == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: empty file (default tuning in use)" };
+            if (t.Ball == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: ball: must be an object (default tuning in use)" };
+            foreach (var (field, curve) in new[] { ("ball.drag_curve", t.Ball.DragCurve), ("ball.lift_curve", t.Ball.LiftCurve), ("ball.restitution_curve", t.Ball.RestitutionCurve) })
+            {
+                string? bad = curve == null ? "must be an array of [x, y] pairs" : curve.Validate();
+                if (bad != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: {field}: {bad} (default tuning in use)" };
+            }
             var w = new List<LoadWarning>();
             if (t.TickRate < 1 || t.TickRate > 1000)
             {
@@ -224,4 +230,46 @@ public static class DataLoader
         e.LineNumber is long line
             ? $"{file}: invalid JSON at line {line + 1}: {e.Message}"
             : $"{file}: invalid JSON: {e.Message}";
+}
+
+/// <summary>
+/// Reads and writes a <see cref="Curve"/> as an array of [x, y] number pairs. A wrong shape throws a JsonException, which names the
+/// field's path; the values themselves are checked by <see cref="Curve.Validate"/> after loading.
+/// </summary>
+sealed class CurveJsonConverter : JsonConverter<Curve>
+{
+    public override Curve Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.StartArray) throw new JsonException();
+        var points = new List<(float, float)>();
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+        {
+            if (reader.TokenType != JsonTokenType.StartArray) throw new JsonException();
+            float x = ReadNumber(ref reader, options), y = ReadNumber(ref reader, options);
+            if (!reader.Read() || reader.TokenType != JsonTokenType.EndArray) throw new JsonException();
+            points.Add((x, y));
+        }
+        return new Curve(points.ToArray());
+    }
+
+    static float ReadNumber(ref Utf8JsonReader reader, JsonSerializerOptions options)
+    {
+        if (!reader.Read() || reader.TokenType is not (JsonTokenType.Number or JsonTokenType.String)) throw new JsonException();
+        // Same number rules as every other tuning value (named literals such as "NaN" parse, then fail validation).
+        return JsonSerializer.Deserialize<float>(ref reader, options);
+    }
+
+    public override void Write(Utf8JsonWriter writer, Curve value, JsonSerializerOptions options)
+    {
+        writer.WriteStartArray();
+        for (int i = 0; i < value.Count; i++)
+        {
+            var (x, y) = value[i];
+            writer.WriteStartArray();
+            JsonSerializer.Serialize(writer, x, options);
+            JsonSerializer.Serialize(writer, y, options);
+            writer.WriteEndArray();
+        }
+        writer.WriteEndArray();
+    }
 }

@@ -19,20 +19,29 @@ public struct BallStepResult
 }
 
 /// <summary>
-/// The ball: a free sphere with gravity, drag, spin (Magnus) force, spin decay, bounce and rolling.
+/// The ball: a free sphere with gravity, speed-dependent drag, spin (Magnus) force, spin decay, bounce with friction and rolling.
 /// Semi-implicit Euler: velocity is updated from forces first, then position from the new velocity.
 /// <see cref="Position"/> is the ball's centre, so a ball at rest on the ground has Y = radius.
 /// </summary>
 public sealed class Ball
 {
     readonly BallTuning _t;
+    Vector3 _spin;
 
     /// <summary>Centre of the ball, metres.</summary>
     public Vector3 Position { get; internal set; }
     /// <summary>Metres per second.</summary>
     public Vector3 Velocity { get; internal set; }
-    /// <summary>Angular velocity vector in radians per second (direction = axis, length = rate).</summary>
-    public Vector3 Spin { get; internal set; }
+    /// <summary>Angular velocity vector in radians per second (direction = axis, length = rate), capped at <see cref="BallTuning.MaxSpin"/>.</summary>
+    public Vector3 Spin
+    {
+        get => _spin;
+        internal set
+        {
+            float max = _t.MaxSpin, sq = value.LengthSquared();
+            _spin = max > 0f && sq > max * max ? value * (max / MathF.Sqrt(sq)) : value;
+        }
+    }
     public float Radius => _t.Radius;
 
     public Ball(BallTuning tuning) { _t = tuning; }
@@ -54,7 +63,7 @@ public sealed class Ball
             float speed = v.Length();
             if (speed > 1e-4f)
             {
-                float dragForce = 0.5f * _t.AirDensity * _t.DragCoefficient * _t.CrossSection * speed * speed;
+                float dragForce = 0.5f * _t.AirDensity * _t.DragCurve.Evaluate(speed) * _t.CrossSection * speed * speed;
                 a -= v / speed * (dragForce / _t.Mass);
 
                 Vector3 wxv = Vector3.Cross(Spin, v);
@@ -62,13 +71,13 @@ public sealed class Ball
                 if (cross > 1e-6f)
                 {
                     float omegaAcross = cross / speed;
-                    float cl = MathF.Min(_t.MaxLiftCoefficient, _t.Radius * omegaAcross / speed);
+                    float cl = _t.LiftCurve.Evaluate(_t.Radius * omegaAcross / speed);
                     float magnus = 0.5f * _t.AirDensity * cl * _t.CrossSection * speed * speed;
                     a += wxv / cross * (magnus / _t.Mass);
                 }
             }
             v += a * dt;
-            Spin *= 1f - _t.SpinDecayPerSecond * dt;
+            Spin *= MathF.Exp(-_t.SpinDecayPerSecond * dt);
         }
         else
         {
@@ -77,7 +86,8 @@ public sealed class Ball
             float dec = _t.RollDeceleration * dt;
             h = sp <= dec || sp < _t.RestSpeed ? Vector3.Zero : h * ((sp - dec) / sp);
             v = h;
-            if (h == Vector3.Zero) Spin = Vector3.Zero;
+            // Rolling without slipping: the contact point (radius below the centre) is at rest, so spin = up x v / radius.
+            Spin = h == Vector3.Zero ? Vector3.Zero : Vector3.Cross(Vector3.UnitY, h) / _t.Radius;
         }
         Velocity = v;
     }
@@ -134,10 +144,10 @@ public sealed class Ball
             if (vel.Y < 0f)
             {
                 float vIn = -vel.Y;
-                float vUp = vIn * _t.BounceRestitution;
+                float vUp = vIn * _t.RestitutionCurve.Evaluate(vIn);
                 if (vUp < _t.MinBounceSpeed) vUp = 0f;
-                vel = new Vector3(vel.X * _t.BounceSidewaysKept, vUp, vel.Z * _t.BounceSidewaysKept);
-                Spin *= _t.BounceSpinKept;
+                Spin = GroundFriction(vel, Spin, vIn + vUp, out var vt);
+                vel = new Vector3(vt.X, vUp, vt.Z);
                 if (vIn >= _t.BounceEventSpeed)
                 {
                     result.Bounced = true;
@@ -149,6 +159,27 @@ public sealed class Ball
         Position = pos;
         Velocity = vel;
         return result;
+    }
+
+    /// <summary>
+    /// Coulomb friction at a ground bounce. <paramref name="normalImpulse"/> is the vertical speed change (per unit mass). The contact
+    /// point's slip is u = v_t + spin x (0, -r, 0); friction acts against u, up to mu * normalImpulse, and never past the impulse that
+    /// stops the slip (the ball then leaves rolling). Returns the new spin; <paramref name="vt"/> is the new horizontal velocity.
+    /// </summary>
+    Vector3 GroundFriction(Vector3 vel, Vector3 spin, float normalImpulse, out Vector3 vt)
+    {
+        vt = new Vector3(vel.X, 0f, vel.Z);
+        var contact = new Vector3(0f, -_t.Radius, 0f);
+        Vector3 u = vt + Vector3.Cross(spin, contact);
+        float slip = u.Length();
+        if (slip < 1e-6f) return spin;
+        float k = _t.InertiaFactor;
+        // Impulse per unit mass that brings the slip to zero: each unit cuts the slip by (1 + k) / k.
+        float j = MathF.Min(_t.BounceFriction * normalImpulse, slip * k / (1f + k));
+        Vector3 impulse = u * (-j / slip);
+        vt += impulse;
+        // Angular: delta omega = (r_contact x J) / I, with I = k m r^2 and J per unit mass.
+        return spin + Vector3.Cross(contact, impulse) / (k * _t.Radius * _t.Radius);
     }
 
     static bool SweepPointSphere(Vector3 p0, Vector3 d, SweepSphere s, out float t)
