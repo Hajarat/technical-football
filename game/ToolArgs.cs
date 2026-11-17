@@ -16,6 +16,7 @@ public sealed class ToolArgs
     public int BurstStart, BurstCount, BurstStep = 1;
     public string? DataDir;
     public string? ReplayPath;
+    public bool Background;
 
     public static ToolArgs Parse()
     {
@@ -28,6 +29,7 @@ public sealed class ToolArgs
             {
                 case "--quit-after-ticks": int.TryParse(Next(), out a.QuitAfterTicks); break;
                 case "--quit-after-round": a.QuitAfterRound = true; break;
+                case "--background": a.Background = true; break;
                 case "--frame-times": a.FrameTimes = true; break;
                 case "--close-cam": a.CloseCam = true; break;
                 case "--close-keeper": a.CloseCam = true; a.CloseKeeper = true; break;

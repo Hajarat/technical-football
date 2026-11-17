@@ -28,6 +28,7 @@ public partial class Match : Node3D
     public override void _Ready()
     {
         _args = ToolArgs.Parse();
+        if (_args.Background) MacBackground.Apply();
 
         var env = new Godot.Environment
         {
