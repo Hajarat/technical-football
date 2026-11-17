@@ -9,6 +9,8 @@ using FootballSim.Core;
 //   ... --replay replays/<file>.json            re-runs a replay and prints its report
 //   ... --save-replay <file>                    plays one scripted round (use --seed) and saves its replay
 //   ... --dump-tuning                           prints the built-in tuning as JSON (the format of data/tuning/default.json)
+//   ... --probe dribble [--seeds 50] [--ratings 1,50,99] [--exact 1] [--only straight_jog,...]
+//                                               runs the nine dribble probes (no keeper involved) and prints their metrics
 
 return Cli.Run(args);
 
@@ -38,6 +40,11 @@ static class Cli
         var tuning = tr.Value!;
 
         if (opts.TryGetValue("replay", out var replayPath)) return RunReplay(replayPath, dataDir, tuning);
+        if (opts.TryGetValue("probe", out var probe))
+        {
+            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble)"); return 2; }
+            return DribbleProbe.Run(opts, dataDir, tuning);
+        }
 
         if (!opts.TryGetValue("scenario", out var scenarioId)) { Console.Error.WriteLine("Need --scenario <id> (or --replay <file>)"); return 2; }
         var sc = Load(DataLoader.LoadScenario(Path.Combine(dataDir, "scenarios", scenarioId + ".json")));

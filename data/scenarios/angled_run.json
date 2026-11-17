@@ -1,0 +1,25 @@
+{
+  "id": "angled_run",
+  "name": "Angled run",
+  "default_attacker": "striker_a",
+  "default_keeper": "the_wall",
+  "team_size": 1,
+  "ball": {
+    "x": 22.2,
+    "z": 17.5
+  },
+  "attacker": {
+    "x": 21.68,
+    "z": 17.8,
+    "facing_deg": -30
+  },
+  "keeper_on_line": false,
+  "clock_limit": 15,
+  "shoot_distance": 16,
+  "pitch": {
+    "half_length": 52.5,
+    "width": 68.0,
+    "goal_width": 7.32,
+    "goal_height": 2.44
+  }
+}

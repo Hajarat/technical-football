@@ -134,6 +134,10 @@ public partial class Match : Node3D
             GD.Print(FootStats.ContactStrikeLine());
             GD.Print(FootStats.PoseLine());
             GD.Print(FootStats.SlideLine());
+            GD.Print(FootStats.ContactBallLine());
+            GD.Print(FootStats.TouchFootLine());
+            GD.Print(FootStats.TouchMissLine());
+            if (Attacker.Figure.IsSkinned) GD.Print(FootStats.SkinLine());
         }
         if (_args.FrameTimes)
         {

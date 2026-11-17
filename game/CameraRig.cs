@@ -9,10 +9,10 @@ namespace FootballSim.Game;
 /// </summary>
 public partial class CameraRig : Camera3D
 {
-    public float Height = 11.2f, Distance = 28f, SmoothSeconds = 0.35f;
-    public float MinFocusX = 8f, MaxFocusX = 42f, ZFollow = 0.85f, LookZOffset = 0f;
+    public float Height = 6.2f, Distance = 15.5f, SmoothSeconds = 0.35f;
+    public float MinFocusX = 8f, MaxFocusX = 47f, ZFollow = 0.85f, LookZOffset = 0f;
     /// <summary>Lead toward the goal (metres) that is fully applied once the ball is LeadFullX; starts at LeadStartX.</summary>
-    public float GoalLead = 9.5f, LeadStartX = 22f, LeadFullX = 28f;
+    public float GoalLead = 3f, LeadStartX = 30f, LeadFullX = 38f;
     float _focusX, _focusZ;
 
     public override void _Ready()

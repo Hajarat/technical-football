@@ -19,7 +19,8 @@ public struct BallStepResult
 }
 
 /// <summary>
-/// The ball: a free sphere with gravity, speed-dependent drag, spin (Magnus) force, spin decay, bounce with friction and rolling.
+/// The ball: a free sphere with gravity, speed-dependent drag, spin (Magnus) force, spin decay, bounce with friction, and on the
+/// ground a skid (sliding friction while the contact point slips) that turns into rolling.
 /// Semi-implicit Euler: velocity is updated from forces first, then position from the new velocity.
 /// <see cref="Position"/> is the ball's centre, so a ball at rest on the ground has Y = radius.
 /// </summary>
@@ -48,6 +49,15 @@ public sealed class Ball
 
     /// <summary>A copy of the state, for prediction.</summary>
     internal Ball Clone() => new(_t) { Position = Position, Velocity = Velocity, Spin = Spin };
+
+    /// <summary>Makes this ball a copy of <paramref name="o"/>'s state (a reusable prediction copy).</summary>
+    internal Ball CopyFrom(Ball o) { Position = o.Position; Velocity = o.Velocity; _spin = o._spin; return this; }
+
+    Ball? _scratchA, _scratchB;
+
+    /// <summary>A reusable copy of this ball's current state for predictions (same tuning). Two independent copies.</summary>
+    internal Ball ScratchA() => (_scratchA ??= new Ball(_t)).CopyFrom(this);
+    internal Ball ScratchB() => (_scratchB ??= new Ball(_t)).CopyFrom(this);
 
     /// <summary>True when the ball is resting on or rolling along the ground.</summary>
     public bool OnGround => Position.Y <= _t.Radius + 1e-3f && Velocity.Y <= 0.01f;
@@ -82,14 +92,55 @@ public sealed class Ball
         else
         {
             var h = new Vector3(v.X, 0f, v.Z);
-            float sp = h.Length();
-            float dec = _t.RollDeceleration * dt;
-            h = sp <= dec || sp < _t.RestSpeed ? Vector3.Zero : h * ((sp - dec) / sp);
-            v = h;
-            // Rolling without slipping: the contact point (radius below the centre) is at rest, so spin = up x v / radius.
-            Spin = h == Vector3.Zero ? Vector3.Zero : Vector3.Cross(Vector3.UnitY, h) / _t.Radius;
+            var contact = new Vector3(0f, -_t.Radius, 0f);
+            Vector3 u = h + Vector3.Cross(Spin, contact);
+            float slip = u.Length();
+            if (slip > SkidSlipEpsilon && _t.SkidFriction > 0f)
+            {
+                // Skidding: sliding friction mu * g against the contact point's slip, on both the velocity and the spin (the
+                // same inertia model as a bounce), never past the impulse that stops the slip; then the ball rolls.
+                float k = _t.InertiaFactor;
+                float j = MathF.Min(_t.SkidFriction * _t.Gravity * dt, slip * k / (1f + k));
+                Vector3 impulse = u * (-j / slip);
+                h += impulse;
+                Vector3 spin = Spin + Vector3.Cross(contact, impulse) / (k * _t.Radius * _t.Radius);
+                if (j >= slip * k / (1f + k)) spin = new Vector3(0f, spin.Y, 0f) + Vector3.Cross(Vector3.UnitY, h) / _t.Radius;
+                Spin = spin;
+                v = h;
+            }
+            else
+            {
+                float sp = h.Length();
+                float dec = _t.RollDeceleration * dt;
+                h = sp <= dec || sp < _t.RestSpeed ? Vector3.Zero : h * ((sp - dec) / sp);
+                v = h;
+                // Rolling without slipping: the contact point (radius below the centre) is at rest, so spin = up x v / radius.
+                Spin = h == Vector3.Zero ? Vector3.Zero : Vector3.Cross(Vector3.UnitY, h) / _t.Radius;
+            }
         }
         Velocity = v;
+    }
+
+    /// <summary>Contact-point slip below which a ball on the ground counts as rolling, m/s.</summary>
+    const float SkidSlipEpsilon = 1e-3f;
+
+    /// <summary>True while the ball is on the ground and its contact point slips (it skids before it rolls).</summary>
+    public bool Skidding => OnGround && (new Vector3(Velocity.X, 0f, Velocity.Z) + Vector3.Cross(Spin, new Vector3(0f, -_t.Radius, 0f))).Length() > SkidSlipEpsilon;
+
+    /// <summary>The spin of a ball rolling without slipping at ground velocity <paramref name="v"/>.</summary>
+    internal Vector3 RollingSpin(Vector3 v) => Vector3.Cross(Vector3.UnitY, new Vector3(v.X, 0f, v.Z)) / _t.Radius;
+
+    /// <summary>
+    /// Where this ball comes to rest on the ground, ignoring the frame and all players, or its position after
+    /// <paramref name="maxSeconds"/> if it is still moving then.
+    /// </summary>
+    internal Vector3 PredictRest(float dt, float maxSeconds)
+    {
+        if (OnGround && Velocity == Vector3.Zero) return Position;
+        var b = Clone();
+        int steps = (int)(maxSeconds / dt);
+        for (int i = 0; i < steps && b.Velocity != Vector3.Zero; i++) b.Step(dt, null, null);
+        return b.Position;
     }
 
     /// <summary>

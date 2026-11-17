@@ -31,30 +31,17 @@ public static class Movement
     /// <summary>The speed the legs ease toward for an intent under a speed cap: cap * stick deflection * mode fraction, m/s.</summary>
     internal static float TargetSpeed(in TickIntent intent, float top, Tuning t)
     {
-        var m = t.Movement;
         float mag = MathF.Min(1f, intent.Move.Length());
-        if (mag < m.StickDeadZone) mag = 0f;
-        float mode = intent.CloseControl
-            ? m.CloseControlFraction
-            : m.JogFraction + (m.SprintFraction - m.JogFraction) * Math.Clamp(intent.Sprint, 0f, 1f);
-        return top * mag * mode;
+        if (mag < t.Movement.StickDeadZone) mag = 0f;
+        return top * mag * ModeFraction(intent, t);
     }
 
-    /// <summary>
-    /// Distance a player covers in <paramref name="ticks"/> ticks after <paramref name="start"/> running straight, with the speed
-    /// starting at <paramref name="v0"/> and easing toward <paramref name="target"/> exactly as <see cref="Step"/> does (touch
-    /// boost included), metres. Turning, the balance loss and the sideways assist are left out.
-    /// </summary>
-    internal static float RunDistance(PlayerState p, float v0, float target, float start, int ticks, Tuning t)
+    /// <summary>The fraction of the cap the legs aim for: close control, or jog to sprint by the sprint input.</summary>
+    internal static float ModeFraction(in TickIntent intent, Tuning t)
     {
-        float dt = t.Dt, speed = MathF.Max(v0, 0f), dist = 0f;
-        for (int j = 1; j <= ticks; j++)
-        {
-            float tau = MathF.Max(TimeConstantAt(p, start + j * dt, t), dt);
-            speed = MathF.Max(speed + (target - speed) / tau * dt, 0f);
-            dist += speed * dt;
-        }
-        return dist;
+        var m = t.Movement;
+        return intent.CloseControl ? m.CloseControlFraction
+            : m.JogFraction + (m.SprintFraction - m.JogFraction) * Math.Clamp(intent.Sprint, 0f, 1f);
     }
 
     /// <summary>Turn rate in degrees per second before the speed penalty: agility, scaled by weight.</summary>
@@ -89,8 +76,9 @@ public static class Movement
         Step(p, intent, dt, now, new MoveAssist(hasBall ? TopSpeedWithBall(p.Sheet, t) : TopSpeed(p.Sheet, t), 1f, Vector2.Zero), t, pitch);
 
     /// <summary>
-    /// Moves a player one tick with an explicit speed cap, turn-rate scale and a sideways correction velocity (the possession
-    /// assist). The forward speed follows the facing; the sideways correction is added on top and does not feed back into it.
+    /// Moves a player one tick with an explicit speed cap, turn-rate scale and a steering correction velocity (the touch
+    /// planner bringing the ball into the contact zone). The running speed follows the facing; the correction is added on top
+    /// and does not feed back into it, nor into the stride clock, which advances at the running speed.
     /// </summary>
     internal static void Step(PlayerState p, in TickIntent intent, float dt, float now, in MoveAssist assist, Tuning t, Pitch? pitch)
     {
@@ -101,12 +89,9 @@ public static class Movement
         if (mag > 1f) { stick /= mag; mag = 1f; }
         if (mag < m.StickDeadZone) mag = 0f;
 
-        float mode = intent.CloseControl
-            ? m.CloseControlFraction
-            : m.JogFraction + (m.SprintFraction - m.JogFraction) * Math.Clamp(intent.Sprint, 0f, 1f);
-        float target = top * mag * mode;
+        float target = top * mag * ModeFraction(intent, t);
         var fwd0 = new Vector3(MathF.Cos(p.Facing), 0f, MathF.Sin(p.Facing));
-        float speed = MathF.Max(0f, Vector3.Dot(p.Velocity, fwd0));
+        float speed = MathF.Max(0f, Vector3.Dot(p.Velocity - p.SteerVelocity, fwd0));
         float tau = MathF.Max(TimeConstantAt(p, now, t), dt);
         speed += (target - speed) / tau * dt;
 
@@ -137,7 +122,9 @@ public static class Movement
         speed = MathF.Max(speed, 0f);
         p.MoveTime = now;
         p.Facing = facing;
-        p.Velocity = new Vector3(MathF.Cos(facing) * speed + assist.Lateral.X, 0f, MathF.Sin(facing) * speed + assist.Lateral.Y);
+        p.RunSpeed = speed;
+        p.SteerVelocity = new Vector3(assist.Steer.X, 0f, assist.Steer.Y);
+        p.Velocity = new Vector3(MathF.Cos(facing) * speed + assist.Steer.X, 0f, MathF.Sin(facing) * speed + assist.Steer.Y);
         Vector3 pos = p.Position + p.Velocity * dt;
         if (pitch != null)
         {
@@ -146,8 +133,9 @@ public static class Movement
         }
         p.Position = pos;
         p.HandPosition = pos;
+        Gait.Advance(p, speed, dt, t);
     }
 }
 
-/// <summary>Per-tick movement modifiers: the speed cap, a turn-rate scale and a sideways correction velocity (world X, Z).</summary>
-internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Lateral);
+/// <summary>Per-tick movement modifiers: the speed cap, a turn-rate scale and a steering correction velocity (world X, Z).</summary>
+internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Steer);

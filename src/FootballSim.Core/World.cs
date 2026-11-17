@@ -39,7 +39,6 @@ public sealed class World
     float _awayFor;            // seconds the ball has been beyond the controller's lose distance
     bool _softPending;         // shoot pressed in possession: the soft touch is still to be made
     Foot _strikeFoot;          // foot decided at the press, kept through the strike
-    TickIntent _lastIntent;    // the attacker's latest intent, for the next-touch prediction
 
     struct PendingShot
     {
@@ -163,7 +162,7 @@ public sealed class World
         _shootWasHeld = false; _charge = 0f; _latchFinesse = _latchChip = false; _lastStick = default;
         _pending = default; _buffered = default; _bufferLeft = 0f; _strikeLeft = 0f; _outcomeLeft = 0f;
         _liveSeconds = 0f; _endTick = 0; _endClock = 0f; _lastShot = null;
-        _controller = null; _awayFor = 0f; _softPending = false; _strikeFoot = Foot.Right; _lastIntent = default;
+        _controller = null; _awayFor = 0f; _softPending = false; _strikeFoot = Foot.Right;
 
         float r = Tuning.Ball.Radius;
         Ball.Position = new Vector3(Scenario.Ball.X, r, Scenario.Ball.Z);
@@ -185,12 +184,22 @@ public sealed class World
         {
             var p = team1[i];
             p.Position = i == 0
-                ? Core.Keeper.SetSpot(Ball.Position, Pitch, Tuning, Scenario.KeeperOnLine)
+                ? KeeperStart()
                 : ClampToPitch(new Vector3(Pitch.GoalLineX - 12f - 3f * i, 0f, (i % 2 == 0 ? 8f : -8f) * ((i + 1) / 2)));
             p.Facing = MathF.PI;
             ResetPlayer(p);
         }
         _brain = new KeeperBrain(Keeper, Pitch, Tuning, Scenario.KeeperOnLine);
+    }
+
+    /// <summary>The keeper's start: his set spot, or the scenario's distance off the line on the same ball-to-goal line.</summary>
+    Vector3 KeeperStart()
+    {
+        if (Scenario.KeeperOffLine is not float off) return Core.Keeper.SetSpot(Ball.Position, Pitch, Tuning, Scenario.KeeperOnLine);
+        float x = Pitch.GoalLineX - off;
+        float dx = Pitch.GoalLineX - Ball.Position.X;
+        float z = dx > 1e-3f ? Ball.Position.Z * off / dx : 0f;
+        return new Vector3(x, 0f, Math.Clamp(z, -Pitch.GoalHalfWidth, Pitch.GoalHalfWidth));
     }
 
     Vector3 ClampToPitch(Vector3 v) =>
@@ -211,6 +220,30 @@ public sealed class World
         p.StrikeEta = float.NaN;
         p.StrikeFoot = p.Sheet.PreferredFoot;
         p.LastTouchFoot = p.Sheet.PreferredFoot;
+        p.CurrentTick = 0;
+        p.GaitPhase = 0f;
+        p.StepFrequency = 0f;
+        p.GaitLockTicks = 0;
+        p.GaitLockTarget = 0f;
+        p.SwingMiddleCrossed = null;
+        p.SteerVelocity = Vector3.Zero;
+        p.RunSpeed = 0f;
+        p.Action = null;
+        p.PreviousAction = null;
+        p.ActionContactEta = float.NaN;
+        p.Recovering = false;
+        p.LastTouchKind = ActionKind.First;
+        p.KnockOnRequested = false;
+        p.Replanning = false;
+        p.TouchRhythm = false;
+        p.SoftWaitAction = null;
+        p.TouchBoostFrom = float.NaN;
+        p.TouchBoostUntil = -100f;
+        p.TouchBoostFactor = 1f;
+        p.KnockOnFrom = float.NaN;
+        p.KnockOnUntil = -100f;
+        p.KnockOnDirection = Vector2.Zero;
+        p.MoveTime = 0f;
     }
 
     // ---- stepping ----
@@ -235,7 +268,6 @@ public sealed class World
         Tick++;
         SimTime += _dt;
         TickIntent atk = IntentFor(intents, 0, 0);
-        _lastIntent = atk;
         StepSimulation(atk);
         PublishContract();
     }
@@ -333,8 +365,7 @@ public sealed class World
         var tuning = Tuning;
         _lastStick = it.Move;
         bool inPossession = _controller == p;
-        var assist = Possession.Assist(p, it, Ball, inPossession, tuning);
-        var legs = Possession.MovementIntent(p, it, Ball, inPossession, assist.TopSpeed, tuning);
+        var assist = TouchPlanner.BeginTick(p, it, Ball, inPossession, State == RoundState.Live, Tick, SimTime, tuning, Pitch, out var legs);
         Movement.Step(p, legs, _dt, SimTime, assist, tuning, Pitch);
 
         // Other players on both teams stand still (no behaviour yet).
@@ -345,6 +376,8 @@ public sealed class World
             return;
         }
 
+        if (it.KnockOn && inPossession) TouchPlanner.RequestKnockOn(p);
+
         if (it.ShootHeld)
         {
             if (!_shootWasHeld)
@@ -353,13 +386,13 @@ public sealed class World
                 _latchFinesse = _latchChip = false;
                 _buffered = default;
                 _bufferLeft = 0f;
-                // In possession the next touch is a soft one, so the ball stays strikable through the charge.
+                // In possession the next touch is a soft one, so the ball stays strikable through the charge. A touch already
+                // winding up is made first.
                 _softPending = inPossession;
-                if (_softPending) TryTouch(p, it, softOnly: true);
+                if (_softPending) TouchPlanner.OnShootPressed(p, Tick, tuning);
                 _strikeFoot = ShotModel.StrikingFoot(p, Ball.Position, tuning);
                 p.StrikeFoot = _strikeFoot;
             }
-            else if (_softPending && _controller == p) TryTouch(p, it, softOnly: true);
             _charge = MathF.Min(1f, _charge + _dt / tuning.Shot.ChargeSeconds);
             _latchFinesse |= it.Finesse;
             _latchChip |= it.Chip;
@@ -393,16 +426,20 @@ public sealed class World
         }
         _shootWasHeld = it.ShootHeld;
 
-        // Dribble touches are blocked while shoot is held and while a released shot waits for the ball.
-        if (State == RoundState.Live && !it.ShootHeld && !_buffered.Active) TryTouch(p, it, softOnly: false);
+        // Dribble touches are blocked while shoot is held (only the soft touch) and while a released shot waits for the ball.
+        if (State != RoundState.Live) return;
+        var mode = it.ShootHeld
+            ? (_softPending && _controller == p ? TouchStepMode.SoftOnly : TouchStepMode.None)
+            : (_buffered.Active ? TouchStepMode.None : TouchStepMode.Normal);
+        TryTouch(p, it, mode);
     }
 
     /// <summary>Lets a player touch the ball and raises the Touch event; a first contact with a loose ball gains possession.</summary>
-    void TryTouch(PlayerState p, in TickIntent it, bool softOnly)
+    void TryTouch(PlayerState p, in TickIntent it, TouchStepMode mode)
     {
         bool inPossession = _controller == p;
-        if (!TouchModel.TryTouch(p, it, Ball, SimTime, inPossession, softOnly, Tuning, _rng, out var touch)) return;
-        if (touch.Kind == TouchKind.Soft) _softPending = false;
+        if (TouchPlanner.Step(p, it, Ball, inPossession, mode, Tick, SimTime, Tuning, Pitch, _rng) is not TouchResult touch) return;
+        if (touch.Kind == ActionKind.Soft) _softPending = false;
         _events.Add(new SimEvent(EventKind.Touch, touch.ContactPoint, touch.BallVelocity.Length(), Foot: touch.Foot, Team: p.Team, PlayerIndex: p.Index));
         if (!inPossession) SetController(p);
         _awayFor = 0f;
@@ -416,6 +453,7 @@ public sealed class World
         if (_controller != null)
         {
             _controller.InPossession = false;
+            TouchPlanner.OnPossessionLost(_controller);
             _events.Add(new SimEvent(EventKind.PossessionLost, Ball.Position, speed, Team: _controller.Team, PlayerIndex: _controller.Index));
         }
         _controller = p;
@@ -427,7 +465,7 @@ public sealed class World
         }
     }
 
-    /// <summary>Fills the per-player contract read by the view: next touch, strike timing and feet.</summary>
+    /// <summary>Fills the per-player contract read by the view: action phases, next touch, strike timing and feet.</summary>
     void PublishContract()
     {
         foreach (var team in Teams)
@@ -435,12 +473,14 @@ public sealed class World
             {
                 p.NextTouchEta = float.NaN;
                 p.StrikeEta = float.NaN;
+                p.CurrentTick = Tick;
+                TouchPlanner.UpdatePhases(p, Tick, Tuning);
             }
         var a = Attacker;
         if (State == RoundState.Strike && _pending.Active) a.StrikeEta = MathF.Max(0f, _strikeLeft);
         if (State == RoundState.Live && _controller == a)
         {
-            var f = Possession.PredictNextTouch(a, _lastIntent, Ball, SimTime, true, _shootWasHeld, _softPending, Tuning);
+            var f = Possession.PredictNextTouch(a, Tick, true, Tuning);
             a.NextTouchEta = f.Eta;
             if (!float.IsNaN(f.Eta)) { a.NextTouchFoot = f.Foot; a.NextTouchPoint = f.Point; }
         }

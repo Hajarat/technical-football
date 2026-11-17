@@ -64,37 +64,45 @@ public class PlannedTouchTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ExactStraightDribbleHasTheBallInReachAtEveryPlannedTouch(bool sprint)
+    [InlineData(0, 1)]
+    [InlineData(0, 50)]
+    [InlineData(0, 99)]
+    [InlineData(1, 1)]
+    [InlineData(1, 50)]
+    [InlineData(1, 99)]
+    [InlineData(2, 50)]
+    public void ExactStraightDribbleMeetsTheBallAtEveryPlannedContact(int mode, int dribbling)
     {
+        // Zero error draws: every planned contact has the ball centre inside the contact zone of the planned contact point,
+        // on the foot in swing at that tick; the push solve (skid included) lands the ball within 0.03 m of the next meet.
         var t = Exact();
-        var s = Sheet(99);
-        var it = new TickIntent { MoveX = 1, Sprint = sprint ? 1f : 0f };
+        var s = Sheet(dribbling);
+        var it = new TickIntent { MoveX = 1, Sprint = mode == 1 ? 1f : 0f, CloseControl = mode == 2 };
         var w = Lab(s, 1, t);
         Gain(w, it);
-        int cadence = TouchModel.CadenceTicks(TouchModel.ModeFor(it, t), t);
-        float reach = TouchModel.FootReach(s, t);
-        var due = new List<int>();
-        int tick = 0, planned = 0, touches = 0;
+        int contacts = 0, left = 0, right = 0;
         float worst = 0f;
         bool lost = false;
-        Steps(w, it, 5 * 120, x =>
+        var p = w.Attacker;
+        Steps(w, it, 8 * 120, x =>
         {
-            tick++;
-            lost |= !x.Attacker.InPossession;
-            while (due.Count > 0 && due[0] == tick)
-            {
-                due.RemoveAt(0);
-                planned++;
-                worst = MathF.Max(worst, BallDistance(x));
-                Assert.True(BallDistance(x) <= reach, $"t {tick * t.Dt:F2} s: ball {BallDistance(x):F2} m away at the planned touch, reach {reach:F2}");
-            }
-            if (AttackerTouched(x)) { touches++; due.Add(tick + cadence); }
+            lost |= !p.InPossession;
+            if (!AttackerTouched(x)) return;
+            var a = p.PreviousAction is { Made: true } pa && pa.ContactTick == x.Tick ? pa : p.Action!;
+            Assert.True(a.Made);
+            Assert.Equal(x.Tick, a.ContactTick);
+            Assert.True(p.IsStepping);
+            Assert.Equal(p.SwingFoot, a.Foot);
+            Assert.InRange(a.ContactMiss, 0f, t.Touch.ContactZoneRadius);
+            worst = MathF.Max(worst, a.ContactMiss);
+            contacts++;
+            if (a.Foot == Foot.Left) left++; else right++;
         });
-        _out.WriteLine($"{(sprint ? "sprint" : "jog")}: {touches} touches, {planned} planned touch times checked, worst {worst:F2} m (reach {reach:F2}), speed {w.Attacker.Speed:F2}");
+        _out.WriteLine($"mode {mode} dribbling {dribbling}: {contacts} contacts, L {left} R {right}, worst miss {worst:F3} m, speed {p.Speed:F2}");
         Assert.False(lost, "possession lost");
-        Assert.True(planned >= (sprint ? 14 : 20), $"{planned} planned touches");
+        Assert.True(contacts >= (mode == 1 ? 4 : 10), $"{contacts} contacts");
+        Assert.True(worst <= 0.03f, $"worst miss {worst:F3} m");
+        Assert.True(left > 0 && right > 0, $"feet L {left} R {right}");
     }
 
     [Fact]
@@ -188,7 +196,7 @@ public class PlannedTouchTests
         // The press is held until the ball is next in reach (with a low dribbling rating at a sprint, that is the next touch).
         var knock = sprint;
         knock.KnockOn = true;
-        for (int i = 0; i < 120 && !AttackerTouched(w); i++) Steps(w, knock, 1);
+        for (int i = 0; i < 240 && !AttackerTouched(w); i++) Steps(w, knock, 1);
         Assert.True(AttackerTouched(w), "no knock-on touch");
         Assert.Equal(w.SimTime, w.Attacker.KnockOnFrom);
         return w.SimTime;

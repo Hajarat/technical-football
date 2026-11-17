@@ -97,9 +97,10 @@ public class PossessionTests
         }
     }
 
-    // 2.
+    // 2. A touch is committed: a 90 degree stick change (not more than the replan angle) is played by the next planned
+    // touch, at most three jog steps (about 0.95 s) away.
     [Fact]
-    public void JogThenTurnNinetyDegreesFollowsWithinHalfASecond()
+    public void JogThenTurnNinetyDegreesFollowsWithinOneTouch()
     {
         var turn = new TickIntent { MoveZ = 1 };
         for (ulong seed = 1; seed <= 50; seed++)
@@ -121,7 +122,7 @@ public class PossessionTests
             });
             Assert.False(lost, $"seed {seed}: possession lost in the turn");
             Assert.True(w.Attacker.InPossession);
-            Assert.True(followedAt <= 0.5f, $"seed {seed}: ball followed the turn after {followedAt} s");
+            Assert.True(followedAt <= 1.0f, $"seed {seed}: ball followed the turn after {followedAt} s");
             Assert.True(max <= 1.5f, $"seed {seed}: ball {max:F2} m away in the turn");
         }
     }
@@ -178,18 +179,19 @@ public class PossessionTests
         Assert.True(lo.MeanMax > hi.MeanMax + 0.3, $"mean max distance: dribbling 40 {lo.MeanMax:F2} m, 90 {hi.MeanMax:F2} m");
     }
 
-    // 6.
+    // 6. Steps per touch at a sprint is a whole number of steps by dribbling (6 at 1 down to 4 at 99: 5 at 40 and 60, 4 at
+    // 80), so the distance falls in steps and must never rise.
     [Fact]
-    public void MaxBallDistanceFallsAsDribblingRises()
+    public void MaxBallDistanceDoesNotRiseWithDribbling()
     {
         double d40 = SprintStats(40, 20f, 200).MeanMax, d60 = SprintStats(60, 20f, 200).MeanMax, d80 = SprintStats(80, 20f, 200).MeanMax;
         _out.WriteLine($"sprint 20 m mean max distance 40/60/80: {d40:F2} / {d60:F2} / {d80:F2}");
-        Assert.True(d40 > d60 && d60 > d80, $"mean max distance 40/60/80: {d40:F2} / {d60:F2} / {d80:F2}");
+        Assert.True(d40 >= d60 - 0.05 && d60 >= d80 - 0.05 && d40 > d80 + 0.1, $"mean max distance 40/60/80: {d40:F2} / {d60:F2} / {d80:F2}");
     }
 
     /// <summary>
-    /// Sprints, releases the stick while the ball is knocked ahead out of reach, and waits for PossessionLost. Planned sprint
-    /// touches seldom leave the ball that far ahead, so after two seconds of sprinting the player knocks it on.
+    /// Sprints for two seconds, knocks the ball on, releases the stick once the knock-on is made and the ball is well ahead,
+    /// and waits for PossessionLost (only a knock-on or a heavy touch lets the ball be lost by distance).
     /// </summary>
     static bool LoseTheBall(World w)
     {
@@ -197,7 +199,7 @@ public class PossessionTests
         float reach = TouchModel.FootReach(w.Attacker.Sheet, w.Tuning);
         for (int i = 0; i < 120 * 10; i++)
         {
-            bool away = w.Attacker.InPossession && w.Attacker.Speed > 6f && BallDistance(w) > reach + w.Tuning.Possession.ReachBallMargin + 0.1f
+            bool away = w.Attacker.InPossession && Possession.CanLoseByDistance(w.Attacker) && w.Attacker.Speed > 6f && BallDistance(w) > reach + 0.6f
                         && w.Ball.Velocity.X > w.Attacker.Velocity.X;
             buf[0] = away ? default : Sprint;
             buf[0].KnockOn = !away && i >= 240 && w.Attacker.InPossession && w.Attacker.Speed > 6f;
@@ -239,14 +241,11 @@ public class PossessionTests
                     if (w.Events.Any(e => e.Kind == EventKind.PossessionGained && e.Team == 0 && e.PlayerIndex == 0))
                     {
                         gained = true;
-                        // Error = distance of the ball's velocity from the clean touch (along the stick at the player's speed plus
-                        // the overshoot), relative to the clean touch's speed. It includes the direction error and the unwanted
-                        // part of the relative speed that the contact kept.
+                        // Error = the ball's velocity across the stick, relative to its speed along it. It includes the direction
+                        // error and the unwanted part of the relative speed that the contact kept.
                         var v = new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z);
-                        var mode = TouchModel.ModeFor(buf[0], w.Tuning);
-                        float along = Vector2.Dot(new Vector2(w.Attacker.Velocity.X, w.Attacker.Velocity.Z), d);
-                        float clean = MathF.Max(along, TouchModel.MinPush(mode, w.Tuning)) * (1f + TouchModel.Overshoot(w.Attacker.Sheet, mode, w.Tuning));
-                        sum += (v - d * clean).Length() / clean;
+                        float along = MathF.Max(Vector2.Dot(v, d), 0.5f);
+                        sum += MathF.Abs(v.X * d.Y - v.Y * d.X) / along;
                         n++;
                     }
                 }
@@ -388,7 +387,9 @@ public class PossessionTests
             if (float.IsNaN(x.Attacker.NextTouchEta)) return;
             withEta++;
             Assert.InRange(x.Attacker.NextTouchEta, 0f, x.Tuning.Possession.PredictionHorizon);
-            Assert.InRange(TouchModel.HorizontalDistance(x.Attacker.Position, x.Attacker.NextTouchPoint), 0f, 3f);
+            // The planned contact point lies where the player will be at the contact, the contact zone ahead.
+            float reachable = x.Attacker.NextTouchEta * Movement.TopSpeed(x.Attacker.Sheet, x.Tuning) + 0.6f;
+            Assert.InRange(TouchModel.HorizontalDistance(x.Attacker.Position, x.Attacker.NextTouchPoint), 0f, reachable);
             Assert.True(float.IsNaN(x.Attacker.StrikeEta));
         });
         Assert.True(withEta > 0.9 * ticks, $"{withEta} of {ticks} ticks had a next touch");

@@ -48,6 +48,8 @@ public sealed partial class SkinnedBody : Node3D
     readonly int[] _up = new int[2], _leg = new int[2], _foot = new int[2], _toe = new int[2];
     int[] _trunk = Array.Empty<int>();
     float _thigh0, _shin0, _arm0, _fore0;   // model bone lengths
+    /// <summary>The model is scaled so that its leg (hip to ankle) is as long as the figure's (0.48 of the height): longer legs would stay bent at every pelvis height.</summary>
+    float _fit = 1f;
 
     // driven bones in hierarchy order, with the last two physics ticks' local poses for interpolation
     int[] _driven = Array.Empty<int>();
@@ -123,6 +125,7 @@ public sealed partial class SkinnedBody : Node3D
         _posPrev = new Vector3[_driven.Length]; _posCur = new Vector3[_driven.Length];
         _rotPrev = new Quaternion[_driven.Length]; _rotCur = new Quaternion[_driven.Length];
 
+        _fit = 0.48f * ModelHeight / (_thigh0 + _shin0);
         Measure(root);
         BuildNumber();
         SetProcess(true);
@@ -157,6 +160,89 @@ public sealed partial class SkinnedBody : Node3D
             }
         }
         _restAnkleHeight = _restPos[_foot[0]].Y - bootLow;
+        BuildSurfaces();
+    }
+
+    // ---- boot contact surfaces: points on the boot mesh (rest pose), carried rigidly by the foot bone ----
+    readonly Vector3[,] _surfRest = new Vector3[2, 4];   // rest offset (model space) from the foot bone to the surface point
+    readonly Basis[] _footRot = new Basis[2];
+    readonly Vector3[] _footPos = new Vector3[2];
+    bool _hasSurfaces;
+
+    /// <summary>True when the boot mesh was found and the contact surfaces measured from it.</summary>
+    public bool HasSurfaces => _hasSurfaces;
+
+    /// <summary>
+    /// Picks one point per boot surface from the boot mesh vertices of each foot: the medial and lateral extremes at mid-foot (inside, outside),
+    /// the top of the vamp (laces) and the underside at mid-foot (sole).
+    /// </summary>
+    void BuildSurfaces()
+    {
+        var verts = new List<Vector3>[] { new(), new() };
+        foreach (var (mesh, surface, role, _) in _surfaces)
+        {
+            if (role != "boots") continue;
+            var arr = (Vector3[])mesh.Mesh.SurfaceGetArrays(surface)[(int)Mesh.ArrayType.Vertex];
+            foreach (var raw in arr)
+            {
+                var v = mesh.Transform * raw;
+                int f = Math.Abs(v.X - _restPos[_foot[0]].X) <= Math.Abs(v.X - _restPos[_foot[1]].X) ? 0 : 1;
+                verts[f].Add(v);
+            }
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            var list = verts[i];
+            if (list.Count < 8) return;
+            Vector3 b = _restPos[_foot[i]];
+            float outward = i == 0 ? 1f : -1f;   // the left foot sits at +X; outward is away from the body's centre line
+            float zmin = float.MaxValue, zmax = float.MinValue, ymin = float.MaxValue, lmin = float.MaxValue, lmax = float.MinValue;
+            foreach (var v in list)
+            {
+                zmin = Math.Min(zmin, v.Z); zmax = Math.Max(zmax, v.Z); ymin = Math.Min(ymin, v.Y);
+                float l = (v.X - b.X) * outward; lmin = Math.Min(lmin, l); lmax = Math.Max(lmax, l);
+            }
+            float dz = zmax - zmin, half = (lmax - lmin) * 0.5f, lmid = (lmax + lmin) * 0.5f;
+            float yTop = ymin;
+            foreach (var v in list) if (v.Z > zmin + 0.4f * dz && v.Z < zmin + 0.7f * dz) yTop = Math.Max(yTop, v.Y);
+            float hz = yTop - ymin;
+
+            Vector3 inside = default, outside = default, laces = default, sole = default;
+            float bi = float.MaxValue, bo = float.MinValue, bl = float.MinValue, bs = float.MaxValue;
+            foreach (var v in list)
+            {
+                float l = (v.X - b.X) * outward;
+                bool mid = v.Z > zmin + 0.4f * dz && v.Z < zmin + 0.7f * dz;
+                if (mid && v.Y > ymin + 0.25f * hz && v.Y < ymin + 0.7f * hz)
+                {
+                    if (l < bi) { bi = l; inside = v; }
+                    if (l > bo) { bo = l; outside = v; }
+                }
+                bool central = Math.Abs(l - lmid) < 0.25f * half;
+                if (central && v.Z > zmin + 0.5f * dz && v.Z < zmin + 0.8f * dz && v.Y > bl) { bl = v.Y; laces = v; }
+                if (central && mid && v.Y < bs) { bs = v.Y; sole = v; }
+            }
+            _surfRest[i, (int)BootSurface.Inside] = inside - b;
+            _surfRest[i, (int)BootSurface.Outside] = outside - b;
+            _surfRest[i, (int)BootSurface.Laces] = laces - b;
+            _surfRest[i, (int)BootSurface.Sole] = sole - b;
+        }
+        _hasSurfaces = true;
+    }
+
+    /// <summary>The surface point's offset from the ankle joint in the foot's frame (forward, up, the character's right), metres, for a figure of the given height.</summary>
+    public Vector3 SurfaceOffset(int foot, BootSurface surface, float height, float ankleH)
+    {
+        float sc = height / ModelHeight * _fit;
+        var o = _surfRest[foot, (int)surface];
+        return new Vector3(o.Z * sc, (o.Y + _restAnkleHeight) * sc - ankleH, -o.X * sc);
+    }
+
+    /// <summary>The surface point on the boot mesh in world space, from the latest <see cref="Pose"/> (the physics-tick pose, not the interpolated one).</summary>
+    public Vector3 SurfacePoint(int foot, BootSurface surface)
+    {
+        Vector3 pm = _footPos[foot] + _footRot[foot] * _surfRest[foot, (int)surface];
+        return ModelToWorld * pm * _scale;
     }
 
     /// <summary>Shirt number on the upper back, riding the chest bone.</summary>
@@ -251,7 +337,7 @@ public sealed partial class SkinnedBody : Node3D
     /// <summary>Poses the skeleton from the figure's joints. Call once per physics tick, after the figure has computed them.</summary>
     public void Pose(FigureJoints j)
     {
-        float s = j.Height / ModelHeight;
+        float s = j.Height / ModelHeight * _fit;
         if (Math.Abs(s - _scale) > 1e-4f)
         {
             _scale = s;
@@ -308,6 +394,7 @@ public sealed partial class SkinnedBody : Node3D
             fd = fd.LengthSquared() > 1e-6f ? fd.Normalized() : Vector3.Back;
             Basis foot = new Basis(fd, Vector3.Up, fd.Cross(Vector3.Up)) * new Basis(Vector3.Back, Vector3.Up, Vector3.Back.Cross(Vector3.Up)).Transposed();
             Put(_foot[i], foot, ankle);
+            _footRot[i] = foot; _footPos[i] = ankle;
             Put(_toe[i], foot, ankle + foot * (_restPos[_toe[i]] - _restPos[_foot[i]]));
 
             // arm: the figure's arms are longer than the model's, so the shoulder girdle reaches toward a hand that is out of reach (as a real one does)

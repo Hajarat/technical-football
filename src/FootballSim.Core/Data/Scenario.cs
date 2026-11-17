@@ -34,6 +34,11 @@ public sealed class Scenario
     public StartSpot Attacker { get; set; } = new() { X = 40.9f, Z = 0f, FacingDeg = 0f };
     /// <summary>True for penalties: the keeper stands on the goal line instead of in front of it.</summary>
     public bool KeeperOnLine { get; set; }
+    /// <summary>
+    /// Where the keeper starts: this far off his goal line on the line from the ball to the goal centre, metres. Null starts him
+    /// on his set spot. He then moves as usual.
+    /// </summary>
+    public float? KeeperOffLine { get; set; }
     /// <summary>Seconds of Live time before TIME_UP, or null for no clock.</summary>
     public float? ClockLimit { get; set; }
     /// <summary>Distance from the goal centre at which the scripted attacker shoots. 0 means at once.</summary>

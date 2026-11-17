@@ -148,6 +148,11 @@ public static class DataLoader
             w.Add(new LoadWarning(fileLabel, "team_size", $"{s.TeamSize} is outside 1..11; clamped"));
             s.TeamSize = Math.Clamp(s.TeamSize, 1, 11);
         }
+        if (s.KeeperOffLine is float kol && (float.IsNaN(kol) || kol < 0f || kol > s.Pitch.HalfLength))
+        {
+            w.Add(new LoadWarning(fileLabel, "keeper_off_line", $"{kol} is outside 0..{s.Pitch.HalfLength}; using the set spot"));
+            s.KeeperOffLine = null;
+        }
         if (s.ClockLimit is <= 0f)
         {
             w.Add(new LoadWarning(fileLabel, "clock_limit", "must be positive; using no clock"));
@@ -185,7 +190,9 @@ public static class DataLoader
             var t = JsonSerializer.Deserialize<Tuning>(json, Options);
             if (t == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: empty file (default tuning in use)" };
             if (t.Ball == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: ball: must be an object (default tuning in use)" };
-            foreach (var (field, curve) in new[] { ("ball.drag_curve", t.Ball.DragCurve), ("ball.lift_curve", t.Ball.LiftCurve), ("ball.restitution_curve", t.Ball.RestitutionCurve) })
+            if (t.Touch == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: touch: must be an object (default tuning in use)" };
+            foreach (var (field, curve) in new[] { ("ball.drag_curve", t.Ball.DragCurve), ("ball.lift_curve", t.Ball.LiftCurve), ("ball.restitution_curve", t.Ball.RestitutionCurve),
+                ("touch.early_execution", t.Touch.EarlyExecution) })
             {
                 string? bad = curve == null ? "must be an array of [x, y] pairs" : curve.Validate();
                 if (bad != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: {field}: {bad} (default tuning in use)" };

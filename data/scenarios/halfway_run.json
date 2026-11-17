@@ -1,0 +1,25 @@
+{
+  "id": "halfway_run",
+  "name": "Halfway run",
+  "default_attacker": "striker_a",
+  "default_keeper": "the_wall",
+  "team_size": 1,
+  "ball": {
+    "x": 1.0,
+    "z": 0
+  },
+  "attacker": {
+    "x": 0.4,
+    "z": 0,
+    "facing_deg": 0
+  },
+  "keeper_on_line": true,
+  "clock_limit": 15,
+  "shoot_distance": 18,
+  "pitch": {
+    "half_length": 52.5,
+    "width": 68.0,
+    "goal_width": 7.32,
+    "goal_height": 2.44
+  }
+}

@@ -98,6 +98,11 @@ public sealed class BallTuning
     public float InertiaFactor { get; set; } = 0.66f;
     /// <summary>Rolling deceleration, m/s squared.</summary>
     public float RollDeceleration { get; set; } = 1.2f;
+    /// <summary>
+    /// Sliding friction coefficient on grass while the ball skids on the ground (its contact point slips): the ball slows at
+    /// this times gravity (0.40 is about 3.9 m/s squared) and its spin changes to match, until it rolls.
+    /// </summary>
+    public float SkidFriction { get; set; } = 0.40f;
     public float Gravity { get; set; } = 9.81f;
     /// <summary>Rolling speed below which the ball is at rest, m/s.</summary>
     public float RestSpeed { get; set; } = 0.05f;
@@ -143,12 +148,58 @@ public sealed class MovementTuning
     public float WeightFactorMax { get; set; } = 1.15f;
     /// <summary>Stick deflection below this counts as no input.</summary>
     public float StickDeadZone { get; set; } = 0.05f;
+    /// <summary>Stride clock: steps per second at a standstill pace (f(v) = base + per_speed * v).</summary>
+    public float StepFrequencyBase { get; set; } = 2.4f;
+    /// <summary>Stride clock: extra steps per second per m/s of running speed.</summary>
+    public float StepFrequencyPerSpeed { get; set; } = 0.17f;
+    /// <summary>Below this running speed the stride clock idles: the current step is finished, then no new step starts, m/s.</summary>
+    public float StepIdleSpeed { get; set; } = 0.3f;
+}
+
+/// <summary>A length that runs linearly from <see cref="Rest"/> at a standstill to <see cref="Sprint"/> at top speed.</summary>
+public sealed class SpeedRange
+{
+    public float Rest { get; set; }
+    public float Sprint { get; set; }
+
+    public SpeedRange() { }
+    public SpeedRange(float rest, float sprint) { Rest = rest; Sprint = sprint; }
+
+    /// <summary>Value at a 0..1 fraction of top speed.</summary>
+    public float Lerp(float speedFraction) => Rest + (Sprint - Rest) * Math.Clamp(speedFraction, 0f, 1f);
+}
+
+/// <summary>How many steps of the stride clock pass between two dribble touches, per touch mode.</summary>
+public sealed class StepsPerTouchTuning
+{
+    public float Close { get; set; } = 1f;
+    public float Jog { get; set; } = 2f;
+    /// <summary>At a sprint, by dribbling rating (rounded to whole steps).</summary>
+    public RatingRange Sprint { get; set; } = new(6f, 4f);
+}
+
+/// <summary>The most steps to the next meet while turning (see <see cref="TouchTuning.TurningStickRateDeg"/>).</summary>
+public sealed class TurningStepsTuning
+{
+    public int Jog { get; set; } = 2;
+    public int Sprint { get; set; } = 3;
+}
+
+/// <summary>Launch angle above the ground of a touch, degrees.</summary>
+public sealed class TouchLiftTuning
+{
+    /// <summary>Close control and jog touches (dribbling rating).</summary>
+    public RatingRange Jog { get; set; } = new(8f, 3f);
+    /// <summary>Sprint touches and knock-ons (dribbling rating).</summary>
+    public RatingRange Sprint { get; set; } = new(8f, 3f);
+    /// <summary>A heavy touch.</summary>
+    public float Heavy { get; set; } = 12f;
 }
 
 /// <summary>
-/// Touches. A touch sets the ball's speed relative to the player's: in possession a dribble touch is planned so the ball rolls
-/// to a point a short lead ahead of where the feet will be at the next touch, so touches are small and frequent and the ball
-/// stays at the feet.
+/// Touches. In possession every touch is a committed action planned on the stride: the planner picks the contact tick (the
+/// middle of a swing of the stride clock), the foot in swing then, and the contact point ahead of that foot; the player is
+/// steered so the ball is there; at contact the push speed is solved so the ball meets the foot again a few steps later.
 /// </summary>
 public sealed class TouchTuning
 {
@@ -156,39 +207,68 @@ public sealed class TouchTuning
     public float ReachPerHeight { get; set; } = 0.30f;
     public float HeightMin { get; set; } = 1.60f;
     public float HeightSpan { get; set; } = 0.40f;
-    public float MaxBallHeight { get; set; } = 0.4f;
+    /// <summary>A touch is only made with the ball centre at or below this height, metres.</summary>
+    public float MaxBallHeight { get; set; } = 0.45f;
     /// <summary>Top speed with the ball as a fraction of top speed (dribbling rating).</summary>
     public RatingRange TopSpeedWithBall { get; set; } = new(0.80f, 0.96f);
-    /// <summary>Sprint input at or above this counts as sprinting (touch cadence and overshoot).</summary>
+    /// <summary>Sprint input at or above this counts as sprinting (touch mode).</summary>
     public float SprintThreshold { get; set; } = 0.5f;
-    /// <summary>Stick deflection below this asks for no dribble touch; in possession it asks for a trap.</summary>
+    /// <summary>Stick deflection below this asks for no dribble touch; in possession it asks for a stop.</summary>
     public float StickThreshold { get; set; } = 0.1f;
 
-    /// <summary>Minimum seconds between touches in close control.</summary>
-    public float CloseControlCadence { get; set; } = 0.16f;
-    /// <summary>Minimum seconds between touches at a jog.</summary>
-    public float JogCadence { get; set; } = 0.22f;
-    /// <summary>Minimum seconds between touches at a sprint.</summary>
-    public float SprintCadence { get; set; } = 0.30f;
-
-    /// <summary>A first touch with the stick pushed sends the ball at the player's speed along the touch times (1 + overshoot).</summary>
-    public float CloseControlOvershoot { get; set; } = 0.02f;
-    public float JogOvershoot { get; set; } = 0.05f;
-    /// <summary>Sprint overshoot for a first touch (dribbling rating).</summary>
-    public RatingRange SprintOvershoot { get; set; } = new(0.22f, 0.06f);
+    /// <summary>A touch is planned at least this long before its contact, seconds (the pre-windup).</summary>
+    public float PreWindup { get; set; } = 0.30f;
+    /// <summary>The windup (the foot drawn back) starts this long before contact, seconds.</summary>
+    public float Windup { get; set; } = 0.12f;
+    /// <summary>The recovery (follow-through) ends this long after contact, seconds.</summary>
+    public float Recovery { get; set; } = 0.15f;
+    /// <summary>The contact point is this far ahead of the swinging foot's hip, metres, from a standstill to top speed.</summary>
+    public SpeedRange ContactZoneAhead { get; set; } = new(0.25f, 0.45f);
+    /// <summary>The ball centre must be within this of the contact point at contact, metres (horizontal).</summary>
+    public float ContactZoneRadius { get; set; } = 0.12f;
+    /// <summary>The contact point lies this far to the swinging foot's side of the body's centreline, metres.</summary>
+    public float LateralFootOffset { get; set; } = 0.09f;
+    /// <summary>Above <see cref="ExecutionMinSpeed"/>, a touch sent more than this off the ball's travel is a turn, degrees.</summary>
+    public float ExecutionAngle { get; set; } = 10f;
+    /// <summary>Speed above which the execution angle applies, m/s.</summary>
+    public float ExecutionMinSpeed { get; set; } = 1f;
+    /// <summary>A stick change larger than this before contact drops the planned touch and plans again, degrees.</summary>
+    public float ReplanAngle { get; set; } = 90f;
     /// <summary>
-    /// A dribble or turn touch aims the ball to arrive this far ahead of where the feet will be at the next touch, metres, in
-    /// close control (dribbling rating).
+    /// Early execution by the angle between the stick and the ball's travel, degrees: the fraction of the normal cadence a turn
+    /// may cut it to. A stick turn pulls the waiting touch forward to no sooner after the previous touch than this fraction of
+    /// the time the touch had (never below <see cref="EarlyMinInterval"/>), and a turn or cut touch pushes the ball to a meet
+    /// this fraction of the usual steps away (at least one). Multiplied by <see cref="EarlyExecutionDribbling"/>.
     /// </summary>
-    public RatingRange CloseControlLead { get; set; } = new(0.40f, 0.30f);
-    /// <summary>Planned-touch lead at a jog, metres (dribbling rating).</summary>
-    public RatingRange JogLead { get; set; } = new(0.70f, 0.50f);
-    /// <summary>Planned-touch lead at a sprint, metres (dribbling rating). Beyond foot reach the touch waits for the player.</summary>
-    public RatingRange SprintLead { get; set; } = new(1.20f, 0.60f);
-    /// <summary>Ball speed after a touch never falls below this, m/s (a touch from a standstill).</summary>
+    public Curve EarlyExecution { get; set; } = new((10f, 1.0f), (30f, 0.6f), (60f, 0.35f), (90f, 0.25f));
+    /// <summary>Multiplier on <see cref="EarlyExecution"/> by the dribbling rating.</summary>
+    public RatingRange EarlyExecutionDribbling { get; set; } = new(1.15f, 0.85f);
+    /// <summary>Early turn touches are at least this far apart (from the previous touch), seconds.</summary>
+    public float EarlyMinInterval { get; set; } = 0.22f;
+    /// <summary>
+    /// The stick counts as moving (a turn is likely) when its smoothed turn rate is above this, degrees per second; then, as
+    /// for a touch sent more than the execution angle off the ball's travel, the push goes to a meet at most
+    /// <see cref="TurningMaxSteps"/> steps away.
+    /// </summary>
+    public float TurningStickRateDeg { get; set; } = 20f;
+    /// <summary>The most steps to the next meet while turning, per mode.</summary>
+    public TurningStepsTuning TurningMaxSteps { get; set; } = new();
+    /// <summary>
+    /// With the stick pushed and no touch possible on the stick's path, the legs may bend this far from the stick toward the
+    /// ball, degrees. Only when no such bend reaches the ball do they run on to it or run to it directly (the last resort).
+    /// </summary>
+    public float ApproachMaxStickDeg { get; set; } = 45f;
+    /// <summary>Largest correction added to the player's velocity while steering the ball into the contact zone, m/s.</summary>
+    public float SteerMax { get; set; } = 0.6f;
+    /// <summary>Steps of the stride clock between dribble touches, per mode.</summary>
+    public StepsPerTouchTuning StepsPerTouch { get; set; } = new();
+    /// <summary>Launch angle of touches, degrees.</summary>
+    public TouchLiftTuning LiftDeg { get; set; } = new();
+
+    /// <summary>Ball speed after a planned touch never falls below this, m/s.</summary>
     public float MinPush { get; set; } = 2.0f;
     public float CloseControlMinPush { get; set; } = 1.2f;
-    /// <summary>A planned dribble or turn touch never sends the ball faster than this, m/s.</summary>
+    /// <summary>A planned touch never sends the ball faster than this, m/s; a touch that would need more is a heavy touch.</summary>
     public float MaxPush { get; set; } = 12f;
     /// <summary>Standard deviation of the touch speed factor (dribbling), before the speed scaling.</summary>
     public RatingRange SpeedError { get; set; } = new(0.10f, 0.02f);
@@ -202,11 +282,9 @@ public sealed class TouchTuning
     /// <summary>The ball must be this far past the body's centreline on the other side to be touched with the other foot, metres.</summary>
     public float FootSideOffset { get; set; } = 0.15f;
 
-    /// <summary>A wanted direction this far off the ball's travel allows an early touch, degrees.</summary>
-    public float TurnTriggerDeg { get; set; } = 20f;
-    /// <summary>Earliest touch after the last one for turns, traps and soft touches, seconds.</summary>
+    /// <summary>Earliest first touch of a loose ball after the player's previous touch, seconds.</summary>
     public float TurnMinInterval { get; set; } = 0.10f;
-    /// <summary>A turn sharper than this at speed is a cut: the ball leaves at the player's post-turn speed, no overshoot.</summary>
+    /// <summary>A touch turning the ball more than this at speed is a cut: the player loses the balance percentage of speed.</summary>
     public float CutDeg { get; set; } = 60f;
     /// <summary>Player speed above which a sharp turn is a cut, m/s.</summary>
     public float CutMinSpeed { get; set; } = 2.0f;
@@ -228,6 +306,8 @@ public sealed class TouchTuning
     /// (dribbling rating).
     /// </summary>
     public RatingRange KnockOnCatchTime { get; set; } = new(1.8f, 1.3f);
+    /// <summary>A knock-on is never pushed faster than this, m/s (it has to outrun the skid to reach its catch point).</summary>
+    public float KnockOnMaxPush { get; set; } = 18f;
     /// <summary>A knock-on's speed and direction errors are the sprint ones (full speed fraction) times this.</summary>
     public float KnockOnErrorScale { get; set; } = 1.5f;
     /// <summary>
@@ -238,9 +318,9 @@ public sealed class TouchTuning
     /// <summary>The chase ends this long after the planned catch time if the player has not touched the ball again, seconds.</summary>
     public float KnockOnChaseGrace { get; set; } = 0.5f;
 
-    /// <summary>A trap is made when the ball would come to rest more than this from where the player stops, metres.</summary>
+    /// <summary>A stop touch is made when the ball would come to rest more than this from where the player stops, metres.</summary>
     public float TrapTolerance { get; set; } = 0.25f;
-    /// <summary>Where a trap aims the ball to come to rest: this far ahead of where the player stops, metres.</summary>
+    /// <summary>Where a stop touch aims the ball to come to rest: this far ahead of where the player stops, metres.</summary>
     public float TrapRestOffset { get; set; } = 0.35f;
 
     /// <summary>First contact with a loose ball: direction error at relative speed equal to the reference (first_touch).</summary>
@@ -253,7 +333,7 @@ public sealed class TouchTuning
     public float FirstTouchMinRelativeSpeed { get; set; } = 0.5f;
 }
 
-/// <summary>Possession: who controls the ball, when control is lost, the possession assist and the next-touch prediction.</summary>
+/// <summary>Possession: who controls the ball, when control is lost, the recovery run and the planning horizon.</summary>
 public sealed class PossessionTuning
 {
     /// <summary>Possession is lost when the ball stays further than the lose distance for this long, seconds.</summary>
@@ -262,22 +342,11 @@ public sealed class PossessionTuning
     public float LoseDistanceSlow { get; set; } = 2.0f;
     /// <summary>Lose distance at top speed, metres (linear in speed fraction between).</summary>
     public float LoseDistanceFast { get; set; } = 3.5f;
-    /// <summary>Multiplies the sideways auto-steer toward the ball's line (0 turns it off).</summary>
-    public float AssistStrength { get; set; } = 1.0f;
-    /// <summary>Sideways correction speed per metre of offset, 1/s.</summary>
-    public float AssistGain { get; set; } = 4f;
-    /// <summary>Sideways correction speed cap, m/s.</summary>
-    public float AssistMaxSpeed { get; set; } = 1.5f;
-    /// <summary>With the ball ahead and out of reach, the speed cap rises to this fraction of off-ball top speed.</summary>
+    /// <summary>While the player runs to recover a ball that no touch can be planned for, the speed cap is this fraction of top speed.</summary>
     public float ChaseSpeedFraction { get; set; } = 0.97f;
-    /// <summary>
-    /// A released stick or a new direction first carries the player on to the ball when it is ahead and at most this far
-    /// beyond foot reach, metres; a ball knocked further than that is left to roll.
-    /// </summary>
-    public float ReachBallMargin { get; set; } = 0.5f;
     /// <summary>Off possession the turn rate is multiplied by (1 + this).</summary>
     public float OffBallTurnBonus { get; set; } = 0.15f;
-    /// <summary>How far ahead the next-touch prediction looks, seconds.</summary>
+    /// <summary>How far ahead the touch planner looks for a swing that can play the ball, seconds.</summary>
     public float PredictionHorizon { get; set; } = 1.5f;
 }
 

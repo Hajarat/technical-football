@@ -144,4 +144,17 @@ public class WorldTests
         Assert.Equal(w.Shots[0].Aimed.X, last.Value.AimedZ, 4);
         Assert.Null(w.PreviewShot());
     }
+
+    [Fact]
+    public void KeeperRushScenarioStartsTheKeeperOffHisLine()
+    {
+        var w = TestData.Live("keeper_rush");
+        Assert.Equal(w.Pitch.GoalLineX - 8f, w.Keeper.Position.X, 3);
+        Assert.Equal(0f, w.Keeper.Position.Z, 3);
+        var h = TestData.Live("halfway_run");
+        Assert.Equal(w.Pitch.GoalLineX, h.Keeper.Position.X, 3);   // on his line
+        var a = TestData.Live("angled_run");
+        float angle = MathF.Atan2(a.Ball.Position.Z, a.Pitch.GoalLineX - a.Ball.Position.X) * 180f / MathF.PI;
+        Assert.InRange(angle, 28f, 32f);
+    }
 }

@@ -149,10 +149,56 @@ public class BallTests
     [Fact]
     public void RollingBallSpinMatchesItsVelocity()
     {
+        // A ball set moving on the ground without spin skids first; once it rolls, its spin matches its velocity.
         var t = new Tuning();
         var b = new Ball(t.Ball) { Position = new Vector3(0, t.Ball.Radius, 0), Velocity = new Vector3(3f, 0, 2f) };
         b.Step(t.Dt, null, null);
+        Assert.True(b.Skidding);
+        for (int i = 0; i < 240 && b.Skidding; i++) b.Step(t.Dt, null, null);
+        Assert.False(b.Skidding);
+        b.Step(t.Dt, null, null);
         Assert.True(Slip(b) < 1e-4f, $"slip {Slip(b)}");
+        Assert.True(b.Velocity.Length() > 0.5f);
+    }
+
+    /// <summary>Pushes a ball along +X on the ground with a spin about Z and returns (skid seconds, skid distance, speed when rolling starts).</summary>
+    static (float Seconds, float Distance, float RollSpeed) Skid(Tuning t, float speed, float spinZ)
+    {
+        var b = new Ball(t.Ball) { Position = new Vector3(0, t.Ball.Radius, 0), Velocity = new Vector3(speed, 0, 0), Spin = new Vector3(0, 0, spinZ) };
+        int n = 0;
+        while (b.Skidding && n < 2000) { b.Step(t.Dt, null, null); n++; }
+        return (n * t.Dt, b.Position.X, b.Velocity.X);
+    }
+
+    [Fact]
+    public void NoSpinPushSkidsThenRollsAtSpeedOverOnePlusInertiaFactor()
+    {
+        var t = new Tuning();
+        foreach (float u in new[] { 3f, 6f, 10f })
+        {
+            var (seconds, _, roll) = Skid(t, u, 0f);
+            float expected = u / (1f + t.Ball.InertiaFactor);
+            Assert.InRange(roll, expected * 0.98f, expected * 1.02f);
+            // Sliding friction mu * g: the skid lasts u * k / ((1 + k) * mu * g).
+            float k = t.Ball.InertiaFactor;
+            Assert.InRange(seconds, u * k / ((1f + k) * t.Ball.SkidFriction * t.Ball.Gravity) - 0.02f, u * k / ((1f + k) * t.Ball.SkidFriction * t.Ball.Gravity) + 0.02f);
+        }
+    }
+
+    [Fact]
+    public void TopspinShortensAndBackspinLengthensTheSkid()
+    {
+        var t = new Tuning();
+        // Rolling toward +X spins about -Z; topspin is negative Z, backspin positive.
+        float rolling = 8f / t.Ball.Radius;
+        var plain = Skid(t, 8f, 0f);
+        var top = Skid(t, 8f, -0.5f * rolling);
+        var back = Skid(t, 8f, 0.5f * rolling);
+        Assert.True(top.Seconds < plain.Seconds - 0.05f, $"topspin {top.Seconds:F2} s vs plain {plain.Seconds:F2} s");
+        Assert.True(back.Seconds > plain.Seconds + 0.05f, $"backspin {back.Seconds:F2} s vs plain {plain.Seconds:F2} s");
+        Assert.True(top.RollSpeed > plain.RollSpeed && plain.RollSpeed > back.RollSpeed);
+        // A ball already rolling does not skid at all.
+        Assert.Equal(0f, Skid(t, 8f, -rolling).Seconds);
     }
 
     [Fact]
@@ -257,7 +303,8 @@ public class BallTests
     public void RollingBallStopsAfterTheExpectedDistance()
     {
         var t = new Tuning();
-        var b = new Ball(t.Ball) { Position = new Vector3(0, t.Ball.Radius, 0), Velocity = new Vector3(5f, 0, 0) };
+        // Set rolling (spin matching the velocity), so there is no skid.
+        var b = new Ball(t.Ball) { Position = new Vector3(0, t.Ball.Radius, 0), Velocity = new Vector3(5f, 0, 0), Spin = new Vector3(0, 0, -5f / t.Ball.Radius) };
         int ticks = 0;
         while (b.Velocity.LengthSquared() > 0 && ticks++ < 5000) b.Step(t.Dt, null, null);
         Assert.Equal(Vector3.Zero, b.Velocity);

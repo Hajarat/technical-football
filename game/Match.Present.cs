@@ -31,6 +31,7 @@ public partial class Match
             if (e.Kind == EventKind.Touch) { f.TouchEvent = true; f.EventRight = e.Foot == Foot.Right; f.BallPos = G(e.Position); }
             else if (e.Kind == EventKind.Strike) { f.StrikeEvent = true; f.EventRight = e.Foot == Foot.Right; f.BallPos = G(e.Position); }
         }
+        FillGait(ref f, p);
         f.NextTouchEta = p.NextTouchEta; f.NextTouchRight = p.NextTouchFoot == Foot.Right; f.NextTouchPoint = G(p.NextTouchPoint);
         f.ShotCharge = w.ShotCharge;
         // The core counts StrikeEta down through the strike delay and fixes StrikeFoot at the button press.
@@ -49,7 +50,33 @@ public partial class Match
         f.Reacting = k.KeeperAction == KeeperAction.Reacting;
         f.HandPosition = G(k.HandPosition);
         f.BallPos = G(World.Ball.Position);
+        FillGait(ref f, k);
         return f;
+    }
+
+    /// <summary>The simulation's stride clock and touches as plain values: the figure draws them and decides no timing of its own.</summary>
+    void FillGait(ref FigureFrame f, PlayerState p)
+    {
+        float dt = World.Tuning.Dt;
+        f.HasGait = true; f.IsStepping = p.IsStepping; f.SwingRight = p.SwingFoot == Foot.Right;
+        f.GaitPhase = p.GaitPhase; f.StepFrequency = p.StepFrequency; f.SwingProgress = p.SwingProgress;
+        f.RightFootPhase = p.RightFootPhase; f.LeftFootPhase = p.LeftFootPhase;
+        f.RunSpeed = p.RunSpeed;
+        f.Action = ActionFrame(p.Action, p, dt);
+        f.PrevAction = ActionFrame(p.PreviousAction, p, dt);
+    }
+
+    static FigureAction ActionFrame(BallAction? a, PlayerState p, float dt)
+    {
+        if (a == null) return default;
+        return new FigureAction
+        {
+            Valid = true, Kind = (int)a.Kind, Phase = (TouchPhase)(int)a.Phase, Right = a.Foot == Foot.Right, Surface = (BootSurface)(int)a.Surface,
+            Id = a.PlanTick, ContactTick = a.ContactTick, ContactEta = a.ContactEta(p.CurrentTick, dt), RecoverySeconds = (a.EndTick - a.ContactTick) * dt,
+            ContactPoint = G(a.ContactPoint), BallOutVelocity = G(a.BallOutVelocity),
+            NextMeetPoint = a.NextMeetTick >= 0 ? G(a.NextMeetPoint) : new Vector3(float.NaN, 0, 0),
+            ContactMiss = a.ContactMiss, Made = a.Made,
+        };
     }
 
     static Vector3 G(System.Numerics.Vector3 v) => new(v.X, v.Y, v.Z);

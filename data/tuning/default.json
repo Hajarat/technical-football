@@ -15,6 +15,7 @@
     "bounce_friction": 0.55,
     "inertia_factor": 0.66,
     "roll_deceleration": 1.2,
+    "skid_friction": 0.4,
     "gravity": 9.81,
     "rest_speed": 0.05,
     "min_bounce_speed": 0.6,
@@ -54,40 +55,66 @@
     "weight_turn_slope": 0.15,
     "weight_factor_min": 0.85,
     "weight_factor_max": 1.15,
-    "stick_dead_zone": 0.05
+    "stick_dead_zone": 0.05,
+    "step_frequency_base": 2.4,
+    "step_frequency_per_speed": 0.17,
+    "step_idle_speed": 0.3
   },
   "touch": {
     "reach_base": 0.55,
     "reach_per_height": 0.3,
     "height_min": 1.6,
     "height_span": 0.4,
-    "max_ball_height": 0.4,
+    "max_ball_height": 0.45,
     "top_speed_with_ball": {
       "at1": 0.8,
       "at99": 0.96
     },
     "sprint_threshold": 0.5,
     "stick_threshold": 0.1,
-    "close_control_cadence": 0.16,
-    "jog_cadence": 0.22,
-    "sprint_cadence": 0.3,
-    "close_control_overshoot": 0.02,
-    "jog_overshoot": 0.05,
-    "sprint_overshoot": {
-      "at1": 0.22,
-      "at99": 0.06
+    "pre_windup": 0.3,
+    "windup": 0.12,
+    "recovery": 0.15,
+    "contact_zone_ahead": {
+      "rest": 0.25,
+      "sprint": 0.45
     },
-    "close_control_lead": {
-      "at1": 0.4,
-      "at99": 0.3
+    "contact_zone_radius": 0.12,
+    "lateral_foot_offset": 0.09,
+    "execution_angle": 10,
+    "execution_min_speed": 1,
+    "replan_angle": 90,
+    "early_execution": [[10, 1], [30, 0.6], [60, 0.35], [90, 0.25]],
+    "early_execution_dribbling": {
+      "at1": 1.15,
+      "at99": 0.85
     },
-    "jog_lead": {
-      "at1": 0.7,
-      "at99": 0.5
+    "early_min_interval": 0.22,
+    "turning_stick_rate_deg": 20,
+    "turning_max_steps": {
+      "jog": 2,
+      "sprint": 3
     },
-    "sprint_lead": {
-      "at1": 1.2,
-      "at99": 0.6
+    "approach_max_stick_deg": 45,
+    "steer_max": 0.6,
+    "steps_per_touch": {
+      "close": 1,
+      "jog": 2,
+      "sprint": {
+        "at1": 6,
+        "at99": 4
+      }
+    },
+    "lift_deg": {
+      "jog": {
+        "at1": 8,
+        "at99": 3
+      },
+      "sprint": {
+        "at1": 8,
+        "at99": 3
+      },
+      "heavy": 12
     },
     "min_push": 2,
     "close_control_min_push": 1.2,
@@ -104,7 +131,6 @@
     "error_speed_slope": 0.6,
     "weak_foot_error_step": 0.1,
     "foot_side_offset": 0.15,
-    "turn_trigger_deg": 20,
     "turn_min_interval": 0.1,
     "cut_deg": 60,
     "cut_min_speed": 2,
@@ -119,6 +145,7 @@
       "at1": 1.8,
       "at99": 1.3
     },
+    "knock_on_max_push": 18,
     "knock_on_error_scale": 1.5,
     "knock_on_chase_min_speed": 1,
     "knock_on_chase_grace": 0.5,
@@ -139,11 +166,7 @@
     "lose_seconds": 0.15,
     "lose_distance_slow": 2,
     "lose_distance_fast": 3.5,
-    "assist_strength": 1,
-    "assist_gain": 4,
-    "assist_max_speed": 1.5,
     "chase_speed_fraction": 0.97,
-    "reach_ball_margin": 0.5,
     "off_ball_turn_bonus": 0.15,
     "prediction_horizon": 1.5
   },
