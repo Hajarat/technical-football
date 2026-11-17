@@ -16,6 +16,8 @@ public sealed class ToolArgs
     public int BurstStart, BurstCount, BurstStep = 1;
     public string? DataDir;
     public string? ReplayPath;
+    /// <summary>"skinned" (rigged human models, the default) or "procedural" (primitive meshes).</summary>
+    public string Figure = "skinned";
 
     public static ToolArgs Parse()
     {
@@ -33,6 +35,10 @@ public sealed class ToolArgs
                 case "--close-keeper": a.CloseCam = true; a.CloseKeeper = true; break;
                 case "--data": a.DataDir = Next(); break;
                 case "--replay": a.ReplayPath = Next(); break;
+                case "--figure":
+                    a.Figure = (Next() ?? "").ToLowerInvariant();
+                    if (a.Figure != "skinned" && a.Figure != "procedural") { GD.PushWarning($"--figure expects skinned or procedural, got '{a.Figure}'; using skinned"); a.Figure = "skinned"; }
+                    break;
                 case "--shots": a.ShotDir = Next(); break;
                 case "--shot-ticks":
                     foreach (var s in (Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))

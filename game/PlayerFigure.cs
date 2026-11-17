@@ -91,6 +91,32 @@ public partial class PlayerFigure : Node3D
         _mat.Shirt.AlbedoColor = _kit.Shirt; _mat.Shorts.AlbedoColor = _kit.Shorts; _mat.Socks.AlbedoColor = _kit.Socks;
         _mat.Skin.AlbedoColor = _kit.Skin; _mat.Boots.AlbedoColor = _kit.Boots; _mat.Gloves.AlbedoColor = _kit.Gloves; _mat.Hair.AlbedoColor = _kit.Hair;
         if (_number != null) { _number.Text = _kit.Number.ToString(); _number.Modulate = _kit.NumberColor; }
+        _body?.ApplyKit(_kit);
+    }
+
+    // ---- skinned body (optional): follows the joints computed below; the primitive meshes are hidden while it is active ----
+    Node3D _prims = null!;
+    SkinnedBody? _body;
+    readonly FigureJoints _joints = new();
+
+    /// <summary>The joints computed by the latest <c>Update</c> (world space), for anything that follows the figure.</summary>
+    public FigureJoints Joints => _joints;
+
+    /// <summary>True while a skinned body replaces the primitive meshes.</summary>
+    public bool IsSkinned => _body != null;
+
+    /// <summary>Replaces the primitive meshes with the rigged model at <paramref name="path"/>; on failure the primitives stay and the reason is returned.</summary>
+    public bool TryUseSkinned(string path, out string error)
+    {
+        var body = SkinnedBody.TryLoad(path, out error);
+        if (body == null) return false;
+        _body?.QueueFree();
+        _body = body;
+        AddChild(body);
+        _prims.Visible = false;
+        _number.Visible = false;
+        body.ApplyKit(_kit);
+        return true;
     }
 
     // ---- parts ----
@@ -133,6 +159,8 @@ public partial class PlayerFigure : Node3D
     public override void _Ready()
     {
         bool sleeves = IsKeeper;
+        _prims = new Node3D { Name = "Primitives" };
+        AddChild(_prims);
         _pelvis = Part("Pelvis", FigureMeshes.Pelvis(_mat));
         _torso = Part("Torso", FigureMeshes.Torso(_mat));
         _neck = Part("Neck", FigureMeshes.Neck(_mat));
@@ -158,7 +186,7 @@ public partial class PlayerFigure : Node3D
     MeshInstance3D Part(string n, Mesh mesh)
     {
         var mi = new MeshInstance3D { Name = n, Mesh = mesh, CastShadow = GeometryInstance3D.ShadowCastingSetting.On };
-        AddChild(mi);
+        _prims.AddChild(mi);
         return mi;
     }
 
@@ -179,6 +207,7 @@ public partial class PlayerFigure : Node3D
         _strikeT = _touchT = -1f; _windT = 0; _lastCharge = 0; _lean = 0; _leanExtraS = 0; _stActive = false; _phaseMul = 1f; _pinWas = false;
         Update(f);
         ResetPhysicsInterpolation();
+        _body?.ResetInterpolation();
     }
 
     void InitState(Vector3 pos, Vector3 fwd, Vector3 right)
@@ -736,7 +765,12 @@ public partial class PlayerFigure : Node3D
             Vector3 hz = B.Z - hy * B.Z.Dot(hy);
             hz = hz.LengthSquared() > 1e-6f ? hz.Normalized() : Vector3.Back;
             _hand[i].Transform = new Transform3D(new Basis(hy.Cross(hz), hy, hz).Scaled(Vector3.One * k), hand);
+
+            _joints.Hip[i] = hip; _joints.Knee[i] = knee[i]; _joints.Ankle[i] = ankle[i]; _joints.FootDir[i] = fd;
+            _joints.Shoulder[i] = sh; _joints.Elbow[i] = elbow; _joints.Hand[i] = hand;
         }
+        _joints.Pelvis = pel; _joints.Torso = B; _joints.Height = H; _joints.AnkleHeight = AnkleH;
+        _body?.Pose(_joints);
     }
 
     /// <summary>Stretches a limb mesh (centred on its midpoint, +Y distal, built for <paramref name="refLen"/> metres plus end caps) between two joints.</summary>

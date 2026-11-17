@@ -261,6 +261,7 @@ public partial class Match
     string WarningLine()
     {
         var w = _data.Warnings;
+        if (_figureWarning.Length > 0) return w.Count == 0 ? _figureWarning : $"{_figureWarning} (+{w.Count} data warnings)";
         if (w.Count == 0) return "";
         return w.Count == 1 ? w[0] : $"{w[0]} (+{w.Count - 1} more)";
     }
