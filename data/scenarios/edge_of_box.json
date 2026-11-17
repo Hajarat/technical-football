@@ -1,0 +1,25 @@
+{
+  "id": "edge_of_box",
+  "name": "Edge of the box",
+  "default_attacker": "striker_a",
+  "default_keeper": "the_wall",
+  "team_size": 1,
+  "ball": {
+    "x": 32.5,
+    "z": 0
+  },
+  "attacker": {
+    "x": 31.9,
+    "z": 0,
+    "facing_deg": 0
+  },
+  "keeper_on_line": false,
+  "clock_limit": 15,
+  "shoot_distance": 0,
+  "pitch": {
+    "half_length": 52.5,
+    "width": 68.0,
+    "goal_width": 7.32,
+    "goal_height": 2.44
+  }
+}

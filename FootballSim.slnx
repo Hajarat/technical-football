@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FootballSim.Batch/FootballSim.Batch.csproj" />
+    <Project Path="src/FootballSim.Core.Tests/FootballSim.Core.Tests.csproj" />
+    <Project Path="src/FootballSim.Core/FootballSim.Core.csproj" />
+  </Folder>
+</Solution>

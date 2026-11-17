@@ -1,0 +1,234 @@
+{
+  "tick_rate": 120,
+  "error_scale": 1,
+  "aim_assist": 0.3,
+  "ball": {
+    "mass": 0.43,
+    "radius": 0.11,
+    "cross_section": 0.038,
+    "air_density": 1.225,
+    "drag_coefficient": 0.25,
+    "max_lift_coefficient": 0.35,
+    "spin_decay_per_second": 0.02,
+    "bounce_restitution": 0.6,
+    "bounce_sideways_kept": 0.75,
+    "bounce_spin_kept": 0.5,
+    "roll_deceleration": 1.2,
+    "gravity": 9.81,
+    "rest_speed": 0.05,
+    "min_bounce_speed": 0.6,
+    "bounce_event_speed": 1
+  },
+  "frame": {
+    "post_radius": 0.06,
+    "restitution": 0.7,
+    "net_speed_kept": 0.1,
+    "net_depth": 2
+  },
+  "movement": {
+    "sprint_speed": {
+      "at1": 6,
+      "at99": 9.8
+    },
+    "time_constant": {
+      "at1": 1.1,
+      "at99": 0.45
+    },
+    "jog_fraction": 0.6,
+    "sprint_fraction": 1,
+    "close_control_fraction": 0.35,
+    "turn_rate_deg": {
+      "at1": 180,
+      "at99": 420
+    },
+    "turn_speed_penalty": 0.5,
+    "sharp_turn_deg": 60,
+    "sharp_turn_window": 0.2,
+    "balance_loss": {
+      "at1": 0.5,
+      "at99": 0.15
+    },
+    "weight_reference": 75,
+    "weight_range": 25,
+    "weight_turn_slope": 0.15,
+    "weight_factor_min": 0.85,
+    "weight_factor_max": 1.15,
+    "stick_dead_zone": 0.05
+  },
+  "touch": {
+    "reach_base": 0.55,
+    "reach_per_height": 0.3,
+    "height_min": 1.6,
+    "height_span": 0.4,
+    "max_ball_height": 0.4,
+    "top_speed_with_ball": {
+      "at1": 0.8,
+      "at99": 0.96
+    },
+    "sprint_threshold": 0.5,
+    "stick_threshold": 0.1,
+    "close_control_cadence": 0.16,
+    "jog_cadence": 0.22,
+    "sprint_cadence": 0.3,
+    "close_control_overshoot": 0.02,
+    "jog_overshoot": 0.05,
+    "sprint_overshoot": {
+      "at1": 0.22,
+      "at99": 0.06
+    },
+    "min_push": 2,
+    "close_control_min_push": 1.2,
+    "speed_error": {
+      "at1": 0.1,
+      "at99": 0.02
+    },
+    "direction_error_deg": {
+      "at1": 7,
+      "at99": 1
+    },
+    "error_speed_base": 0.4,
+    "error_speed_slope": 0.6,
+    "weak_foot_error_step": 0.1,
+    "foot_side_offset": 0.15,
+    "turn_trigger_deg": 20,
+    "turn_min_interval": 0.1,
+    "cut_deg": 60,
+    "cut_min_speed": 2,
+    "trap_tolerance": 0.25,
+    "trap_rest_offset": 0.35,
+    "first_touch_direction_error_deg": {
+      "at1": 25,
+      "at99": 3
+    },
+    "first_touch_speed_kept": {
+      "at1": 0.45,
+      "at99": 0.05
+    },
+    "first_touch_reference_speed": 15,
+    "first_touch_min_relative_speed": 0.5
+  },
+  "possession": {
+    "lose_seconds": 0.15,
+    "lose_distance_slow": 2,
+    "lose_distance_fast": 3.5,
+    "assist_strength": 1,
+    "assist_gain": 4,
+    "assist_max_speed": 1.5,
+    "chase_speed_fraction": 0.97,
+    "reach_ball_margin": 0.5,
+    "off_ball_turn_bonus": 0.15,
+    "prediction_horizon": 1.5
+  },
+  "shot": {
+    "base_sigma_deg": 7,
+    "sigma_skill_slope": 6.2,
+    "vertical_ratio": 0.7,
+    "speed_noise": 0.04,
+    "finishing_range": 18,
+    "long_shot_range": 25,
+    "power": {
+      "at1": 22,
+      "at99": 36
+    },
+    "charge_base_speed": 0.45,
+    "charge_speed_slope": 0.55,
+    "charge_seconds": 0.9,
+    "speed_multiplier_slope": 0.5,
+    "angle_free_deg": 30,
+    "angle_span_deg": 60,
+    "angle_multiplier_slope": 0.6,
+    "weak_foot_step": 0.18,
+    "pressure_slope": 0.6,
+    "pressure_far_metres": 4,
+    "pressure_near_metres": 1,
+    "power_threshold": 0.8,
+    "power_max_multiplier": 1.5,
+    "air_height": 0.15,
+    "air_multiplier": 1.3,
+    "normal_type_multiplier": 1,
+    "finesse_type_multiplier": 0.8,
+    "chip_type_multiplier": 1.1,
+    "normal_elevation_base_deg": 4,
+    "normal_elevation_charge_deg": 14,
+    "normal_spin_max_rev": 2,
+    "finesse_speed_fraction": 0.75,
+    "finesse_elevation_base_deg": 6,
+    "finesse_elevation_charge_deg": 10,
+    "finesse_spin_rev": {
+      "at1": 4,
+      "at99": 10
+    },
+    "chip_speed_fraction": 0.55,
+    "chip_elevation_base_deg": 28,
+    "chip_elevation_charge_deg": 12,
+    "chip_backspin_min_rev": 4,
+    "chip_backspin_max_rev": 6,
+    "max_target_z": 4.5,
+    "assist_range": 1.5,
+    "assist_inset": 0.6,
+    "strike_reach_margin": 0.2,
+    "strike_max_height": 0.6,
+    "wrong_foot_offset": 0.25
+  },
+  "keeper": {
+    "reaction": {
+      "at1": 0.34,
+      "at99": 0.16
+    },
+    "reaction_noise": 0.02,
+    "reaction_noise_clamp_sigma": 3,
+    "min_reaction": 0.05,
+    "dive_speed": {
+      "at1": 3,
+      "at99": 6
+    },
+    "push_off": 0.12,
+    "arm_sweep": 0.9,
+    "arm_sweep_time": 0.15,
+    "stretch": {
+      "at1": 2.2,
+      "at99": 2.9
+    },
+    "stretch_height_reference": 1.9,
+    "prediction_noise": 0.1,
+    "catch_speed": {
+      "at1": 14,
+      "at99": 26
+    },
+    "catch_zone_fraction": 0.7,
+    "parry_speed_min": 0.4,
+    "parry_speed_max": 0.6,
+    "parry_wide_max": 1.5,
+    "parry_lift": 0.15,
+    "parry_yaw_noise_deg": 8,
+    "set_distance": 1.5,
+    "set_move_speed": 4.5,
+    "home_height_fraction": 0.55,
+    "hand_radius": 0.2,
+    "recover_seconds": 1,
+    "body_follow": 0.8,
+    "position_error": {
+      "at1": 0.6,
+      "at99": 0.05
+    },
+    "still_moving_reaction_penalty": 0.05,
+    "rush_speed": {
+      "at1": 4.5,
+      "at99": 7
+    },
+    "rush_misjudge": {
+      "at1": 0.4,
+      "at99": 0.05
+    },
+    "fingertip_zone_fraction": 0.1,
+    "fingertip_speed_kept": 0.7,
+    "fingertip_max_bend_deg": 25
+  },
+  "round": {
+    "shoot_buffer": 0.25,
+    "strike_delay": 0.1,
+    "outcome_seconds": 1.5,
+    "max_seconds": 120
+  },
+  "dt": 0.008333334
+}
