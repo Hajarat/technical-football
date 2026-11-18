@@ -11,6 +11,8 @@ using FootballSim.Core;
 //   ... --dump-tuning                           prints the built-in tuning as JSON (the format of data/tuning/default.json)
 //   ... --probe dribble [--seeds 50] [--ratings 1,50,99] [--exact 1] [--only straight_jog,...]
 //                                               runs the nine dribble probes (no keeper involved) and prints their metrics
+//   ... --probe feel [--seeds 20] [--replays <dir|file>]
+//                                               speed surges, acceleration, touch cadence and heading response of dribbling
 //   ... --skill-probe [--seeds 50] [--ratings 1,50,99] [--only step_over,...]
 //                                               runs the skill-move probes (scripted right-stick traces) and prints their metrics
 //   ... --write-skill-replays <dir>             writes one replay per skill move (edge_of_box start) for game screenshots
@@ -58,7 +60,8 @@ static class Cli
         if (opts.TryGetValue("write-keeper-replays", out var keeperDir)) return KeeperReplays.WriteReplays(keeperDir, dataDir, tuning);
         if (opts.TryGetValue("probe", out var probe))
         {
-            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble)"); return 2; }
+            if (probe == "feel") return FeelProbe.Run(opts, dataDir, tuning);
+            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel)"); return 2; }
             return DribbleProbe.Run(opts, dataDir, tuning);
         }
 
