@@ -11,13 +11,13 @@ public struct PadSnapshot
     public bool ShootHeld;         // B / Circle; pressed again after the release, before the strike, a low shot (read by the core)
     public bool Finesse;           // right bumper: curved shot; with the left bumper and the left stick back, a drag-back (core)
     public bool Chip;              // left bumper: chip
-    public bool Driven;            // keyboard C, held. The pad has no driven button: its low shot is shoot tapped twice
+    public bool Driven;            // not set by any device (GOALS has no driven button: the low shot is shoot pressed twice); kept for replays
     public bool KnockOn;           // keyboard X: true from the press for a short window (see InputReader); the pad's knock-on is a right-stick gesture read by the core
     public float RightX, RightZ;   // -1..1, radial dead zone applied; stick right = +RightX, stick up = -RightZ (read by the core's gesture reader)
-    public bool Cancel;            // A / Cross or G held: a shot cancelled within the core's window becomes a fake
+    public bool Cancel;            // A / Cross, right mouse or G held: a shot cancelled within the core's window becomes a fake
     // A, X, Y and right bumper + A are GOALS' passes (ground, lofted, through, driven): not built, so during play A only
     // cancels a shot, X does nothing, and Y is read only at the report (retry).
-    public FootballSim.Core.SkillKey SkillKey; // keyboard 1-4: set for one poll per press
+    public FootballSim.Core.SkillKey SkillKey; // keyboard 1-4 (GOALS has no skill-move keys): set for one poll per press
     // One-shot presses: true only on the tick the button went down.
     public bool OverlayToggle;     // right stick click
     public bool NextSpot, PrevSpot; // D-pad right / left
@@ -194,32 +194,37 @@ public partial class InputReader : Node
         return m;
     }
 
+    /// <summary>
+    /// Keyboard and mouse, following GOALS' default PC bindings wherever they do not clash with running on WASD (GOALS itself
+    /// steers with the mouse and uses W/A/S/D as buttons): left mouse shoots, right mouse cancels, Left Ctrl sprints, Left Shift
+    /// is the chip modifier and the arrow keys are the D-pad. GOALS' W (shield) and D (curved shot) move to Q and E; A and S are
+    /// its through and lofted passes, not built. Non-gameplay keys stay off keys GOALS uses in play (its R, F, Space, Tab, H).
+    /// </summary>
     PadSnapshot PollKeyboard()
     {
-        float x = (Held(Key.Right, Key.D) ? 1f : 0f) - (Held(Key.Left, Key.A) ? 1f : 0f);
-        float z = (Held(Key.Down, Key.S) ? 1f : 0f) - (Held(Key.Up, Key.W) ? 1f : 0f);
+        float x = (Held(Key.D) ? 1f : 0f) - (Held(Key.A) ? 1f : 0f);
+        float z = (Held(Key.S) ? 1f : 0f) - (Held(Key.W) ? 1f : 0f);
         var v = new Vector2(x, z);
         if (v.LengthSquared() > 1f) v = v.Normalized();
         return new PadSnapshot
         {
             MoveX = v.X, MoveZ = v.Y,
-            Sprint = Held(Key.Shift) ? 1f : 0f,
-            Shield = Held(Key.Ctrl, Key.Alt),
-            ShootHeld = Held(Key.Space),
+            Sprint = Held(Key.Ctrl) ? 1f : 0f,
+            Shield = Held(Key.Q),
+            ShootHeld = Input.IsMouseButtonPressed(MouseButton.Left) || Held(Key.Space),
             Finesse = Held(Key.E),
-            Chip = Held(Key.Q),
-            Driven = Held(Key.C),
+            Chip = Held(Key.Shift),
             KnockOn = Pressed(Key.X, Key.X),
-            Cancel = Held(Key.G),
+            Cancel = Input.IsMouseButtonPressed(MouseButton.Right) || Held(Key.G),
             SkillKey = SkillKeyPressed(),
             OverlayToggle = Pressed(Key.O, Key.O),
-            NextSpot = Pressed(Key.Bracketright, Key.Bracketright),
-            PrevSpot = Pressed(Key.Bracketleft, Key.Bracketleft),
-            NextAttacker = Pressed(Key.Comma, Key.Comma),
-            NextKeeper = Pressed(Key.Period, Key.Period),
+            NextSpot = Pressed(Key.Right, Key.Right),
+            PrevSpot = Pressed(Key.Left, Key.Left),
+            NextAttacker = Pressed(Key.Up, Key.Up),
+            NextKeeper = Pressed(Key.Down, Key.Down),
             Confirm = Pressed(Key.Enter, Key.Enter, Key.KpEnter),
-            Retry = Pressed(Key.R, Key.R),
-            Flag = Pressed(Key.F, Key.F),
+            Retry = Pressed(Key.Backspace, Key.Backspace),
+            Flag = Pressed(Key.M, Key.M),
             Pause = Pressed(Key.P, Key.P, Key.Escape),
         };
     }

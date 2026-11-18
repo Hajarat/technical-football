@@ -10,7 +10,7 @@ namespace FootballSim.Game;
 public partial class Match
 {
     const string NoPadNotice = "No gamepad detected. macOS has to list it as a game controller: try the controller's Bluetooth, Switch or PlayStation mode. " +
-                               "Keyboard works meanwhile: arrows to move, Space to shoot, Enter to start.";
+                               "Keyboard works meanwhile: WASD to move, left mouse or Space to shoot, Enter to start.";
 
     GameData _data = null!;
     ReplayDriver? _replay;
