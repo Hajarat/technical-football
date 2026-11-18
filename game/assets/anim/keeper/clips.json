@@ -60,6 +60,7 @@
     ]
    },
    "notes": "crouched ready stance with small weight shifts",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.1515,
     "max_dir_err_deg": 0.025,
@@ -117,6 +118,7 @@
     ]
    },
    "notes": "one sidestep to his right from standing (subject stands on a raised floor)",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.1896,
     "max_dir_err_deg": 0.025,
@@ -166,6 +168,7 @@
     ]
    },
    "notes": "wide sidestep to his right into a low stance",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.1896,
     "max_dir_err_deg": 0.024,
@@ -182,6 +185,72 @@
      1.1
     ],
     "lowest_joint_at": 69
+   }
+  },
+  {
+   "name": "stance_crouchwalk_136_09",
+   "file": "stance_crouchwalk_136_09.kclip",
+   "trial": "136_09",
+   "frames": [
+    121,
+    600
+   ],
+   "set": "stance",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 240,
+   "seconds": 4.0,
+   "contacts": {
+    "left": [
+     [
+      0,
+      121
+     ],
+     [
+      177,
+      200
+     ]
+    ],
+    "right": [
+     [
+      0,
+      82
+     ],
+     [
+      114,
+      118
+     ],
+     [
+      133,
+      167
+     ],
+     [
+      214,
+      239
+     ]
+    ]
+   },
+   "notes": "walking forward crouched (spread / jockey)",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.0908,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.044,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     150,
+     155
+    ],
+    "hips_roll_deg": 7.48,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.2,
+     6.6
+    ],
+    "lowest_joint_at": 135
    }
   },
   {
@@ -231,6 +300,7 @@
     ]
    },
    "notes": "quick large steps backwards",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.1664,
     "max_dir_err_deg": 0.025,
@@ -296,6 +366,7 @@
     ]
    },
    "notes": "walking backwards crouched",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.0908,
     "max_dir_err_deg": 0.024,
@@ -353,6 +424,7 @@
     ]
    },
    "notes": "run, about 2.8 m/s",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.0752,
     "max_dir_err_deg": 0.025,
@@ -414,6 +486,7 @@
     ]
    },
    "notes": "from standing into a run",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.0504,
     "max_dir_err_deg": 0.024,
@@ -467,6 +540,7 @@
     ]
    },
    "notes": "run to a quick stop, turning",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.0504,
     "max_dir_err_deg": 0.025,
@@ -528,6 +602,7 @@
     ]
    },
    "notes": "run with a side step to his left",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.0504,
     "max_dir_err_deg": 0.024,
@@ -595,6 +670,7 @@
     ]
    },
    "notes": "catch in front of the chest (then the throw starts)",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2195,
     "max_dir_err_deg": 0.024,
@@ -662,6 +738,7 @@
     ]
    },
    "notes": "catch above the head",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2195,
     "max_dir_err_deg": 0.025,
@@ -721,6 +798,7 @@
     ]
    },
    "notes": "step forward into a catch",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2075,
     "max_dir_err_deg": 0.024,
@@ -772,6 +850,7 @@
     ]
    },
    "notes": "left hand reaches high to his left",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2035,
     "max_dir_err_deg": 0.024,
@@ -823,6 +902,7 @@
     ]
    },
    "notes": "crouch and reach low to his left",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2035,
     "max_dir_err_deg": 0.025,
@@ -874,6 +954,7 @@
     ]
    },
    "notes": "right hand reaches high to his right",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2035,
     "max_dir_err_deg": 0.024,
@@ -929,6 +1010,7 @@
     ]
    },
    "notes": "crouch, right hand reaches low in front of him (slightly to his left)",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2035,
     "max_dir_err_deg": 0.024,
@@ -992,6 +1074,7 @@
     ]
    },
    "notes": "deep lunge forward onto the knee, left arm up",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2035,
     "max_dir_err_deg": 0.024,
@@ -1046,6 +1129,7 @@
     "right": []
    },
    "notes": "deep lunge straight forward, right arm sweeping over his head",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2035,
     "max_dir_err_deg": 0.025,
@@ -1107,6 +1191,7 @@
     ]
    },
    "notes": "arms up, block",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2035,
     "max_dir_err_deg": 0.024,
@@ -1162,6 +1247,7 @@
     ]
    },
    "notes": "step and block with both arms",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2035,
     "max_dir_err_deg": 0.024,
@@ -1214,6 +1300,7 @@
     ]
    },
    "notes": "jump sideways to his left (a small hop: take-off and landing only)",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2075,
     "max_dir_err_deg": 0.024,
@@ -1277,6 +1364,7 @@
     ]
    },
    "notes": "two-foot jump forward",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.0607,
     "max_dir_err_deg": 0.024,
@@ -1338,6 +1426,7 @@
     ]
    },
    "notes": "crouch and jump",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.0635,
     "max_dir_err_deg": 0.024,
@@ -1392,6 +1481,7 @@
     "right": []
    },
    "notes": "low lunge forward, hands down to the ground",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.2035,
     "max_dir_err_deg": 0.025,
@@ -1449,6 +1539,7 @@
     ]
    },
    "notes": "jump backwards off a ledge and land",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.1448,
     "max_dir_err_deg": 1.776,
@@ -1494,6 +1585,7 @@
     "right": []
    },
    "notes": "fall on his face onto a mat, lying",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.0525,
     "max_dir_err_deg": 0.025,
@@ -1553,6 +1645,7 @@
     ]
    },
    "notes": "rug-pull fall onto his back, lying",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.0525,
     "max_dir_err_deg": 0.024,
@@ -1613,6 +1706,7 @@
     ]
    },
    "notes": "lying, rolling over",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.1803,
     "max_dir_err_deg": 0.025,
@@ -1631,6 +1725,357 @@
      14.4
     ],
     "lowest_joint_at": 158
+   }
+  },
+  {
+   "name": "smother_diveroll_127_23",
+   "file": "smother_diveroll_127_23.kclip",
+   "trial": "127_23",
+   "frames": [
+    1,
+    300
+   ],
+   "set": "smother",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "contact": 44,
+    "landing": 60
+   },
+   "fps": 60,
+   "frame_count": 150,
+   "seconds": 2.5,
+   "contacts": {
+    "left": [
+     [
+      83,
+      87
+     ],
+     [
+      99,
+      103
+     ],
+     [
+      129,
+      138
+     ]
+    ],
+    "right": [
+     [
+      0,
+      13
+     ],
+     [
+      99,
+      107
+     ],
+     [
+      122,
+      149
+     ]
+    ]
+   },
+   "notes": "run, dive forward over, roll and get up",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.0504,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.02,
+    "guarded_frames": {
+     "RightHand": 5
+    },
+    "flat_foot_frames": [
+     5,
+     3
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -7.3,
+     7.6
+    ],
+    "lowest_joint_at": 84
+   }
+  },
+  {
+   "name": "smother_roll_90_34",
+   "file": "smother_roll_90_34.kclip",
+   "trial": "90_34",
+   "frames": [
+    241,
+    570
+   ],
+   "set": "smother",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "contact": 52,
+    "landing": 84
+   },
+   "fps": 60,
+   "frame_count": 165,
+   "seconds": 2.75,
+   "contacts": {
+    "left": [
+     [
+      0,
+      30
+     ],
+     [
+      147,
+      164
+     ]
+    ],
+    "right": [
+     [
+      0,
+      30
+     ],
+     [
+      149,
+      164
+     ]
+    ]
+   },
+   "notes": "forward roll from standing, wide legs",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.0525,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.018,
+    "guarded_frames": {
+     "LeftHand": 12,
+     "RightHand": 25,
+     "LeftFoot": 76,
+     "RightFoot": 73
+    },
+    "flat_foot_frames": [
+     0,
+     0
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -40.0,
+     12.3
+    ],
+    "lowest_joint_at": 81
+   }
+  },
+  {
+   "name": "getup_front_140_01",
+   "file": "getup_front_140_01.kclip",
+   "trial": "140_01",
+   "frames": [
+    121,
+    600
+   ],
+   "set": "getup",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "up": 176
+   },
+   "fps": 60,
+   "frame_count": 240,
+   "seconds": 4.0,
+   "contacts": {
+    "left": [
+     [
+      76,
+      134
+     ],
+     [
+      138,
+      152
+     ],
+     [
+      159,
+      200
+     ],
+     [
+      211,
+      239
+     ]
+    ],
+    "right": [
+     [
+      94,
+      228
+     ]
+    ]
+   },
+   "notes": "get up from lying face down",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.1599,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.034,
+    "guarded_frames": {
+     "LeftHand": 59,
+     "RightHand": 22,
+     "LeftFoot": 240
+    },
+    "flat_foot_frames": [
+     66,
+     40
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -2.5,
+     23.5
+    ],
+    "lowest_joint_at": 39
+   }
+  },
+  {
+   "name": "getup_side_140_03",
+   "file": "getup_side_140_03.kclip",
+   "trial": "140_03",
+   "frames": [
+    91,
+    760
+   ],
+   "set": "getup",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "up": 302
+   },
+   "fps": 60,
+   "frame_count": 335,
+   "seconds": 5.583,
+   "contacts": {
+    "left": [
+     [
+      52,
+      58
+     ],
+     [
+      63,
+      89
+     ],
+     [
+      123,
+      185
+     ],
+     [
+      205,
+      252
+     ],
+     [
+      270,
+      334
+     ]
+    ],
+    "right": [
+     [
+      0,
+      68
+     ],
+     [
+      133,
+      214
+     ],
+     [
+      237,
+      275
+     ]
+    ]
+   },
+   "notes": "get up from lying on his side",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.1599,
+    "max_dir_err_deg": 0.026,
+    "lowest_joint_m": 0.045,
+    "guarded_frames": {
+     "RightHand": 13,
+     "LeftFoot": 1,
+     "RightFoot": 89
+    },
+    "flat_foot_frames": [
+     204,
+     107
+    ],
+    "hips_roll_deg": -8.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -7.2,
+     7.1
+    ],
+    "lowest_joint_at": 182
+   }
+  },
+  {
+   "name": "getup_back_140_08",
+   "file": "getup_back_140_08.kclip",
+   "trial": "140_08",
+   "frames": [
+    61,
+    660
+   ],
+   "set": "getup",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "up": 271
+   },
+   "fps": 60,
+   "frame_count": 300,
+   "seconds": 5.0,
+   "contacts": {
+    "left": [
+     [
+      104,
+      218
+     ],
+     [
+      224,
+      227
+     ],
+     [
+      235,
+      299
+     ]
+    ],
+    "right": [
+     [
+      0,
+      172
+     ],
+     [
+      188,
+      242
+     ]
+    ]
+   },
+   "notes": "get up from lying on his back",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.1599,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.047,
+    "guarded_frames": {
+     "RightHand": 25
+    },
+    "flat_foot_frames": [
+     239,
+     153
+    ],
+    "hips_roll_deg": -8.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -6.5,
+     9.2
+    ],
+    "lowest_joint_at": 59
    }
   },
   {
@@ -1686,6 +2131,7 @@
     ]
    },
    "notes": "get up from his back, rolling over",
+   "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.1515,
     "max_dir_err_deg": 0.025,

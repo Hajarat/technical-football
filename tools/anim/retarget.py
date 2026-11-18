@@ -23,7 +23,7 @@ Method (spec appendix D):
   in the files) at 120 Hz; clips are kept at 60 Hz (every other frame).
 * Foot contacts: the foot's lowest point under 4 cm and its speed under 0.35 m/s, debounced over 3 frames.
 * Checks: every mapped bone's direction (after quantisation) within 3 degrees of its source bone (the constant corrections above
-  excepted), and the foot in every contact span within 2 cm of the ground at its lowest. A clip that fails is not written; it is
+  excepted), and the foot in every contact span within 2 cm of the ground at its lowest (a clip may set contact_tolerance_cm). A clip that fails is not written; it is
   reported and the run exits non-zero.
 
 .kclip layout (little-endian), version 1:
@@ -617,6 +617,7 @@ def retarget(clip: dict, t: Target, cache: Path = CACHE) -> Result:
     c = np.stack([label_contacts(h[:, s], v[:, s]) for s in range(2)], axis=1)
 
     problems = []
+    tol = float(clip.get("contact_tolerance_cm", MAX_CONTACT_H * 100)) / 100   # per-clip override (clips.toml)
     # direction check: each mapped bone's direction against its source bone
     worst, worst_at = 0.0, ""
     for k, b in enumerate(BONES):
@@ -640,7 +641,7 @@ def retarget(clip: dict, t: Target, cache: Path = CACHE) -> Result:
     for s in range(2):
         for a, b in spans(c[:, s]):
             lo = float(h[a:b + 1, s].min())
-            if abs(lo) > MAX_CONTACT_H:
+            if abs(lo) > tol:
                 problems.append(f"{'LR'[s]} foot contact {a}-{b} is {lo * 100:.1f} cm off the ground")
 
     events = {}
@@ -724,7 +725,7 @@ def main(argv: list[str]) -> int:
                       "set": c["set"], "side": c.get("side", "none"), "kind": c.get("kind", ""), "loop": r.loop,
                       "events": r.events, "fps": FPS, "frame_count": r.stats["frames"], "seconds": r.stats["seconds"],
                       "contacts": {k: [list(s) for s in v] for k, v in cs.items()},
-                      "notes": c.get("notes", ""), "checks": {k: v for k, v in r.stats.items() if k not in ("frames", "seconds")}})
+                      "notes": c.get("notes", ""), "contact_tolerance_cm": float(c.get("contact_tolerance_cm", MAX_CONTACT_H * 100)), "checks": {k: v for k, v in r.stats.items() if k not in ("frames", "seconds")}})
         print(f"wrote {c['name']}: {r.stats['frames']} frames, scale {r.stats['scale']}, dir err {r.stats['max_dir_err_deg']} deg, "
               f"lowest joint {r.stats['lowest_joint_m']} m, contacts L{len(cs['left'])} R{len(cs['right'])}")
     if not only:

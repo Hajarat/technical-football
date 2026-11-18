@@ -8,6 +8,8 @@
 #   events  AMC frame numbers; save sets (catch, reflex_*, body_block, dive_*, back_leap, smother) need "contact"
 #   loop    true only for a clip whose end runs into its start (none yet: the matcher treats every clip as one-shot)
 #   notes   what the trial shows
+#   contact_tolerance_cm  optional: how far a contact foot may stay off the ground (default 2); recorded in clips.json so it can be
+#           tightened once milestone 2's foot locking pins the feet
 #
 # Frame ranges and events were read off each trial's motion (root height and velocity, hand and foot heights; see
 # game/assets/anim/SOURCES.md), not from a viewer:
@@ -55,6 +57,7 @@ trial = "136_09"
 frames = [121, 600]
 set = "stance"
 side = "none"
+contact_tolerance_cm = 4
 loop = false
 notes = "walking forward crouched (spread / jockey)"
 
@@ -308,6 +311,7 @@ frames = [1, 300]
 set = "smother"
 side = "none"
 events = { contact = 88, landing = 122 }
+contact_tolerance_cm = 4
 loop = false
 notes = "run, dive forward over, roll and get up"
 
@@ -318,6 +322,7 @@ frames = [241, 570]
 set = "smother"
 side = "none"
 events = { contact = 345, landing = 408 }
+contact_tolerance_cm = 4
 loop = false
 notes = "forward roll from standing, wide legs"
 
@@ -328,6 +333,7 @@ frames = [121, 600]
 set = "getup"
 side = "none"
 events = { up = 472 }
+contact_tolerance_cm = 4
 loop = false
 notes = "get up from lying face down"
 
@@ -338,6 +344,7 @@ frames = [91, 760]
 set = "getup"
 side = "none"
 events = { up = 695 }
+contact_tolerance_cm = 4
 loop = false
 notes = "get up from lying on his side"
 
@@ -348,6 +355,7 @@ frames = [61, 660]
 set = "getup"
 side = "none"
 events = { up = 603 }
+contact_tolerance_cm = 4
 loop = false
 notes = "get up from lying on his back"
 
