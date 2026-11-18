@@ -436,6 +436,43 @@ public sealed partial class SkinnedBody : Node3D
         _poseFrame = Engine.GetPhysicsFrames();
     }
 
+    /// <summary>Names of the driven bones in the order <see cref="PoseBones"/> takes their rotations (the .kclip bone order).</summary>
+    public IReadOnlyList<string> DrivenBoneNames
+    {
+        get
+        {
+            var names = new string[_driven.Length];
+            for (int k = 0; k < _driven.Length; k++) names[k] = _sk.GetBoneName(_driven[k]);
+            return names;
+        }
+    }
+
+    /// <summary>
+    /// Poses the skeleton from bone rotations, as a motion clip stores them: <paramref name="local"/> holds every driven bone's local
+    /// rotation in <see cref="DrivenBoneNames"/> order, <paramref name="hips"/> the hips bone's position in model space (metres, the
+    /// model's own 1.80 m size, ground at y = 0). The other bones keep their rest offsets. The node's transform is left alone: the
+    /// caller places and scales the body. Call once per physics tick instead of <see cref="Pose"/>; it is interpolated the same way.
+    /// </summary>
+    public void PoseBones(ReadOnlySpan<Quaternion> local, Vector3 hips)
+    {
+        if (local.Length < _driven.Length) throw new ArgumentException($"PoseBones needs {_driven.Length} rotations, got {local.Length}");
+        for (int k = 0; k < _driven.Length; k++)
+        {
+            int b = _driven[k];
+            Quaternion rot = local[k].Normalized();
+            Vector3 pos = k == 0 ? hips : _sk.GetBoneRest(b).Origin;
+            _glob[b] = k == 0 ? new Transform3D(new Basis(rot), pos) : _glob[_parent[b]] * new Transform3D(new Basis(rot), pos);
+            _posPrev[k] = _havePose ? _posCur[k] : pos; _rotPrev[k] = _havePose ? _rotCur[k] : rot;
+            _posCur[k] = pos; _rotCur[k] = rot;
+        }
+        for (int i = 0; i < 2; i++) { _footRot[i] = _glob[_foot[i]].Basis * _restBasis[_foot[i]].Transposed(); _footPos[i] = _glob[_foot[i]].Origin; }
+        _havePose = true;
+        _poseFrame = Engine.GetPhysicsFrames();
+    }
+
+    /// <summary>A driven bone's head in model space from the latest <see cref="Pose"/> or <see cref="PoseBones"/> (the physics-tick pose).</summary>
+    public Vector3 DrivenBoneOrigin(int k) => _glob[_driven[k]].Origin;
+
     /// <summary>Forget the previous tick (teleport): the next render shows the new pose with no blend.</summary>
     public void ResetInterpolation()
     {

@@ -501,3 +501,6 @@ sessions/
 
 # Orca worktrees
 .worktrees/
+
+# CMU motion capture downloads (tools/anim/cmu.py)
+tools/anim/.cache/

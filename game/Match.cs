@@ -71,9 +71,19 @@ public partial class Match : Node3D
 
         if (!StartSession()) { _quitting = true; GetTree().Quit(1); }
         else if (_args.GalleryDir != null) StartGallery();
+        else if (_args.ClipGalleryDir != null) StartClipGallery();
     }
 
     KeeperGallery? _gallery;
+    ClipGallery? _clipGallery;
+
+    /// <summary>--clip-gallery: the keeper's motion clips play on a body of their own; the match figures, ball, overlay and HUD stay out of the shots.</summary>
+    void StartClipGallery()
+    {
+        Attacker.Visible = false; Keeper.Visible = false; Ball.Visible = false; Hud.Visible = false;
+        Overlay.Enabled = false;
+        _clipGallery = new ClipGallery(this, _args.ClipGalleryDir!, _args.Video, _args.ClipOnly, World.Pitch.GoalLineX);
+    }
 
     /// <summary>--keeper-gallery: the keeper is driven from a script instead of the simulation; the attacker, overlay and ball ring stay out of the shots.</summary>
     void StartGallery()
@@ -104,6 +114,11 @@ public partial class Match : Node3D
         if (_gallery != null)
         {
             if (_gallery.Step()) { _quitting = true; GD.Print("GALLERY_DONE"); GetTree().Quit(0); }
+            return;
+        }
+        if (_clipGallery != null)
+        {
+            if (_clipGallery.Step()) { _quitting = true; GD.Print("CLIP_GALLERY_DONE"); GetTree().Quit(0); }
             return;
         }
         var pad = Pad.Poll();
