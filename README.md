@@ -210,7 +210,7 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
   chip-safe depth for the ball's distance now. Beyond that depth by more than `charge_chip_allowance` (by rushing_out;
   `charge_chip_hysteresis` more once going) he does not go: the chip is a risk he weighs, and a brave keeper takes more of it.
   Within `engage_range` of the ball he always charges. Charging, he runs at rush speed to the point on the cover line
-  `jockey_distance` short of the ball (never beyond `charge_max_out`), then jockeys there: low and spread, stepping with the
+  `jockey_distance` short of the ball (never beyond the area's front line), then jockeys there: low and spread, stepping with the
   attacker to stay on the cover line, giving ground no faster than `jockey_retreat_speed`, so an attacker who runs at him
   closes the gap. He drops the charge once the time to close exceeds `charge_drop_factor` times what he accepts (plus 0.25 s),
   for an attacker who stops or turns away, and recovers to his limits as when closing down. With the ball up to
@@ -237,14 +237,14 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
   (within his anticipation) brings him to the area's line and no further (`KeeperMode.HoldArea`); a race he cannot win sends him
   back to his spot. A smother whose ball leaves the area before he has it becomes a slide or poke at it when it is low and
   within `slide_reach`, else he abandons it on the ground. Inside the area he plays as below. `KeeperReport.Slid` records a
-  slide or poke before the first strike. Inside the area `rush_max_from_goal` (15 m) still limits his rushes, so in front of
-  goal he does not race for a ball between 15 m and the area's line at 16.5 m.
+  slide or poke before the first strike. Inside the area his rushes and charges reach out to the area's front line (its depth from the goal
+  centre), so he uses all of it.
 - **Rush and smother.** Each tick he races for the ball whenever it is off the attacker's foot (between touches, a long sprint
   touch or a loose ball): the earliest point on its predicted path he can reach (to within `smother_reach`) before it gets
   there and before the attacker's next planned touch, with a `rush_margin` (by distance, scaled by rushing_out; none for a
   ball already within a dive, so he lunges at a ball pushed past him, unless the attacker is within `contested_distance` of
   it) and a misjudgement drawn per attacker touch
-  (`rush_misjudge`), only within `rush_max_from_goal`. The longer the ball runs ahead of the attacker, the further out he wins
+  (`rush_misjudge`), only within his area's depth of the goal centre (outside it, `slide_beyond_area` past its line). The longer the ball runs ahead of the attacker, the further out he wins
   it. A race short of the margin by less than `rush_anticipation` (by rushing_out) starts him toward the ball at
   `anticipate_speed_fraction` of his rush speed; he aborts back to his spot if it turns against him. A close-control dribbler
   (a touch every step) gives him no such race. Movement targets are capped at `move_target_cap`. Within a dive he smothers the

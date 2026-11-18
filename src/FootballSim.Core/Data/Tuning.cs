@@ -636,8 +636,6 @@ public sealed class KeeperTuning
     public Curve RushMargin { get; set; } = new((2f, 0.05f), (6f, 0.15f), (12f, 0.30f));
     /// <summary>Multiplier on <see cref="RushMargin"/> by rushing_out.</summary>
     public RatingRange RushMarginRating { get; set; } = new(3.5f, 2.5f);
-    /// <summary>The keeper rushes only for a ball he can take within this distance of the goal centre, metres (GOALS 15).</summary>
-    public float RushMaxFromGoal { get; set; } = 15f;
     /// <summary>Each movement decision moves toward a point at most this far away, metres (GOALS 3.5).</summary>
     public float MoveTargetCap { get; set; } = 3.5f;
     /// <summary>Closing down never takes him (or holds him) further than this from the goal mouth, metres.</summary>
@@ -721,8 +719,6 @@ public sealed class KeeperTuning
     public float ChargeHoldMargin { get; set; } = 4f;
     /// <summary>A charge is dropped once the time to close exceeds this multiple of what he accepts (plus 0.25 s).</summary>
     public float ChargeDropFactor { get; set; } = 1.5f;
-    /// <summary>A charge never takes him further than this from the goal mouth, metres.</summary>
-    public float ChargeMaxOut { get; set; } = 14f;
     /// <summary>
     /// Charging when a shot winds up, he keeps coming to block it if, coming on until the last <see cref="ChargePlantLead"/>
     /// seconds and then braking, he would be within <see cref="ChargeBlockDistance"/> metres of the ball at the strike (he may be
@@ -767,9 +763,9 @@ public sealed class KeeperTuning
     // ---- outside the penalty area: the slide tackle and the poke ----
     /// <summary>
     /// Outside his penalty area he may not use his hands, so he plays a loose ball there with his feet: he races for it up to this
-    /// far beyond the area's front line, metres (inside the area <see cref="RushMaxFromGoal"/> still limits him).
+    /// far beyond the area's front line, metres (inside the area he rushes and charges out to the line, the area's depth).
     /// </summary>
-    public float SlideBeyondArea { get; set; } = 3f;
+    public float SlideBeyondArea { get; set; } = 5f;
     /// <summary>He goes into a slide tackle at a ball outside his area from this far away (the leading foot's full reach), metres.</summary>
     public float SlideReach { get; set; } = 2.4f;
     /// <summary>How far ahead of his feet the leading foot is when the slide starts, metres.</summary>

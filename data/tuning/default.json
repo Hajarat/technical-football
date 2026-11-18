@@ -360,7 +360,6 @@
       "at1": 3.5,
       "at99": 2.5
     },
-    "rush_max_from_goal": 15,
     "move_target_cap": 3.5,
     "hold_ground_max_out": 8.5,
     "rush_anticipation": {
@@ -417,7 +416,6 @@
     "charge_chip_hysteresis": 2,
     "charge_hold_margin": 4,
     "charge_drop_factor": 1.5,
-    "charge_max_out": 14,
     "charge_plant_lead": 0.3,
     "charge_block_distance": 4.5,
     "jockey_distance": 2,
@@ -433,7 +431,7 @@
     "smother_radius": 0.4,
     "smother_hold_speed": 9,
     "smother_max_seconds": 0.6,
-    "slide_beyond_area": 3,
+    "slide_beyond_area": 5,
     "slide_reach": 2.4,
     "slide_foot_start": 0.3,
     "slide_speed": 6,

@@ -14,6 +14,10 @@ public sealed partial class KeeperBrain
     bool _handsOff;             // his hands met a ball outside the area in this save: they are pulled away for the rest of it
     bool _roundSlid;
 
+    /// <summary>How far from the goal mouth he rushes and charges inside his area: out to its front line (its depth).</summary>
+    float RushMaxFromGoal => _pitch.PenaltyAreaDepth;
+    float ChargeMaxOut => _pitch.PenaltyAreaDepth;
+
     /// <summary>
     /// True when he may use his hands on a ball centred at <paramref name="ball"/>: any part of it is in his penalty area
     /// (<see cref="Pitch.InPenaltyArea"/>).

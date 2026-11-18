@@ -192,8 +192,8 @@ static class KeeperReplays
         return (frames, rec.Replay);
     }
 
-    /// <summary>Prints the keeper's state on every tick his action changes, and around the strike, for one scripted round.</summary>
-    public static int Trace(Tuning tuning, Scenario sc, PlayerSheet attacker, PlayerSheet keeper, ulong seed)
+    /// <summary>Prints the keeper's state on every tick his action changes, and around the strike, for one scripted round (every tick from <paramref name="from"/> to <paramref name="to"/> too).</summary>
+    public static int Trace(Tuning tuning, Scenario sc, PlayerSheet attacker, PlayerSheet keeper, ulong seed, int from = -1, int to = -1)
     {
         var ic = CultureInfo.InvariantCulture;
         var world = new World(tuning, sc, attacker, keeper, seed);
@@ -211,7 +211,7 @@ static class KeeperReplays
             bool strike = world.Events.Any(e => e.Kind == EventKind.Strike);
             if (strike) strikeTick = world.Tick;
             bool near = strikeTick >= 0 && world.Tick - strikeTick <= 60 && (world.Tick - strikeTick) % 3 == 0;
-            if (k.KeeperAction != last || strike || near || world.Events.Any(e => e.Kind is EventKind.Save or EventKind.Goal))
+            if ((world.Tick >= from && world.Tick <= to) || k.KeeperAction != last || strike || near || world.Events.Any(e => e.Kind is EventKind.Save or EventKind.Goal))
             {
                 last = k.KeeperAction;
                 var b = world.Ball.Position;
