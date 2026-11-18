@@ -146,6 +146,10 @@ public sealed class PlayerState
     internal float KnockOnUntil = -100f;
     /// <summary>Simulation seconds of the player's most recent movement step (lets possession rules that get no clock see the time).</summary>
     internal float MoveTime;
+    /// <summary>Running speed still to be shed after a sharp turn or a cut (at balance_deceleration), m/s.</summary>
+    internal float SpeedDebt;
+    /// <summary>The touch planner's steering correction last tick (world X, Z), m/s: it eases from there (zero during a skill move).</summary>
+    internal Vector2 PlannerSteer;
     internal float TurnRefHeading;
     internal float TurnRefTime;
     /// <summary>Ticks left of a stride-clock lock (0 = free running).</summary>
@@ -171,8 +175,10 @@ public sealed class PlayerState
     internal float StickRate;
     /// <summary>A knock-on was asked for; the next touch made is one.</summary>
     internal bool KnockOnRequested;
-    /// <summary>Alternates the next-meet step count for even steps-per-touch so both feet play the ball.</summary>
+    /// <summary>No longer read (the foot switch counts <see cref="TouchCadenceCount"/>); the world still clears it each round.</summary>
     internal bool TouchRhythm;
+    /// <summary>Touches pushed with an even steps_per_touch this round, for the foot switch (see foot_switch_every).</summary>
+    internal int TouchCadenceCount;
 
     // Gesture reader (see GestureReader).
     internal GestureReader.Zone GZone, GPrevZone;
@@ -237,7 +243,7 @@ public sealed class PlayerState
         Position = o.Position; Velocity = o.Velocity; Facing = o.Facing; HandPosition = o.HandPosition;
         LastTouchTime = o.LastTouchTime; TouchBoostUntil = o.TouchBoostUntil; TouchBoostFactor = o.TouchBoostFactor;
         TouchBoostFrom = o.TouchBoostFrom; KnockOnFrom = o.KnockOnFrom; KnockOnDirection = o.KnockOnDirection;
-        KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
+        KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; PlannerSteer = o.PlannerSteer; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction;

@@ -136,16 +136,19 @@ public class TouchPlannerTests
     static float Deg(float rad) => rad * 180f / MathF.PI;
     static float WrapDeg(float d) => Deg(Movement.WrapAngle(d * MathF.PI / 180f));
 
-    /// <summary>Jogs straight until a touch is made whose next contact is at most <paramref name="maxEta"/> seconds away (a short push).</summary>
-    static void RunToShortPush(World w, float maxEta)
+    /// <summary>
+    /// Jogs straight until a touch is made whose next contact is at most <paramref name="maxEta"/> seconds away (a two-step jog
+    /// push); returns that contact's distance in time.
+    /// </summary>
+    static float RunToPush(World w, float maxEta)
     {
         for (int i = 0; i < 240; i++) Step(w, Jog);
         for (int i = 0; i < 600; i++)
         {
             Step(w, Jog);
-            if (ContactsOf(w).Any() && w.Attacker.Action is { Pending: true } n && n.ContactEta(w.Tick, w.Tuning.Dt) <= maxEta) return;
+            if (ContactsOf(w).Any() && w.Attacker.Action is { Pending: true } n && n.ContactEta(w.Tick, w.Tuning.Dt) is var eta && eta <= maxEta) return eta;
         }
-        throw new Exception("no short push");
+        throw new Exception("no push");
     }
 
     [Fact]
@@ -155,7 +158,7 @@ public class TouchPlannerTests
         for (ulong seed = 1; seed <= 10; seed++)
         {
             var w = Lab(seed, Exact());
-            if (shortPush) RunToShortPush(w, 0.35f);
+            if (shortPush) RunToPush(w, 0.7f);
             else RunUntilPhase(w, Jog, ActionPhase.Planned);
             for (int i = 0; i < 120; i++)
             {
@@ -175,7 +178,7 @@ public class TouchPlannerTests
         for (ulong seed = 1; seed <= 10; seed++)
         {
             var w = Lab(seed, Exact());
-            RunToShortPush(w, 0.35f);
+            float planned = RunToPush(w, 0.7f);
             float pushAt = w.Attacker.LastTouchTime;
             var before = w.Ball.Velocity;
             BallAction? turn = null;
@@ -186,8 +189,9 @@ public class TouchPlannerTests
                 foreach (var c in ContactsOf(w)) { turn = c; at = w.Attacker.LastTouchTime; }
             }
             Assert.NotNull(turn);
-            // Within 0.35 s of the push, but never sooner than early_min_interval after it.
-            Assert.InRange(at - pushAt, w.Tuning.Touch.EarlyMinInterval - 1e-4f, 0.35f + 1e-4f);
+            // No later than the push's planned meet (sooner when the ball is in reach at an earlier swing; after a two-step jog push
+            // it rarely is), and never sooner than early_min_interval after it.
+            Assert.InRange(at - pushAt, w.Tuning.Touch.EarlyMinInterval - 1e-4f, planned + 1e-4f);
             Assert.True(turn!.Kind is ActionKind.Turn or ActionKind.Cut, $"seed {seed}: {turn.Kind}");
             // The ball now heads toward the stick side.
             float change = WrapDeg(Deg(MathF.Atan2(turn.BallOutVelocity.Z, turn.BallOutVelocity.X)) - Deg(MathF.Atan2(before.Z, before.X)));
@@ -252,6 +256,89 @@ public class TouchPlannerTests
             Assert.True(p.InPossession);
         }
         _out.WriteLine($"{bent} ticks with the legs bent toward the ball");
+    }
+
+    // ---- smoothness (GOALS-parity pass) ----
+
+    [Fact]
+    public void TheSteeringNeverStepsTheVelocity()
+    {
+        foreach (var it in new[] { Jog, Sprint, Toward(45f), Toward(-45f, 1f) })
+        for (ulong seed = 1; seed <= 10; seed++)
+        {
+            var w = Lab(seed);
+            var p = w.Attacker;
+            Vector3 prev = p.SteerVelocity;
+            float max = 0f;
+            for (int i = 0; i < 6 * 120; i++)
+            {
+                // straight for 3 s, then the stick turned, as a keyboard does
+                Step(w, i < 360 ? Jog with { Sprint = it.Sprint } : it);
+                if (p.SkillMove == null) max = MathF.Max(max, (p.SteerVelocity - prev).Length());
+                prev = p.SteerVelocity;
+            }
+            Assert.True(max <= w.Tuning.Touch.SteerAccel * w.Tuning.Dt * 1.001f + 1e-5f, $"seed {seed}: steering changed by {max:F3} m/s in a tick");
+            Assert.True(p.InPossession);
+        }
+    }
+
+    [Fact]
+    public void AStraightJogKeepsAnEvenCadenceWithBothFeet()
+    {
+        for (ulong seed = 1; seed <= 10; seed++)
+        {
+            var w = Lab(seed, Exact());
+            for (int i = 0; i < 360; i++) Step(w, Jog);
+            var ticks = new List<int>();
+            int left = 0, right = 0;
+            for (int i = 0; i < 8 * 120; i++)
+            {
+                Step(w, Jog);
+                foreach (var c in ContactsOf(w)) { ticks.Add(w.Tick); if (c.Foot == Foot.Left) left++; else right++; }
+            }
+            Assert.True(left > 0 && right > 0, $"seed {seed}: feet {left}/{right}");
+            var gaps = ticks.Zip(ticks.Skip(1), (a, b) => (b - a) * w.Tuning.Dt).ToList();
+            // two steps (about 0.62 s) or, on every fourth touch, three (about 0.93 s): never a one-step push between them
+            Assert.True(gaps.Min() > 0.5f, $"seed {seed}: shortest gap {gaps.Min():F2} s");
+            Assert.True(gaps.Max() < 1.05f, $"seed {seed}: longest gap {gaps.Max():F2} s");
+        }
+    }
+
+    [Fact]
+    public void AStickPushedNoFurtherThanTheWalkLimitDribblesWithATouchEveryStep()
+    {
+        var w = Lab(1);
+        var walk = new TickIntent { MoveX = 0.5f };
+        for (int i = 0; i < 360; i++) Step(w, walk);
+        var kinds = new List<ActionKind>();
+        for (int i = 0; i < 4 * 120; i++) { Step(w, walk); kinds.AddRange(ContactsOf(w).Select(c => c.Kind)); }
+        Assert.True(kinds.Count >= 10, $"{kinds.Count} touches in 4 s");
+        // close-control touches (a foot-to-foot touch on every step sends the ball across by more than the execution angle: a turn)
+        Assert.All(kinds, k => Assert.True(k is ActionKind.Close or ActionKind.Turn, k.ToString()));
+        Assert.True(w.Attacker.InPossession);
+    }
+
+    [Fact]
+    public void ACutShedsItsSpeedOverSeveralTicks()
+    {
+        for (ulong seed = 1; seed <= 10; seed++)
+        {
+            var w = Lab(seed);
+            var p = w.Attacker;
+            for (int i = 0; i < 360; i++) Step(w, Jog);
+            float prev = p.RunSpeed, worst = 0f;
+            bool cut = false;
+            for (int i = 0; i < 240; i++)
+            {
+                Step(w, Toward(90f));
+                cut |= ContactsOf(w).Any(c => c.Kind == ActionKind.Cut);
+                worst = MathF.Max(worst, prev - p.RunSpeed);
+                prev = p.RunSpeed;
+            }
+            Assert.True(cut, $"seed {seed}: no cut");
+            // easing toward the target plus balance_deceleration, never the balance percentage at once
+            Assert.True(worst <= (w.Tuning.Movement.BalanceDeceleration + 6f) * w.Tuning.Dt, $"seed {seed}: run speed fell {worst:F2} m/s in a tick");
+        }
     }
 
     [Fact]

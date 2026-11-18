@@ -18,11 +18,23 @@ public static class TouchModel
         return k.ReachBase + k.ReachPerHeight * (s.HeightM - k.HeightMin) / k.HeightSpan;
     }
 
-    /// <summary>The touch mode for an intent: close control wins, then sprint, else jog.</summary>
+    /// <summary>
+    /// The touch mode for an intent: close control wins, then sprint; a stick pushed no further than walk_max_input asks for
+    /// walking touches, which are played like close control (a touch on every step, short pushes; GOALS' walking touch below
+    /// MaximumInputSizeForWalkTouch 0.7); else jog.
+    /// </summary>
     public static TouchMode ModeFor(in TickIntent intent, Tuning t) =>
         intent.CloseControl ? TouchMode.CloseControl
         : intent.Sprint >= t.Touch.SprintThreshold ? TouchMode.Sprint
+        : Walking(intent, t) ? TouchMode.CloseControl
         : TouchMode.Jog;
+
+    /// <summary>True when the stick is pushed (past the stick threshold) but no further than walk_max_input.</summary>
+    public static bool Walking(in TickIntent intent, Tuning t)
+    {
+        float mag = intent.Move.Length();
+        return mag >= t.Touch.StickThreshold && mag <= t.Touch.WalkMaxInput;
+    }
 
     /// <summary>Steps of the stride clock between two dribble touches in a mode (sprint by dribbling), at least 1.</summary>
     public static int StepsPerTouch(PlayerSheet s, TouchMode mode, Tuning t)

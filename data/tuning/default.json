@@ -37,27 +37,29 @@
   },
   "movement": {
     "sprint_speed": {
-      "at1": 6,
-      "at99": 9.8
+      "at1": 6.8,
+      "at99": 8.5
     },
     "time_constant": {
       "at1": 1.1,
       "at99": 0.45
     },
-    "jog_fraction": 0.6,
+    "jog_speed": 5.3,
     "sprint_fraction": 1,
     "close_control_fraction": 0.35,
     "turn_rate_deg": {
-      "at1": 180,
-      "at99": 420
+      "at1": 193,
+      "at99": 450
     },
     "turn_speed_penalty": 0.5,
+    "turn_ease": 0.05,
     "sharp_turn_deg": 60,
     "sharp_turn_window": 0.2,
     "balance_loss": {
       "at1": 0.5,
       "at99": 0.15
     },
+    "balance_deceleration": 12,
     "weight_reference": 75,
     "weight_range": 25,
     "weight_turn_slope": 0.15,
@@ -80,7 +82,9 @@
     },
     "sprint_threshold": 0.5,
     "stick_threshold": 0.1,
-    "pre_windup": 0.3,
+    "walk_max_input": 0.7,
+    "pre_windup": 0.4,
+    "min_plan_ahead": 0.3,
     "windup": 0.12,
     "recovery": 0.15,
     "contact_zone_ahead": {
@@ -105,6 +109,9 @@
     },
     "approach_max_stick_deg": 45,
     "steer_max": 0.6,
+    "steer_accel": 6,
+    "reach_tolerance": 0.08,
+    "foot_switch_every": 4,
     "steps_per_touch": {
       "close": 1,
       "jog": 2,

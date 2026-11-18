@@ -143,21 +143,32 @@ public sealed class ArenaTuning
 /// <summary>Attacker speed, acceleration, turning, balance and weight.</summary>
 public sealed class MovementTuning
 {
-    public RatingRange SprintSpeed { get; set; } = new(6.0f, 9.8f);
+    /// <summary>Top speed, m/s (sprint_speed rating): GOALS' MaxSprintSpeed 6.8-8.5 m/s.</summary>
+    public RatingRange SprintSpeed { get; set; } = new(6.8f, 8.5f);
     /// <summary>Speed time constant, seconds (acceleration rating).</summary>
     public RatingRange TimeConstant { get; set; } = new(1.10f, 0.45f);
-    /// <summary>Fraction of top speed when not sprinting ("jog is 60%").</summary>
-    public float JogFraction { get; set; } = 0.6f;
+    /// <summary>Jogging speed without the ball, the same for every player (GOALS' MaxJogSpeed 5.3 m/s), m/s.</summary>
+    public float JogSpeed { get; set; } = 5.3f;
     public float SprintFraction { get; set; } = 1.0f;
     public float CloseControlFraction { get; set; } = 0.35f;
-    /// <summary>Turn rate, degrees per second (agility rating).</summary>
-    public RatingRange TurnRateDeg { get; set; } = new(180f, 420f);
+    /// <summary>Turn rate with the ball, degrees per second (agility rating): GOALS' dribbling RotationRate 450 at the top.</summary>
+    public RatingRange TurnRateDeg { get; set; } = new(193f, 450f);
     /// <summary>Turn rate is scaled by (1 - this * speed fraction).</summary>
     public float TurnSpeedPenalty { get; set; } = 0.5f;
+    /// <summary>
+    /// Heading changes smaller than turn rate times this ease in exponentially with this time constant, seconds (0: every
+    /// change at the full turn rate). A turn's own angle multiplier on its acceleration, as GOALS' turn acceleration has.
+    /// </summary>
+    public float TurnEase { get; set; } = 0.05f;
     public float SharpTurnDeg { get; set; } = 60f;
     public float SharpTurnWindow { get; set; } = 0.2f;
     /// <summary>Fraction of speed lost on a sharp turn (balance rating).</summary>
     public RatingRange BalanceLoss { get; set; } = new(0.50f, 0.15f);
+    /// <summary>
+    /// The rate a sharp turn's or a cut's speed loss is shed at, m/s^2: a planted cut, harder than GOALS' passive Deceleration
+    /// (5 m/s^2, no input); its active deceleration curves are not known.
+    /// </summary>
+    public float BalanceDeceleration { get; set; } = 12f;
     public float WeightReference { get; set; } = 75f;
     public float WeightRange { get; set; } = 25f;
     public float WeightTurnSlope { get; set; } = 0.15f;
@@ -232,9 +243,19 @@ public sealed class TouchTuning
     public float SprintThreshold { get; set; } = 0.5f;
     /// <summary>Stick deflection below this asks for no dribble touch; in possession it asks for a stop.</summary>
     public float StickThreshold { get; set; } = 0.1f;
+    /// <summary>A stick pushed no further than this (and no sprint) dribbles with walking touches, played as close control.</summary>
+    public float WalkMaxInput { get; set; } = 0.7f;
 
-    /// <summary>A touch is planned at least this long before its contact, seconds (the pre-windup).</summary>
-    public float PreWindup { get; set; } = 0.30f;
+    /// <summary>
+    /// The pre-windup, seconds (GOALS' PreWindupTime 0.4): the last stretch before a contact in which the player is steered so
+    /// the ball arrives in the contact zone (the windup's included).
+    /// </summary>
+    public float PreWindup { get; set; } = 0.40f;
+    /// <summary>
+    /// A touch is planned at least this long before its contact, seconds (shorter than the pre-windup, so a touch on every
+    /// step of close control still fits; such a touch is in its pre-windup from the moment it is planned).
+    /// </summary>
+    public float MinPlanAhead { get; set; } = 0.30f;
     /// <summary>The windup (the foot drawn back) starts this long before contact, seconds.</summary>
     public float Windup { get; set; } = 0.12f;
     /// <summary>The recovery (follow-through) ends this long after contact, seconds.</summary>
@@ -277,6 +298,15 @@ public sealed class TouchTuning
     public float ApproachMaxStickDeg { get; set; } = 45f;
     /// <summary>Largest correction added to the player's velocity while steering the ball into the contact zone, m/s.</summary>
     public float SteerMax { get; set; } = 0.6f;
+    /// <summary>
+    /// The steering brings the ball only to within this of the swinging foot's contact point, metres; the foot reaches the
+    /// rest (at most the contact zone radius), so small misses never move the body.
+    /// </summary>
+    public float ReachTolerance { get; set; } = 0.08f;
+    /// <summary>The steering correction changes by at most this, m/s^2 (0: at once), so it never steps the velocity.</summary>
+    public float SteerAccel { get; set; } = 6f;
+    /// <summary>With an even steps_per_touch, every this-many-th touch takes one step more so the other foot plays on.</summary>
+    public int FootSwitchEvery { get; set; } = 4;
     /// <summary>Steps of the stride clock between dribble touches, per mode.</summary>
     public StepsPerTouchTuning StepsPerTouch { get; set; } = new();
     /// <summary>Launch angle of touches, degrees.</summary>
