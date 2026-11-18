@@ -95,7 +95,13 @@ public class SkillMoveTests
     static TickIntent StepOver(int i, TickIntent it, int side) => Right(it, i < 6 ? new Vector2(1f, 0f) : i < 12 ? new Vector2(0f, side) : Vector2.Zero);
     static TickIntent Feint(int i, TickIntent it, int side) => Right(it, i < 5 ? new Vector2(0f, side) : Vector2.Zero);
     static TickIntent Roll(int i, TickIntent it, int side) => Right(it, i < 16 ? new Vector2(0f, side) : Vector2.Zero);
-    static TickIntent Drag(int i, TickIntent it) => Right(it, i < 8 ? new Vector2(-1f, 0f) : Vector2.Zero);
+    /// <summary>The drag-back: the left stick back with both shoulder buttons held (the right stick back alone does nothing).</summary>
+    static TickIntent Drag(int i, TickIntent it)
+    {
+        if (i >= 8) return it;
+        it.MoveX = -1f; it.MoveZ = 0f; it.Finesse = true; it.Chip = true;
+        return it;
+    }
 
     public static IEnumerable<object[]> Moves()
     {
@@ -547,6 +553,76 @@ public class SkillMoveTests
             Assert.False(p.Action is { Kind: ActionKind.KnockOn } || p.PreviousAction is { Kind: ActionKind.KnockOn });
         }
         Assert.True(p.InPossession);
+    }
+
+    public static IEnumerable<object[]> IgnoredTraces() => new[]
+    {
+        new object[] { "rs_back" }, new object[] { "elastico" }, new object[] { "heel_to_heel" }, new object[] { "spin" },
+    };
+
+    /// <summary>
+    /// Right-stick traces that make no move: back alone, and the recognised but not built elastico, heel-to-heel and spin
+    /// (right side), for a player running along +X.
+    /// </summary>
+    static Vector2 IgnoredStick(string trace, int i) => trace switch
+    {
+        "rs_back" => i < 10 ? new Vector2(-1f, 0f) : Vector2.Zero,
+        "elastico" => i < 6 ? new Vector2(-1f, 0f) : i < 12 ? new Vector2(0f, 1f) : Vector2.Zero,
+        "heel_to_heel" => i < 5 ? new Vector2(1f, 0f) : i < 9 ? Vector2.Zero : i < 14 ? new Vector2(-1f, 0f) : Vector2.Zero,
+        _ => i < 5 ? new Vector2(1f, 0f) : i < 9 ? Vector2.Zero : i < 13 ? new Vector2(0f, 1f) : Vector2.Zero,
+    };
+
+    [Theory]
+    [MemberData(nameof(IgnoredTraces))]
+    public void TheRightStickBackAloneAndTheMovesNotBuiltChangeNothing(string trace)
+    {
+        foreach (var e in new[] { Entry.Standing, Entry.Jog, Entry.Sprint })
+        {
+            // The same run with and without the trace: no move, no knock-on, the same player and ball on every tick.
+            var a = Field(2);
+            var b = Field(2);
+            var buf = new TickIntent[a.PlayerCount];
+            for (int tick = 1; tick <= 600; tick++)
+            {
+                var it = Run(e, tick);
+                buf[0] = it;
+                a.Step(buf);
+                int i = tick - 241;
+                if (i >= 0) { var r = IgnoredStick(trace, i); it.RightX = r.X; it.RightZ = r.Y; }
+                buf[0] = it;
+                b.Step(buf);
+                Assert.DoesNotContain(b.Events, x => x.Kind == EventKind.SkillMove);
+                Assert.Equal(a.Attacker.Position, b.Attacker.Position);
+                Assert.Equal(a.Ball.Position, b.Ball.Position);
+            }
+            var expect = trace switch { "rs_back" => Gesture.None, "elastico" => Gesture.Elastico, "heel_to_heel" => Gesture.HeelToHeel, _ => Gesture.SpinAndGo };
+            Assert.Equal(expect, b.Attacker.LastGesture);
+        }
+    }
+
+    [Fact]
+    public void ASprintingForwardFlickIsAKnockOnUnlessAHeelToHeelFollows()
+    {
+        bool Knocked(Func<int, Vector2> stick)
+        {
+            var w = Field(1);
+            var p = w.Attacker;
+            var buf = new TickIntent[w.PlayerCount];
+            bool knocked = false;
+            for (int tick = 1; tick <= 480; tick++)
+            {
+                var it = Run(Entry.Sprint, tick);
+                int i = tick - 241;
+                if (i >= 0) { var r = stick(i); it.RightX = r.X; it.RightZ = r.Y; }
+                buf[0] = it;
+                w.Step(buf);
+                knocked |= p.Action is { Kind: ActionKind.KnockOn } || p.PreviousAction is { Kind: ActionKind.KnockOn };
+            }
+            return knocked;
+        }
+        Assert.True(Knocked(i => i < 6 ? new Vector2(1f, 0f) : Vector2.Zero));
+        Assert.False(Knocked(i => IgnoredStick("heel_to_heel", i)));
+        Assert.False(Knocked(i => IgnoredStick("spin", i)));
     }
 
     [Fact]

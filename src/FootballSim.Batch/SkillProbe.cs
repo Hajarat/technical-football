@@ -24,9 +24,10 @@ static class SkillProbe
     sealed record Move(string Name, Gesture Expect, int Side, string[] Entries, Func<int, int, Script> Trace, Vector2 Exit);
 
     /// <summary>
-    /// One tick of a trace: the right stick, the left stick until the move ends (null: the entry run), shoot and cancel.
+    /// One tick of a trace: the right stick, the left stick until the move ends (null: the entry run), shoot, cancel and both
+    /// shoulder buttons (finesse and chip).
     /// </summary>
-    readonly record struct Script(Vector2 Right, Vector2? Left, bool Shoot, bool Cancel);
+    readonly record struct Script(Vector2 Right, Vector2? Left, bool Shoot, bool Cancel, bool Shoulders = false);
 
     static readonly string[] AllEntries = { "standing", "jog", "sprint" };
 
@@ -42,10 +43,15 @@ static class SkillProbe
     static Script StepOver(int i, int side) => new(i < 6 ? Ahead : i < 12 ? new Vector2(0f, side) : Vector2.Zero, null, false, false);
     static Script Feint(int i, int side) => new(i < 6 ? new Vector2(0f, side) : Vector2.Zero, null, false, false);
     static Script Roll(int i, int side) => new(i < 20 ? new Vector2(0f, side) : Vector2.Zero, null, false, false);
-    static Script DragBack(int i, int side) => new(i < 8 ? new Vector2(-1f, 0f) : Vector2.Zero, null, false, false);
+    // The drag-back is the left stick back with both shoulder buttons held (the right stick back alone does nothing).
+    static Script DragBack(int i, int side) => i < 8 ? new(Vector2.Zero, new Vector2(-1f, 0f), false, false, true) : new(Vector2.Zero, null, false, false);
     static Script Knock(int i, int side) => new(i < 8 ? Ahead : Vector2.Zero, null, false, false);
     static Script FakeStop(int i, int side) => new(Vector2.Zero, Vector2.Zero, i < 15, i is >= 6 and < 10);
     static Script FakeCut(int i, int side) => new(Vector2.Zero, i < 1 ? null : Rot(Ahead, side * 60f), i < 15, i is >= 6 and < 10);
+    // Recognised but not built (no move is made): elastico, heel-to-heel, spin.
+    static Script Elastico(int i, int side) => new(i < 6 ? new Vector2(-1f, 0f) : i < 12 ? new Vector2(0f, side) : Vector2.Zero, null, false, false);
+    static Script HeelToHeel(int i, int side) => new(i < 5 ? Ahead : i is >= 9 and < 14 ? new Vector2(-1f, 0f) : Vector2.Zero, null, false, false);
+    static Script Spin(int i, int side) => new(i < 5 ? Ahead : i is >= 9 and < 13 ? new Vector2(0f, side) : Vector2.Zero, null, false, false);
 
     // Exits: away from the sold side at 45 degrees (step-over, feint), a right turn after a drag-back, the cut (fake cut),
     // straight on otherwise.
@@ -62,6 +68,12 @@ static class SkillProbe
         new("fake_stop", Gesture.FakeStop, 0, AllEntries, FakeStop, Ahead),
         new("fake_cut", Gesture.FakeCut, 1, AllEntries, FakeCut, Rot(Ahead, 60f)),
         new("fake_cut", Gesture.FakeCut, -1, AllEntries, FakeCut, Rot(Ahead, -60f)),
+        // Not built: recognised_pct should be 100 and made_pct 0.
+        new("elastico", Gesture.Elastico, 1, AllEntries, Elastico, Ahead),
+        new("elastico", Gesture.Elastico, -1, AllEntries, Elastico, Ahead),
+        new("heel_to_heel", Gesture.HeelToHeel, 0, AllEntries, HeelToHeel, Ahead),
+        new("spin", Gesture.SpinAndGo, 1, AllEntries, Spin, Ahead),
+        new("spin", Gesture.SpinAndGo, -1, AllEntries, Spin, Ahead),
     };
 
     const int TraceTicks = 20;
@@ -196,7 +208,7 @@ static class SkillProbe
             else if (!baseline && i >= 0)
             {
                 var s = move.Trace(Math.Min(i, TraceTicks - 1), move.Side);
-                if (i < TraceTicks) { it.RightX = s.Right.X; it.RightZ = s.Right.Y; it.ShootHeld = s.Shoot; it.Cancel = s.Cancel; }
+                if (i < TraceTicks) { it.RightX = s.Right.X; it.RightZ = s.Right.Y; it.ShootHeld = s.Shoot; it.Cancel = s.Cancel; it.Finesse = it.Chip = s.Shoulders; }
                 if (s.Left is Vector2 l) { it.MoveX = l.X; it.MoveZ = l.Y; }
             }
             buf[0] = it;
@@ -207,7 +219,8 @@ static class SkillProbe
                 if (e.Kind == EventKind.PossessionGained) gained = true;
                 if (e.Kind == EventKind.PossessionLost && gained && lostAt < 0) lostAt = w.Tick;
                 if (baseline || end >= 0 || w.Tick <= g0) continue;
-                if (e.Kind == EventKind.SkillMove && e.Skill is ActionKind k && move.Expect != Gesture.KnockOn && k == SkillMoves.KindOf(move.Expect))
+                if (e.Kind == EventKind.SkillMove && e.Skill is ActionKind k && move.Expect != Gesture.KnockOn && !GestureReader.NotBuilt(move.Expect)
+                    && k == SkillMoves.KindOf(move.Expect))
                 {
                     act = p.SkillMove;
                     end = act?.EndTick ?? w.Tick;
@@ -303,7 +316,7 @@ static class SkillProbe
                     var r = Rot(s.Right, turn);
                     it.RightX = r.X; it.RightZ = r.Y;
                     if (s.Left is Vector2 l) { var lw = Rot(l, turn); it.MoveX = lw.X; it.MoveZ = lw.Y; }
-                    it.ShootHeld = s.Shoot; it.Cancel = s.Cancel;
+                    it.ShootHeld = s.Shoot; it.Cancel = s.Cancel; it.Finesse = it.Chip = s.Shoulders;
                 }
                 else if (tick > runEnd && tick <= runEnd + shootTicks) it.ShootHeld = true;
                 buf[0] = it;

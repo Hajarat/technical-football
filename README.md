@@ -13,7 +13,7 @@ World coordinates are metres: X toward the attacked goal (goal line 52.5), Y up,
 | Batch run, 10 000 scripted rounds | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario penalty --n 10000 --seed 1` |
 | Save a scripted round as a replay | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario breakaway --seed 6 --save-replay game/tests/smoke_replay.json` |
 | Re-run a replay in the batch tool | `dotnet run -c Release --project src/FootballSim.Batch -- --replay game/tests/smoke_replay.json` |
-| Skill-move probe (scripted right-stick gestures per move, side, entry pace and skill_moves 1/50/99) | `dotnet run -c Release --project src/FootballSim.Batch -- --skill-probe` |
+| Skill-move probe (scripted gestures per move, side, entry pace and skill_moves 1/50/99; the not-built elastico, heel-to-heel and spin rows should read recognised 100, made 0) | `dotnet run -c Release --project src/FootballSim.Batch -- --skill-probe` |
 | Write one replay per skill move (edge_of_box start) for screenshots | `dotnet run -c Release --project src/FootballSim.Batch -- --write-skill-replays out/skill-replays` |
 | Write one replay per visible keeper action (shuffle, rush, planted then reacting, each dive kind, tip over the bar, smother, parry then grounded then getting up) for screenshots; prints each file with the tick range of its action | `dotnet run -c Release --project src/FootballSim.Batch -- --write-keeper-replays out/keeper-replays` |
 | Print the keeper's state tick by tick for one scripted round | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario tight_angle --trace-keeper 1` |
@@ -46,14 +46,29 @@ A fresh checkout needs `godot-mono --headless --path game --import` once.
 
 ## Gamepad controls
 
+The pad follows GOALS' Standard preset (Xbox names). Inputs for moves not built yet are recognised and ignored, so they never
+set off a different move.
+
 | Control | Action |
 | --- | --- |
 | Left stick | Run (stick right = toward the goal) and aim |
 | Right trigger | Sprint |
-| Left trigger (past half) | Close control |
-| B / Circle (hold, release) | Shoot: power builds while held (full in 0.3 s) |
-| Right bumper / left bumper / X / Square | Finesse / chip / driven shot (hold while shooting; driven + finesse is a low finesse) |
-| Right stick flick (past 0.7) | Knock-on: a heavy touch ahead to sprint onto, caught about 1.3-1.8 s later (one per flick) |
+| Left trigger (past half) | Shield (close control) |
+| B / Circle (hold, release) | Power shot: power builds while held (full in 0.3 s) |
+| Right bumper + B | Curved (finesse) shot |
+| Left bumper + B | Chip |
+| B (hold for power, release), then B again before the strike | Low (driven) shot; right bumper + B, B is a low curved shot; left bumper + B, B (GOALS' low chip, not built) is a chip |
+| B, then A / Cross within 0.1 s | Fake shot: left stick at rest a fake stop, pushed a fake cut that way |
+| Right stick: forward, then straight on to a side | Step-over to that side |
+| Right stick: a side flicked from rest and released | Body feint to that side |
+| Right stick: a side held 0.1 s | Ball roll to that side |
+| Right stick: forward flick while sprinting | Knock-on: a heavy touch ahead to sprint onto |
+| Left stick back with left and right bumpers held | Drag-back |
+| Right stick: back, then straight on to a side | Elastico: recognised, not built (nothing happens) |
+| Right stick: forward flick, rest, back | Heel-to-heel: recognised, not built |
+| Right stick: forward flick, rest, a side | Spin: recognised, not built |
+| Right stick back alone | Nothing (the start of an elastico) |
+| A, X, Y, right bumper + A | GOALS' passes (ground, lofted, through, driven): nothing during play |
 | A / Cross | Start the round; at the report, next round (new seed) |
 | Y / Triangle | At the report, retry with the same seed |
 | D-pad left / right | Previous / next start spot |
@@ -63,10 +78,27 @@ A fresh checkout needs `godot-mono --headless --path game --import` once.
 | Menu / Options / Start | Pause |
 | Keyboard `B` | Swap face buttons (A with B, X with Y) for the active pad. On by default for Nintendo / Switch / Pro Controller pads; the choice is saved per pad name |
 
+Skill-move directions are taken against the running direction (the facing when standing), and every side move works to
+either side. The right stick counts from half deflection; the timings are in the `skill` section of
+`data/tuning/default.json`:
+
+- Step-over: the side within 0.25 s of forward, within 30 degrees of square, without passing the stick through rest
+  (forward, rest, side is a spin).
+- Body feint: from rest, a side held at least a tick and back at rest within 0.1 s. Ball roll: a side held 0.1 s.
+- Knock-on: forward past 0.85 deflection while sprinting; it fires 0.15 s after the flick unless the stick goes to a side or
+  back first, and a flick released to rest waits until a spin or heel-to-heel can no longer follow (0.125 s after the release).
+- Heel-to-heel and spin: from rest a forward flick of at most 0.125 s, rest, then back (heel-to-heel) or a side (spin), within
+  0.125 s of the release (`combo_step_window`). Elastico: back, then a side as for the step-over.
+- Low shot: hold B for the power wanted, release, and press B again any time after the release and before the strike (the
+  contact comes no sooner than 0.45 s after the first press and 0.12 s after the release). The charge is the first press's,
+  so a low shot can have full power; bumpers held on either press count. There is no minimum gap between the release and
+  the second press.
+
 ## Shooting
 
 Five shot types share one model; the modifiers held at any point during the press pick the type at the release: chip if chip
-was held, else driven + finesse is a low finesse, then driven, finesse, and power with none.
+was held, else driven + finesse is a low finesse, then driven, finesse, and power with none. Shoot pressed again after the release and
+before the strike (the gamepad's low shot) counts as driven held.
 
 | Type | Flight | Foot |
 | --- | --- | --- |
@@ -149,10 +181,13 @@ Works alongside a gamepad (the larger stick value wins) and when none is detecte
 | --- | --- |
 | Arrow keys or WASD | Run and aim (up = toward the far touchline, right = toward the goal) |
 | Left Shift | Sprint |
-| Left Ctrl or Alt | Close control |
-| Space (hold, release) | Shoot |
+| Left Ctrl or Alt | Shield (close control) |
+| Space (hold, release) | Shoot (Space tapped twice is a low shot, as on the pad) |
 | E / Q / C | Finesse / chip / driven (hold while shooting; C + E is a low finesse) |
 | X | Knock-on |
+| 1 / 2 / 3 / 4 | Step-over / body feint / ball roll / drag-back (side from the arrow keys, right by default) |
+| G | Cancel: pressed within 0.1 s of Space, a fake shot |
+| Arrow key pointing back against the run + E + Q | Drag-back, as the pad's left stick back with both bumpers |
 | Enter | Start the round; at the report, next round |
 | R | At the report, retry with the same seed |
 | `[` / `]` | Previous / next start spot |
