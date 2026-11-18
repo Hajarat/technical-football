@@ -66,13 +66,13 @@ public sealed class PadBind
     {
         (PadKind.PlayStation, JoyButton.LeftShoulder) => "L1", (PadKind.PlayStation, JoyButton.RightShoulder) => "R1",
         (PadKind.PlayStation, JoyButton.Back) => "Share", (PadKind.PlayStation, JoyButton.Start) => "Options",
-        (PadKind.PlayStation, JoyButton.LeftStick) => "L3", (PadKind.PlayStation, JoyButton.RightStick) => "R3",
+        (PadKind.PlayStation, JoyButton.RightStick) => "R3",
         (PadKind.Nintendo, JoyButton.LeftShoulder) => "L", (PadKind.Nintendo, JoyButton.RightShoulder) => "R",
         (PadKind.Nintendo, JoyButton.Back) => "-", (PadKind.Nintendo, JoyButton.Start) => "+",
-        (PadKind.Nintendo, JoyButton.LeftStick) => "LS click", (PadKind.Nintendo, JoyButton.RightStick) => "RS click",
+        (PadKind.Nintendo, JoyButton.RightStick) => "RS click",
         (_, JoyButton.LeftShoulder) => "LB", (_, JoyButton.RightShoulder) => "RB",
         (_, JoyButton.Back) => "View", (_, JoyButton.Start) => "Menu",
-        (_, JoyButton.LeftStick) => "LS click", (_, JoyButton.RightStick) => "RS click",
+        (_, JoyButton.RightStick) => "RS click",
         (_, JoyButton.DpadUp) => "D-pad ↑", (_, JoyButton.DpadDown) => "D-pad ↓",
         (_, JoyButton.DpadLeft) => "D-pad ←", (_, JoyButton.DpadRight) => "D-pad →",
         _ => b.ToString(),
@@ -132,11 +132,9 @@ public static class Bindings
         public static readonly PadBind NextSpot = new("pad_next", JoyButton.DpadRight), PrevSpot = new("pad_prev", JoyButton.DpadLeft);
         public static readonly PadBind NextAttacker = new("pad_next_attacker", JoyButton.DpadUp), NextKeeper = new("pad_next_keeper", JoyButton.DpadDown);
         public static readonly PadBind Flag = new("pad_flag", JoyButton.Back), Pause = new("pad_pause", JoyButton.Start);
-        /// <summary>Left stick click: no gameplay action (GOALS' R, "left stick click action", is not built here).</summary>
-        public static readonly PadBind Controls = new("pad_controls", JoyButton.LeftStick);
         public static readonly PadBind[] All =
         {
-            Shoot, Confirm, Retry, Finesse, Chip, Overlay, NextSpot, PrevSpot, NextAttacker, NextKeeper, Flag, Pause, Controls,
+            Shoot, Confirm, Retry, Finesse, Chip, Overlay, NextSpot, PrevSpot, NextAttacker, NextKeeper, Flag, Pause,
         };
     }
 
@@ -193,7 +191,7 @@ public static class Bindings
                 new("Flag last round", Flag.Label, B(Pad.Flag)),
                 new("Debug overlay", Overlay.Label, B(Pad.Overlay)),
                 new("Swap face buttons", SwapFace.Label, $"keyboard {SwapFace.Label}"),
-                new("This panel", Controls.Label, B(Pad.Controls)),
+                new("This panel", Controls.Label, $"{B(Pad.Pause)} (shown while paused)"),
             }),
         };
     }

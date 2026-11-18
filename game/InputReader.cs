@@ -26,7 +26,7 @@ public struct PadSnapshot
     public bool Retry;             // Y / Triangle
     public bool Flag;              // View / Share / Back
     public bool Pause;             // Menu / Options / Start
-    public bool ControlsToggle;    // keyboard H / left stick click: show or hide the controls panel
+    public bool ControlsToggle;    // keyboard H: show or hide the controls panel
 
     /// <summary>The shield button under the core's name for it (<see cref="FootballSim.Core.TickIntent.CloseControl"/>).</summary>
     public readonly bool CloseControl => Shield;
@@ -295,7 +295,6 @@ public partial class InputReader : Node
             Retry = Input.IsActionJustPressed(Bindings.Pad.Retry.Action),
             Flag = Input.IsActionJustPressed(Bindings.Pad.Flag.Action),
             Pause = Input.IsActionJustPressed(Bindings.Pad.Pause.Action),
-            ControlsToggle = Input.IsActionJustPressed(Bindings.Pad.Controls.Action),
         };
     }
 

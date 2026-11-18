@@ -246,8 +246,8 @@ public partial class Match
             kind = _args.ControlsPanel switch { "playstation" => PadKind.PlayStation, "nintendo" => PadKind.Nintendo, _ => PadKind.Xbox };
             padName = ""; swapped = false;
         }
-        Hud.SetControlsHint(device == InputDevice.Gamepad ? $"{Bindings.Pad.Controls.Label(kind)}: controls" : $"{Bindings.Controls.Label}: controls");
-        bool show = forced || _paused || _controlsOn;
+        Hud.SetControlsHint(device == InputDevice.Gamepad ? $"{Bindings.Pad.Pause.Label(kind)}: controls" : $"{Bindings.Controls.Label}: controls");
+        bool show = (forced && !_args.ControlsHintOnly) || _paused || _controlsOn;
         if (show) Hud.Controls.Open(device, kind, padName, swapped);
         else Hud.Controls.Close();
     }
