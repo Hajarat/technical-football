@@ -18,6 +18,10 @@ public sealed class PlayerState
     public PlayerSheet Sheet { get; }
     /// <summary>For keepers: what the keeper is doing. Outfield players stay at Set.</summary>
     public KeeperAction KeeperAction { get; internal set; }
+    /// <summary>For keepers: the save motion while Diving (None otherwise).</summary>
+    public KeeperDive KeeperDive { get; internal set; }
+    /// <summary>For keepers: seconds since <see cref="KeeperAction"/> last changed.</summary>
+    public float KeeperActionTime { get; internal set; }
     /// <summary>For keepers: where the hands are this tick, so a view can lean the body. For outfield players, the feet position.</summary>
     public Vector3 HandPosition { get; internal set; }
 

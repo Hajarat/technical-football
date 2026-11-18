@@ -67,6 +67,17 @@ public partial class Match : Node3D
                      $"screen={DisplayServer.WindowGetCurrentScreen()} screen_size={DisplayServer.ScreenGetSize()} scale={DisplayServer.ScreenGetScale()} screens={DisplayServer.GetScreenCount()}");
 
         if (!StartSession()) { _quitting = true; GetTree().Quit(1); }
+        else if (_args.GalleryDir != null) StartGallery();
+    }
+
+    KeeperGallery? _gallery;
+
+    /// <summary>--keeper-gallery: the keeper is driven from a script instead of the simulation; the attacker, overlay and ball ring stay out of the shots.</summary>
+    void StartGallery()
+    {
+        Attacker.Visible = false;
+        Overlay.Enabled = false;
+        _gallery = new KeeperGallery(this, _args.GalleryDir!, World.Pitch.GoalLineX);
     }
 
     string _figureWarning = "";
@@ -87,6 +98,11 @@ public partial class Match : Node3D
     {
         if (_quitting) return;
         _tick++;
+        if (_gallery != null)
+        {
+            if (_gallery.Step()) { _quitting = true; GD.Print("GALLERY_DONE"); GetTree().Quit(0); }
+            return;
+        }
         var pad = Pad.Poll();
         Tick(pad);
         Present();
@@ -116,6 +132,7 @@ public partial class Match : Node3D
             {
                 if (moment == "skill") SkillShots();
                 else if (moment == "shot") ShotShots();
+                else if (moment == "keeper") KeeperShots();
                 else if (MomentReached(moment)) _shots.Request(moment);
             }
         }
@@ -125,6 +142,20 @@ public partial class Match : Node3D
     }
 
     bool _skillSeen;
+
+    FootballSim.Core.KeeperAction? _keeperSeen;
+    int _keeperBurstLeft, _keeperBurstNext, _keeperShotN;
+
+    /// <summary>--shot-on keeper: a burst of five frames (every 8 ticks) whenever the keeper's action changes, named keeper000_Action[_Dive]_tNNNN.</summary>
+    void KeeperShots()
+    {
+        var k = World.Keeper;
+        if (_keeperSeen != k.KeeperAction) { _keeperSeen = k.KeeperAction; _keeperBurstLeft = 5; _keeperBurstNext = _tick; }
+        if (_keeperBurstLeft <= 0 || _tick < _keeperBurstNext) return;
+        string dive = k.KeeperDive == FootballSim.Core.KeeperDive.None ? "" : "_" + k.KeeperDive;
+        _shots!.Request($"keeper{_keeperShotN++:D3}_{k.KeeperAction}{dive}_t{_tick:D4}");
+        _keeperBurstLeft--; _keeperBurstNext = _tick + 8;
+    }
 
     /// <summary>--shot-on skill: six frames evenly across the move (skill0..skill5) and one just after it ends (skill6).</summary>
     void SkillShots()

@@ -254,13 +254,19 @@ public class ArenaTests
     }
 
     [Fact]
-    public void KeeperClaimsASlowLooseBallNearHimPlaceholder()
+    public void KeeperSmothersASlowLooseBallNearHim()
     {
         var w = TestData.Live("edge_of_box");
         var k = w.Keeper.Position;
         w.Ball.Position = new Vector3(k.X - 1f, R, k.Z);
         w.Ball.Velocity = new Vector3(-1f, 0f, 0f);
-        w.Step(new TickIntent[w.PlayerCount]);
+        bool smother = false;
+        for (int i = 0; i < 120 && w.State == RoundState.Live; i++)
+        {
+            w.Step(new TickIntent[w.PlayerCount]);
+            smother |= w.Keeper.KeeperAction == KeeperAction.Smother;
+        }
+        Assert.True(smother, "he goes down on it");
         Assert.Equal(RoundState.Outcome, w.State);
         Assert.Equal(Outcome.Held, w.Outcome);
         Assert.Equal(w.Keeper, w.BallController);

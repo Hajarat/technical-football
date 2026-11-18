@@ -13,7 +13,7 @@ public class KeeperTests
         var ball = new Ball(T.Ball) { Position = new Vector3(P.GoalLineX - 11f, T.Ball.Radius, 0) };
         var keeper = new PlayerState(1, 0, PlayerRole.Keeper, sheet)
         {
-            Position = Keeper.SetSpot(ball.Position, P, T, onLine),
+            Position = onLine ? ClampOnPitch(Keeper.LineSpot(ball.Position, P, T)) : Keeper.ArcTarget(ball.Position, P, T, sheet),
             Facing = MathF.PI,
         };
         return (new KeeperBrain(keeper, P, T, onLine), keeper, ball);
@@ -39,11 +39,11 @@ public class KeeperTests
     }
 
     [Fact]
-    public void ReactionMeanRunsFromPointThreeFourToPointOneSix()
+    public void ReactionMeanRunsFromPointThreeFourToPointOneFourFive()
     {
         var s = TestData.Sheet(50);
         s.Reflexes = 1; Assert.Equal(0.34f, Keeper.ReactionMean(s, T), 3);
-        s.Reflexes = 99; Assert.Equal(0.16f, Keeper.ReactionMean(s, T), 3);
+        s.Reflexes = 99; Assert.Equal(0.145f, Keeper.ReactionMean(s, T), 3);
     }
 
     [Fact]
@@ -85,16 +85,11 @@ public class KeeperTests
         s.Handling = 99; Assert.Equal(26f, Keeper.CatchSpeed(s, T), 3);
     }
 
-    [Fact]
-    public void SetSpotIsOnTheLineFromBallToGoalCentre()
+    static Vector3 ClampOnPitch(Vector3 v)
     {
-        var ball = new Vector3(P.GoalLineX - 12f, 0.11f, 14f);
-        var spot = Keeper.SetSpot(ball, P, T, onLine: false);
-        Assert.Equal(P.GoalLineX - 1.5f, spot.X, 3);
-        Assert.Equal(14f * 1.5f / 12f, spot.Z, 3);
-        var pen = Keeper.SetSpot(new Vector3(P.GoalLineX - 11f, 0.11f, 0f), P, T, onLine: true);
-        Assert.Equal(P.GoalLineX, pen.X, 3);
-        Assert.Equal(0f, pen.Z, 3);
+        var vel = Vector3.Zero;
+        P.ClampPlayer(ref v, ref vel);
+        return v;
     }
 
     [Fact]
@@ -114,13 +109,13 @@ public class KeeperTests
     }
 
     [Fact]
-    public void FastBallIsParriedAtFortyToSixtyPercentOfItsSpeed()
+    public void FastBallIsParriedInADiveAtFortyToSixtyPercentOfItsSpeed()
     {
         var s = TestData.Sheet(50); s.Handling = 1;
         var (brain, keeper, ball) = Rig(s);
         for (ulong i = 0; i < 40; i++)
         {
-            brain.OnStrike(new SimRng(i));
+            brain.BeginDiveForTest(new Vector3(keeper.Position.X - 0.3f, 1.0f, 0.3f), 0.3f);
             ball.Position = new Vector3(keeper.Position.X - 0.3f, 1.0f, 0.3f);
             ball.Velocity = new Vector3(30f, 0, 0);
             bool held = brain.Contact(ball, ball.Position, new SimRng(i), out _);
@@ -153,7 +148,7 @@ public class KeeperTests
             double sum = 0;
             for (ulong i = 0; i < 100; i++)
             {
-                brain.OnStrike(new SimRng(i));
+                brain.BeginDiveForTest(new Vector3(keeper.Position.X - 0.3f, 1.0f, 0.5f), 0.3f);
                 ball.Position = new Vector3(keeper.Position.X - 0.3f, 1.0f, 0.5f);
                 ball.Velocity = new Vector3(33f, 0, 0);
                 brain.Contact(ball, ball.Position, new SimRng(i + 1000), out _);

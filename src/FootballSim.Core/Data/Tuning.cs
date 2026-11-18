@@ -406,7 +406,11 @@ public sealed class ShotTuning
     public float StunChargeSeconds { get; set; } = 0.35f;
     public float StunSpeedFraction { get; set; } = 0.4f;
 
-    public float SpeedMultiplierSlope { get; set; } = 0.5f;
+    /// <summary>
+    /// Spread multiplier at full running speed is 1 + this (linear in speed / top speed). Calibrated in Phase D so a finishing-78
+    /// striker at full sprint puts 10-15 m shots on target about 60-75% of the time.
+    /// </summary>
+    public float SpeedMultiplierSlope { get; set; } = 3.0f;
     public float AngleFreeDeg { get; set; } = 30f;
     public float AngleSpanDeg { get; set; } = 60f;
     public float AngleMultiplierSlope { get; set; } = 0.6f;
@@ -469,7 +473,7 @@ public sealed class ShotTuning
 /// <summary>Keeper model constants.</summary>
 public sealed class KeeperTuning
 {
-    public RatingRange Reaction { get; set; } = new(0.34f, 0.16f);
+    public RatingRange Reaction { get; set; } = new(0.34f, 0.145f);
     public float ReactionNoise { get; set; } = 0.02f;
     /// <summary>Reaction noise is clamped to this many standard deviations, so the reaction time has hard bounds.</summary>
     public float ReactionNoiseClampSigma { get; set; } = 3f;
@@ -489,24 +493,179 @@ public sealed class KeeperTuning
     public float ParryWideMax { get; set; } = 1.5f;
     public float ParryLift { get; set; } = 0.15f;
     public float ParryYawNoiseDeg { get; set; } = 8f;
-    /// <summary>Standing distance in front of the goal line along the ball-to-goal line, metres (basic keeper).</summary>
-    public float SetDistance { get; set; } = 1.5f;
-    public float SetMoveSpeed { get; set; } = 4.5f;
     /// <summary>Height of the keeper's reach centre as a fraction of his height.</summary>
     public float HomeHeightFraction { get; set; } = 0.55f;
     public float HandRadius { get; set; } = 0.20f;
-    /// <summary>Seconds after a parry before the keeper is set again.</summary>
-    public float RecoverSeconds { get; set; } = 1.0f;
-    /// <summary>Fraction of the keeper's body that follows the hands sideways in a dive (view only).</summary>
+    /// <summary>Set (still at the strike), the keeper holds his hands this far out to each side of his body's centre, metres...</summary>
+    public float HandSpan { get; set; } = 0.5f;
+    /// <summary>...at this fraction of his height (about the waist). His reach grows from the span, not from zero.</summary>
+    public float HandSpanHeightFraction { get; set; } = 0.5f;
+    /// <summary>Fraction of the keeper's body that follows the hands sideways in a dive.</summary>
     public float BodyFollow { get; set; } = 0.8f;
-    // Parsed and held for later slices, not used yet.
+    /// <summary>The body the ball can hit while he plays a shot: a capsule of this radius, metres...</summary>
+    public float BodyRadius { get; set; } = 0.22f;
+    /// <summary>...upright from this height (shins)...</summary>
+    public float BodyLow { get; set; } = 0.15f;
+    /// <summary>...to this fraction of his height (shoulders); in a dive it runs from the hip height toward the hands.</summary>
+    public float BodyTopFraction { get; set; } = 0.82f;
+    public float HipHeight { get; set; } = 0.95f;
+    /// <summary>Planted closer than this to the ball at the strike, the keeper is spread (makes himself big), metres...</summary>
+    public float SpreadRange { get; set; } = 6f;
+    /// <summary>...fully spread from this close, metres.</summary>
+    public float SpreadFull { get; set; } = 3f;
+    /// <summary>Spread, his body is a capsule across the shot this far either side of his centre, metres...</summary>
+    public float SpreadHalfWidth { get; set; } = 0.45f;
+    /// <summary>...at this height, metres...</summary>
+    public float SpreadHeight { get; set; } = 0.6f;
+    /// <summary>...with this radius, metres.</summary>
+    public float SpreadRadius { get; set; } = 0.4f;
+    /// <summary>A ball that hits the body slower than this is held; faster it is blocked, m/s.</summary>
+    public float BodyHoldSpeed { get; set; } = 8f;
+
+    // ---- hold arc ----
+    /// <summary>The arc's base distance out from the goal mouth (the reference geometry), metres (GOALS 0.70).</summary>
+    public float ArcRadius { get; set; } = 0.70f;
+    /// <summary>The keeper never stands closer than this to his goal line on the arc, metres (GOALS 0.60).</summary>
+    public float ArcMinFromLine { get; set; } = 0.60f;
+    /// <summary>Extra distance out beyond <see cref="ArcRadius"/>, metres, by the ball's distance from the goal mouth (more as it comes closer).</summary>
+    public Curve ArcDepth { get; set; } = new((6f, 0.9f), (12f, 0.8f), (20f, 0.6f), (30f, 0.4f));
+    /// <summary>Further extra distance out, metres, by the ball's bearing from the goal's centre line in degrees (closing down a tight angle).</summary>
+    public Curve ArcDepthBearing { get; set; } = new((40f, 0f), (55f, 0.9f), (70f, 2.1f), (85f, 2.7f));
+    /// <summary>Multiplier on <see cref="ArcDepth"/> by positioning: a poorly positioned keeper stays deeper.</summary>
+    public RatingRange ArcDepthPositioning { get; set; } = new(0.5f, 1.0f);
+    /// <summary>The arc spot is worked out for the ball this far ahead along its ground velocity, seconds.</summary>
+    public float ArcLookahead { get; set; } = 0.2f;
+    /// <summary>Fraction of the half-angle between the posts the cover line turns toward the near post, by the ball's bearing in degrees.</summary>
+    public Curve NearPostBias { get; set; } = new((0f, 0f), (85f, 0f));
+    /// <summary>Holding his line, the keeper stays this far inside each post, metres.</summary>
+    public float LineInset { get; set; } = 0.5f;
+    /// <summary>A new arc spot is taken only when the ideal spot has moved this far from the last one, metres.</summary>
+    public float RepositionThreshold { get; set; } = 0.25f;
+    /// <summary>A reposition longer than this is jogged instead of side-stepped, metres.</summary>
+    public float JogThreshold { get; set; } = 1.5f;
+    /// <summary>Side-step speed by positioning, m/s.</summary>
+    public RatingRange ShuffleSpeed { get; set; } = new(2.0f, 3.5f);
+    /// <summary>Jogging speed by positioning, m/s.</summary>
+    public RatingRange JogSpeed { get; set; } = new(3.5f, 5.5f);
+    /// <summary>Acceleration on foot by rushing_out, m/s².</summary>
+    public RatingRange MoveAccel { get; set; } = new(5.0f, 8.0f);
+    /// <summary>How fast the keeper turns to face the ball, degrees per second.</summary>
+    public float TurnRateDeg { get; set; } = 540f;
+    /// <summary>Deceleration when the keeper plants for a shot (and while he reacts with momentum), m/s².</summary>
+    public float PlantDecel { get; set; } = 12f;
+    /// <summary>Below this speed the keeper counts as still (set), m/s.</summary>
+    public float StillSpeed { get; set; } = 0.3f;
+    /// <summary>The keeper plants when a shot winds up with the ball within this distance of the goal centre, metres...</summary>
+    public float SetRange { get; set; } = 25f;
+    /// <summary>...once its strike is at most this far off, seconds (the shooter's last stride).</summary>
+    public float PlantLead { get; set; } = 0.30f;
+    /// <summary>Standard deviation of the error in each new arc spot, metres, by positioning (drawn per reposition).</summary>
     public RatingRange PositionError { get; set; } = new(0.60f, 0.05f);
+    /// <summary>Added to the reaction when the keeper is still moving at the strike, seconds.</summary>
     public float StillMovingReactionPenalty { get; set; } = 0.05f;
+
+    // ---- rush ----
+    /// <summary>Top speed running out, m/s, by rushing_out.</summary>
     public RatingRange RushSpeed { get; set; } = new(4.5f, 7.0f);
+    /// <summary>Standard deviation of the keeper's error judging a rush race, seconds, by rushing_out (drawn per attacker touch).</summary>
     public RatingRange RushMisjudge { get; set; } = new(0.40f, 0.05f);
-    public float FingertipZoneFraction { get; set; } = 0.10f;
+    /// <summary>Time margin wanted over the attacker's next touch before rushing, seconds, by distance to the ball in metres.</summary>
+    public Curve RushMargin { get; set; } = new((2f, 0.05f), (6f, 0.15f), (12f, 0.30f));
+    /// <summary>Multiplier on <see cref="RushMargin"/> by rushing_out.</summary>
+    public RatingRange RushMarginRating { get; set; } = new(3.5f, 2.5f);
+    /// <summary>The keeper rushes only for a ball he can take within this distance of the goal centre, metres (GOALS 15).</summary>
+    public float RushMaxFromGoal { get; set; } = 15f;
+    /// <summary>Each movement decision moves toward a point at most this far away, metres (GOALS 3.5).</summary>
+    public float MoveTargetCap { get; set; } = 3.5f;
+    /// <summary>One-on-one: once the attacker is on the ball within this shooting range of the goal mouth, metres...</summary>
+    public float HoldGroundRange { get; set; } = 20f;
+    /// <summary>...running at goal at least this fast, m/s, a keeper further out than his arc spot stops backpedalling...</summary>
+    public float HoldGroundMinSpeed { get; set; } = 3f;
+    /// <summary>...if he is no further than this from the goal mouth, metres (further out, he still recovers to his arc).</summary>
+    public float HoldGroundMaxOut { get; set; } = 8.5f;
+    /// <summary>Seconds to commit to a rush from standing (added to the race time when not already rushing).</summary>
+    public float RushStartDelay { get; set; } = 0.15f;
+    /// <summary>The keeper rushes or claims only a ball whose centre is below this height, metres.</summary>
+    public float ClaimMaxHeight { get; set; } = 0.6f;
+    /// <summary>With no touch planned, the keeper reckons the attacker plays the ball once within this distance of it, metres...</summary>
+    public float AttackerReach { get; set; } = 0.5f;
+    /// <summary>...after running to it at his top speed, plus this, seconds.</summary>
+    public float AttackerReactTime { get; set; } = 0.1f;
+    /// <summary>A ball predicted further ahead than this is not raced for, seconds.</summary>
+    public float RushLookahead { get; set; } = 2.0f;
+
+    // ---- smother and claim ----
+    /// <summary>The keeper dives at a loose ball (smother) from this far away, metres.</summary>
+    public float SmotherReach { get; set; } = 1.5f;
+    /// <summary>Speed of the hands going to the ball in a smother, m/s.</summary>
+    public float SmotherSpeed { get; set; } = 5.0f;
+    /// <summary>Radius of the body spread on the ball in a smother (instead of the hand radius), metres.</summary>
+    public float SmotherRadius { get; set; } = 0.40f;
+    /// <summary>A ball met in a smother slower than this is held, m/s; faster it is blocked.</summary>
+    public float SmotherHoldSpeed { get; set; } = 9f;
+    /// <summary>A smother that has not met the ball after this long ends on the ground, seconds.</summary>
+    public float SmotherMaxSeconds { get; set; } = 0.6f;
+
+    // ---- saves ----
+    /// <summary>The dive wedge: a target is at least this far from the feet, metres (GOALS 0.05).</summary>
+    public float WedgeMinRadius { get; set; } = 0.05f;
+    /// <summary>The dive wedge: a target is at most this far from the feet, metres (GOALS 3.5).</summary>
+    public float WedgeMaxRadius { get; set; } = 3.5f;
+    /// <summary>The dive wedge: a target is within this angle of the keeper's sideways axis, degrees (GOALS 75).</summary>
+    public float WedgeHalfAngleDeg { get; set; } = 75f;
+    /// <summary>The dive wedge: above this height a target must be in the keeper's save plane, metres (GOALS 0.8).</summary>
+    public float WedgeLowCap { get; set; } = 0.8f;
+    /// <summary>Above the low cap, how far in front of the keeper a target may be, metres.</summary>
+    public float WedgeHighForward { get; set; } = 0.5f;
+    /// <summary>Largest random delay to a dive's start for an easy save, seconds (GOALS 0.001).</summary>
+    public float SaveTimeJitterEasy { get; set; } = 0.001f;
+    /// <summary>Largest random delay to a dive's start for a save at full stretch, seconds (GOALS 0.025).</summary>
+    public float SaveTimeJitterHard { get; set; } = 0.025f;
+    /// <summary>Catch speed in a dive as a fraction of the standing catch speed.</summary>
+    public float DivingCatchFactor { get; set; } = 0.9f;
+    /// <summary>Catch speed for a ball blocked at the feet as a fraction of the standing catch speed.</summary>
+    public float FeetCatchFactor { get; set; } = 0.5f;
+    /// <summary>A target this close to the body (horizontally) is a standing save, metres.</summary>
+    public float CatchBodyRadius { get; set; } = 0.45f;
+    /// <summary>A target below <see cref="FeetBlockHeight"/> and this close is blocked at the feet, metres.</summary>
+    public float FeetBlockRadius { get; set; } = 0.7f;
+    public float FeetBlockHeight { get; set; } = 0.40f;
+    /// <summary>Dive kind by target height: low below this, metres.</summary>
+    public float LowDiveHeight { get; set; } = 0.6f;
+    /// <summary>Dive kind by target height: high from this, metres.</summary>
+    public float HighDiveHeight { get; set; } = 1.5f;
+    /// <summary>A ball met above this fraction of the goal height...</summary>
+    public float TipOverBarHeight { get; set; } = 0.7f;
+    /// <summary>...with the keeper within this distance of his line is tipped over the bar, metres (GOALS 0.7 and 3 m).</summary>
+    public float TipOverBarDistance { get; set; } = 3.0f;
+    /// <summary>Slowest a parried ball leaves the keeper, m/s (GOALS 3.0).</summary>
+    public float MinParrySpeed { get; set; } = 3.0f;
+    /// <summary>Slowest a blocked ball leaves the keeper, m/s (GOALS 4.5).</summary>
+    public float BlockSpeed { get; set; } = 4.5f;
+    /// <summary>A blocked ball keeps between these fractions of its speed.</summary>
+    public float BlockSpeedMin { get; set; } = 0.25f;
+    public float BlockSpeedMax { get; set; } = 0.45f;
+    /// <summary>Largest angle of a block off straight back out, degrees.</summary>
+    public float BlockAngleDeg { get; set; } = 45f;
+    /// <summary>Contact in the outer fraction of the keeper's stretch is a fingertip save.</summary>
+    public float FingertipZoneFraction { get; set; } = 0.05f;
+    /// <summary>A fingertip save keeps this fraction of the ball's speed...</summary>
     public float FingertipSpeedKept { get; set; } = 0.70f;
-    public float FingertipMaxBendDeg { get; set; } = 25f;
+    /// <summary>...and bends its path away from the goal by up to this much, degrees.</summary>
+    public float FingertipMaxBendDeg { get; set; } = 40f;
+    /// <summary>A dive that has not met the ball ends (the keeper lands) this long after its reach stops growing, seconds...</summary>
+    public float DiveLandSeconds { get; set; } = 0.15f;
+    /// <summary>...and no later than this after the reaction, seconds. A standing save lasts at least <see cref="StandSaveSeconds"/>.</summary>
+    public float DiveMaxSeconds { get; set; } = 0.8f;
+    public float StandSaveSeconds { get; set; } = 0.35f;
+
+    // ---- recovery ----
+    /// <summary>Lying after a dive, smother or block before getting up, seconds.</summary>
+    public float GroundedSeconds { get; set; } = 0.3f;
+    /// <summary>Getting up takes this long, seconds (GOALS 1.0).</summary>
+    public float GetUpSeconds { get; set; } = 1.0f;
+    /// <summary>A new save can start this long into getting up, seconds (GOALS 0.2).</summary>
+    public float GetUpSaveAfter { get; set; } = 0.2f;
 }
 
 /// <summary>

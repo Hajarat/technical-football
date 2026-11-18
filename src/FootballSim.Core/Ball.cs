@@ -5,6 +5,9 @@ namespace FootballSim.Core;
 /// <summary>A sphere the ball's path is tested against (the keeper's hands, grown by the ball radius).</summary>
 public readonly record struct SweepSphere(Vector3 Center, float Radius);
 
+/// <summary>A capsule the ball's path is tested against (the keeper's body, grown by the ball radius): segment A to B, radius.</summary>
+public readonly record struct SweepCapsule(Vector3 A, Vector3 B, float Radius);
+
 /// <summary>What happened to the ball during one step.</summary>
 public struct BallStepResult
 {
@@ -16,6 +19,8 @@ public struct BallStepResult
     /// <summary>The path met the supplied sphere; the ball stopped at <see cref="SpherePoint"/> and the caller decides what happens.</summary>
     public bool SphereHit;
     public Vector3 SpherePoint;
+    /// <summary>With <see cref="SphereHit"/>: the obstacle met was the body capsule, not the hands (sphere or hands capsule).</summary>
+    public bool BodyHit;
     /// <summary>The ball met an arena board or the ceiling; the first contact of the tick is reported.</summary>
     public bool BoardHit;
     /// <summary>Ball centre at the first board contact.</summary>
@@ -154,7 +159,7 @@ public sealed class Ball
     /// extra obstacle such as the keeper's hands: the ball stops at the first contact and reports it.
     /// Movement is swept along the whole path, so a 36 m/s ball (0.3 m per tick) cannot skip a post or a hand.
     /// </summary>
-    internal BallStepResult Step(float dt, Pitch? pitch, SweepSphere? sphere)
+    internal BallStepResult Step(float dt, Pitch? pitch, SweepSphere? sphere, SweepCapsule? body = null, SweepCapsule? hands = null)
     {
         var result = new BallStepResult();
         ApplyForces(dt);
@@ -174,11 +179,15 @@ public sealed class Ball
             bool board = pitch != null && pitch.SweepBoards(pos, pos + d, _t.Radius, out bh);
             if (board) tBoard = bh.T;
             if (sphere is { } sp && SweepPointSphere(pos, d, sp, out float ts)) tSphere = ts;
+            bool bodyFirst = false;
+            if (hands is { } hc && SweepPointCapsule(pos, d, hc, out float th) && th < tSphere) tSphere = th;
+            if (body is { } bc && SweepPointCapsule(pos, d, bc, out float tc) && tc < tSphere) { tSphere = tc; bodyFirst = true; }
 
             if (tSphere < float.MaxValue && tSphere <= tFrame && tSphere <= tBoard)
             {
                 pos += d * tSphere;
                 result.SphereHit = true;
+                result.BodyHit = bodyFirst;
                 result.SpherePoint = pos;
                 Position = pos;
                 Velocity = vel;
@@ -269,6 +278,43 @@ public sealed class Ball
         vtOut += impulse;
         // Angular: delta omega = (r_contact x J) / I, with I = k m r^2 and J per unit mass.
         return spin + Vector3.Cross(contact, impulse) / (k * _t.Radius * _t.Radius);
+    }
+
+    /// <summary>
+    /// The first fraction t in [0, 1] of the move p0 to p0 + d at which the point comes within the capsule's radius of its segment.
+    /// The distance from a point moving on a line to a segment is convex in t, so the closest approach is found by a ternary
+    /// search and the entry by bisection before it.
+    /// </summary>
+    static bool SweepPointCapsule(Vector3 p0, Vector3 d, SweepCapsule c, out float t)
+    {
+        t = 0f;
+        float r2 = c.Radius * c.Radius;
+        float D2(float u) => SegmentDistance2(p0 + d * u, c.A, c.B);
+        if (D2(0f) <= r2) return true;
+        float lo = 0f, hi = 1f;
+        for (int i = 0; i < 24; i++)
+        {
+            float m1 = lo + (hi - lo) / 3f, m2 = hi - (hi - lo) / 3f;
+            if (D2(m1) < D2(m2)) hi = m2; else lo = m1;
+        }
+        float tm = 0.5f * (lo + hi);
+        if (D2(tm) > r2) return false;
+        lo = 0f; hi = tm;
+        for (int i = 0; i < 24; i++)
+        {
+            float mid = 0.5f * (lo + hi);
+            if (D2(mid) > r2) lo = mid; else hi = mid;
+        }
+        t = hi;
+        return true;
+    }
+
+    static float SegmentDistance2(Vector3 p, Vector3 a, Vector3 b)
+    {
+        Vector3 ab = b - a;
+        float l2 = Vector3.Dot(ab, ab);
+        float u = l2 > 1e-9f ? Math.Clamp(Vector3.Dot(p - a, ab) / l2, 0f, 1f) : 0f;
+        return Vector3.DistanceSquared(p, a + ab * u);
     }
 
     static bool SweepPointSphere(Vector3 p0, Vector3 d, SweepSphere s, out float t)

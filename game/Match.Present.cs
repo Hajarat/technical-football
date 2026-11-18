@@ -68,9 +68,8 @@ public partial class Match
         f.Velocity = G(k.Velocity);
         f.HeightM = k.Sheet.HeightM;
         f.Dt = World.Tuning.Dt;
-        f.Diving = k.KeeperAction == KeeperAction.Diving;
+        f.KeeperAction = k.KeeperAction; f.KeeperDive = k.KeeperDive; f.KeeperActionTime = k.KeeperActionTime;
         f.Holding = k.KeeperAction == KeeperAction.Holding;
-        f.Reacting = k.KeeperAction == KeeperAction.Reacting;
         f.HandPosition = G(k.HandPosition);
         f.BallPos = G(World.Ball.Position);
         FillGait(ref f, k);

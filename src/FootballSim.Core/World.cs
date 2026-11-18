@@ -16,6 +16,7 @@ public sealed class World
     readonly PlayerSheet _keeperSheet;
     readonly float _dt;
     SimRng _rng;
+    SimRng _keeperRng;         // the keeper's own stream, so his decisions never shift the attacker's draws
     KeeperBrain _brain = null!;
     ReplayRecorder? _recorder;
 
@@ -40,6 +41,8 @@ public sealed class World
     Foot _strikeFoot;          // foot decided at the press, kept through the strike
     int _shotStartTick = -1;   // tick shoot was pressed for the shot under way (for the fake shot), or -1
     bool _shotCancelled;       // the shot was turned into a fake: the rest of this press of shoot is ignored
+
+    const ulong KeeperSeedSalt = 0x6B65657065723144UL;
 
     struct PendingShot
     {
@@ -70,6 +73,7 @@ public sealed class World
         Pitch = new Pitch(scenario.Pitch, tuning.Frame, tuning.Arena);
         Ball = new Ball(tuning.Ball);
         _rng = new SimRng(seed);
+        _keeperRng = new SimRng(seed ^ KeeperSeedSalt);
         Seed = seed;
         var t0 = new List<PlayerState>();
         var t1 = new List<PlayerState>();
@@ -164,6 +168,7 @@ public sealed class World
     {
         Seed = seed;
         _rng = new SimRng(seed);
+        _keeperRng = new SimRng(seed ^ KeeperSeedSalt);
         State = RoundState.Setup;
         Outcome = Outcome.None;
         Clock = 0f; ShotCharge = 0f; Tick = 0; SimTime = 0f;
@@ -201,14 +206,19 @@ public sealed class World
             p.Facing = MathF.PI;
             ResetPlayer(p);
         }
-        _brain = new KeeperBrain(Keeper, Pitch, Tuning, Scenario.KeeperOnLine);
+        _brain = new KeeperBrain(Keeper, Pitch, Tuning, Scenario.KeeperHoldLine);
         IdealCharge = ShotModel.IdealCharge(ShotModel.GoalDistance(Ball.Position, Pitch), Tuning);
     }
 
-    /// <summary>The keeper's start: his set spot, or the scenario's distance off the line on the same ball-to-goal line.</summary>
+    /// <summary>
+    /// The keeper's start: on his line (where the cover line from the ball meets it) when the scenario says so, at the scenario's
+    /// distance off the line on the ball-to-goal line, or else on his arc spot.
+    /// </summary>
     Vector3 KeeperStart()
     {
-        if (Scenario.KeeperOffLine is not float off) return ClampToPitch(Core.Keeper.SetSpot(Ball.Position, Pitch, Tuning, Scenario.KeeperOnLine));
+        var keeperSheet = Teams[1][0].Sheet;
+        if (Scenario.KeeperOffLine is not float off)
+            return ClampToPitch(Scenario.KeeperOnLine ? Core.Keeper.LineSpot(Ball.Position, Pitch, Tuning) : Core.Keeper.ArcTarget(Ball.Position, Pitch, Tuning, keeperSheet));
         float x = Pitch.GoalLineX - off;
         float dx = Pitch.GoalLineX - Ball.Position.X;
         float z = dx > 1e-3f ? Ball.Position.Z * off / dx : 0f;
@@ -228,6 +238,8 @@ public sealed class World
         p.Velocity = Vector3.Zero;
         p.HandPosition = p.Position;
         p.KeeperAction = KeeperAction.Set;
+        p.KeeperDive = KeeperDive.None;
+        p.KeeperActionTime = 0f;
         p.LastTouchTime = -100f;
         p.TurnRefHeading = p.Facing;
         p.TurnRefTime = 0f;
@@ -296,6 +308,7 @@ public sealed class World
 
     void StepSimulation(in TickIntent atk)
     {
+        _brain.BeginTick(_dt);
         if (State == RoundState.Outcome)
         {
             StepOutcome();
@@ -313,11 +326,11 @@ public sealed class World
         }
 
         // 3. Keeper.
-        _brain.Update(_dt, Ball, _rng);
+        _brain.Update(_dt, Ball, _keeperRng, KeeperSituation());
 
         // 4. Ball, with the frame, the arena boards and the keeper's hands as obstacles.
         Vector3 prev = Ball.Position;
-        var res = Ball.Step(_dt, Pitch, _brain.HandsSphere);
+        var res = Ball.Step(_dt, Pitch, _brain.HandsSphere, _brain.BodyCapsule, _brain.HandsCapsule);
         float speed = Ball.Velocity.Length();
         if (res.Bounced) _events.Add(new SimEvent(EventKind.Bounce, res.BouncePoint, res.BounceSpeed));
         if (res.FrameHit)
@@ -342,21 +355,12 @@ public sealed class World
         if (res.SphereHit)
         {
             float v;
-            bool held = _brain.Contact(Ball, res.SpherePoint, _rng, out v);
+            bool held = _brain.Contact(Ball, res.SpherePoint, _keeperRng, out v, res.BodyHit);
             _events.Add(new SimEvent(EventKind.Save, res.SpherePoint, v, held));
             // The keeper touching the ball ends anyone else's control; holding it is the keeper's possession.
             SetController(held ? Keeper : null);
             if (held) { EndRound(Outcome.Held); return; }
             if (State == RoundState.Flight) State = RoundState.Live;
-        }
-        else if (_controller == null && State is RoundState.Live or RoundState.Flight && !Pitch.IsGoal(Ball.Position, Ball.Radius)
-                 && _brain.TryClaimLooseBall(Ball))
-        {
-            // Placeholder: the keeper picks up a slow loose ball within reach (see KeeperBrain.TryClaimLooseBall).
-            _events.Add(new SimEvent(EventKind.Save, Ball.Position, speed, true));
-            SetController(Keeper);
-            EndRound(Outcome.Held);
-            return;
         }
 
         // Possession is lost when the ball stays beyond the lose distance for long enough.
@@ -394,6 +398,48 @@ public sealed class World
             float limit = Scenario.ClockLimit ?? float.MaxValue;
             if (Clock >= limit || _liveSeconds >= Tuning.Round.MaxSeconds) EndRound(Outcome.TimeUp);
         }
+    }
+
+    /// <summary>
+    /// What the keeper reads of the attacker this tick: when the attacker can next play the ball (his planned touch, the planned
+    /// meet after a push, a skill move's sole contact or a shot's contact; with none planned, his run to the ball, after any stun),
+    /// whether a shot is winding up, and whether a struck shot is in flight.
+    /// </summary>
+    KeeperSituation KeeperSituation()
+    {
+        var a = Attacker;
+        float best = float.PositiveInfinity;
+        int tick = -1;
+        void Take(int t)
+        {
+            float e = MathF.Max(0f, (t - Tick) * _dt);
+            if (e < best) { best = e; tick = t; }
+        }
+        if (_controller == a)
+        {
+            if (a.TouchAction is { } ta)
+            {
+                if (ta.Pending) Take(ta.ContactTick);
+                else if (ta.Made && ta.NextMeetTick > Tick) Take(ta.NextMeetTick);
+            }
+            if (a.SkillAction is { Made: false } sk && sk.ContactTick > Tick && sk.Phase != ActionPhase.Done) Take(sk.ContactTick);
+            if (a.ShotAction is { Made: false } sh) Take(sh.ContactTick);
+        }
+        if (float.IsPositiveInfinity(best))
+        {
+            float d = MathF.Max(0f, TouchModel.HorizontalDistance(a.Position, Ball.Position) - Tuning.Keeper.AttackerReach);
+            best = MathF.Max(0f, a.StunUntil - SimTime) + d / MathF.Max(1f, Movement.TopSpeed(a.Sheet, Tuning)) + Tuning.Keeper.AttackerReactTime;
+            tick = -2;
+        }
+        return new KeeperSituation
+        {
+            AttackerNextTouch = best,
+            AttackerTouchTick = tick,
+            AttackerHasBall = _controller == a,
+            Windup = a.ShotAction is { Made: false },
+            StrikeIn = a.ShotAction is { Made: false } shot ? MathF.Max(0f, (shot.ContactTick - Tick) * _dt) : float.PositiveInfinity,
+            ShotInFlight = State == RoundState.Flight,
+        };
     }
 
     static bool IsFinite(Vector3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
@@ -677,7 +723,7 @@ public sealed class World
         _pending = default;
         _events.Add(new SimEvent(EventKind.Strike, Ball.Position, result.Speed, Foot: result.Foot, Team: Attacker.Team, PlayerIndex: Attacker.Index));
         SetController(null); // a struck ball is nobody's
-        _brain.OnStrike(_rng);
+        _brain.OnStrike(_keeperRng, Ball);
         State = RoundState.Flight;
     }
 
@@ -710,7 +756,7 @@ public sealed class World
     {
         var idle = default(TickIntent);
         Movement.Step(Attacker, idle, _dt, SimTime, false, Tuning, Pitch);
-        _brain.Update(_dt, Ball, _rng);
+        _brain.Update(_dt, Ball, _keeperRng, new KeeperSituation { AttackerNextTouch = float.PositiveInfinity, AttackerTouchTick = -1, StrikeIn = float.PositiveInfinity, BallDead = true });
         if (Outcome == Outcome.Held) Ball.Position = Keeper.HandPosition;
         else if (Outcome == Outcome.Goal)
         {

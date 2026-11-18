@@ -149,12 +149,12 @@ public class CalibrationTests
     [Fact]
     public void SpreadMatchesTheFormulaWithEveryMultiplier()
     {
-        // speed 1.5 (full run), finesse 0.8, power 1.25 (90% charge), air 1.3, pressure 1.6, weak foot 1.72.
+        // speed 1 + speed_multiplier_slope (full run), finesse 0.8, power 1.25 (90% charge), air 1.3, pressure 1.6, weak foot 1.72.
         var s = TestData.Sheet(60); s.Finishing = 70; s.Composure = 1; s.WeakFoot = 1; s.PreferredFoot = Foot.Right;
         var keeper = new PlayerState(1, 0, PlayerRole.Keeper, TestData.Sheet(50)) { Position = new Vector3(42.5f, 0f, 0f) };
         var cases = new (string Name, Func<ShotResult[]> Run, float M)[]
         {
-            ("run", () => { var p = TestData.Outfield(s, 41f, 0f); p.Velocity = new Vector3(Movement.TopSpeed(s, new Tuning()), 0, 0); return Draw(p, new Vector3(41.5f, 0.11f, 0f), ShotType.Power, 0.5f); }, 1.5f),
+            ("run", () => { var p = TestData.Outfield(s, 41f, 0f); p.Velocity = new Vector3(Movement.TopSpeed(s, new Tuning()), 0, 0); return Draw(p, new Vector3(41.5f, 0.11f, 0f), ShotType.Power, 0.5f); }, 1f + new Tuning().Shot.SpeedMultiplierSlope),
             ("finesse", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.11f, 0f), ShotType.Finesse, 0.5f), 0.8f),
             ("chip", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.11f, 0f), ShotType.Chip, 0.5f), 1.1f),
             ("power", () => Draw(TestData.Outfield(s, 41f, 0f), new Vector3(41.5f, 0.11f, 0f), ShotType.Power, 0.9f), 1.25f),
@@ -209,19 +209,20 @@ public class CalibrationTests
 
     /// <summary>
     /// The scoring rate of each scenario over 2,000 scripted rounds from seed 1 stays in its band. Penalty and edge of the
-    /// box are held to the shooting targets (72-80%, 6-14%; 10,000 rounds measured 76.8 and 8.2%). The others are bands of
-    /// about four points around their measured values (10,000 rounds: tight angle 20.1, breakaway 39.5, halfway run 65.5,
-    /// angled run 51.1, keeper rush 96.8%); they depend on the keeper (and the running ones on the dribbling) as much as on
-    /// the shot, and move when either changes.
+    /// box are held to the shooting targets (72-80%, 6-14%); tight angle, halfway run and keeper rush to the keeper targets
+    /// (2-8%, 30-45%, 25-40%). Breakaway and angled run are bands of about four points around their measured values after
+    /// Phase D (2,000 rounds: 17.8 and 33.1%): breakaway is below its keeper target (35-50%) and angled run above its (15-30%)
+    /// once running shots were calibrated to about 60-75% on target. They depend on the keeper (and the running ones on the
+    /// dribbling) as much as on the shot, and move when either changes.
     /// </summary>
     [Theory]
     [InlineData("penalty", 72.0, 80.0)]
     [InlineData("edge_of_box", 6.0, 14.0)]
-    [InlineData("tight_angle", 16.0, 24.0)]
-    [InlineData("breakaway", 35.5, 43.5)]
-    [InlineData("halfway_run", 61.5, 69.5)]
-    [InlineData("angled_run", 47.0, 55.0)]
-    [InlineData("keeper_rush", 93.5, 100.0)]
+    [InlineData("tight_angle", 2.0, 8.0)]
+    [InlineData("breakaway", 14.0, 22.0)]
+    [InlineData("halfway_run", 30.0, 45.0)]
+    [InlineData("angled_run", 29.0, 37.0)]
+    [InlineData("keeper_rush", 25.0, 40.0)]
     public void ScoringRateStaysInItsBand(string scenario, double lo, double hi)
     {
         var r = TestData.Rate(TestData.Scenario(scenario), TestData.Player("striker_a"), TestData.Player("the_wall"), N, 1);

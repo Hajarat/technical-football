@@ -121,7 +121,12 @@ public struct FigureFrame
     /// <summary>Seconds until a pending shot makes contact (NaN when none) and the foot that will strike (also used while charging).</summary>
     public float StrikeEta; public bool StrikeRight;
     public float ShotCharge;
-    public bool Diving, Holding, Reacting;
+    /// <summary>The ball is in the keeper's hands (also true while <see cref="KeeperAction"/> is Holding).</summary>
+    public bool Holding;
+    /// <summary>The keeper's contract state (Phase D): the action, the save kind while diving, the seconds since the action began, and where the hands go.</summary>
+    public FootballSim.Core.KeeperAction KeeperAction;
+    public FootballSim.Core.KeeperDive KeeperDive;
+    public float KeeperActionTime;
     public Vector3 HandPosition;
     public float Dt;
 
@@ -343,7 +348,7 @@ public partial class PlayerFigure : Node3D
     {
         _init = false;
         _strikeT = -1f; _windT = 0; _lastCharge = 0; _lean = 0; _leanExtraS = 0; _stActive = false; _pinWas = false; _skId = int.MinValue; _skJumpValid = false;
-        _accFS = 0; _runPrev = float.NaN; _ratioS = 0.9945f; _bobStep = -1;
+        _accFS = 0; _runPrev = float.NaN; _ratioS = 0.9945f; _bobStep = -1; _kInit = false;
         foreach (var t in _tf) { t.Id = t.ContactId = int.MinValue; }
         Update(f);
         ResetPhysicsInterpolation();
@@ -390,7 +395,13 @@ public partial class PlayerFigure : Node3D
         bool stepping = f.HasGait && f.IsStepping;
         Vector3 fm = speed > 0.5f ? hv / speed : fwd;
 
-        if (IsKeeper && f.Diving) { UpdateDive(f, fwd, right, dt); return; }
+        if (IsKeeper)
+        {
+            // every keeper state but Rush is drawn by the keeper pose code; Rush reuses the run cycle below and is blended with it
+            bool rushing = f.KeeperAction == FootballSim.Core.KeeperAction.Rush;
+            _wR = rushing ? Math.Min(1f, _wR + dt / 0.12f) : Math.Max(0f, _wR - dt / 0.15f);
+            if (!rushing) { UpdateKeeper(f, pos, fwd, right, hv, speed, dt, null); return; }
+        }
 
         // ---- posture: pelvis height as a fraction of the standing height ----
         float ratioT;
@@ -568,7 +579,7 @@ public partial class PlayerFigure : Node3D
         else leanT = stepping ? Mathf.Clamp(_accFS / 4f, -1f, 1f) * MaxLeanRad : 0f;
         _lean = Mathf.Lerp(_lean, leanT, 1f - Mathf.Exp(-dt / 0.12f));
         _leanExtraS = Mathf.Lerp(_leanExtraS, _leanExtra, 1f - Mathf.Exp(-dt / 0.05f));
-        float lean = _lean + _leanExtraS + (IsKeeper && f.Reacting ? 0.12f : 0f);
+        float lean = _lean + _leanExtraS;
         lean = Mathf.Clamp(lean, -0.42f, 0.42f);
         Basis B = new Basis(right, -lean) * new Basis(fwd, Vector3.Up, right);
 
@@ -593,11 +604,10 @@ public partial class PlayerFigure : Node3D
             float bend = 0.10f + 0.30f * sfs;          // about 90 degrees of elbow at a sprint
             Vector3 dirLocal = new Vector3(Mathf.Sin(alpha), -Mathf.Cos(alpha), side * (0.12f + 0.35f * _lastCharge)).Normalized();
             handT[i] = sh + B * dirLocal * ((ArmUp + ArmLow) * (1f - bend));
-            if (IsKeeper && !f.Holding) handT[i] = sh + B * new Vector3(0.30f * H, -0.12f * H, side * 0.05f * H);
-            if (f.Holding && IsKeeper) handT[i] = f.HandPosition + right * side * 0.07f;
             elbowPole[i] = (B * new Vector3(-1f, -0.2f, side * 0.5f)).Normalized();
         }
-        RenderBody(pel, B, shoulderC, knee, ankEff, dir, handT, elbowPole);
+        if (IsKeeper) UpdateKeeper(f, pos, fwd, right, hv, speed, dt, new KPose { Pel = pel, Q = B.GetRotationQuaternion(), Knee = knee, Ank = ankEff, Dir = dir, Hand = handT, Pole = elbowPole });
+        else RenderBody(pel, B, shoulderC, knee, ankEff, dir, handT, elbowPole);
         var posFlat = new Vector3(pos.X, 0, pos.Z);
         // the playing foot's per-tick move (body-relative and world), during the move and the three ticks after it
         if (!IsKeeper && Stats != null && (f.Skill.Valid || _skTail > 0))
@@ -1238,47 +1248,6 @@ public partial class PlayerFigure : Node3D
         if (arrived) _skInLogged = true;
         GD.Print($"SKILL_FOOT kind={s.Kind} {(atContact ? "contact" : "arrived")} t={s.Elapsed:F3} err_m={err:F3}");
         if (atContact && Stats != null) Stats.SkillContact.Add(err);
-    }
-
-    // ---------------------------------------------------------------------------------------------------------------
-    // keeper dive
-
-    void UpdateDive(in FigureFrame f, Vector3 fwd, Vector3 right, float dt)
-    {
-        _kW = 0; _moving = false; _strikeT = -1f;
-        Vector3 pos = f.Position;
-        Vector3 chest = pos + new Vector3(0, 0.5f * H, 0);
-        Vector3 d = f.HandPosition - chest;
-        if (d.LengthSquared() < 1e-4f) d = fwd;
-        float angle = Math.Min(Vector3.Up.AngleTo(d), 78f * Mathf.Pi / 180f);
-        Vector3 axis = Vector3.Up.Cross(d);
-        Quaternion q = axis.LengthSquared() > 1e-8f ? new Quaternion(axis.Normalized(), angle) : Quaternion.Identity;
-        Basis B = new Basis(q) * new Basis(fwd, Vector3.Up, right);
-        float pelY = 0.5f * H * Mathf.Cos(angle) + 0.07f + 0.12f * Mathf.Sin(angle);
-        Vector3 pel = new(pos.X, pelY, pos.Z);
-        Vector3 bodyUp = B.Y; Vector3 bodyRight = B.Z;
-        var knee = new Vector3[2]; var ank = new Vector3[2]; var dir = new Vector3[2];
-        for (int i = 0; i < 2; i++)
-        {
-            float side = i == 0 ? -1f : 1f;
-            Vector3 hip = pel + bodyRight * side * HipW;
-            Vector3 target = hip - bodyUp * (Leg * 0.93f) + bodyRight * side * 0.10f * H - B.X * 0.05f * H;
-            target.Y = Math.Max(target.Y, AnkleH);
-            SolveLeg(hip, target, B.X, out knee[i], out ank[i]);
-            dir[i] = fwd;
-        }
-        Vector3 shoulderC = pel + B * new Vector3(0, 0.035f * H + TorsoLen - 0.03f * H, 0);
-        var handT = new Vector3[2]; var pole = new Vector3[2];
-        for (int i = 0; i < 2; i++)
-        {
-            float side = i == 0 ? -1f : 1f;
-            handT[i] = f.HandPosition + bodyRight * side * 0.07f * H;
-            pole[i] = (B * new Vector3(-0.3f, -1f, side * 0.6f)).Normalized();
-        }
-        RenderBody(pel, B, shoulderC, knee, ank, dir, handT, pole);
-        for (int i = 0; i < 2; i++) { var ft = _feet[i]; ft.Planted = false; ft.Timed = false; ft.InStance = false; ft.Blend = 0f; ft.BlendFrom = ank[i]; ft.Ankle = ank[i]; ft.Plant = new Vector3(ank[i].X, AnkleH, ank[i].Z); }
-        TrackSlide(new[] { false, false }, ank);
-        _lastPos = pos;
     }
 
     // ---------------------------------------------------------------------------------------------------------------
