@@ -13,6 +13,8 @@ public partial class Match
 
     int _strikeTicks, _touchCount;
     bool _closeControl;
+    TickIntent _intent;          // the attacker's intent on the latest simulated tick (presentation only)
+    int _looseSince = int.MinValue;   // the world tick the attacker last stopped being in possession
     public FigureStats FootStats { get; } = new();
 
     /// <summary>Everything the attacker's figure needs this tick, copied from the world's state and events. No gameplay is decided here.</summary>
@@ -55,6 +57,8 @@ public partial class Match
                 ContactPoint = G(sa.ContactPoint), BallOutVelocity = G(sa.BallOutVelocity), Made = sa.Made,
                 Held = !sa.Released,
             };
+        if (p.TouchAction is { } ta) f.Action.Surface = ContactSurface(p, ta, f.Action.Surface);
+        f.Upcoming = UpcomingTouch(p, out f.UpcomingReady);
         f.NextTouchEta = p.NextTouchEta; f.NextTouchRight = p.NextTouchFoot == Foot.Right; f.NextTouchPoint = G(p.NextTouchPoint);
         f.ShotCharge = w.ShotCharge;
         // The core counts StrikeEta down through the strike delay and fixes StrikeFoot at the button press.
@@ -85,7 +89,138 @@ public partial class Match
         f.RightFootPhase = p.RightFootPhase; f.LeftFootPhase = p.LeftFootPhase;
         f.RunSpeed = p.RunSpeed;
         f.Action = ActionFrame(p.TouchAction, p, dt);   // the touch planner's slot: the soft touch at a shot's press is drawn under the shot windup
-        f.PrevAction = ActionFrame(p.PreviousAction, p, dt);
+        f.PrevAction = ActionFrame(p.PreviousTouchAction, p, dt);   // a touch made just before a shot's soft touch still follows through
+    }
+
+    /// <summary>
+    /// The touch the core is about to make at once, with no windup of its own (an immediate touch: the exit touch on the tick a skill
+    /// move ends, the soft touch that keeps the ball at the foot during a shot's windup, the first touch of a loose ball), predicted
+    /// from the current state and stick so the figure can swing the right foot toward it beforehand. Presentation only: it reads the
+    /// world and decides nothing in it; the core's own touch, when it comes, is drawn from <see cref="FigureFrame.Action"/> as usual.
+    /// <paramref name="ready"/> is set for a still ball at the feet of a standing player, where the touch waits for the stick.
+    /// </summary>
+    FigureAction UpcomingTouch(PlayerState p, out bool ready)
+    {
+        ready = false;
+        var w = World;
+        var t = w.Tuning;
+        float dt = t.Dt, r = w.Ball.Radius;
+        const int Horizon = 18;   // ticks looked ahead (0.15 s)
+        if (p.InPossession) _looseSince = int.MinValue;
+        else if (_looseSince == int.MinValue) _looseSince = p.CurrentTick;
+        if (w.Keeper.InPossession || w.State is RoundState.Report or RoundState.Outcome) return default;
+        var ball = w.Ball;
+        var stick = new System.Numerics.Vector2(_intent.MoveX, _intent.MoveZ);
+        bool stickOn = stick.Length() >= t.Touch.StickThreshold;
+        var pv = new System.Numerics.Vector3(p.Velocity.X, 0f, p.Velocity.Z);
+        var bv = new System.Numerics.Vector3(ball.Velocity.X, 0f, ball.Velocity.Z);
+        float reach = TouchModel.FootReach(p.Sheet, t);
+        bool InReachAt(int j, float margin = 0f)
+        {
+            var pp = p.Position + pv * (j * dt);
+            var bp = ball.Position + bv * (Math.Max(0, j - 1) * dt);   // the player moves before the touch on a tick, the ball after it
+            return ball.Position.Y <= t.Touch.MaxBallHeight && new System.Numerics.Vector2(bp.X - pp.X, bp.Z - pp.Z).Length() <= reach + margin;
+        }
+        Foot FootAt(int j)
+        {
+            if (p.IsStepping) { float s = (p.GaitPhase + p.StepFrequency * j * dt) % 2f; return Gait.SwingFoot(s); }
+            return TouchModel.ChooseFoot(p.Sheet, p.Position + pv * (j * dt), p.Facing, ball.Position + bv * (Math.Max(0, j - 1) * dt), t);
+        }
+
+        int j = -1, anchor; ActionKind kind; System.Numerics.Vector3 dir;
+        float turnRef = MathF.Atan2(bv.Z, bv.X);
+        if (p.Action is { IsSkill: true } sk && sk.Phase != ActionPhase.Done)
+        {
+            // the exit touch: made on the move's last tick if the stick is pushed and the ball is in reach then
+            int n = sk.EndTick - p.CurrentTick;
+            // (with some slack: the legs and the ball change course on that tick; a touch drawn for but not made fades back)
+            if (n < 1 || n > Horizon || !stickOn || !InReachAt(n, 0.05f)) return default;
+            j = n; anchor = sk.StartTick;
+            dir = System.Numerics.Vector3.Normalize(new System.Numerics.Vector3(stick.X, 0f, stick.Y));
+            var mode = TouchModel.ModeFor(_intent, t);
+            kind = mode == TouchMode.CloseControl ? ActionKind.Close : mode == TouchMode.Jog ? ActionKind.Jog : ActionKind.Sprint;
+            // the ball's travel on that tick: a ball roll leaves it rolling along the run at the player's pace, a drag-back or fake stop at rest
+            var rd = new System.Numerics.Vector3(sk.RunDirection.X, 0f, sk.RunDirection.Y);
+            var bvEnd = sk.Kind == ActionKind.BallRoll ? rd * MathF.Max(0f, System.Numerics.Vector3.Dot(pv, rd))
+                : sk.Kind is ActionKind.DragBack or ActionKind.FakeStop ? System.Numerics.Vector3.Zero : bv;
+            float refA = bvEnd.Length() > 0.3f ? MathF.Atan2(bvEnd.Z, bvEnd.X) : p.Facing;
+            turnRef = refA;
+            float turnDeg = MathF.Abs(Movement.WrapAngle(MathF.Atan2(dir.Z, dir.X) - refA)) * 180f / MathF.PI;
+            if (p.RunSpeed > t.Touch.ExecutionMinSpeed && turnDeg > t.Touch.ExecutionAngle) kind = ActionKind.Turn;
+            if (turnDeg > t.Touch.CutDeg && p.RunSpeed > t.Touch.CutMinSpeed) kind = ActionKind.Cut;
+        }
+        else if (p.Action is { IsShot: true, Made: false } shot && p.InPossession
+            // a touch already winding up at the press is waited for; one planned after it is dropped for the soft touch
+            && (p.TouchAction is not { Pending: true } pt || pt.PlanTick > shot.PlanTick)
+            && p.TouchAction is not { Kind: ActionKind.Soft, Made: true } && p.PreviousTouchAction is not { Kind: ActionKind.Soft, Made: true })
+        {
+            // the soft touch: made on the first tick of the windup the ball is in reach
+            for (int k = 1; k <= Horizon && j < 0; k++) if (InReachAt(k)) j = k;
+            if (j < 0) return default;
+            anchor = shot.PlanTick; kind = ActionKind.Soft;
+            dir = pv.Length() > 0.5f ? System.Numerics.Vector3.Normalize(pv) : new System.Numerics.Vector3(MathF.Cos(p.Facing), 0f, MathF.Sin(p.Facing));
+        }
+        else if (!p.InPossession && p.Action is not { IsShot: true } && w.State is RoundState.Setup or RoundState.Live)
+        {
+            // the first touch of a loose ball: in reach and either the stick pushed or the ball moving against the player
+            anchor = _looseSince == int.MinValue ? -1 : _looseSince; kind = ActionKind.First;
+            bool still = (bv - pv).Length() < t.Touch.FirstTouchMinRelativeSpeed;
+            if (still && !p.IsStepping && InReachAt(0) && !stickOn && w.SimTime >= p.StunEndTime)
+            {
+                ready = true; j = 0;
+                dir = new System.Numerics.Vector3(MathF.Cos(p.Facing), 0f, MathF.Sin(p.Facing));
+            }
+            else
+            {
+                if (!stickOn && still) return default;
+                // no touch until the stun after a strike is over
+                for (int k = 1; k <= Horizon && j < 0; k++) if (InReachAt(k) && w.SimTime + k * dt >= p.StunEndTime) j = k;
+                if (j < 0) return default;
+                dir = stickOn ? System.Numerics.Vector3.Normalize(new System.Numerics.Vector3(stick.X, 0f, stick.Y))
+                    : pv.Length() > 0.5f ? System.Numerics.Vector3.Normalize(pv) : new System.Numerics.Vector3(MathF.Cos(p.Facing), 0f, MathF.Sin(p.Facing));
+            }
+        }
+        else return default;
+
+        var foot = FootAt(j);
+        var c = ball.Position + bv * (Math.Max(0, j - 1) * dt);
+        float turnSign = MathF.Sign(Movement.WrapAngle(MathF.Atan2(dir.Z, dir.X) - turnRef));
+        var surface = kind switch
+        {
+            ActionKind.Soft => FootSurface.Sole,
+            ActionKind.Sprint => FootSurface.Laces,
+            ActionKind.Turn or ActionKind.Cut => (turnSign > 0f) == (foot == Foot.Right) ? FootSurface.Outside : FootSurface.Inside,
+            _ => FootSurface.Inside,
+        };
+        var cp = new System.Numerics.Vector3(c.X, r, c.Z);
+        return new FigureAction
+        {
+            Valid = true, Kind = (int)kind, Phase = TouchPhase.Windup, Right = foot == Foot.Right, Surface = (BootSurface)(int)surface,
+            // stable for one predicted touch while its tick estimate moves: a negative id per kind and the tick its situation began
+            Id = -1 - ((int)kind << 22) - (anchor & 0x3FFFFF), ContactTick = p.CurrentTick + j, ContactEta = j * dt, RecoverySeconds = 0f,
+            ContactPoint = G(cp), BallOutVelocity = Vector3.Zero, NextMeetPoint = G(cp + dir * 2f), ContactMiss = float.NaN,
+        };
+    }
+
+    /// <summary>
+    /// The surface a touch still waiting for its contact is expected to be made with: the core settles the kind at the contact, a push sent
+    /// more than the execution angle off the ball's travel becoming a turn or cut played with the side of the foot (presentation only).
+    /// </summary>
+    BootSurface ContactSurface(PlayerState p, BallAction a, BootSurface planned)
+    {
+        var t = World.Tuning;
+        if (a.Made || a.Phase == ActionPhase.Done || a.IsSkill || a.IsShot) return planned;
+        if (a.Kind is not (ActionKind.Close or ActionKind.Jog or ActionKind.Sprint or ActionKind.Slowdown or ActionKind.Turn or ActionKind.Cut)) return planned;
+        var stick = new System.Numerics.Vector2(_intent.MoveX, _intent.MoveZ);
+        if (stick.Length() < t.Touch.StickThreshold) return planned;
+        var bv = new System.Numerics.Vector2(World.Ball.Velocity.X, World.Ball.Velocity.Z);
+        float refA = bv.Length() > 0.3f ? MathF.Atan2(bv.Y, bv.X) : p.Facing;
+        float turnDeg = MathF.Abs(Movement.WrapAngle(MathF.Atan2(stick.Y, stick.X) - refA)) * 180f / MathF.PI;
+        bool turn = p.RunSpeed > t.Touch.ExecutionMinSpeed && turnDeg > t.Touch.ExecutionAngle || turnDeg > t.Touch.CutDeg && p.RunSpeed > t.Touch.CutMinSpeed;
+        if (!turn) return a.Kind is ActionKind.Turn or ActionKind.Cut ? BootSurface.Inside : planned;
+        var to = a.NextMeetTick >= 0 ? new System.Numerics.Vector2(a.NextMeetPoint.X - a.ContactPoint.X, a.NextMeetPoint.Z - a.ContactPoint.Z) : stick;
+        float turnSign = MathF.Sign(Movement.WrapAngle(MathF.Atan2(to.Y, to.X) - MathF.Atan2(bv.Y, bv.X)));
+        return (turnSign > 0f) == (a.Foot == Foot.Right) ? BootSurface.Outside : BootSurface.Inside;
     }
 
     static FigureAction ActionFrame(BallAction? a, PlayerState p, float dt)
@@ -112,6 +247,7 @@ public partial class Match
         Hud.HideReport();
         Hud.SetPower(0); Hud.SetIdealMarker(0, false);
         _strikeTicks = 0; _touchCount = 0;
+        _intent = default; _looseSince = int.MinValue;
         Ball.Teleport(G(World.Ball.Position));
         Ball.SetPossession(false);
         Attacker.Teleport(AttackerFrame(World.Attacker), World.Attacker.InPossession);
@@ -127,6 +263,7 @@ public partial class Match
         Ball.Apply(G(w.Ball.Position));
         Ball.SetPossession(w.Attacker.InPossession || w.Keeper.InPossession);
         var af = AttackerFrame(w.Attacker);
+        FootStats.Tick = _tick;
         Attacker.Apply(af, w.Attacker.InPossession);
         Keeper.Apply(KeeperFrame(w.Keeper));
         if (af.TouchEvent || af.StrikeEvent)
