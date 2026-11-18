@@ -42,7 +42,9 @@ public sealed class KeeperGallery
     float _t;
     int _mi, _settle, _view;
     bool _capturing, _finished;
-    float _minY, _gaitPhase;
+    float _minY, _gaitPhase, _maxStep;
+    string _maxStepWhere = "";
+    Vector3[]? _prevJ;
     string _minWhere = "";
     bool _bad;
 
@@ -148,7 +150,7 @@ public sealed class KeeperGallery
                     sc.Phases.Add(Ph(KeeperAction.Grounded, 0.7f, KeeperDive.None, _ => tgt));
                     MomPh(sc, 3, 1f, "ground");
                     sc.Phases.Add(Ph(KeeperAction.GettingUp, KeeperView.GetUpSeconds, KeeperDive.None, _ => tgt));
-                    foreach (var (f, tag) in new[] { (0.2f, "up20"), (0.5f, "up50"), (0.9f, "up90") }) MomPh(sc, 4, f, tag);
+                    foreach (var (f, tag) in new[] { (0.2f, "up20"), (0.35f, "up35"), (0.5f, "up50"), (0.7f, "up70"), (0.9f, "up90") }) MomPh(sc, 4, f, tag);
                     // holding the ball where he lies: same save, then Holding to the end
                     var hs = S("holding_after_" + name);
                     hs.Phases.Add(Ph(KeeperAction.Planted, 0.4f)); hs.Phases.Add(Ph(KeeperAction.Reacting, 0.3f));
@@ -158,12 +160,9 @@ public sealed class KeeperGallery
                 }
                 else
                 {
-                    sc.Phases.Add(Ph(kind == KeeperDive.Catch ? KeeperAction.Holding : KeeperAction.Grounded, 0.6f, KeeperDive.None, _ => tgt));
+                    // the core ends a standing save in Holding (catch) or straight back in Set (feet block); neither lies down
+                    sc.Phases.Add(Ph(kind == KeeperDive.Catch ? KeeperAction.Holding : KeeperAction.Set, 0.6f, KeeperDive.None, _ => tgt));
                     MomPh(sc, 3, 1f, "after");
-                    if (kind == KeeperDive.Feet)
-                    {
-                        sc.Phases.Add(Ph(KeeperAction.GettingUp, 0.5f, KeeperDive.None, _ => tgt));
-                    }
                 }
             }
     }
@@ -190,7 +189,7 @@ public sealed class KeeperGallery
         {
             if (_s != null) Report();
             if (++_si >= _scripts.Count) { _finished = true; return false; }
-            _s = _scripts[_si]; _t = 0; _mi = 0; _minY = 1e9f; _bad = false;
+            _s = _scripts[_si]; _t = 0; _mi = 0; _minY = 1e9f; _bad = false; _maxStep = 0; _prevJ = null;
             var f0 = Frame(0, out _);
             _m.Keeper.Teleport(f0);
             _m.Camera.ResetPhysicsInterpolation();
@@ -268,8 +267,40 @@ public sealed class KeeperGallery
             if (v.Y < _minY) { _minY = v.Y; _minWhere = $"{name}@{_t:F2}s"; }
         }
         One("pelvis", j.Pelvis);
+        Trace(j);
+        // frame-to-frame snaps: the largest single-tick move of any joint (a snap shows as several times the speed of a fast dive)
+        var cur = new Vector3[10];
+        cur[0] = j.Pelvis;
+        for (int i = 0; i < 2; i++) { cur[1 + i] = j.Knee[i]; cur[3 + i] = j.Ankle[i]; cur[5 + i] = j.Shoulder[i]; cur[7 + i] = j.Elbow[i]; }
+        // (the scripted hand target of the Diving/Smother phases itself starts with a jump, so those phases are left out)
+        var act = _s.Phases[PhaseAt(_t)].Action;
+        if (_prevJ != null && _t > Dt * 2 && act != KeeperAction.Diving && act != KeeperAction.Smother)
+            for (int i = 0; i < cur.Length; i++)
+            {
+                float step = (cur[i] - _prevJ[i]).Length();
+                if (step > _maxStep) { _maxStep = step; _maxStepWhere = $"joint{i}@{_t:F2}s {act}"; }
+            }
+        _prevJ = cur;
         for (int i = 0; i < 2; i++) { One("hip", j.Hip[i]); One("knee", j.Knee[i]); One("shoulder", j.Shoulder[i]); One("elbow", j.Elbow[i]); One("hand", j.Hand[i]); One("ankle", j.Ankle[i] - new Vector3(0, j.AnkleHeight, 0)); }
     }
 
-    void Report() => GD.Print($"GALLERY_CHECK script={_s.Name} non_finite={_bad} lowest_joint_y_m={_minY:F3} at={_minWhere}");
+    /// <summary>KEEPER_TRACE every 0.05 s: torso lean from upright (deg), its sideways and forward parts (along the keeper's own right and facing, + = right / ahead), the torso's front direction's height (-1 = face down, 0 = on his side, +1 = on his back), the hands' mean height and the pelvis height.</summary>
+    void Trace(FigureJoints j)
+    {
+        if (_s.Name.StartsWith("holding_")) return;
+        int tick = Mathf.RoundToInt(_t / Dt);
+        if (tick % 6 != 0) return;
+        var f = Frame(_t, out int phase);
+        var mid = (j.Shoulder[0] + j.Shoulder[1]) * 0.5f;
+        var axis = (mid - j.Pelvis).Normalized();
+        var right = (j.Shoulder[1] - j.Shoulder[0]).Normalized();
+        var front = axis.Cross(right).Normalized();
+        float lean = Mathf.RadToDeg(Mathf.Acos(Mathf.Clamp(axis.Y, -1f, 1f)));
+        float hh = (j.Hand[0].Y + j.Hand[1].Y) * 0.5f;
+        GD.Print($"KEEPER_TRACE script={_s.Name} t={_t:F2} {f.KeeperAction} u={f.KeeperActionTime:F2} lean_deg={lean:F0} side={axis.Dot(_right):F2} ahead={axis.Dot(_fwd):F2} front_y={front.Y:F2} hand_y={hh:F2} pelvis_y={j.Pelvis.Y:F2} hand_span={(j.Hand[1] - j.Hand[0]).Length():F2}");
+    }
+
+    int PhaseAt(float t) { Frame(t, out int ph); return ph; }
+
+    void Report() => GD.Print($"GALLERY_CHECK script={_s.Name} non_finite={_bad} lowest_joint_y_m={_minY:F3} at={_minWhere} max_joint_step_m_per_tick={_maxStep:F3} at={_maxStepWhere}");
 }

@@ -34,10 +34,16 @@ public partial class PlayerFigure
     // smoothed dive state: tilt from upright (radians), horizontal direction of the tilt, how far the pelvis travels toward it, pelvis height, hands and ankles
     float _dTilt, _dOff, _dPelY;
     Vector3 _dDir = new(1, 0, 0);
+    // the direction the body tilts toward and the way its front faces while it is tilted (they leave the dive direction when he rolls or rises)
+    Vector3 _dTiltDir = new(1, 0, 0), _dFace = new(1, 0, 0);
+    float _smSide;   // which way his front faces while he lies after a smother (+1 / -1 along the horizontal normal of the dive direction), 0 = not chosen
+    bool _wasSmother;
     readonly Vector3[] _dHand = new Vector3[2], _dAnk = new Vector3[2];
     KPose _rushSnap;   // the last run-cycle pose, relative to the keeper's feet position (XZ), blended out when the rush ends
 
     const float Deg = Mathf.Pi / 180f;
+    static readonly float[] GetUpG = { 0f, 0.25f, 0.6f, 1f };
+    static readonly float[] GetUpTilt = { 86f, 64f, 32f, 8f };
 
     static void StandTargets(KAct act, out float legFrac, out float hw, out float lean, out float hf, out float hd, out float hs)
     {
@@ -47,7 +53,7 @@ public partial class PlayerFigure
             case KAct.Planted: legFrac = 0.78f; hw = 3.0f; lean = 0.27f; hf = 0.33f; hd = -0.08f; hs = 0.15f; break;
             case KAct.Reacting: legFrac = 0.73f; hw = 3.2f; lean = 0.35f; hf = 0.34f; hd = -0.05f; hs = 0.17f; break;
             case KAct.Holding: legFrac = 0.94f; hw = 2.4f; lean = 0.05f; hf = 0.30f; hd = -0.12f; hs = 0.05f; break;
-            default: legFrac = 0.84f; hw = 2.4f; lean = 0.12f; hf = 0.30f; hd = -0.12f; hs = 0.05f; break;
+            default: legFrac = 0.82f; hw = 2.5f; lean = 0.15f; hf = 0.25f; hd = -0.20f; hs = 0.10f; break;
         }
     }
 
@@ -56,14 +62,13 @@ public partial class PlayerFigure
         _kInit = true;
         StandTargets(f.KeeperAction, out _kLegFrac, out _kHw, out _kLean, out _kHf, out _kHd, out _kHs);
         var act = f.KeeperAction;
-        float up = Smooth(Mathf.Clamp(f.KeeperActionTime / KeeperView.GetUpSeconds, 0f, 1f));
-        _wD = act is KAct.Diving or KAct.Smother or KAct.Grounded ? 1f : act == KAct.GettingUp ? 1f - up : 0f;
+        _wD = act is KAct.Diving or KAct.Smother or KAct.Grounded ? 1f : act == KAct.GettingUp ? GetUpWeight(Mathf.Clamp(f.KeeperActionTime / KeeperView.GetUpSeconds, 0f, 1f)) : 0f;
         _wR = act == KAct.Rush ? 1f : 0f;
         _ground = act is KAct.Grounded or KAct.GettingUp;
         _dKind = f.KeeperDive == KDive.None ? KDive.Low : f.KeeperDive;
         _dSmother = act == KAct.Smother;
         _hasLatch = false;
-        _dDir = fwd;
+        _dDir = fwd; _dTiltDir = fwd; _dFace = fwd; _smSide = 0f; _wasSmother = false;
         float hwf = HipW * _kHw;
         for (int i = 0; i < 2; i++)
         {
@@ -90,7 +95,7 @@ public partial class PlayerFigure
         if (_wD < 0.02f)
         {
             // not in a dive: the dive state follows the standing pose, so the next dive starts from the stance
-            _dTilt = 0.1f; _dOff = 0f; _dPelY = S.Pel.Y; _dDir = fwd; _hasLatch = _hasLatch && _ground;
+            _dTilt = 0.1f; _dOff = 0f; _dPelY = S.Pel.Y; _dDir = fwd; _dTiltDir = fwd; _dFace = fwd; _smSide = 0f; _hasLatch = _hasLatch && _ground;
             for (int i = 0; i < 2; i++) { _dHand[i] = S.Hand[i]; _dAnk[i] = S.Ank[i]; }
         }
         var D = KeeperDiveShape(f, pos, fwd, right, S, dt, k);
@@ -142,8 +147,20 @@ public partial class PlayerFigure
             case KAct.Holding: target = _ground ? 1f : 0f; tau = _ground ? 0.10f : 0.15f; break;
             default: target = 0f; tau = 0.12f; break;
         }
-        if (act == KAct.GettingUp) _wD = Math.Min(_wD, 1f - Smooth(getUp));
+        if (act == KAct.GettingUp) _wD = Math.Min(_wD, GetUpWeight(getUp));
         else _wD += (target - _wD) * (1f - Mathf.Exp(-dt / tau));
+    }
+
+    /// <summary>How much of the dive (ground) pose is left at this point of the get-up: all of it while he rolls onto his front and comes up onto his knees, then it hands over to the stance.</summary>
+    static float GetUpWeight(float g) => 1f - Smooth(Mathf.Clamp((g - 0.6f) / 0.4f, 0f, 1f));
+
+    /// <summary>Piecewise-linear keyframes (the filter on the tilt rounds the corners): g in 0..1 and the value.</summary>
+    static float Keys(float g, float[] gs, float[] vs)
+    {
+        if (g <= gs[0]) return vs[0];
+        for (int i = 1; i < gs.Length; i++)
+            if (g <= gs[i]) return Mathf.Lerp(vs[i - 1], vs[i], (g - gs[i - 1]) / (gs[i] - gs[i - 1]));
+        return vs[^1];
     }
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -239,6 +256,10 @@ public partial class PlayerFigure
         bool diving = act is KAct.Diving or KAct.Smother;
         bool lie = act is KAct.Grounded or KAct.GettingUp || (act == KAct.Holding && _ground);
         bool holdBall = act == KAct.Holding;
+        bool getting = act == KAct.GettingUp;
+        float g = getting ? Mathf.Clamp(f.KeeperActionTime / KeeperView.GetUpSeconds, 0f, 1f) : 0f;
+        if (act == KAct.Smother && !_wasSmother) _smSide = 0f;
+        _wasSmother = act == KAct.Smother;
         Vector3 hand = f.HandPosition;
         if (diving || holdBall) { _latchHand = hand; _hasLatch = true; }
         else if (_hasLatch) hand = _latchHand;
@@ -261,17 +282,40 @@ public partial class PlayerFigure
         float hl = horiz.Length();
         Vector3 dirT = hl > 0.08f ? horiz / hl : _dDir;
         float tiltT = lie ? 86f * Deg : Mathf.Clamp(Mathf.Atan2(hl, d.Y), minT, maxT);
+        // getting up: he rolls from lying onto his front, pushes up onto his knees and rises with the chest forward, so the tilt turns toward his
+        // own facing (never sideways) while it eases from flat to the stance's lean
+        if (getting) tiltT = Keys(g, GetUpG, GetUpTilt) * Deg;
 
-        float tau = diving ? 0.05f : 0.10f;
+        float tau = diving ? 0.05f : getting ? 0.06f : 0.10f;
         float a = 1f - Mathf.Exp(-dt / tau);
         _dTilt += (tiltT - _dTilt) * a;
         Vector3 nd = _dDir + (dirT - _dDir) * a;
         _dDir = nd.LengthSquared() > 1e-6f ? nd.Normalized() : dirT;
+        // after a smother he lies on his side: the front faces along the ground, at right angles to the way he went, so the hands meet the ball from
+        // above and below and his body stays behind it
+        Vector3 tiltDirT = getting ? fwd : dirT, faceT = fwd;
+        if (_dSmother && !getting && (diving || lie))
+        {
+            if (_smSide == 0f)
+            {
+                var pT = new Vector3(-dirT.Z, 0, dirT.X);
+                float dd = pT.Dot(fwd);
+                _smSide = Mathf.Abs(dd) > 0.15f ? Mathf.Sign(dd) : pT.Dot(right) >= 0f ? 1f : -1f;
+            }
+            faceT = new Vector3(-_dDir.Z, 0, _dDir.X) * _smSide;
+        }
+        float aR = 1f - Mathf.Exp(-dt / (getting ? 0.11f : tau));
+        Vector3 nt = _dTiltDir + (tiltDirT - _dTiltDir) * aR;
+        _dTiltDir = nt.LengthSquared() > 1e-6f ? nt.Normalized() : tiltDirT;
+        Vector3 nf = _dFace + (faceT - _dFace) * aR;
+        _dFace = nf.LengthSquared() > 1e-6f ? nf.Normalized() : faceT;
+        Vector3 faceRight = new(-_dFace.Z, 0, _dFace.X);
 
         float shoulderUp = 0.035f * H + TorsoLen - 0.03f * H;
         float armLen = (ArmUp + ArmLow) * 0.92f;
         float reachH = shoulderUp * Mathf.Sin(_dTilt) + armLen * 0.85f;
         float offT = Mathf.Clamp(hl - reachH, 0f, maxOff);
+        if (getting) offT *= 1f - Smooth(g / 0.75f);   // the body comes back to where he stands as he rises
         _dOff += (offT - _dOff) * a;
 
         // pelvis height from the tilt and the kind
@@ -286,11 +330,12 @@ public partial class PlayerFigure
             case KDive.Catch: pelT = AnkleH + Leg * 0.80f; break;
             default: pelT = 0.50f * H * cos + k * (0.05f * lift + 0.10f * sin); break;
         }
+        if (getting) pelT = Keys(g, GetUpG, new[] { 0.22f * k, 0.36f * k, 0.60f * k, S.Pel.Y });
         _dPelY += (pelT - _dPelY) * (1f - Mathf.Exp(-dt / 0.04f));
 
-        Vector3 axis = Vector3.Up.Cross(_dDir * sin + Vector3.Up * cos);
+        Vector3 axis = Vector3.Up.Cross(_dTiltDir * sin + Vector3.Up * cos);
         Quaternion q = axis.LengthSquared() > 1e-8f ? new Quaternion(axis.Normalized(), _dTilt) : Quaternion.Identity;
-        Basis B = new Basis(q) * new Basis(fwd, Vector3.Up, right);
+        Basis B = new Basis(q) * new Basis(_dFace, Vector3.Up, faceRight);
         float pelY = _dPelY;
         if (!standing)
         {
@@ -309,8 +354,9 @@ public partial class PlayerFigure
         Vector3 bodyUp = B.Y, bodyRight = B.Z;
 
         var knee = new Vector3[2]; var ank = new Vector3[2]; var dir = new Vector3[2]; var handW = new Vector3[2]; var pole = new Vector3[2];
-        float aH = 1f - Mathf.Exp(-dt / (diving || holdBall ? 0.04f : 0.12f));
+        float aH = 1f - Mathf.Exp(-dt / (diving || holdBall ? 0.04f : getting ? 0.08f : 0.12f));
         float aA = 1f - Mathf.Exp(-dt / 0.05f);
+        float kneeFwd = Smooth((g - 0.05f) / 0.40f);
         float flatLeg = Smooth((_dTilt - 0.5f) / 0.8f);   // flat on the ground the knees bend up, never into the ground
         for (int i = 0; i < 2; i++)
         {
@@ -332,8 +378,19 @@ public partial class PlayerFigure
             }
             if (dir[i] == Vector3.Zero) dir[i] = fwd;
             _dAnk[i] += (at - _dAnk[i]) * aA;
-            SolveLeg(hip, _dAnk[i], (B.X * (1f - flatLeg) + Vector3.Up * (1.2f * flatLeg)).Normalized(), out knee[i], out ank[i]);
+            // getting up the knees bend up while he lies, then forward and down onto the ground as he comes onto them (a pole that follows the body's front
+            // would run along the leg when the torso is half up and flip the knee)
+            Vector3 kneePole = getting
+                ? (Vector3.Up * (1.2f * (1f - kneeFwd)) + fwd * kneeFwd).Normalized()
+                : (B.X * (1f - flatLeg) + Vector3.Up * (1.2f * flatLeg)).Normalized();
+            SolveLeg(hip, _dAnk[i], kneePole, out knee[i], out ank[i]);
             Vector3 ht = hand + bodyRight * side * 0.07f * H;
+            if (getting)
+            {
+                // hands on the ground under the shoulders (a little ahead), coming up to the thighs as he reaches his knees
+                Vector3 shW = pel + B * new Vector3(0, shoulderUp, side * ShoulderW) + _dTiltDir * (0.08f * H);
+                ht = new Vector3(shW.X, 0.06f * k + 0.55f * k * Smooth((g - 0.35f) / 0.35f), shW.Z);
+            }
             ht.Y = Math.Max(ht.Y, 0.06f * k);
             _dHand[i] += (ht - _dHand[i]) * aH;
             handW[i] = _dHand[i];
@@ -342,7 +399,7 @@ public partial class PlayerFigure
             float flat = Smooth((_dTilt - 0.5f) / 0.8f);
             pole[i] = (pb * (1f - flat) + Vector3.Up * (1.2f * flat)).Normalized();
         }
-        return new KPose { Pel = pel, Q = q * new Basis(fwd, Vector3.Up, right).GetRotationQuaternion(), Knee = knee, Ank = ank, Dir = dir, Hand = handW, Pole = pole };
+        return new KPose { Pel = pel, Q = B.GetRotationQuaternion(), Knee = knee, Ank = ank, Dir = dir, Hand = handW, Pole = pole };
     }
 
     // ---------------------------------------------------------------------------------------------------------------
