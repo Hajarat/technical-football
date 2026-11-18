@@ -208,7 +208,8 @@ public sealed class World
             p.Facing = MathF.PI;
             ResetPlayer(p);
         }
-        _brain = new KeeperBrain(Keeper, Pitch, Tuning, Scenario.KeeperHoldLine, Attacker.Sheet);
+        _brain = new KeeperBrain(Keeper, Pitch, Tuning, Scenario.KeeperHoldLine, Attacker.Sheet)
+        { HoldLineThroughDribble = Scenario.KeeperHoldLineThroughDribble };
         IdealCharge = ShotModel.IdealCharge(ShotModel.GoalDistance(Ball.Position, Pitch), Tuning);
     }
 

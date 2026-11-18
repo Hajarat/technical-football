@@ -690,6 +690,7 @@ public class SkillMoveTests
         var sc = TestData.Scenario("halfway_run");
         // The keeper holds his line, so he does not come out and claim the ball before the trace has made all its moves.
         sc.KeeperHoldLine = true;
+        sc.KeeperHoldLineThroughDribble = true;
         var att = TestData.Player("striker_a");
         var kee = TestData.Player("the_wall");
         var w = new World(t, sc, att, kee, 9);
