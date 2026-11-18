@@ -275,22 +275,34 @@ public class ShotActionTests
     [InlineData(false, false, ShotType.Driven)]      // B, B: low shot
     [InlineData(true, false, ShotType.LowFinesse)]   // RB + B, B: low curved
     [InlineData(false, true, ShotType.Chip)]         // LB + B, B: the low chip is not built, a chip
-    public void ShootTappedTwiceIsALowShot(bool finesse, bool chip, ShotType type)
+    public void ShootPressedAgainBeforeTheStrikeIsALowShot(bool finesse, bool chip, ShotType type)
     {
         Assert.Equal(type, DoubleTap(8, 6, 6, finesse, chip).Type);
-        // The second press on the last tick of the 0.25 s window still counts.
-        Assert.Equal(type, DoubleTap(8, 30 - 8, 6, finesse, chip).Type);
+        // A first press held past the old 0.25 s, the second press late in the wind-up (contact at 54 ticks after the press).
+        Assert.Equal(type, DoubleTap(40, 4, 6, finesse, chip).Type);
+        Assert.Equal(type, DoubleTap(8, 44, 2, finesse, chip).Type);
     }
 
     [Theory]
     [InlineData(false, false, ShotType.Power)]
     [InlineData(true, false, ShotType.Finesse)]
     [InlineData(false, true, ShotType.Chip)]
-    public void ASecondPressAfterTheWindowOrASingleTapChangesNothing(bool finesse, bool chip, ShotType type)
+    public void ASingleTapOrAPressAfterTheStrikeChangesNothing(bool finesse, bool chip, ShotType type)
     {
-        Assert.Equal(type, DoubleTap(8, 31 - 8, 6, finesse, chip).Type);   // one tick too late
         Assert.Equal(type, DoubleTap(8, 0, 0, finesse, chip).Type);        // a single tap
-        Assert.Equal(type, DoubleTap(40, 4, 6, finesse, chip).Type);       // held past the window, then pressed again
+        Assert.Equal(type, DoubleTap(8, 47, 6, finesse, chip).Type);       // pressed again only after the contact (tick 54)
+    }
+
+    [Fact]
+    public void AFullChargeLowShot()
+    {
+        // Held 0.4 s (full charge at 0.3 s), released, tapped before the contact: driven at full charge.
+        var power = DoubleTap(48, 0, 0);
+        var low = DoubleTap(48, 4, 4);
+        Assert.Equal(ShotType.Power, power.Type);
+        Assert.Equal(ShotType.Driven, low.Type);
+        Assert.Equal(1f, low.Charge);
+        Assert.Equal(power.Charge, low.Charge);
     }
 
     [Fact]

@@ -162,8 +162,8 @@ public class GestureReaderTests
         // The back flick of a heel-to-heel turned to the side is no elastico.
         AssertOnly(Read(e, Hold(Fwd(), 5).Concat(Neutral(4)).Concat(Hold(Back(), 14)).Concat(Hold(Side(1), 4))), Gesture.HeelToHeel, SkillSide.None);
         // Too slow a step (a forward hold or a neutral pause past 0.125 s): nothing.
-        Assert.Empty(Read(e, Hold(Fwd(), 20).Concat(Neutral(4)).Concat(Hold(Back(), 5))).Where(x => x.G.Kind != Gesture.KnockOn));
-        Assert.Empty(Read(e, Hold(Fwd(), 5).Concat(Neutral(20)).Concat(Hold(Back(), 5))).Where(x => x.G.Kind != Gesture.KnockOn));
+        Assert.DoesNotContain(Read(e, Hold(Fwd(), 20).Concat(Neutral(4)).Concat(Hold(Back(), 5))), x => x.G.Kind != Gesture.KnockOn);
+        Assert.DoesNotContain(Read(e, Hold(Fwd(), 5).Concat(Neutral(20)).Concat(Hold(Back(), 5))), x => x.G.Kind != Gesture.KnockOn);
         Assert.True(GestureReader.NotBuilt(Gesture.HeelToHeel));
     }
 

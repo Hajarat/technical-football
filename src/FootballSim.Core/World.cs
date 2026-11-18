@@ -587,13 +587,12 @@ public sealed class World
     }
 
     /// <summary>
-    /// Shoot pressed again after its release, the shot not yet struck: within low_shot_window of the first press it becomes a
-    /// low shot (power to driven, finesse to low finesse; a chip stays a chip, as there is no low chip yet). Shoulder buttons
-    /// held on the second press count as if held through the first.
+    /// Shoot pressed again after its release, any time before the strike: the shot becomes a low shot (power to driven,
+    /// finesse to low finesse; a chip stays a chip, as there is no low chip yet). The charge stays the first press's, so a
+    /// low shot can have any power. Shoulder buttons held on the second press count as if held through the first.
     /// </summary>
     void PressShootAgain(PlayerState p, in TickIntent it)
     {
-        if (_shotStartTick < 0 || Tick - _shotStartTick > Ticks(Tuning.Skill.LowShotWindow)) return;
         var t = _pending.Type;
         bool finesse = t is ShotType.Finesse or ShotType.LowFinesse || it.Finesse;
         bool chip = t == ShotType.Chip || it.Chip;

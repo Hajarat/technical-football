@@ -22,8 +22,8 @@ public struct TickIntent
     /// <summary>Held: close control (the gamepad's shield button, left trigger).</summary>
     public bool CloseControl;
     /// <summary>
-    /// True while the shoot button is held. Power charges while held; release strikes. Pressed again within
-    /// low_shot_window of the first press, before the strike, it makes the shot a low one (as <see cref="Driven"/>).
+    /// True while the shoot button is held. Power charges while held; release strikes. Pressed again after the release,
+    /// before the strike, it makes the shot a low one (as <see cref="Driven"/>).
     /// </summary>
     public bool ShootHeld;
     /// <summary>

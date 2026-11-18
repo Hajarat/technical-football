@@ -8,7 +8,7 @@ public struct PadSnapshot
     public float MoveX, MoveZ;     // -1..1, radial dead zone applied; stick right = +MoveX, stick up = -MoveZ
     public float Sprint;           // 0..1, right trigger
     public bool Shield;            // left trigger past half (GOALS' shield; the core's close control)
-    public bool ShootHeld;         // B / Circle; tapped twice, a low shot (read by the core)
+    public bool ShootHeld;         // B / Circle; pressed again after the release, before the strike, a low shot (read by the core)
     public bool Finesse;           // right bumper: curved shot; with the left bumper and the left stick back, a drag-back (core)
     public bool Chip;              // left bumper: chip
     public bool Driven;            // keyboard C, held. The pad has no driven button: its low shot is shoot tapped twice

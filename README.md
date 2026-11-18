@@ -57,7 +57,7 @@ set off a different move.
 | B / Circle (hold, release) | Power shot: power builds while held (full in 0.3 s) |
 | Right bumper + B | Curved (finesse) shot |
 | Left bumper + B | Chip |
-| B, B (second press within 0.25 s of the first) | Low (driven) shot; right bumper + B, B is a low curved shot; left bumper + B, B (GOALS' low chip, not built) is a chip |
+| B (hold for power, release), then B again before the strike | Low (driven) shot; right bumper + B, B is a low curved shot; left bumper + B, B (GOALS' low chip, not built) is a chip |
 | B, then A / Cross within 0.1 s | Fake shot: left stick at rest a fake stop, pushed a fake cut that way |
 | Right stick: forward, then straight on to a side | Step-over to that side |
 | Right stick: a side flicked from rest and released | Body feint to that side |
@@ -89,15 +89,16 @@ either side. The right stick counts from half deflection; the timings are in the
   back first, and a flick released to rest waits until a spin or heel-to-heel can no longer follow (0.125 s after the release).
 - Heel-to-heel and spin: from rest a forward flick of at most 0.125 s, rest, then back (heel-to-heel) or a side (spin), within
   0.125 s of the release (`combo_step_window`). Elastico: back, then a side as for the step-over.
-- Low shot: the second press of B within 0.25 s (`low_shot_window`) of the first, while the shot is still winding up. A
-  tap is about 0.1 s, so a double tap lands about 0.15-0.25 s after the first press, well inside the 0.45 s wind-up, and the
-  type is settled before the contact. The charge is the first press's; bumpers held on either press count.
+- Low shot: hold B for the power wanted, release, and press B again any time after the release and before the strike (the
+  contact comes no sooner than 0.45 s after the first press and 0.12 s after the release). The charge is the first press's,
+  so a low shot can have full power; bumpers held on either press count. There is no minimum gap between the release and
+  the second press.
 
 ## Shooting
 
 Five shot types share one model; the modifiers held at any point during the press pick the type at the release: chip if chip
-was held, else driven + finesse is a low finesse, then driven, finesse, and power with none. Shoot pressed a second time within
-`skill.low_shot_window` of the first press (the gamepad's low shot) counts as driven held.
+was held, else driven + finesse is a low finesse, then driven, finesse, and power with none. Shoot pressed again after the release and
+before the strike (the gamepad's low shot) counts as driven held.
 
 | Type | Flight | Foot |
 | --- | --- | --- |
