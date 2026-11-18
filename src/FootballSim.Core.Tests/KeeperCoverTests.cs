@@ -23,7 +23,12 @@ public class KeeperCoverTests
     /// Whether the keeper, planted for the shot <paramref name="distance"/> metres in front of him, touches a ball struck at
     /// <paramref name="speed"/> that passes <paramref name="offset"/> metres to his side at <paramref name="height"/>.
     /// </summary>
-    internal static bool Touches(Tuning t, PlayerSheet sheet, float distance, float speed, float height, float offset, ulong seed)
+    internal static bool Touches(Tuning t, PlayerSheet sheet, float distance, float speed, float height, float offset, ulong seed) =>
+        Touches(t, sheet, distance, speed, height, offset, seed, out _);
+
+    /// <summary>As <see cref="Touches(Tuning, PlayerSheet, float, float, float, float, ulong)"/>, with the keeper's report for the shot.</summary>
+    internal static bool Touches(Tuning t, PlayerSheet sheet, float distance, float speed, float height, float offset, ulong seed,
+        out KeeperReport report, bool planted = true)
     {
         var feet = new Vector3(P.GoalLineX - 2f, 0f, 0f);
         var ball = new Ball(t.Ball) { Position = new Vector3(feet.X - distance, height, 0f) };
@@ -36,7 +41,7 @@ public class KeeperCoverTests
             AttackerPosition = ball.Position - new Vector3(0.5f, 0f, 0f),
         };
         var rng = new SimRng(seed);
-        for (int i = 0; i < 6; i++) brain.Update(t.Dt, ball, rng, windup);
+        if (planted) for (int i = 0; i < 6; i++) brain.Update(t.Dt, ball, rng, windup);
         keeper.Position = feet;
         keeper.Velocity = Vector3.Zero;
         // Aimed to pass the keeper's position offset metres to his side at the given height (flat apart from gravity).
@@ -45,12 +50,13 @@ public class KeeperCoverTests
         ball.Velocity = new Vector3(h.X, 0.5f * 9.81f * flight, h.Y);
         ball.Spin = Vector3.Zero;
         brain.OnStrike(rng, ball);
+        report = brain.Report;
         var flying = new KeeperSituation { AttackerNextTouch = float.PositiveInfinity, AttackerTouchTick = -1, StrikeIn = float.PositiveInfinity, ShotInFlight = true };
         for (int i = 0; i < 240; i++)
         {
             brain.Update(t.Dt, ball, rng, flying);
             var res = ball.Step(t.Dt, null, brain.HandsSphere, brain.BodyCapsule, brain.HandsCapsule);
-            if (res.SphereHit) return true;
+            if (res.SphereHit) { brain.Contact(ball, res.SpherePoint, rng, out _, res.BodyHit); return true; }
             if (ball.Position.X > feet.X + 1.5f) return false;
         }
         return false;
@@ -81,7 +87,7 @@ public class KeeperCoverTests
     [Fact]
     public void ReportCoveredAngleByDistance()
     {
-        var t = new Tuning();
+        var t = DataLoader.LoadTuning(Path.Combine(TestData.DataDir, "tuning", "default.json")).Value!;
         var wall = TestData.Player("the_wall");
         foreach (float height in new[] { 0.3f, 1.0f })
         {

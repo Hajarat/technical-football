@@ -295,9 +295,9 @@ public class KeeperBrainTests
     {
         var s = Wall();
         Assert.Equal(T.Keeper.Reaction.ForRating(s.Reflexes), Keeper.ReactionMean(s, T), 5);
-        Assert.Equal(0.001f, Keeper.SaveJitterMax(s, T, 0f), 5);
-        Assert.Equal(0.025f, Keeper.SaveJitterMax(s, T, Keeper.Stretch(s, T)), 5);
-        Assert.True(Keeper.SaveJitterMax(s, T, 1f) is > 0.001f and < 0.025f);
+        Assert.Equal(0.001f, Keeper.SaveJitterMax(T, 0f), 5);
+        Assert.Equal(0.025f, Keeper.SaveJitterMax(T, 1f), 5);
+        Assert.True(Keeper.SaveJitterMax(T, 0.4f) is > 0.001f and < 0.025f);
 
         // Through the brain: reacting until the drawn reaction has passed, then diving.
         var (brain, keeper, ball) = Rig(s, new Vector3(P.GoalLineX - 11f, 0.11f, 0f));
@@ -331,7 +331,8 @@ public class KeeperBrainTests
         bool Stopped(bool set)
         {
             var (brain, keeper, ball) = Rig(Wall(), new Vector3(P.GoalLineX - 11f, 0.11f, 0f));
-            if (!set) keeper.Velocity = new Vector3(0f, 0f, 2f);
+            // Not set: moving away from where the ball will pass (moving toward it, a reflex hand would get there).
+            if (!set) keeper.Velocity = new Vector3(0f, 0f, -2f);
             // A ball struck from 3 m, passing 0.55 m to his side at waist height: it arrives before he can react.
             var hands = new Vector3(keeper.Position.X, T.Keeper.HandSpanHeightFraction * keeper.Sheet.HeightM, keeper.Position.Z + 0.55f);
             ball.Position = hands - new Vector3(3f, 0f, 0f);

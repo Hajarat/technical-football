@@ -42,7 +42,8 @@ public sealed partial class KeeperBrain
         var b = ball.ScratchB();
         float dt = 1f / 60f, t = 0f;
         // A leap is short: only a ball he meets within its first moments counts (he keeps running otherwise).
-        int steps = (int)MathF.Ceiling((_t.Keeper.PushOff + _t.Keeper.ArmSweepTime + 0.15f) / dt);
+        float exec = Keeper.SaveExecution(_k.Sheet, _t, 1f);
+        int steps = (int)MathF.Ceiling((exec + _t.Keeper.ArmSweepTime + 0.15f) / dt);
         for (int i = 0; i < steps; i++)
         {
             b.Step(dt, null, null);
@@ -50,7 +51,7 @@ public sealed partial class KeeperBrain
             var p = b.Position;
             if (p.X > _pitch.GoalLineX) return false;
             if (p.Y > leap) continue;
-            if (Vector3.Distance(p, home) <= Keeper.ReachAt(_k.Sheet, _t, t - Keeper.SaveJitterMax(_k.Sheet, _t, Keeper.Stretch(_k.Sheet, _t)))) return true;
+            if (Vector3.Distance(p, home) <= Keeper.ReachAt(_k.Sheet, _t, t - Keeper.SaveJitterMax(_t, 1f))) return true;
         }
         return false;
     }
@@ -115,7 +116,7 @@ public sealed partial class KeeperBrain
         }
         // Leap once his reach gets to the ball in time from where he is (the same test the dive makes), or, out of time, at it
         // anyway as it drops in.
-        if (CanLeapNow(ball, leap) || !found && tLine <= k.PushOff + k.ArmSweepTime + 0.1f)
+        if (CanLeapNow(ball, leap) || !found && tLine <= Keeper.SaveExecution(_k.Sheet, _t, 1f) + k.ArmSweepTime + 0.1f)
         {
             _reaction = _since;
             _fromBackpedal = true;

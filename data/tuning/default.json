@@ -267,7 +267,6 @@
       "at1": 3,
       "at99": 6
     },
-    "push_off": 0.12,
     "arm_sweep": 0.9,
     "arm_sweep_time": 0.15,
     "stretch": {
@@ -276,11 +275,6 @@
     },
     "stretch_height_reference": 1.9,
     "prediction_noise": 0.1,
-    "catch_speed": {
-      "at1": 14,
-      "at99": 26
-    },
-    "catch_zone_fraction": 0.7,
     "parry_speed_min": 0.4,
     "parry_speed_max": 0.6,
     "parry_wide_max": 1.5,
@@ -295,11 +289,9 @@
     "body_low": 0.15,
     "body_top_fraction": 0.82,
     "hip_height": 0.95,
-    "spread_range": 6,
-    "spread_full": 3,
-    "spread_half_width": 0.45,
-    "spread_height": 0.6,
-    "spread_radius": 0.4,
+    "ready_full": 3.5,
+    "ready_range": 6,
+    "hull_radius": 0.75,
     "body_hold_speed": 8,
     "arc_radius": 0.7,
     "arc_min_from_line": 0.6,
@@ -422,6 +414,54 @@
     "smother_radius": 0.4,
     "smother_hold_speed": 9,
     "smother_max_seconds": 0.6,
+    "reflex_time": {
+      "at1": 0.2,
+      "at99": 0.08
+    },
+    "reflex_execution_easy": {
+      "at1": 0.04,
+      "at99": 0.0
+    },
+    "reflex_execution_hard": {
+      "at1": 0.08,
+      "at99": 0.03
+    },
+    "reflex_speed": {
+      "at1": 3.0,
+      "at99": 4.8
+    },
+    "reflex_range": {
+      "at1": 1.3,
+      "at99": 1.7
+    },
+    "reflex_height_fraction": 1.15,
+    "reflex_attempt_margin": 0.6,
+    "reflex_body_follow": 0.2,
+    "reflex_foot_height": 0.45,
+    "stance_foot_offset": 0.35,
+    "reflex_body_height": 1.3,
+    "difficulty_low": [[0, 0.1], [0.35, 0.25], [0.7, 0.7], [1, 1]],
+    "difficulty_mid": [[0, 0], [0.35, 0.15], [0.7, 0.6], [1, 1]],
+    "difficulty_high": [[0, 0.1], [0.35, 0.3], [0.7, 0.75], [1, 1]],
+    "difficulty_low_height": 0.4,
+    "difficulty_mid_height": 1,
+    "difficulty_high_height": 1.8,
+    "counter_momentum_penalty": [[0, 0], [1, 0.2], [2, 0.45], [4, 0.8]],
+    "save_execution_easy": {
+      "at1": 0.13,
+      "at99": 0.07
+    },
+    "save_execution_hard": {
+      "at1": 0.17,
+      "at99": 0.11
+    },
+    "catch_range_standing_min": [[8, 1.2], [12, 0.8], [16, 0]],
+    "catch_range_standing_max": [[14, 1.4], [22, 1.1], [26, 0.6], [30, 0]],
+    "catch_range_diving_min": [[8, 2], [12, 1.4], [15, 0]],
+    "catch_range_diving_max": [[14, 2.2], [20, 2], [23, 1.4], [26, 0]],
+    "catch_range_time": [[0.15, 0.3], [0.3, 0.7], [0.5, 1]],
+    "catch_max_difficulty": 0.8,
+    "fingertip_difficulty": 0.92,
     "wedge_min_radius": 0.05,
     "wedge_max_radius": 3.5,
     "wedge_half_angle_deg": 75,
@@ -429,7 +469,6 @@
     "wedge_high_forward": 0.5,
     "save_time_jitter_easy": 0.001,
     "save_time_jitter_hard": 0.025,
-    "diving_catch_factor": 0.9,
     "feet_catch_factor": 0.5,
     "catch_body_radius": 0.45,
     "feet_block_radius": 0.7,
@@ -443,7 +482,6 @@
     "block_speed_min": 0.25,
     "block_speed_max": 0.45,
     "block_angle_deg": 45,
-    "fingertip_zone_fraction": 0.05,
     "fingertip_speed_kept": 0.7,
     "fingertip_max_bend_deg": 40,
     "dive_land_seconds": 0.15,

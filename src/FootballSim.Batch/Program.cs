@@ -222,11 +222,14 @@ sealed class KeeperStats
     int _onTarget;
     int _n, _shots, _rush, _charge, _smother, _smotherClaim, _planted, _reactN, _parried;
     double _react, _speed;
-    readonly Dictionary<string, int> _after = new(), _save = new(), _dive = new();
+    readonly Dictionary<string, int> _after = new(), _save = new(), _dive = new(), _atStrike = new();
     readonly double[] _bandSum = new double[KeeperReport.DepthBands.Length];
     readonly int[] _bandN = new int[KeeperReport.DepthBands.Length];
     int _won, _wonHeld, _chips, _chipsScored, _chipsTipped, _rounded, _roundedScored;
     readonly int[] _saveCount = new int[Enum.GetValues<SaveKind>().Length];
+    readonly int[] _typeCount = new int[Enum.GetValues<SaveType>().Length];
+    double _difficulty, _ready;
+    int _difficultyN, _readyN;
     int _beaten;
     readonly List<int> _rev = new(), _rev2 = new();
 
@@ -260,6 +263,10 @@ sealed class KeeperStats
             if (float.IsFinite(k.ReactionS)) { _react += k.ReactionS; _reactN++; }
             if (k.Save != SaveKind.None) Bump(_save, k.Save.ToString());
             _saveCount[(int)k.Save]++;
+            _typeCount[(int)k.SaveType]++;
+            if (float.IsFinite(k.Difficulty)) { _difficulty += k.Difficulty; _difficultyN++; }
+            if (k.Ready > 0f) { _ready += k.Ready; _readyN++; }
+            Bump(_atStrike, $"{k.ActionAtStrike}{(k.SpeedAtStrikeMs <= 0.3f ? "" : k.SpeedAtStrikeMs <= 1.5f ? " <1.5" : k.SpeedAtStrikeMs <= 3f ? " <3" : " 3+")}");
             if (k.Action == KeeperResult.Beaten) _beaten++;
             if (k.Dive != KeeperDive.None) Bump(_dive, k.Dive.ToString());
         }
@@ -292,6 +299,7 @@ sealed class KeeperStats
         Console.WriteLine($"{prefix}keeper: charge {Pct(_charge)} of rounds, rush {Pct(_rush)}, smother {Pct(_smother)} (claimed before a shot {Pct(_smotherClaim)}), " +
                           $"planted at strike {PctOf(_planted, _shots)} of shots, mean reaction {(_react / Math.Max(1, _reactN)).ToString("F3", ic)} s, " +
                           $"mean speed at strike {(_speed / Math.Max(1, _shots)).ToString("F2", ic)} m/s");
+        Console.WriteLine($"{prefix}keeper action at the strike (and speed band, m/s; % of shots): {List(_atStrike, c => PctOf(c, _shots))}");
         Console.WriteLine($"{prefix}shots on target (unhindered flight inside the goal) {PctOf(_onTarget, _shots)} of {_shots} shots");
         Console.WriteLine($"{prefix}at strike: keeper off his line {Spread(_depth)} m, ball from goal centre {Spread(_dist)} m");
         Console.WriteLine($"{prefix}after parry/rebound (% of rounds): {List(_after, Pct)}");
@@ -300,6 +308,11 @@ sealed class KeeperStats
         int S(SaveKind kind) => _saveCount[(int)kind];
         Console.WriteLine($"{prefix}first-shot save counts: catch {S(SaveKind.Catch)}, parry {S(SaveKind.Parry)}, block {S(SaveKind.Block)}, " +
                           $"tip {S(SaveKind.TipOver)}, fingertip {S(SaveKind.Fingertip)}, smother {S(SaveKind.Smother)}, beaten {_beaten} (of {_shots} shots)");
+        int T(SaveType type) => _typeCount[(int)type];
+        Console.WriteLine($"{prefix}first-shot save types (what he went for): catch {T(SaveType.Catch)}, parry {T(SaveType.Parry)}, reflex {T(SaveType.Reflex)}, " +
+                          $"reflex attempt {T(SaveType.ReflexAttempt)}, failed attempt {T(SaveType.FailedAttempt)}, none {T(SaveType.None)}; " +
+                          $"mean difficulty {(_difficulty / Math.Max(1, _difficultyN)).ToString("F2", ic)}, ready at the strike {PctOf(_readyN, _shots)} of shots " +
+                          $"(mean {(_ready / Math.Max(1, _readyN)).ToString("F2", ic)})");
         var bands = KeeperReport.DepthBands;
         Console.WriteLine($"{prefix}keeper depth off his line as the attacker on the ball came within (m of goal): " + string.Join(", ",
             bands.Select((b, i) => $"{b.ToString("F0", ic)} m: {(_bandN[i] == 0 ? "-" : (_bandSum[i] / _bandN[i]).ToString("F2", ic))} (n {_bandN[i]})")));
