@@ -207,10 +207,10 @@ public class KeeperBrainTests
     }
 
     [Fact]
-    public void HeDoesNotRushForABallBeyondFifteenMetresFromGoal()
+    public void HeDoesNotRushForABallBeyondTheReachOfHisArea()
     {
         var (brain, keeper, ball) = Rig(Wall(), new Vector3(P.GoalLineX - 20f, 0.11f, 0f));
-        ball.Position = new Vector3(P.GoalLineX - 16.5f, 0.11f, 0f);
+        ball.Position = new Vector3(P.GoalLineX - P.PenaltyAreaDepth - T.Keeper.SlideBeyondArea - 1f, 0.11f, 0f);
         for (int i = 0; i < 30; i++) brain.Update(Dt, ball, new SimRng(1), Loose(5f));
         Assert.NotEqual(KeeperAction.Rush, keeper.KeeperAction);
         ball.Position = new Vector3(P.GoalLineX - 13f, 0.11f, 0f);

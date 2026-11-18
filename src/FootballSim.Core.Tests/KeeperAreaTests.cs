@@ -23,8 +23,7 @@ public class KeeperAreaTests
     }
 
     /// <summary>
-    /// A 14 m deep area, inside the 15 m he rushes to (<c>rush_max_from_goal</c>): with the full 16.5 m area he never races for a
-    /// ball inside it near its line in front of goal, so a smother there cannot start.
+    /// A 14 m deep area: a smother near its line, 14 m from goal, is a race he takes (he rushes out to the line of any area).
     /// </summary>
     static readonly Pitch Shallow = new(new PitchSpec { PenaltyAreaDepth = 14f }, T.Frame);
 
@@ -259,5 +258,75 @@ public class KeeperAreaTests
             ball.Step(Dt, null, null);
         }
         Assert.True(dived);
+    }
+
+    // ---- his reach: all of the area, and a little beyond it ----
+
+    /// <summary>Ticks until he has gone down or run at the ball (or <paramref name="ticks"/> pass), stepping the ball too; true if he left his spot.</summary>
+    static bool Races(KeeperBrain brain, PlayerState keeper, Ball ball, float attackerNextTouch, int ticks = 90)
+    {
+        var rng = new SimRng(1);
+        float x0 = keeper.Position.X;
+        for (int i = 0; i < ticks; i++)
+        {
+            brain.Update(Dt, ball, rng, Loose(attackerNextTouch));
+            ball.Step(Dt, P, brain.HandsSphere, brain.BodyCapsule, brain.HandsCapsule);
+            if (keeper.KeeperAction is KeeperAction.Rush or KeeperAction.Smother or KeeperAction.Slide or KeeperAction.Diving
+                && keeper.Position.X < x0 - 0.5f) return true;
+            if (keeper.KeeperAction is KeeperAction.Smother or KeeperAction.Slide or KeeperAction.Diving) return true;
+        }
+        return false;
+    }
+
+    [Fact]
+    public void HeRacesForALooseBallRightUpToTheLineOfHisArea()
+    {
+        Assert.Equal(P.PenaltyAreaDepth, P.GoalLineX - Line);
+        // Between 15 m and the line at 16.5 m from goal: he used to stop short of it.
+        foreach (float dist in new[] { 15.5f, 16.0f, 16.4f })
+        {
+            var ballAt = new Vector3(P.GoalLineX - dist, R, 0f);
+            Assert.True(P.InPenaltyArea(ballAt, R));
+            var (brain, keeper, ball) = Rig(new Vector3(Line + 3.5f, 0f, 0f), ballAt);
+            Assert.True(Races(brain, keeper, ball, 3f), $"ball {dist} m from goal");
+        }
+    }
+
+    [Fact]
+    public void HeRacesForABallJustOutsideTheAreaAndPlaysItWithHisFeetNeverHisHands()
+    {
+        foreach (float out_ in new[] { 2f, 3f, 4f })
+        {
+            var (brain, keeper, ball) = Rig(new Vector3(Line + 1.5f, 0f, 0f), new Vector3(Line - out_, R, 0f));
+            var rng = new SimRng(1);
+            bool slid = false;
+            for (int i = 0; i < 3 * T.TickRate; i++)
+            {
+                brain.Update(Dt, ball, rng, Loose(3f));
+                var res = ball.Step(Dt, P, brain.HandsSphere, brain.BodyCapsule, brain.HandsCapsule);
+                if (res.SphereHit && !brain.RefuseHands(res.SpherePoint, res.BodyHit))
+                    Assert.False(brain.Contact(ball, res.SpherePoint, rng, out _, res.BodyHit), $"{out_} m out: a hand save");
+                if (brain.Report.Slid) slid = true;
+                Assert.NotEqual(KeeperAction.Holding, keeper.KeeperAction);
+                Assert.NotEqual(SaveKind.Catch, brain.Report.Save);
+            }
+            Assert.True(slid, $"{out_} m outside the line");
+            Assert.True(brain.Report.Save is SaveKind.Slide or SaveKind.Block or SaveKind.None);
+        }
+    }
+
+    [Fact]
+    public void HeDoesNotLeaveForABallBeyondHisReachOrOneHeWouldNotWin()
+    {
+        // More than slide_beyond_area past the line.
+        float past = T.Keeper.SlideBeyondArea + 0.8f;
+        var (brain, keeper, ball) = Rig(new Vector3(Line + 1.5f, 0f, 0f), new Vector3(Line - past, R, 0f));
+        Assert.False(Races(brain, keeper, ball, 3f));
+
+        // In reach, but the attacker is on it again before he could get there.
+        var (brain2, keeper2, ball2) = Rig(new Vector3(Line + 6f, 0f, 0f), new Vector3(Line - 3f, R, 0f));
+        Assert.False(Races(brain2, keeper2, ball2, 0.2f));
+        var (brain3, keeper3, ball3) = Rig(new Vector3(Line + 12f, 0f, 0f), new Vector3(Line + 0.5f, R, 0f));
+        Assert.False(Races(brain3, keeper3, ball3, 0.3f));
     }
 }

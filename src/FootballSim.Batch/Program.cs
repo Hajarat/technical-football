@@ -223,7 +223,7 @@ sealed class KeeperStats
 {
     readonly List<float> _depth = new(), _dist = new();
     int _onTarget;
-    int _n, _shots, _rush, _charge, _smother, _smotherClaim, _planted, _reactN, _parried;
+    int _n, _shots, _rush, _charge, _smother, _slide, _smotherClaim, _planted, _reactN, _parried;
     double _react, _speed;
     readonly Dictionary<string, int> _after = new(), _save = new(), _dive = new(), _atStrike = new();
     readonly double[] _bandSum = new double[KeeperReport.DepthBands.Length];
@@ -243,6 +243,7 @@ sealed class KeeperStats
         if (k.Rushed) _rush++;
         if (k.Charged) _charge++;
         if (k.Smothered) _smother++;
+        if (k.Slid) _slide++;
         if (r.End == ShotEnd.NoShot && r.Outcome == Outcome.Held && k.Save == SaveKind.Smother) _smotherClaim++;
         for (int i = 0; i < _bandSum.Length && i < k.DepthAtBandM.Length; i++)
             if (float.IsFinite(k.DepthAtBandM[i])) { _bandSum[i] += k.DepthAtBandM[i]; _bandN[i]++; }
@@ -299,7 +300,7 @@ sealed class KeeperStats
     public void Print(string prefix)
     {
         var ic = CultureInfo.InvariantCulture;
-        Console.WriteLine($"{prefix}keeper: charge {Pct(_charge)} of rounds, rush {Pct(_rush)}, smother {Pct(_smother)} (claimed before a shot {Pct(_smotherClaim)}), " +
+        Console.WriteLine($"{prefix}keeper: charge {Pct(_charge)} of rounds, rush {Pct(_rush)}, smother {Pct(_smother)}, slide or poke {Pct(_slide)} (claimed before a shot {Pct(_smotherClaim)}), " +
                           $"planted at strike {PctOf(_planted, _shots)} of shots, mean reaction {(_react / Math.Max(1, _reactN)).ToString("F3", ic)} s, " +
                           $"mean speed at strike {(_speed / Math.Max(1, _shots)).ToString("F2", ic)} m/s");
         Console.WriteLine($"{prefix}keeper action at the strike (and speed band, m/s; % of shots): {List(_atStrike, c => PctOf(c, _shots))}");

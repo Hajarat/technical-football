@@ -198,7 +198,7 @@ public sealed partial class KeeperBrain
         float cap = MathF.Min(chipCap, bMouth - k.CloseDownGap);
         float lo = MathF.Max(arcD, MathF.Min(want, cap));
         float hi = MathF.Max(lo, cap);
-        if (_chargeSoon) hi = MathF.Max(hi, MathF.Min(mine, k.ChargeMaxOut));
+        if (_chargeSoon) hi = MathF.Max(hi, MathF.Min(mine, ChargeMaxOut));
         _tWant = want; _tChip = chipCap; _tGap = bMouth - k.CloseDownGap;
         float got = Math.Clamp(mine, lo, hi);
         _tLimit = got <= arcD + 1e-3f && arcD >= MathF.Min(want, cap) ? KeeperLimit.Arc
@@ -235,7 +235,7 @@ public sealed partial class KeeperBrain
         // Where they would meet: the ball that much closer, him jockeying short of it; beyond his chip-safe depth for the ball's
         // distance now, a chip on the way is the risk he weighs.
         float bMouth = Keeper.MouthDistance(b, _pitch);
-        float meet = MathF.Min(k.ChargeMaxOut, bMouth - MathF.Max(0f, approach) * (float.IsFinite(tClose) ? tClose : 0f) - k.JockeyDistance);
+        float meet = MathF.Min(ChargeMaxOut, bMouth - MathF.Max(0f, approach) * (float.IsFinite(tClose) ? tClose : 0f) - k.JockeyDistance);
         float chipSafe = ChipSafeJudged(bd, rng);
         float excess = meet - chipSafe;
         float tol = Keeper.ChargeTolerance(_k.Sheet, _t, excess);
@@ -251,7 +251,7 @@ public sealed partial class KeeperBrain
 
     /// <summary>
     /// Charging and jockeying: on the cover line from the ball (looked ahead) <c>jockey_distance</c> short of it, never shallower
-    /// than his arc or further out than <c>charge_max_out</c>, run at rush speed (slowing to arrive). Giving ground toward his goal
+    /// than his arc or further out than the penalty area's depth, run at rush speed (slowing to arrive). Giving ground toward his goal
     /// he moves no faster than <c>jockey_retreat_speed</c> away from the ball, so an attacker who runs at him closes the gap.
     /// Shown as Charge while further than a metre beyond jockeying range, else Jockey.
     /// </summary>
@@ -263,7 +263,7 @@ public sealed partial class KeeperBrain
         float bMouth = Keeper.MouthDistance(lb, _pitch);
         var arc = Keeper.ArcTarget(look, _pitch, _t, _k.Sheet);
         float arcD = Keeper.MouthDistance(new Vector2(arc.X, arc.Z), _pitch);
-        float to = MathF.Max(arcD, MathF.Min(bMouth - k.JockeyDistance, k.ChargeMaxOut));
+        float to = MathF.Max(arcD, MathF.Min(bMouth - k.JockeyDistance, ChargeMaxOut));
         var target = Keeper.CoverSpot(look, _pitch, _t, to, halfWay: false);
         var pos = new Vector2(_k.Position.X, _k.Position.Z);
         var d = Keeper.CapTarget(pos, new Vector2(target.X, target.Z), k.MoveTargetCap) - pos;
@@ -440,7 +440,7 @@ public sealed partial class KeeperBrain
     /// going past him), judged with his misjudgement (drawn per attacker
     /// touch). The more time the ball gives him over the attacker, the further out he wins it. Short of the margin by less than
     /// his anticipation (<c>rush_anticipation</c>), he starts toward the ball and aborts if the race turns against him. Only for
-    /// a low ball he can take within the rush limit inside his penalty area, or up to <c>slide_beyond_area</c> beyond its line
+    /// a low ball he can take inside his penalty area (within its depth of the goal centre), or up to <c>slide_beyond_area</c> beyond its line
     /// outside it. A point outside the area (judged by the ball there) he races for with his feet: within <c>slide_reach</c> a
     /// slide (the foot from <c>slide_foot_start</c> at <c>slide_speed</c>), or a poke within <c>poke_reach</c> (at
     /// <c>poke_speed</c>) when the ball is above <c>slide_max_height</c> or that close.
@@ -451,7 +451,7 @@ public sealed partial class KeeperBrain
         var goal = new Vector2(_pitch.GoalLineX, 0f);
         var b0 = new Vector2(ball.Position.X, ball.Position.Z);
         if (ball.Position.Y > k.ClaimMaxHeight + 0.5f) { _tRaceBlock = "ball high"; return default; }
-        if (Vector2.Distance(b0, goal) > k.RushMaxFromGoal + 4f && b0.X < _pitch.PenaltyAreaLineX - k.SlideBeyondArea - 4f) { _tRaceBlock = "beyond rush max"; return default; }
+        if (Vector2.Distance(b0, goal) > RushMaxFromGoal + 4f && b0.X < _pitch.PenaltyAreaLineX - k.SlideBeyondArea - 4f) { _tRaceBlock = "beyond rush max"; return default; }
         float tAtt = s.AttackerNextTouch;
         var feet = new Vector2(_k.Position.X, _k.Position.Z);
         // The attacker still at the ball (close control, a jog): even a dive at it wants his margin.
@@ -485,7 +485,7 @@ public sealed partial class KeeperBrain
             var p2 = new Vector2(p.X, p.Z);
             if (p.X > _pitch.GoalLineX - 0.3f) continue;
             bool outside = !HandsAllowedAt(p);
-            if (outside ? p.X < _pitch.PenaltyAreaLineX - k.SlideBeyondArea : Vector2.Distance(p2, goal) > k.RushMaxFromGoal) continue;
+            if (outside ? p.X < _pitch.PenaltyAreaLineX - k.SlideBeyondArea : Vector2.Distance(p2, goal) > RushMaxFromGoal) continue;
             var to = p2 - feet;
             float d = to.Length();
             float v0 = d > 1e-4f ? Vector2.Dot(vel, to / d) : 0f;
