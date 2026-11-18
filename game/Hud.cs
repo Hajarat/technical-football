@@ -14,6 +14,9 @@ public partial class Hud : CanvasLayer
     Label _clock = null!, _spot = null!, _notice = null!, _warning = null!, _title = null!, _body = null!, _toast = null!;
     float _toastLeft;
     PanelContainer _report = null!;
+    Label _hint = null!;
+    /// <summary>The full controls list; Match decides when it shows.</summary>
+    public ControlsPanel Controls { get; private set; } = null!;
 
     public override void _Ready()
     {
@@ -59,6 +62,14 @@ public partial class Hud : CanvasLayer
         _toast.OffsetLeft = -700; _toast.OffsetRight = -20; _toast.OffsetTop = -36; _toast.OffsetBottom = -10;
         _toast.LabelSettings!.FontColor = new Color(0.6f, 1f, 0.6f);
         _toast.Visible = false;
+
+        _hint = MakeLabel(root, 16, HorizontalAlignment.Right);
+        _hint.AnchorLeft = _hint.AnchorRight = 1;
+        _hint.OffsetLeft = -380; _hint.OffsetRight = -20; _hint.OffsetTop = 14; _hint.OffsetBottom = 40;
+        _hint.LabelSettings!.FontColor = new Color(1, 1, 1, 0.65f);
+
+        Controls = new ControlsPanel { Name = "ControlsPanel" };
+        root.AddChild(Controls);
 
         _report = new PanelContainer { Name = "ReportCard", Visible = false, MouseFilter = Control.MouseFilterEnum.Ignore };
         var style = new StyleBoxFlat { BgColor = new Color(0, 0, 0, 0.7f), CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8, CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8 };
@@ -123,6 +134,13 @@ public partial class Hud : CanvasLayer
     }
 
     public void HideReport() => _report.Visible = false;
+
+    /// <summary>Small always-on corner hint naming the key or button that opens the controls panel; empty string hides it.</summary>
+    public void SetControlsHint(string text)
+    {
+        _hint.Text = text;
+        _hint.Visible = text.Length > 0;
+    }
 
     /// <summary>Shows or hides the "Connect a gamepad to play" notice.</summary>
     public void SetGamepadNotice(bool visible) => SetNotice(visible ? "Connect a gamepad to play" : "");

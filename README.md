@@ -44,6 +44,19 @@ and hands land on them), tints clothing and skin from `FigureKit` and puts the s
 from the joints, so they are the same with either `--figure` value. Build steps, asset list and licences: `game/assets/characters/SOURCES.md`.
 A fresh checkout needs `godot-mono --headless --path game --import` once.
 
+## Controls panel
+
+The game shows the controls for the device in use: keyboard and mouse or gamepad, switching live to whichever produced the last
+meaningful input (a key, a mouse button or more than a few pixels of mouse movement; a pad button or a stick or trigger past 0.3).
+A small hint in the top-right corner names the toggle: `H` on the keyboard, left stick click (`L3` on PlayStation) on the pad. The
+full list opens on that toggle and while the game is paused (`P` / `Esc` / Menu), and stays out of the play area otherwise. It lists
+movement, shooting, skill moves (the right-stick gesture in words for the pad, the keys for the keyboard; elastico, heel-to-heel and
+spin are marked not built yet) and round / menu actions. Pad buttons use the pad's own names (Xbox, PlayStation or Nintendo, picked
+from the name the OS reports; Xbox names when unknown), and the face-button swap keeps the shoot button the right-hand one, so the
+labels match what is pressed. Every label is read from `game/Bindings.cs`, where `InputReader` also takes its keys and buttons, so
+changing a binding there changes the panel. `-- --controls-panel keyboard|xbox|playstation|nintendo` opens the panel for that
+device without a pad, for screenshots.
+
 ## Gamepad controls
 
 The pad follows GOALS' Standard preset (Xbox names). Inputs for moves not built yet are recognised and ignored, so they never
@@ -76,6 +89,7 @@ set off a different move.
 | Right stick click | Toggle the debug overlay (shot wedge, aimed and landed markers, keeper reach) |
 | View / Share / Back | Flag the most recent finished round (a `flag` line in the session log) |
 | Menu / Options / Start | Pause |
+| Left stick click | Show or hide the controls panel (no gameplay action) |
 | Keyboard `B` | Swap face buttons (A with B, X with Y) for the active pad. On by default for Nintendo / Switch / Pro Controller pads; the choice is saved per pad name |
 
 Skill-move directions are taken against the running direction (the facing when standing), and every side move works to
@@ -221,7 +235,7 @@ GOALS bindings.
 | Key | Action | GOALS default |
 | --- | --- | --- |
 | WASD | Run and aim (W = toward the far touchline, D = toward the goal) | Mouse steers; W/A/S/D are buttons |
-| Left Ctrl | Sprint | Same |
+| Ctrl | Sprint (either Ctrl; GOALS: Left Ctrl) | Left Ctrl |
 | Q | Shield (close control) | W |
 | Left mouse (hold, release) | Shoot; pressed again after the release, before the strike, a low shot | Same |
 | E | Curved (finesse) shot, held while shooting | D |
@@ -240,9 +254,10 @@ GOALS bindings.
 | M | Flag the most recent finished round | |
 | P or Esc | Pause | Esc opens the menu |
 | B | Swap the pad's face buttons (see above) | |
+| H | Show or hide the controls panel | Hero select (not built) |
 
-GOALS keys not used here: R (its left stick click action), F (switch set-piece taker), Tab (match menu), H (hero select),
-middle mouse (hold to use the mouse as the right stick). There is no driven-shot key: as on the pad, the low shot is shoot
+GOALS keys not used here: R (its left stick click action; the pad's left stick click opens the controls panel instead), F (switch set-piece taker), Tab (match menu),
+middle mouse (hold to use the mouse as the right stick); its H (hero select) opens the controls panel. There is no driven-shot key: as on the pad, the low shot is shoot
 pressed twice.
 
 ## Session logs

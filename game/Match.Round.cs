@@ -22,6 +22,7 @@ public partial class Match
     int _round;                       // number of the round being set up or played; a retry is a new number
     int _lastFinishedRound;
     string _lastInputMode = "";
+    bool _controlsOn;
     string _lastPadName = "";
     string _lastWarnings = "";
     int _flightTicks, _liveTicks;
@@ -39,7 +40,7 @@ public partial class Match
         if (_args.ReplayPath == null && _args.GalleryDir == null) _log = SessionLog.Create(Path.GetFullPath(Path.Combine(game, "..")));
         _log?.Write("start",
             ("godot", Engine.GetVersionInfo()["string"].AsString()),
-            ("refresh_hz", DisplayServer.ScreenGetRefreshRate()),
+            ("refresh_hz", float.IsFinite(DisplayServer.ScreenGetRefreshRate()) ? DisplayServer.ScreenGetRefreshRate() : 0f), // infinite under a virtual display
             ("window", $"{DisplayServer.WindowGetSize().X}x{DisplayServer.WindowGetSize().Y}"),
             ("display", DisplayServer.GetName()),
             ("data_dir", _data.Dir));
@@ -146,6 +147,7 @@ public partial class Match
     {
         if (pad.OverlayToggle) Overlay.Enabled = !Overlay.Enabled;
         if (pad.Flag) Flag();
+        if (pad.ControlsToggle) _controlsOn = !_controlsOn;
         if (pad.Pause)
         {
             _paused = !_paused;
@@ -211,7 +213,7 @@ public partial class Match
     {
         Pad.KeyboardEnabled = _replay == null;
         if (_paused) Hud.SetNotice("Paused");
-        else if (_replay == null && !Pad.GamepadConnected) Hud.SetNotice(NoPadNotice);
+        else if (_replay == null && !Pad.GamepadConnected && !_controlsOn && _args.ControlsPanel == null) Hud.SetNotice(NoPadNotice);
         else Hud.SetNotice("");
 
         string name = Pad.GamepadConnected ? Pad.ActivePadName : "";
@@ -221,13 +223,33 @@ public partial class Match
             if (name.Length > 0) Hud.Toast("Gamepad: " + name, 4f);
         }
 
-        string mode = Pad.Source;
-        if (mode == "none" && Pad.GamepadConnected) mode = "gamepad";
+        string mode = Pad.Mode;
         if (mode != _lastInputMode)
         {
             _lastInputMode = mode;
             _log?.Write("input_mode", ("mode", mode));
         }
+        UpdateControls();
+    }
+
+    /// <summary>The corner hint, and the controls panel while paused or toggled (or forced by --controls-panel).</summary>
+    void UpdateControls()
+    {
+        var device = Pad.Device;
+        string padName = Pad.GamepadConnected ? Pad.ActivePadName : "";
+        var kind = PadBind.KindOf(padName);
+        bool swapped = Pad.SwapFaceButtons;
+        bool forced = _args.ControlsPanel != null;
+        if (forced)
+        {
+            device = _args.ControlsPanel == "keyboard" ? InputDevice.Keyboard : InputDevice.Gamepad;
+            kind = _args.ControlsPanel switch { "playstation" => PadKind.PlayStation, "nintendo" => PadKind.Nintendo, _ => PadKind.Xbox };
+            padName = ""; swapped = false;
+        }
+        Hud.SetControlsHint(device == InputDevice.Gamepad ? $"{Bindings.Pad.Controls.Label(kind)}: controls" : $"{Bindings.Controls.Label}: controls");
+        bool show = forced || _paused || _controlsOn;
+        if (show) Hud.Controls.Open(device, kind, padName, swapped);
+        else Hud.Controls.Close();
     }
 
     string Cycle(System.Collections.Generic.List<PlayerSheet> list, string current)
