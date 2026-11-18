@@ -115,7 +115,10 @@ and every number in the `keeper` section of `data/tuning/default.json`. Each tic
   `close_down_depth` (by the ball's distance from the mouth, its excess over the arc scaled by `close_down_positioning`), so his
   depth grows as the attacker comes closer. He comes no further than his chip-safe depth as he judges it, no closer than
   `close_down_gap` to the ball and no further than `hold_ground_max_out` from the mouth; between what he wants and those
-  limits he keeps the depth he has (no backpedalling while the attacker runs at him). With the attacker on the ball within
+  limits he keeps the depth he has (no backpedalling while the attacker runs at him). Before closing down starts, an attacker
+  on the ball in front of him still makes him keep his depth within those limits rather than drop back to his arc. Moving off
+  or toward his line, he does not turn round for a new spot less than `reverse_threshold` the other way from where his
+  braking would stop him; he settles there instead. With the attacker on the ball within
   `engage_range` of him and in front, he pushes up to just inside `pre_spread_range` of the ball at rush speed. A reposition
   back toward goal close to it (inside `urgent_range`: drawn out or taken round) is run, not jogged. Moving away from the ball
   faster than `backpedal_show_speed` shows as `Backpedal`.
@@ -153,8 +156,9 @@ and every number in the `keeper` section of `data/tuning/default.json`. Each tic
 - **Chips.** After his reaction he reads the struck ball's flight (never the shot type): on target and passing over him above
   his leap, he backpedals (`Backpedal`) facing back up the pitch, to the first point on its path where it has dropped to his
   take height that he can reach in time (else to where it crosses the line), and leaps for it once his reach gets there in
-  time: a dive that tips it over the bar or, below `backpedal_catch_factor` of his diving catch speed, catches it. No dive
-  target is above his leap.
+  time: a backward leap (`KeeperDive.Back`: springing up and back, arms over his head toward the ball, falling back toward his
+  goal) that tips it over the bar or, below `backpedal_catch_factor` of his diving catch speed, catches it. No dive target is
+  above his leap.
 - **Recover.** After a dive or smother he lies for `grounded_seconds`, then gets up in `get_up_seconds`; a new save can start
   `get_up_save_after` into getting up.
 
@@ -162,8 +166,9 @@ The batch tool prints, under the scoring table, the keeper's distance off his li
 strike (mean, p10, p90), what became of parried first shots, the share of rounds with a rush or a
 smother before the shot, how often he was planted at the strike, his mean reaction, and the saves and dives he made; then his
 mean depth off his line as the attacker on the ball first came within 20, 15, 10 and 6 m of the goal centre, the rounds he won
-the ball from a dribble (touched it before any shot), the rounds he was taken round, and the chips tried, scored and tipped
-over. A first shot touched by the keeper that carries on into the net counts as scored.
+the ball from a dribble (touched it before any shot), the rounds he was taken round, how often his movement off or toward
+his line changed direction before the shot (above 0.3 m/s held 0.1 s; mean, p95 and max, over the round and its first 2 s),
+and the chips tried, scored and tipped over. `--counters off` makes the scripted attacker ignore the keeper. A first shot touched by the keeper that carries on into the net counts as scored.
 
 The scripted attacker (batch and tests) reacts to the keeper as a player would see him: jogging touches once he is within 9 m
 of the ball and close control within 6 m, taking round a keeper rushing out at it within 5 m (holding the shot until past
