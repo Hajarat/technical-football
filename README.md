@@ -15,7 +15,7 @@ World coordinates are metres: X toward the attacked goal (goal line 52.5), Y up,
 | Re-run a replay in the batch tool | `dotnet run -c Release --project src/FootballSim.Batch -- --replay game/tests/smoke_replay.json` |
 | Skill-move probe (scripted gestures per move, side, entry pace and skill_moves 1/50/99; the not-built elastico, heel-to-heel and spin rows should read recognised 100, made 0) | `dotnet run -c Release --project src/FootballSim.Batch -- --skill-probe` |
 | Write one replay per skill move (edge_of_box start) for screenshots | `dotnet run -c Release --project src/FootballSim.Batch -- --write-skill-replays out/skill-replays` |
-| Write one replay per visible keeper action (shuffle, rush, planted then reacting, each dive kind, tip over the bar, smother, closing down, spread, a long sprint touch won, a backpedal under a chip, taken round, parry then grounded then getting up) for screenshots; prints each file with the tick range of its action | `dotnet run -c Release --project src/FootballSim.Batch -- --write-keeper-replays out/keeper-replays` |
+| Write one replay per visible keeper action (shuffle, rush, planted then reacting, each dive kind, tip over the bar, smother, closing down, charging, jockeying, spread, a long sprint touch won, a backpedal under a chip, taken round, parry then grounded then getting up) for screenshots; prints each file with the tick range of its action | `dotnet run -c Release --project src/FootballSim.Batch -- --write-keeper-replays out/keeper-replays` |
 | Print the keeper's state tick by tick for one scripted round | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario tight_angle --trace-keeper 1` |
 | Smoke run: replay through the game scene, no window | `godot-mono --headless --path game -- --replay tests/smoke_replay.json --quit-after-round` |
 | Smoke comparison (game report vs batch report) | `game/tests/smoke.sh` |
@@ -143,17 +143,28 @@ and every number in the `keeper` section of `data/tuning/default.json`. Each tic
   `reposition_threshold`, with a positioning error drawn then (`position_error`). He side-steps or jogs there with
   rating-based speeds and `move_accel`. Penalties (`keeper_hold_line` in the scenario) keep him on his line until the strike.
 - **Close down.** Once an attacker comes at goal with the ball (within `close_down_range` of the mouth, at
-  `close_down_min_speed` or more; from then on for the round) he comes off his arc along the cover line to
+  `close_down_min_speed` or more, which a close-control dribble reaches; from then on for the round) he comes off his arc along the cover line to
   `close_down_depth` (by the ball's distance from the mouth, its excess over the arc scaled by `close_down_positioning`), so his
   depth grows as the attacker comes closer. He comes no further than his chip-safe depth as he judges it, no closer than
   `close_down_gap` to the ball and no further than `hold_ground_max_out` from the mouth; between what he wants and those
   limits he keeps the depth he has (no backpedalling while the attacker runs at him). Before closing down starts, an attacker
   on the ball in front of him still makes him keep his depth within those limits rather than drop back to his arc. Moving off
   or toward his line, he does not turn round for a new spot less than `reverse_threshold` the other way from where his
-  braking would stop him; he settles there instead. With the attacker on the ball within
-  `engage_range` of him and in front, he pushes up to just inside `pre_spread_range` of the ball at rush speed. A reposition
-  back toward goal close to it (inside `urgent_range`: drawn out or taken round) is run, not jogged. Moving away from the ball
-  faster than `backpedal_show_speed` shows as `Backpedal`.
+  braking would stop him; he settles there instead. A reposition back toward goal close to it (inside `urgent_range`: drawn
+  out or taken round) is run, not jogged. Moving away from the ball faster than `backpedal_show_speed` shows as `Backpedal`.
+- **Charge and jockey.** With the attacker on the ball in front of him, once closing down has started and the ball is within
+  `charge_range` of the goal centre, he weighs a charge each tick: the time to get to `jockey_distance` of the ball at rush
+  speed while the attacker comes on toward him (`Keeper.CloseTime`) against the time he accepts, `charge_time` by rushing_out
+  divided by 1 + `charge_chip_weight` (by rushing_out) x the metres the meeting point would take him beyond his judged
+  chip-safe depth for the ball's distance now. Beyond that depth by more than `charge_chip_allowance` (by rushing_out;
+  `charge_chip_hysteresis` more once going) he does not go: the chip is a risk he weighs, and a brave keeper takes more of it.
+  Within `engage_range` of the ball he always charges. Charging, he runs at rush speed to the point on the cover line
+  `jockey_distance` short of the ball (never beyond `charge_max_out`), then jockeys there: low and spread, stepping with the
+  attacker to stay on the cover line, giving ground no faster than `jockey_retreat_speed`, so an attacker who runs at him
+  closes the gap. He drops the charge once the time to close exceeds `charge_drop_factor` times what he accepts (plus 0.25 s),
+  for an attacker who stops or turns away, and recovers to his limits as when closing down. With the ball up to
+  `charge_hold_margin` beyond the range and a charge he would make, he keeps his depth instead of giving ground first. Shown as
+  `Charge` (the run cycle) while more than a metre beyond jockeying range, then `Jockey`.
 - **Chip-safe depth.** The furthest he can stand off his line and still recover from a chip struck from the ball's distance:
   the attacker's chip at the ideal charge for that distance (`ShotModel`, mean backspin, straight at goal) either passes
   within his leap (`chip_reach_height_fraction` of his height) or he can backpedal (`backpedal_speed` by positioning, from his
@@ -163,16 +174,20 @@ and every number in the `keeper` section of `data/tuning/default.json`. Each tic
 - **Rush and smother.** Each tick he races for the ball whenever it is off the attacker's foot (between touches, a long sprint
   touch or a loose ball): the earliest point on its predicted path he can reach (to within `smother_reach`) before it gets
   there and before the attacker's next planned touch, with a `rush_margin` (by distance, scaled by rushing_out; none for a
-  ball already within a dive, so he lunges at a ball pushed past him) and a misjudgement drawn per attacker touch
+  ball already within a dive, so he lunges at a ball pushed past him, unless the attacker is within `contested_distance` of
+  it) and a misjudgement drawn per attacker touch
   (`rush_misjudge`), only within `rush_max_from_goal`. The longer the ball runs ahead of the attacker, the further out he wins
   it. A race short of the margin by less than `rush_anticipation` (by rushing_out) starts him toward the ball at
   `anticipate_speed_fraction` of his rush speed; he aborts back to his spot if it turns against him. A close-control dribbler
   (a touch every step) gives him no such race. Movement targets are capped at `move_target_cap`. Within a dive he smothers the
   ball and holds it if slower than `smother_hold_speed`.
-- **Stay big.** Within `pre_spread_range` of an attacker on the ball in front of him that he cannot beat to it, he stops and
-  spreads (`Spread`); once the ball is level with him or past, he goes back to covering the goal (and recovers toward it).
+- **Stay big.** Within `pre_spread_range` of an attacker on the ball in front of him that he cannot beat to it and is not
+  charging (closing down has not started), he stops and spreads (`Spread`); once the ball is level with him or past, he goes
+  back to covering the goal (and recovers toward it).
 - **Set.** In the last `plant_lead` seconds of a shot's wind-up (ball within `set_range`; earlier if he needs longer to brake
-  to a stop) he plants, braking at `plant_decel`, so he stops advancing. Planted (or spread) close to the shooter he spreads
+  to a stop) he plants, braking at `plant_decel`, so he stops advancing. Charging into a wind-up, he keeps coming to block it
+  if, braking only in the last `charge_plant_lead` seconds, he would be within `charge_block_distance` of the ball at the
+  strike (he may be caught still moving); otherwise he pulls up at once. Planted (or spread) close to the shooter he spreads
   (`spread_*`), which widens the body the ball can hit; within `pre_spread_range` it shows as `Spread`.
 - **Set stance.** Still at the strike, he holds his hands `hand_span` out to each side at `hand_span_height_fraction` of his
   height: a ball reaching them before he reacts is stopped, and his reach grows from the span rather than from zero.
@@ -195,7 +210,7 @@ and every number in the `keeper` section of `data/tuning/default.json`. Each tic
   `get_up_save_after` into getting up.
 
 The batch tool prints, under the scoring table, the keeper's distance off his line and the ball's distance from goal at the
-strike (mean, p10, p90), what became of parried first shots, the share of rounds with a rush or a
+strike (mean, p10, p90), what became of parried first shots, the share of rounds with a charge, a rush or a
 smother before the shot, how often he was planted at the strike, his mean reaction, and the saves and dives he made; then his
 mean depth off his line as the attacker on the ball first came within 20, 15, 10 and 6 m of the goal centre, the rounds he won
 the ball from a dribble (touched it before any shot), the rounds he was taken round, how often his movement off or toward
@@ -203,9 +218,23 @@ his line changed direction before the shot (above 0.3 m/s held 0.1 s; mean, p95 
 and the chips tried, scored and tipped over. `--counters off` makes the scripted attacker ignore the keeper. A first shot touched by the keeper that carries on into the net counts as scored.
 
 The scripted attacker (batch and tests) reacts to the keeper as a player would see him: jogging touches once he is within 9 m
-of the ball and close control within 6 m, taking round a keeper rushing out at it within 5 m (holding the shot until past
+of the ball and close control within 6 m, taking round a keeper rushing or charging out at it within 5 m (holding the shot until past
 him), and, with a chance that grows with composure, chipping a keeper standing further off his line than his chip-safe depth
 (plus 0.5 m) from within 25 m.
+
+The keeper probes drive the attacker like a human, through the replay path (one intent per tick from what a player sees, no
+scripted attacker), over many seeds: `dotnet run -c Release --project src/FootballSim.Batch -- --keeper-probe [--seeds 40]
+[--rushing 1,50,99] [--only sprint,jog,close,...] [--timeline 1] [--every 30]`. Plans: `sprint`, `jog` and `close_straight`
+run straight at goal from the back of the arena and never shoot; `close` approaches under close control and, with the keeper
+within 3 m, shifts the ball across him and shoots low at the open side; `angled` sprints in from wide; `sprint_slow` sprints
+then jogs under close control within 8 m of him; `knock` adds a knock-on 20 m out; `step_over`, `drag_back` and `ball_roll`
+make the move when he commits (charging or rushing within 4 m, or within 2.5 m) and shoot once past him; `chip` jogs in and
+chips once he comes out. Each row prints how the rounds ended (won = he touched the ball before any shot), how close he was to
+the ball when the attacker was 10 m out, the seconds spent 6-8, 3-5 and 1.5-3 m from the ball, his depth at 20/15/10/6 m and
+the share of his decisions by mode, depth limit and rush race (`World.KeeperThought`, a per-tick diagnostic); `--timeline N`
+prints the first N seeds every 0.25 s. `--probe-replays <dir|file>` prints that timeline for play-test replays
+(`sessions/<folder>/round-*.json`), and `--write-probe-replays <dir>` writes showcase replays (a sprint he charges and wins, a
+close-control approach he jockeys and pounces on, a step-over that beats him, a chip over him) for screenshots.
 
 Player, tuning and scenario files are re-read every time a round is set up, so editing a JSON file in `data/` shows up next round.
 A file that fails to load keeps its last good version and the HUD warning line names the file and field.
