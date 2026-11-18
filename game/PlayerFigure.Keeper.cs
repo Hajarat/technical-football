@@ -257,7 +257,10 @@ public partial class PlayerFigure
     /// <summary>
     /// The save or the ground pose. The body tilts from upright toward the hands (the amount limited per kind), the pelvis travels toward them when they
     /// are beyond what the arms reach, and the legs trail. Low and Smother go flat along the ground; Side is flat at mid height; High leaps with the arms up;
-    /// Feet is a deep standing split with the body forward; Catch is a standing catch at the body. Grounded and GettingUp use the last dive's direction.
+    /// Feet is a deep standing split with the body forward; Catch is a standing catch at the body. The reflex saves stay on their feet: ReflexHand flicks
+    /// the near hand out at the ball (a short lunge onto the near foot, the other arm out for balance); ReflexFoot shoots the near leg out along the
+    /// ground at it, the body crouched over the standing leg; BodyBlock throws the spread body at it, legs wide and arms out and up (a star), leaning in.
+    /// Grounded and GettingUp use the last dive's direction.
     /// </summary>
     KPose KeeperDiveShape(in FigureFrame f, Vector3 pos, Vector3 fwd, Vector3 right, in KPose S, float dt, float k)
     {
@@ -273,7 +276,8 @@ public partial class PlayerFigure
         if (diving || holdBall) { _latchHand = hand; _hasLatch = true; }
         else if (_hasLatch) hand = _latchHand;
         KDive kind = lie ? KDive.Low : _dKind;
-        bool standing = !lie && kind is KDive.Feet or KDive.Catch;
+        bool reflex = !lie && kind is KDive.ReflexHand or KDive.ReflexFoot or KDive.BodyBlock;
+        bool standing = !lie && kind is KDive.Feet or KDive.Catch || reflex;
         if (lie && !holdBall) hand.Y = Math.Min(hand.Y, 0.25f * k);
 
         float minT, maxT, maxOff;
@@ -285,6 +289,9 @@ public partial class PlayerFigure
             case KDive.Back: minT = 30f * Deg; maxT = 72f * Deg; maxOff = 1.4f; break;
             case KDive.Feet: minT = 10f * Deg; maxT = 24f * Deg; maxOff = 0.3f; break;
             case KDive.Catch: minT = 6f * Deg; maxT = 16f * Deg; maxOff = 0.3f; break;
+            case KDive.ReflexHand: minT = 6f * Deg; maxT = 24f * Deg; maxOff = 0.45f; break;
+            case KDive.ReflexFoot: minT = 4f * Deg; maxT = 14f * Deg; maxOff = 0.25f; break;
+            case KDive.BodyBlock: minT = 10f * Deg; maxT = 26f * Deg; maxOff = 0.5f; break;
             default: minT = 70f * Deg; maxT = 86f * Deg; maxOff = 2.4f; break;
         }
         Vector3 chest = pos + new Vector3(0, 0.5f * H, 0);
@@ -349,6 +356,9 @@ public partial class PlayerFigure
             case KDive.Back: pelT = 0.50f * H * cos + k * (0.42f * lift + 0.30f * sin); break;
             case KDive.Feet: pelT = AnkleH + Leg * 0.52f; break;
             case KDive.Catch: pelT = AnkleH + Leg * 0.80f; break;
+            case KDive.ReflexHand: pelT = AnkleH + Leg * 0.74f; break;
+            case KDive.ReflexFoot: pelT = AnkleH + Leg * 0.62f; break;
+            case KDive.BodyBlock: pelT = AnkleH + Leg * 0.60f; break;
             default: pelT = 0.50f * H * cos + k * (0.05f * lift + 0.10f * sin); break;
         }
         if (getting) pelT = Keys(g, GetUpG, new[] { 0.22f * k, 0.36f * k, 0.60f * k, S.Pel.Y });
@@ -379,12 +389,36 @@ public partial class PlayerFigure
         float aA = 1f - Mathf.Exp(-dt / 0.05f);
         float kneeFwd = Smooth((g - 0.05f) / 0.40f);
         float flatLeg = Smooth((_dTilt - 0.5f) / 0.8f);   // flat on the ground the knees bend up, never into the ground
+        // a reflex plays the ball with the limb on its side: +1 = his right
+        Vector3 toBall = new(hand.X - pos.X, 0, hand.Z - pos.Z);
+        float nearSide = toBall.Dot(right) >= 0f ? 1f : -1f;
+        Vector3 toBallDir = toBall.LengthSquared() > 1e-4f ? toBall.Normalized() : right * nearSide;
         for (int i = 0; i < 2; i++)
         {
             float side = i == 0 ? -1f : 1f;
+            bool near = side == nearSide;
             Vector3 hip = pel + B * new Vector3(0, -0.01f * H, side * HipW);
             Vector3 at;
             if (kind == KDive.Catch && !lie) at = S.Ank[i];
+            else if (kind == KDive.ReflexHand && !lie)
+            {
+                // a short lunge: the near foot steps out toward the ball, the other stays planted
+                at = S.Ank[i] + (near ? toBallDir * (0.22f * k) : Vector3.Zero);
+                at.Y = AnkleH;
+            }
+            else if (kind == KDive.ReflexFoot && !lie)
+            {
+                // the near leg shot out along the ground at the ball (the simulation's limb is the foot), the other planted under him
+                at = near ? new Vector3(hand.X, Math.Max(AnkleH, Math.Min(hand.Y, 0.25f * k)), hand.Z) : S.Ank[i];
+                if (!near) at.Y = AnkleH;
+                dir[i] = near ? toBallDir : fwd;
+            }
+            else if (kind == KDive.BodyBlock && !lie)
+            {
+                // legs wide in a star, the near one further out toward the ball
+                at = new Vector3(pos.X, AnkleH, pos.Z) + right * side * ((near ? 0.78f : 0.62f) * k) + fwd * (0.10f * k);
+                dir[i] = new Basis(Vector3.Up, -side * 0.5f) * fwd;
+            }
             else if (kind == KDive.Back && !lie)
             {
                 // legs extended in line with the arched body, one trailing a little, feet off the ground
@@ -412,6 +446,19 @@ public partial class PlayerFigure
                 : (B.X * (1f - flatLeg) + Vector3.Up * (1.2f * flatLeg)).Normalized();
             SolveLeg(hip, _dAnk[i], kneePole, out knee[i], out ank[i]);
             Vector3 ht = hand + bodyRight * side * 0.07f * H;
+            if (reflex)
+            {
+                Vector3 shR = pel + B * new Vector3(0, shoulderUp, side * ShoulderW);
+                if (kind == KDive.ReflexHand)
+                    // the near hand flicks out at the ball, the other goes out to the side for balance
+                    ht = near ? hand : shR + right * side * (0.30f * k) + Vector3.Down * (0.25f * k) + fwd * (0.15f * k);
+                else if (kind == KDive.ReflexFoot)
+                    // the arms out low to both sides, the far one a little higher, for balance over the standing leg
+                    ht = shR + right * side * (0.45f * k) + Vector3.Down * ((near ? 0.45f : 0.30f) * k) + fwd * (0.20f * k);
+                else
+                    // a star: the near arm thrown at where the ball meets him (the simulation's limb), the far one wide and up
+                    ht = near ? hand : shR + right * side * (0.62f * k) + Vector3.Up * (0.30f * k);
+            }
             if (kind == KDive.Back && !lie)
             {
                 // the arms go up over his head and back with the leap at once; the hands follow the simulation's once those are

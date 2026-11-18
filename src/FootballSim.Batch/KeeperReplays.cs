@@ -62,6 +62,12 @@ static class KeeperReplays
         new("keeper-dive-high-tip-over-bar", "Diving, High, tipping the ball over the bar", f => Dive(f, KeeperDive.High, SaveKind.TipOver)),
         new("keeper-dive-feet-block", "Diving, Feet: a standing block at the feet", f => Dive(f, KeeperDive.Feet)),
         new("keeper-dive-catch", "Diving, Catch: a standing catch at the body", f => Dive(f, KeeperDive.Catch)),
+        new("keeper-reflex-hand", "Diving, ReflexHand: a hand flicked out at a shot too quick for the dive", f => Dive(f, KeeperDive.ReflexHand, SaveKind.Parry),
+            new[] { "halfway_run", "angled_run" }),
+        new("keeper-reflex-foot", "Diving, ReflexFoot: a leg shot out at a low shot too quick for the dive", f => Dive(f, KeeperDive.ReflexFoot, SaveKind.Block),
+            new[] { "halfway_run", "angled_run" }),
+        new("keeper-body-block", "Diving, BodyBlock: set close to the shooter, the spread body thrown at the shot", f => Dive(f, KeeperDive.BodyBlock, SaveKind.Block),
+            new[] { "tight_angle", "keeper_rush", "halfway_run" }),
         new("keeper-smother", "Smother: diving at the ball at the attacker's feet", f => First(f, x => x.Action == KeeperAction.Smother),
             new[] { "keeper_rush" }),
         new("keeper-close-down", "Closing down: coming off his line as the attacker runs in, to the strike", f =>
@@ -77,6 +83,14 @@ static class KeeperReplays
             new[] { "keeper_rush", "halfway_run" }),
         new("keeper-spread", "Spread: stopped close to the attacker on the ball, made big", f => First(f, x => x.Action == KeeperAction.Spread, 12),
             new[] { "keeper_rush", "halfway_run" }),
+        new("keeper-hull-block", "Spread, set close to the shooter: the shot meets his spread body before he moves (a block)", f =>
+        {
+            int strike = f.FindIndex(x => x.Struck);
+            if (strike < 0) return null;
+            int b = f.FindIndex(strike, x => x.Save == SaveKind.Block && x.Action != KeeperAction.Diving);
+            return b >= 0 && b - strike <= 20 && f.Skip(strike).Take(b - strike).All(x => x.Action is KeeperAction.Spread or KeeperAction.Set)
+                ? (f[Math.Max(0, strike - 30)].Tick, f[Math.Min(f.Count - 1, b + 30)].Tick) : null;
+        }, new[] { "tight_angle", "keeper_rush" }),
         new("keeper-wins-long-touch", "Rush then Smother: winning a long sprint touch before the attacker gets back to it", f =>
         {
             int w = f.FindIndex(x => x.Won && !x.Struck);

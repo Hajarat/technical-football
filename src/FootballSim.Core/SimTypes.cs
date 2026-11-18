@@ -24,8 +24,10 @@ public enum KeeperAction { Set, Shuffle, Rush, Planted, Reacting, Diving, Smothe
 /// Low: diving along the ground. Side: a flat side dive at mid height. High: a leaping dive / tip over the bar.
 /// Feet: a standing block at the feet (legs and body spread, no dive). Catch: a standing catch at the body, no dive.
 /// Back: a backward leap after backpedalling under a chip, body extended and falling back toward his goal, reaching up and
-/// back for the ball.</summary>
-public enum KeeperDive { None, Low, Side, High, Feet, Catch, Back }
+/// back for the ball. The reflex saves, standing, made before his full reaction when that would come too late: ReflexHand, a
+/// hand flicked out at the ball; ReflexFoot, a leg shot out at a low ball; BodyBlock, the ready (spread) body thrown sideways
+/// at it, legs and arms wide.</summary>
+public enum KeeperDive { None, Low, Side, High, Feet, Catch, Back, ReflexHand, ReflexFoot, BodyBlock }
 
 /// <summary>The round state machine ("Round contract" in the spec).</summary>
 public enum RoundState { Setup, Live, Strike, Flight, Outcome, Report }

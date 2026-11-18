@@ -537,19 +537,17 @@ public sealed class KeeperTuning
     public float ReactionNoiseClampSigma { get; set; } = 3f;
     public float MinReaction { get; set; } = 0.05f;
     public RatingRange DiveSpeed { get; set; } = new(3.0f, 6.0f);
-    public float PushOff { get; set; } = 0.12f;
     public float ArmSweep { get; set; } = 0.9f;
     public float ArmSweepTime { get; set; } = 0.15f;
     public RatingRange Stretch { get; set; } = new(2.2f, 2.9f);
     public float StretchHeightReference { get; set; } = 1.90f;
     public float PredictionNoise { get; set; } = 0.1f;
-    public RatingRange CatchSpeed { get; set; } = new(14f, 26f);
-    public float CatchZoneFraction { get; set; } = 0.7f;
     public float ParrySpeedMin { get; set; } = 0.4f;
     public float ParrySpeedMax { get; set; } = 0.6f;
     /// <summary>Sideways steering of a parry relative to its backward travel, at handling 99. Zero at handling 1.</summary>
     public float ParryWideMax { get; set; } = 1.5f;
     public float ParryLift { get; set; } = 0.15f;
+    /// <summary>Standard deviation of a parry's direction error, degrees, at difficulty 0.5 (times 0.5 + the difficulty: GOALS MaxDeflectionAngleError).</summary>
     public float ParryYawNoiseDeg { get; set; } = 8f;
     /// <summary>Height of the keeper's reach centre as a fraction of his height.</summary>
     public float HomeHeightFraction { get; set; } = 0.55f;
@@ -567,16 +565,23 @@ public sealed class KeeperTuning
     /// <summary>...to this fraction of his height (shoulders); in a dive it runs from the hip height toward the hands.</summary>
     public float BodyTopFraction { get; set; } = 0.82f;
     public float HipHeight { get; set; } = 0.95f;
-    /// <summary>Planted closer than this to the ball at the strike, the keeper is spread (makes himself big), metres...</summary>
-    public float SpreadRange { get; set; } = 6f;
-    /// <summary>...fully spread from this close, metres.</summary>
-    public float SpreadFull { get; set; } = 3f;
-    /// <summary>Spread, his body is a capsule across the shot this far either side of his centre, metres...</summary>
-    public float SpreadHalfWidth { get; set; } = 0.45f;
-    /// <summary>...at this height, metres...</summary>
-    public float SpreadHeight { get; set; } = 0.6f;
-    /// <summary>...with this radius, metres.</summary>
-    public float SpreadRadius { get; set; } = 0.4f;
+    /// <summary>
+    /// Set (planted or spread, still) at the strike within this distance of the ball, he is fully ready, metres (GOALS
+    /// MaxDistanceForFullyReadyStance 3.5)...
+    /// </summary>
+    public float ReadyFull { get; set; } = 3.5f;
+    /// <summary>...and not ready at all from this far, linear between, metres.</summary>
+    public float ReadyRange { get; set; } = 6f;
+    /// <summary>
+    /// Fully ready, his standing body (what the ball hits before he moves) has this effective radius around his upright axis: his
+    /// torso with a set keeper's spread legs and arms, averaged; not ready it is <see cref="BodyRadius"/>, linear between, metres.
+    /// </summary>
+    public float HullRadius { get; set; } = 0.42f;
+    /// <summary>
+    /// His save hull (GOALS CapsuleRadius 0.75 m): a ball his dive will not get to in time that passes within this of his upright
+    /// axis always draws a reflex (a save or an attempt), metres.
+    /// </summary>
+    public float SaveHullRadius { get; set; } = 0.75f;
     /// <summary>A ball that hits the body slower than this is held; faster it is blocked, m/s.</summary>
     public float BodyHoldSpeed { get; set; } = 8f;
 
@@ -676,7 +681,7 @@ public sealed class KeeperTuning
     public float ChipLeapLead { get; set; } = 0.2f;
     /// <summary>Standard deviation of his error judging his chip-safe depth, as a fraction of it, by positioning (drawn once a round).</summary>
     public RatingRange ChipJudgeError { get; set; } = new(0.30f, 0.05f);
-    /// <summary>A ball met in a backward leap after backpedalling is held only below this fraction of his diving catch speed.</summary>
+    /// <summary>A ball met in a backward leap after backpedalling is held as a diving catch of a ball this much faster would be (its speed is divided by it).</summary>
     public float BackpedalCatchFactor { get; set; } = 0.4f;
 
     // ---- staying big ----
@@ -759,6 +764,80 @@ public sealed class KeeperTuning
     /// <summary>A smother that has not met the ball after this long ends on the ground, seconds.</summary>
     public float SmotherMaxSeconds { get; set; } = 0.6f;
 
+    // ---- the reflex save ----
+    /// <summary>
+    /// Seconds from the strike to his reflex, by reflexes (GOALS ReflexesAttributeVersusReflexTime), with the reaction's noise and
+    /// still-moving penalty. At the reflex he decides: when his full reaction and dive will not get to the ball in time, he makes
+    /// a reflex save instead.
+    /// </summary>
+    public RatingRange ReflexTime { get; set; } = new(0.20f, 0.08f);
+    /// <summary>The reflex move's execution time for an easy save, by reflexes (GOALS ReflexesAttributeVersusReflexSaveExecutionTimeEasy)...</summary>
+    public RatingRange ReflexExecutionEasy { get; set; } = new(0.04f, 0.0f);
+    /// <summary>...and for one at the edge of his range, seconds (GOALS ...ReflexSaveExecutionTimeHard), by difficulty between.</summary>
+    public RatingRange ReflexExecutionHard { get; set; } = new(0.08f, 0.03f);
+    /// <summary>A reflex hand, foot or body moves out at this speed, m/s, by reflexes...</summary>
+    public RatingRange ReflexSpeed { get; set; } = new(3.0f, 4.8f);
+    /// <summary>...to at most this far from his upright axis (his standing hull plus a short lunge), metres, by reach, scaled by height / <see cref="StretchHeightReference"/>.</summary>
+    public RatingRange ReflexRange { get; set; } = new(1.3f, 1.7f);
+    /// <summary>A reflex can be aimed no higher than this fraction of his height.</summary>
+    public float ReflexHeightFraction { get; set; } = 1.15f;
+    /// <summary>Within this much beyond his reflex range, a ball neither a dive nor a full reflex gets to in time draws a reflex attempt, metres.</summary>
+    public float ReflexAttemptMargin { get; set; } = 0.6f;
+    /// <summary>Fraction of the body that follows a reflex limb sideways (a short lunge).</summary>
+    public float ReflexBodyFollow { get; set; } = 0.2f;
+    /// <summary>A reflex target at most this high is played with a foot (a leg shot out), metres.</summary>
+    public float ReflexFootHeight { get; set; } = 0.45f;
+    /// <summary>Set and still, his feet are this far out from his axis (where a reflex foot starts), metres; moving, a body's radius.</summary>
+    public float StanceFootOffset { get; set; } = 0.35f;
+    /// <summary>Ready (at least half) at the strike, a reflex target up to this high is a body block (the spread body thrown at it), metres.</summary>
+    public float ReflexBodyHeight { get; set; } = 1.3f;
+
+    // ---- save difficulty ----
+    /// <summary>
+    /// Save difficulty (0 easy, 1 at full stretch) by the lateral range the save needs as a fraction of his stretch, for a low ball
+    /// (GOALS HorizontalRangeVersusSaveDifficultyAtLowHeight)...
+    /// </summary>
+    public Curve DifficultyLow { get; set; } = new((0f, 0.10f), (0.35f, 0.25f), (0.7f, 0.70f), (1f, 1f));
+    /// <summary>...a ball at mid height (GOALS ...AtMediumHeight)...</summary>
+    public Curve DifficultyMid { get; set; } = new((0f, 0f), (0.35f, 0.15f), (0.7f, 0.60f), (1f, 1f));
+    /// <summary>...and a high ball (GOALS ...AtHighHeight).</summary>
+    public Curve DifficultyHigh { get; set; } = new((0f, 0.10f), (0.35f, 0.30f), (0.7f, 0.75f), (1f, 1f));
+    /// <summary>The heights the low, mid and high curves are for, metres; linear between, flat beyond.</summary>
+    public float DifficultyLowHeight { get; set; } = 0.4f;
+    public float DifficultyMidHeight { get; set; } = 1.0f;
+    public float DifficultyHighHeight { get; set; } = 1.8f;
+    /// <summary>
+    /// Added to the difficulty by his speed away from the save (moving the wrong way), m/s (GOALS
+    /// CounterMomentumSpeedVersusSaveDifficultyPenalty).
+    /// </summary>
+    public Curve CounterMomentumPenalty { get; set; } = new((0f, 0f), (1f, 0.2f), (2f, 0.45f), (4f, 0.8f));
+    /// <summary>
+    /// The dive's execution time (from his reaction until the push-off carries him) for an easy save, by reflexes (GOALS
+    /// ReflexesAttributeVersusSaveExecutionTimeEasy)...
+    /// </summary>
+    public RatingRange SaveExecutionEasy { get; set; } = new(0.13f, 0.07f);
+    /// <summary>...and for one at full stretch, seconds (GOALS ...Hard), by difficulty between (capped at 1).</summary>
+    public RatingRange SaveExecutionHard { get; set; } = new(0.17f, 0.11f);
+
+    // ---- catch range ----
+    /// <summary>
+    /// How far from his hands' rest point a ball can be held standing, metres, by its speed in m/s, at handling 1 (GOALS
+    /// BallSpeedCatchRangeMinStanding)...
+    /// </summary>
+    public Curve CatchRangeStandingMin { get; set; } = new((8f, 1.2f), (12f, 0.8f), (16f, 0f));
+    /// <summary>...at handling 99 (GOALS ...MaxStanding), linear between by handling.</summary>
+    public Curve CatchRangeStandingMax { get; set; } = new((14f, 1.4f), (22f, 1.1f), (26f, 0.6f), (30f, 0f));
+    /// <summary>The same in a dive, at handling 1 (GOALS BallSpeedCatchRangeMinDiving)...</summary>
+    public Curve CatchRangeDivingMin { get; set; } = new((8f, 2.0f), (12f, 1.4f), (15f, 0f));
+    /// <summary>...and 99 (GOALS ...MaxDiving).</summary>
+    public Curve CatchRangeDivingMax { get; set; } = new((14f, 2.2f), (20f, 2.0f), (23f, 1.4f), (26f, 0f));
+    /// <summary>The catch range is scaled by this, by the seconds from the strike to the contact (GOALS CatchRangeScalingVersusReactionTime).</summary>
+    public Curve CatchRangeTime { get; set; } = new((0.15f, 0.3f), (0.3f, 0.7f), (0.5f, 1f));
+    /// <summary>A save harder than this is never held.</summary>
+    public float CatchMaxDifficulty { get; set; } = 0.8f;
+    /// <summary>A dive save at least this hard is a fingertip (the ball kept going, bent away).</summary>
+    public float FingertipDifficulty { get; set; } = 0.92f;
+
     // ---- saves ----
     /// <summary>The dive wedge: a target is at least this far from the feet, metres (GOALS 0.05).</summary>
     public float WedgeMinRadius { get; set; } = 0.05f;
@@ -774,9 +853,7 @@ public sealed class KeeperTuning
     public float SaveTimeJitterEasy { get; set; } = 0.001f;
     /// <summary>Largest random delay to a dive's start for a save at full stretch, seconds (GOALS 0.025).</summary>
     public float SaveTimeJitterHard { get; set; } = 0.025f;
-    /// <summary>Catch speed in a dive as a fraction of the standing catch speed.</summary>
-    public float DivingCatchFactor { get; set; } = 0.9f;
-    /// <summary>Catch speed for a ball blocked at the feet as a fraction of the standing catch speed.</summary>
+    /// <summary>A ball at the feet is held as a standing catch of a ball this much faster would be: its speed is divided by it.</summary>
     public float FeetCatchFactor { get; set; } = 0.5f;
     /// <summary>A target this close to the body (horizontally) is a standing save, metres.</summary>
     public float CatchBodyRadius { get; set; } = 0.45f;
@@ -800,8 +877,6 @@ public sealed class KeeperTuning
     public float BlockSpeedMax { get; set; } = 0.45f;
     /// <summary>Largest angle of a block off straight back out, degrees.</summary>
     public float BlockAngleDeg { get; set; } = 45f;
-    /// <summary>Contact in the outer fraction of the keeper's stretch is a fingertip save.</summary>
-    public float FingertipZoneFraction { get; set; } = 0.05f;
     /// <summary>A fingertip save keeps this fraction of the ball's speed...</summary>
     public float FingertipSpeedKept { get; set; } = 0.70f;
     /// <summary>...and bends its path away from the goal by up to this much, degrees.</summary>

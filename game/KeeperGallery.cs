@@ -82,6 +82,9 @@ public sealed class KeeperGallery
         KeeperDive.Side => Rel(0.3f, 2.0f * s, 1.0f),
         KeeperDive.High => Rel(0.2f, 1.2f * s, 2.5f),
         KeeperDive.Feet => Rel(0.45f, 0.35f * s, 0.15f),
+        KeeperDive.ReflexHand => Rel(0.30f, 1.15f * s, 1.05f),
+        KeeperDive.ReflexFoot => Rel(0.30f, 1.05f * s, 0.12f),
+        KeeperDive.BodyBlock => Rel(0.25f, 0.95f * s, 0.75f),
         _ => Rel(0.45f, 0.15f * s, 1.15f),
     };
 
@@ -168,7 +171,8 @@ public sealed class KeeperGallery
         MomPh(holdStand, 2, 0.5f, "hold");
 
         // saves, once for each side; lying ones get up afterwards
-        foreach (var kind in new[] { KeeperDive.Low, KeeperDive.Side, KeeperDive.High, KeeperDive.Feet, KeeperDive.Catch, KeeperDive.None })
+        foreach (var kind in new[] { KeeperDive.Low, KeeperDive.Side, KeeperDive.High, KeeperDive.Feet, KeeperDive.Catch, KeeperDive.None,
+                     KeeperDive.ReflexHand, KeeperDive.ReflexFoot, KeeperDive.BodyBlock })
             foreach (float s in new[] { 1f, -1f })
             {
                 bool smother = kind == KeeperDive.None;
@@ -176,15 +180,18 @@ public sealed class KeeperGallery
                 string name = (smother ? "smother" : "dive_" + kind.ToString().ToLowerInvariant()) + "_" + side;
                 var sc = S(name);
                 var tgt = smother ? Rel(0.9f, 1.4f * s, 0.15f) : Target(kind, s);
-                float dur = kind is KeeperDive.Feet or KeeperDive.Catch ? 0.35f : 0.55f;
-                sc.Phases.Add(Ph(KeeperAction.Planted, 0.4f));
-                sc.Phases.Add(Ph(KeeperAction.Reacting, 0.3f));
+                bool reflexKind = kind is KeeperDive.ReflexHand or KeeperDive.ReflexFoot or KeeperDive.BodyBlock;
+                float dur = reflexKind ? 0.22f : kind is KeeperDive.Feet or KeeperDive.Catch ? 0.35f : 0.55f;
+                // a reflex comes before his full reaction; ready close to the shooter (the body block) he waits spread
+                var waiting = kind == KeeperDive.BodyBlock ? KeeperAction.Spread : KeeperAction.Planted;
+                sc.Phases.Add(Ph(waiting, 0.4f));
+                sc.Phases.Add(Ph(waiting == KeeperAction.Spread ? KeeperAction.Spread : KeeperAction.Reacting, reflexKind ? 0.1f : 0.3f));
                 sc.Phases.Add(Ph(smother ? KeeperAction.Smother : KeeperAction.Diving, dur + 0.15f, smother ? KeeperDive.None : kind, Reach(tgt, dur)));
                 MomPh(sc, 1, 1f, "react");
                 MomPh(sc, 2, 0.15f / (dur + 0.15f) + 0.0f, "dive_a");
                 MomPh(sc, 2, 0.55f, "dive_b");
                 MomPh(sc, 2, 1f, "dive_c");
-                bool ground = !(kind is KeeperDive.Feet or KeeperDive.Catch);
+                bool ground = !(kind is KeeperDive.Feet or KeeperDive.Catch || reflexKind);
                 if (ground)
                 {
                     sc.Phases.Add(Ph(KeeperAction.Grounded, 0.7f, KeeperDive.None, _ => tgt));
@@ -200,7 +207,7 @@ public sealed class KeeperGallery
                 }
                 else
                 {
-                    // the core ends a standing save in Holding (catch) or straight back in Set (feet block); neither lies down
+                    // the core ends a standing save in Holding (catch) or straight back in Set (feet block, reflex); none lies down
                     sc.Phases.Add(Ph(kind == KeeperDive.Catch ? KeeperAction.Holding : KeeperAction.Set, 0.6f, KeeperDive.None, _ => tgt));
                     MomPh(sc, 3, 1f, "after");
                 }
