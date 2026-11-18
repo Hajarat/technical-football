@@ -19,6 +19,10 @@ public sealed class ToolArgs
     /// <summary>--keeper-gallery &lt;dir&gt;: play every keeper state from a script (no simulation) and write screenshots there.</summary>
     public string? GalleryDir;
     public bool Background;
+    /// <summary>--controls-panel keyboard|xbox|playstation|nintendo: open the controls panel for that device (for screenshots; no pad needed).</summary>
+    public string? ControlsPanel;
+    /// <summary>--controls-panel &lt;device&gt;:hint fakes the device but leaves the panel closed, to see the corner hint during play.</summary>
+    public bool ControlsHintOnly;
     /// <summary>"skinned" (rigged human models, the default) or "procedural" (primitive meshes).</summary>
     public string Figure = "skinned";
 
@@ -42,6 +46,12 @@ public sealed class ToolArgs
                 case "--data": a.DataDir = Next(); break;
                 case "--replay": a.ReplayPath = Next(); break;
                 case "--keeper-gallery": a.GalleryDir = Next(); break;
+                case "--controls-panel":
+                    a.ControlsPanel = (Next() ?? "").ToLowerInvariant();
+                    if (a.ControlsPanel.EndsWith(":hint")) { a.ControlsHintOnly = true; a.ControlsPanel = a.ControlsPanel[..^5]; }
+                    if (a.ControlsPanel is not ("keyboard" or "xbox" or "playstation" or "nintendo"))
+                    { GD.PushWarning($"--controls-panel expects keyboard, xbox, playstation or nintendo, got '{a.ControlsPanel}'"); a.ControlsPanel = null; }
+                    break;
                 case "--figure":
                     a.Figure = (Next() ?? "").ToLowerInvariant();
                     if (a.Figure != "skinned" && a.Figure != "procedural") { GD.PushWarning($"--figure expects skinned or procedural, got '{a.Figure}'; using skinned"); a.Figure = "skinned"; }

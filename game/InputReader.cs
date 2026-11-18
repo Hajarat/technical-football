@@ -26,6 +26,7 @@ public struct PadSnapshot
     public bool Retry;             // Y / Triangle
     public bool Flag;              // View / Share / Back
     public bool Pause;             // Menu / Options / Start
+    public bool ControlsToggle;    // keyboard H: show or hide the controls panel
 
     /// <summary>The shield button under the core's name for it (<see cref="FootballSim.Core.TickIntent.CloseControl"/>).</summary>
     public readonly bool CloseControl => Shield;
@@ -38,10 +39,12 @@ public struct PadSnapshot
 public partial class InputReader : Node
 {
     const float DeadZone = 0.15f;
+    /// <summary>Mouse travel, in pixels, before mouse motion counts as the person using keyboard and mouse.</summary>
+    const float MouseMotionThreshold = 8f;
+    /// <summary>Stick or trigger deflection that counts as the person using the pad (above its own dead zone).</summary>
+    const float PadAxisThreshold = 0.3f;
     const string Left = "pad_left", Right = "pad_right", Up = "pad_up", Down = "pad_down",
-        SprintA = "pad_sprint", ShieldA = "pad_shield", Shoot = "pad_shoot", Fin = "pad_finesse", ChipA = "pad_chip",
-        Overlay = "pad_overlay", Next = "pad_next", Prev = "pad_prev", Confirm = "pad_confirm", Retry = "pad_retry",
-        Flag = "pad_flag", Pause = "pad_pause", NextAtk = "pad_next_attacker", NextKeep = "pad_next_keeper",
+        SprintA = "pad_sprint", ShieldA = "pad_shield",
         RLeft = "pad_rs_left", RRight = "pad_rs_right", RUp = "pad_rs_up", RDown = "pad_rs_down";
     /// <summary>
     /// A knock-on key press stays in the snapshot this long, seconds, so it is not lost when the ball is out of reach on the tick of
@@ -53,8 +56,12 @@ public partial class InputReader : Node
     public bool GamepadConnected => Input.GetConnectedJoypads().Count > 0;
     /// <summary>False in replay mode: the keyboard must not affect a replay.</summary>
     public bool KeyboardEnabled = true;
-    /// <summary>Which device last produced input: "gamepad", "keyboard", or "none" until something is touched.</summary>
+    /// <summary>Which device last produced a meaningful input event: "gamepad", "keyboard", or "none" until something is touched.</summary>
     public string Source { get; private set; } = "none";
+    /// <summary>The device the person is using: <see cref="Source"/>, or the pad when one is connected and nothing was touched yet.</summary>
+    public string Mode => Source == "none" && GamepadConnected ? "gamepad" : Source;
+    public InputDevice Device => Mode == "gamepad" ? InputDevice.Gamepad : InputDevice.Keyboard;
+    float _mouseTravel;
     /// <summary>Name of the first connected pad, or empty.</summary>
     public string ActivePadName
     {
@@ -65,21 +72,40 @@ public partial class InputReader : Node
         }
     }
 
-    readonly System.Collections.Generic.Dictionary<Key, bool> _keyPrev = new();
+    readonly System.Collections.Generic.Dictionary<KeyBind, bool> _keyPrev = new();
 
-    bool Held(params Key[] keys)
+    /// <summary>True only on the poll where the binding went down.</summary>
+    bool Pressed(KeyBind b)
     {
-        foreach (var k in keys) if (Input.IsKeyPressed(k)) return true;
-        return false;
+        bool now = b.Held();
+        _keyPrev.TryGetValue(b, out bool was);
+        _keyPrev[b] = now;
+        return now && !was;
     }
 
-    /// <summary>True only on the poll where one of the keys went down.</summary>
-    bool Pressed(Key id, params Key[] keys)
+    /// <summary>
+    /// The one place the active device is decided: the most recent meaningful event. A key press, a mouse button or mouse motion
+    /// beyond a few pixels is keyboard and mouse (ignored in replay mode); a pad button or a stick or trigger past a threshold is the pad.
+    /// </summary>
+    public override void _Input(InputEvent e)
     {
-        bool now = Held(keys);
-        _keyPrev.TryGetValue(id, out bool was);
-        _keyPrev[id] = now;
-        return now && !was;
+        switch (e)
+        {
+            case InputEventKey { Pressed: true, Echo: false } when KeyboardEnabled:
+            case InputEventMouseButton { Pressed: true } when KeyboardEnabled:
+                Source = "keyboard"; _mouseTravel = 0;
+                break;
+            case InputEventMouseMotion m when KeyboardEnabled:
+                _mouseTravel += m.Relative.Length();
+                if (_mouseTravel > MouseMotionThreshold) { Source = "keyboard"; _mouseTravel = 0; }
+                break;
+            case InputEventJoypadButton { Pressed: true }:
+                Source = "gamepad";
+                break;
+            case InputEventJoypadMotion j when Mathf.Abs(j.AxisValue) > PadAxisThreshold:
+                Source = "gamepad";
+                break;
+        }
     }
 
     public override void _Ready()
@@ -90,9 +116,7 @@ public partial class InputReader : Node
         Axis(RLeft, JoyAxis.RightX, -1); Axis(RRight, JoyAxis.RightX, 1);
         Axis(RUp, JoyAxis.RightY, -1); Axis(RDown, JoyAxis.RightY, 1);
         BindFaceButtons();
-        Btn(Fin, JoyButton.RightShoulder); Btn(ChipA, JoyButton.LeftShoulder);
-        Btn(Overlay, JoyButton.RightStick); Btn(Next, JoyButton.DpadRight); Btn(Prev, JoyButton.DpadLeft); Btn(NextAtk, JoyButton.DpadUp); Btn(NextKeep, JoyButton.DpadDown);
-        Btn(Flag, JoyButton.Back); Btn(Pause, JoyButton.Start);
+        BindFixedButtons();
     }
 
     // ---- face-button swap (A<->B, X<->Y) for pads that report them crossed, e.g. Switch-mode Xbox-layout pads ----
@@ -110,15 +134,23 @@ public partial class InputReader : Node
         padName.Contains("Switch", System.StringComparison.OrdinalIgnoreCase) ||
         padName.Contains("Pro Controller", System.StringComparison.OrdinalIgnoreCase);
 
-    JoyButton Face(JoyButton b) => !SwapFaceButtons ? b : b switch
+    /// <summary>Registers every gamepad button binding that is not a face button.</summary>
+    void BindFixedButtons()
     {
-        JoyButton.A => JoyButton.B, JoyButton.B => JoyButton.A, JoyButton.X => JoyButton.Y, JoyButton.Y => JoyButton.X, _ => b,
-    };
+        foreach (var p in Bindings.Pad.All) if (!IsFace(p)) Btn(p.Action, p.Button(false));
+    }
 
+    static bool IsFace(PadBind p) => p == Bindings.Pad.Shoot || p == Bindings.Pad.Confirm || p == Bindings.Pad.Retry;
+
+    /// <summary>(Re)registers the face-button actions for the current swap state.</summary>
     void BindFaceButtons()
     {
-        foreach (var a in new[] { Shoot, Confirm, Retry }) { if (InputMap.HasAction(a)) InputMap.ActionEraseEvents(a); }
-        Btn(Shoot, Face(JoyButton.B)); Btn(Confirm, Face(JoyButton.A)); Btn(Retry, Face(JoyButton.Y));
+        foreach (var p in Bindings.Pad.All)
+        {
+            if (!IsFace(p)) continue;
+            if (InputMap.HasAction(p.Action)) InputMap.ActionEraseEvents(p.Action);
+            Btn(p.Action, p.Button(SwapFaceButtons));
+        }
     }
 
     /// <summary>Notices a new or changed pad and picks its swap setting: the saved choice if there is one, else the default.</summary>
@@ -156,14 +188,10 @@ public partial class InputReader : Node
     public PadSnapshot Poll()
     {
         TrackPad();
-        if (KeyboardEnabled && Pressed(Key.B, Key.B)) ToggleSwap();
+        if (KeyboardEnabled && Pressed(Bindings.SwapFace)) ToggleSwap();
         var pad = PollPad();
-        if (!KeyboardEnabled) { Source = PadTouched(pad) ? "gamepad" : Source; return HoldKnockOn(pad); }
-        var key = PollKeyboard();
-        bool padTouched = PadTouched(pad), keyTouched = PadTouched(key);
-        if (keyTouched && !padTouched) Source = "keyboard";
-        else if (padTouched) Source = "gamepad";
-        return HoldKnockOn(Merge(pad, key));
+        if (!KeyboardEnabled) return HoldKnockOn(pad);
+        return HoldKnockOn(Merge(pad, PollKeyboard()));
     }
 
     /// <summary>Turns a knock-on press (true on one poll) into a short window of polls with KnockOn set.</summary>
@@ -175,11 +203,6 @@ public partial class InputReader : Node
         return p;
     }
 
-    static bool PadTouched(in PadSnapshot p) =>
-        p.MoveX != 0 || p.MoveZ != 0 || p.Sprint > 0.05f || p.Shield || p.ShootHeld || p.Finesse || p.Chip || p.Driven || p.KnockOn ||
-        p.RightX != 0 || p.RightZ != 0 || p.Cancel || p.SkillKey != FootballSim.Core.SkillKey.None ||
-        p.OverlayToggle || p.NextSpot || p.PrevSpot || p.NextAttacker || p.NextKeeper || p.Confirm || p.Retry || p.Flag || p.Pause;
-
     static PadSnapshot Merge(in PadSnapshot a, in PadSnapshot b)
     {
         var m = a;
@@ -190,7 +213,7 @@ public partial class InputReader : Node
         if (b.SkillKey != FootballSim.Core.SkillKey.None) m.SkillKey = b.SkillKey;
         m.OverlayToggle |= b.OverlayToggle; m.NextSpot |= b.NextSpot; m.PrevSpot |= b.PrevSpot;
         m.NextAttacker |= b.NextAttacker; m.NextKeeper |= b.NextKeeper;
-        m.Confirm |= b.Confirm; m.Retry |= b.Retry; m.Flag |= b.Flag; m.Pause |= b.Pause;
+        m.Confirm |= b.Confirm; m.Retry |= b.Retry; m.Flag |= b.Flag; m.Pause |= b.Pause; m.ControlsToggle |= b.ControlsToggle;
         return m;
     }
 
@@ -202,30 +225,31 @@ public partial class InputReader : Node
     /// </summary>
     PadSnapshot PollKeyboard()
     {
-        float x = (Held(Key.D) ? 1f : 0f) - (Held(Key.A) ? 1f : 0f);
-        float z = (Held(Key.S) ? 1f : 0f) - (Held(Key.W) ? 1f : 0f);
+        float x = (Bindings.Right.Held() ? 1f : 0f) - (Bindings.Left.Held() ? 1f : 0f);
+        float z = (Bindings.Down.Held() ? 1f : 0f) - (Bindings.Up.Held() ? 1f : 0f);
         var v = new Vector2(x, z);
         if (v.LengthSquared() > 1f) v = v.Normalized();
         return new PadSnapshot
         {
             MoveX = v.X, MoveZ = v.Y,
-            Sprint = Held(Key.Ctrl) ? 1f : 0f,
-            Shield = Held(Key.Q),
-            ShootHeld = Input.IsMouseButtonPressed(MouseButton.Left) || Held(Key.Space),
-            Finesse = Held(Key.E),
-            Chip = Held(Key.Shift),
-            KnockOn = Pressed(Key.X, Key.X),
-            Cancel = Input.IsMouseButtonPressed(MouseButton.Right) || Held(Key.G),
+            Sprint = Bindings.Sprint.Held() ? 1f : 0f,
+            Shield = Bindings.Shield.Held(),
+            ShootHeld = Bindings.Shoot.Held(),
+            Finesse = Bindings.Finesse.Held(),
+            Chip = Bindings.Chip.Held(),
+            KnockOn = Pressed(Bindings.KnockOn),
+            Cancel = Bindings.Cancel.Held(),
             SkillKey = SkillKeyPressed(),
-            OverlayToggle = Pressed(Key.O, Key.O),
-            NextSpot = Pressed(Key.Right, Key.Right),
-            PrevSpot = Pressed(Key.Left, Key.Left),
-            NextAttacker = Pressed(Key.Up, Key.Up),
-            NextKeeper = Pressed(Key.Down, Key.Down),
-            Confirm = Pressed(Key.Enter, Key.Enter, Key.KpEnter),
-            Retry = Pressed(Key.Backspace, Key.Backspace),
-            Flag = Pressed(Key.M, Key.M),
-            Pause = Pressed(Key.P, Key.P, Key.Escape),
+            OverlayToggle = Pressed(Bindings.Overlay),
+            NextSpot = Pressed(Bindings.NextSpot),
+            PrevSpot = Pressed(Bindings.PrevSpot),
+            NextAttacker = Pressed(Bindings.NextAttacker),
+            NextKeeper = Pressed(Bindings.NextKeeper),
+            Confirm = Pressed(Bindings.Confirm),
+            Retry = Pressed(Bindings.Retry),
+            Flag = Pressed(Bindings.Flag),
+            Pause = Pressed(Bindings.Pause),
+            ControlsToggle = Pressed(Bindings.Controls),
         };
     }
 
@@ -235,7 +259,7 @@ public partial class InputReader : Node
         two ? FootballSim.Core.SkillKey.BodyFeint : one ? FootballSim.Core.SkillKey.StepOver : FootballSim.Core.SkillKey.None;
 
     FootballSim.Core.SkillKey SkillKeyPressed() =>
-        SkillKeyOf(Pressed(Key.Key1, Key.Key1, Key.Kp1), Pressed(Key.Key2, Key.Key2, Key.Kp2), Pressed(Key.Key3, Key.Key3, Key.Kp3), Pressed(Key.Key4, Key.Key4, Key.Kp4));
+        SkillKeyOf(Pressed(Bindings.Skill1), Pressed(Bindings.Skill2), Pressed(Bindings.Skill3), Pressed(Bindings.Skill4));
 
     PadSnapshot PollPad()
     {
@@ -255,22 +279,22 @@ public partial class InputReader : Node
             MoveZ = v.Y,
             Sprint = Mathf.Clamp(Input.GetActionRawStrength(SprintA), 0f, 1f),
             Shield = Input.GetActionRawStrength(ShieldA) > 0.5f,
-            ShootHeld = Input.IsActionPressed(Shoot),
-            Finesse = Input.IsActionPressed(Fin),
-            Chip = Input.IsActionPressed(ChipA),
+            ShootHeld = Input.IsActionPressed(Bindings.Pad.Shoot.Action),
+            Finesse = Input.IsActionPressed(Bindings.Pad.Finesse.Action),
+            Chip = Input.IsActionPressed(Bindings.Pad.Chip.Action),
             RightX = r.X,
             RightZ = r.Y,
             // A / Cross doubles as confirm, but the round flow reads confirm only in Setup and Report, never while live.
-            Cancel = Input.IsActionPressed(Confirm),
-            OverlayToggle = Input.IsActionJustPressed(Overlay),
-            NextSpot = Input.IsActionJustPressed(Next),
-            PrevSpot = Input.IsActionJustPressed(Prev),
-            NextAttacker = Input.IsActionJustPressed(NextAtk),
-            NextKeeper = Input.IsActionJustPressed(NextKeep),
-            Confirm = Input.IsActionJustPressed(Confirm),
-            Retry = Input.IsActionJustPressed(Retry),
-            Flag = Input.IsActionJustPressed(Flag),
-            Pause = Input.IsActionJustPressed(Pause),
+            Cancel = Input.IsActionPressed(Bindings.Pad.Confirm.Action),
+            OverlayToggle = Input.IsActionJustPressed(Bindings.Pad.Overlay.Action),
+            NextSpot = Input.IsActionJustPressed(Bindings.Pad.NextSpot.Action),
+            PrevSpot = Input.IsActionJustPressed(Bindings.Pad.PrevSpot.Action),
+            NextAttacker = Input.IsActionJustPressed(Bindings.Pad.NextAttacker.Action),
+            NextKeeper = Input.IsActionJustPressed(Bindings.Pad.NextKeeper.Action),
+            Confirm = Input.IsActionJustPressed(Bindings.Pad.Confirm.Action),
+            Retry = Input.IsActionJustPressed(Bindings.Pad.Retry.Action),
+            Flag = Input.IsActionJustPressed(Bindings.Pad.Flag.Action),
+            Pause = Input.IsActionJustPressed(Bindings.Pad.Pause.Action),
         };
     }
 
