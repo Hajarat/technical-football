@@ -22,6 +22,15 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
 
     static float Depth(PlayerState k) => P.GoalLineX - k.Position.X;
 
+    /// <summary>The tuning with charging switched off (he never charges an attacker on the ball): closing down and racing only.</summary>
+    static Tuning NoCharge(Tuning? t = null)
+    {
+        t ??= new Tuning();
+        t.Keeper.ChargeTime = new RatingRange(0f, 0f);
+        t.Keeper.EngageRange = 0f;
+        return t;
+    }
+
     /// <summary>An attacker on the ball, touching it every step, running at <paramref name="speed"/> along +X.</summary>
     static KeeperSituation Dribbling(Vector3 ball, float speed, float nextTouch = 0.05f, int touchTick = 1) => new()
     {
@@ -64,10 +73,12 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
             if (!capBinds) Assert.True(depths[^1] > arc + 1.5f, $"at 11 m only {depths[^1]:F2} out (arc {arc:F2})");
             else Assert.True(depths[^1] < Keeper.CloseDownDistance(s, t, 11f, arc) - 0.5f, $"the chip cap did not hold him back: {depths[^1]:F2}");
         }
-        Run(T, "the_wall", 1, false);
-        Run(T, "stand_in", 2, false);
+        // Closing down without charging (charging is tested below).
+        var t = NoCharge();
+        Run(t, "the_wall", 1, false);
+        Run(t, "stand_in", 2, false);
         // A keeper who cannot get back (slow backpedal, low leap): his chip-safe depth holds him short of where he would close down to.
-        var slow = new Tuning();
+        var slow = NoCharge();
         slow.Keeper.BackpedalSpeed = new RatingRange(1f, 1f);
         slow.Keeper.ChipReachHeightFraction = 1.0f;
         slow.Keeper.ChipTakeHeightFraction = 0.9f;
@@ -134,16 +145,18 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
     [Fact]
     public void HeWinsALongSprintTouchFromWhereHeClosedDownThatHeWouldNotWinFromHisArc()
     {
-        // The ball 16 m out rolling on at 8 m/s, the sprinting attacker's next touch 1.5 s off (it runs about 8 m by then).
+        // The ball 16 m out rolling on at 8 m/s, the sprinting attacker's next touch 1.5 s off (it runs about 8 m by then). The
+        // race alone, with charging switched off (a charging keeper wins it from his arc too: see the charge tests).
         var s = TestData.Player("the_wall");
         const float from = 16f, nt = 1.5f;
-        var arcSpot = Keeper.ArcTarget(new Vector3(P.GoalLineX - from, 0.11f, 0f), P, T, s);
-        var closed = new Vector3(P.GoalLineX - Keeper.CloseDownDistance(s, T, from, P.GoalLineX - arcSpot.X), 0f, 0f);
-        var before = new Tuning();
+        var t = NoCharge();
+        var arcSpot = Keeper.ArcTarget(new Vector3(P.GoalLineX - from, 0.11f, 0f), P, t, s);
+        var closed = new Vector3(P.GoalLineX - Keeper.CloseDownDistance(s, t, from, P.GoalLineX - arcSpot.X), 0f, 0f);
+        var before = NoCharge();
         before.Keeper.RushAnticipation = new RatingRange(0f, 0f);
-        double arc = WinRate(T, arcSpot, from, nt, out _), cdBefore = WinRate(before, closed, from, nt, out _);
-        double cd = WinRate(T, closed, from, nt, out double rushes);
-        double close = WinRate(T, closed, from, 0.4f, out double chased);
+        double arc = WinRate(t, arcSpot, from, nt, out _), cdBefore = WinRate(before, closed, from, nt, out _);
+        double cd = WinRate(t, closed, from, nt, out double rushes);
+        double close = WinRate(t, closed, from, 0.4f, out double chased);
         output.WriteLine($"from the arc {arc:P0}, closed down without anticipation {cdBefore:P0}, closed down {cd:P0} (rushed {rushes:P0}); " +
                          $"touch 0.4 s off: won {close:P0}, chased {chased:P0}");
         Assert.Equal(0.0, arc);
@@ -183,20 +196,21 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void HeDoesNotChargeACloseControlDribblerHeCannotBeatButStopsAndSpreads()
+    public void HeClosesACloseControlDribblerDownAndJockeysButDoesNotDiveInAtABallHeCannotBeat()
     {
+        // A close-control dribbler (a touch every 0.3 s, the attacker half a metre behind the ball) comes on from 13 m to about
+        // 3 m from him, then holds the ball there. He charges, then jockeys a couple of metres off the ball; he neither races
+        // for it nor dives in, since the attacker always plays it first.
         var s = TestData.Player("the_wall");
-        var keeperAt = new Vector3(P.GoalLineX - 7f, 0f, 0f);
+        var keeperAt = new Vector3(P.GoalLineX - 4f, 0f, 0f);
         var ballAt = new Vector3(P.GoalLineX - 13f, 0.11f, 0f);
         var (brain, keeper, ball) = Rig(s, ballAt, keeperAt);
         var rng = new SimRng(6);
         const float v = 3f;
-        bool spread = false;
+        bool charged = false, jockeyed = false;
         int tick = 0;
-        for (int i = 0; i < 240; i++)
+        for (int i = 0; i < 300; i++)
         {
-            // A touch every step: the ball stays just ahead, next met within 0.3 s; the dribbler comes to about 3 m from him,
-            // then holds the ball there, shielding it.
             float cycle = 0.3f - (i % 36) * Dt;
             float gap = Vector2.Distance(new Vector2(keeper.Position.X, keeper.Position.Z), new Vector2(ball.Position.X, ball.Position.Z));
             float vb = gap > 3f ? v : 0f;
@@ -206,10 +220,53 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
             brain.Update(Dt, ball, rng, Dribbling(ball.Position, vb, cycle, tick));
             Assert.NotEqual(KeeperAction.Rush, keeper.KeeperAction);
             Assert.NotEqual(KeeperAction.Smother, keeper.KeeperAction);
-            spread |= keeper.KeeperAction == KeeperAction.Spread;
+            charged |= keeper.KeeperAction == KeeperAction.Charge;
+            jockeyed |= keeper.KeeperAction == KeeperAction.Jockey;
         }
-        Assert.True(spread, "close to the dribbler he should stop and make himself big");
-        Assert.True(Vector2.Distance(new Vector2(keeper.Position.X, keeper.Position.Z), new Vector2(ball.Position.X, ball.Position.Z)) > 2f);
+        float end = Vector2.Distance(new Vector2(keeper.Position.X, keeper.Position.Z), new Vector2(ball.Position.X, ball.Position.Z));
+        output.WriteLine($"charged {charged}, jockeyed {jockeyed}, ends {end:F2} m from the ball, {Depth(keeper):F2} m off his line");
+        Assert.True(charged, "he should charge the dribbler coming at him");
+        Assert.True(jockeyed, "close to the dribbler he should jockey");
+        Assert.InRange(end, 1.5f, 2.6f);
+    }
+
+    [Fact]
+    public void JockeyingHeMirrorsTheDribblerAcrossAndGivesGroundOnlySlowly()
+    {
+        // A close-control dribbler comes in from 16 m at 3 m/s until the keeper jockeys 2 m off the ball, then shifts the ball
+        // across at 3 m/s: he steps across with him, staying on the cover line; when the dribbler then comes straight at him at
+        // 3 m/s, he gives ground no faster than jockey_retreat_speed.
+        var s = TestData.Player("the_wall");
+        var ballAt = new Vector3(P.GoalLineX - 16f, 0.11f, 0f);
+        var (brain, keeper, ball) = Rig(s, ballAt, new Vector3(P.GoalLineX - 5f, 0f, 0f));
+        var rng = new SimRng(8);
+        int tick = 0;
+        void Step(Vector3 vel, int i)
+        {
+            ball.Position += vel * Dt;
+            ball.Velocity = vel;
+            if (i % 36 == 0) tick++;
+            var sit = Dribbling(ball.Position, vel.X, 0.3f - (i % 36) * Dt, tick) with { AttackerVelocity = vel };
+            brain.Update(Dt, ball, rng, sit);
+        }
+        for (int i = 0; i < 600 && keeper.KeeperAction != KeeperAction.Jockey; i++) Step(new Vector3(3f, 0f, 0f), i);
+        Assert.Equal(KeeperAction.Jockey, keeper.KeeperAction);
+        for (int i = 0; i < 30; i++) Step(Vector3.Zero, i);
+        for (int i = 0; i < 120; i++) Step(new Vector3(0f, 0f, 3f), i);
+        var cover = Keeper.CoverDirection(new Vector2(ball.Position.X, ball.Position.Z), P, T);
+        var toK = new Vector2(keeper.Position.X - ball.Position.X, keeper.Position.Z - ball.Position.Z);
+        float off = MathF.Abs(toK.X * cover.Y - toK.Y * cover.X);
+        output.WriteLine($"after the shift: {toK.Length():F2} m from the ball, {off:F2} m off the cover line, {keeper.KeeperAction}");
+        Assert.True(off < 0.6f, $"{off:F2} m off the cover line");
+        Assert.InRange(toK.Length(), 1.5f, 2.8f);
+        float maxBack = 0f;
+        for (int i = 0; i < 40; i++)
+        {
+            Step(new Vector3(3f, 0f, 0f), i);
+            maxBack = MathF.Max(maxBack, keeper.Velocity.X);
+        }
+        output.WriteLine($"coming at him: gives ground at most {maxBack:F2} m/s");
+        Assert.True(maxBack <= T.Keeper.JockeyRetreatSpeed + 0.05f, $"{maxBack:F2} m/s");
     }
 
     // ---- the windup ----
@@ -219,7 +276,9 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
     {
         var s = TestData.Player("the_wall");
         var ballAt = new Vector3(P.GoalLineX - 20f, 0.11f, 0f);
-        var (brain, keeper, ball) = Rig(s, ballAt, Keeper.ArcTarget(ballAt, P, T, s));
+        // Closing down (not charging: a charge into a wind-up is tested with the charge).
+        var t = NoCharge();
+        var (brain, keeper, ball) = Rig(s, ballAt, Keeper.ArcTarget(ballAt, P, t, s), t);
         var rng = new SimRng(7);
         const float v = 6f;
         ball.Velocity = new Vector3(v, 0f, 0f);
@@ -240,7 +299,7 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
             Assert.Equal(KeeperAction.Planted, keeper.KeeperAction);
         }
         Assert.Equal(0f, keeper.Velocity.Length(), 2);
-        Assert.True(Depth(keeper) <= depth0 + vx * vx / (2f * T.Keeper.PlantDecel) + 0.02f, $"{depth0:F2} -> {Depth(keeper):F2}");
+        Assert.True(Depth(keeper) <= depth0 + vx * vx / (2f * t.Keeper.PlantDecel) + 0.02f, $"{depth0:F2} -> {Depth(keeper):F2}");
     }
 
     // ---- chips ----

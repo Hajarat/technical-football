@@ -595,7 +595,7 @@ public sealed class KeeperTuning
     /// <summary>He starts closing down once the ball is within this distance of the goal mouth...</summary>
     public float CloseDownRange { get; set; } = 30f;
     /// <summary>...and the attacker comes at goal with it at least this fast, m/s (from then on he keeps closing down this round).</summary>
-    public float CloseDownMinSpeed { get; set; } = 3f;
+    public float CloseDownMinSpeed { get; set; } = 1.5f;
     /// <summary>Closing down (not committing), he stays at least this far short of the ball along the cover line, metres.</summary>
     public float CloseDownGap { get; set; } = 3.0f;
     /// <summary>A reposition longer than <see cref="JogThreshold"/> is run at rush speed once the ball is this close to the mouth, metres.</summary>
@@ -625,10 +625,59 @@ public sealed class KeeperTuning
     /// <summary>Within this distance of an attacker on the ball that he cannot beat to it, he stops and spreads (makes himself big), metres.</summary>
     public float PreSpreadRange { get; set; } = 3.5f;
     /// <summary>
-    /// Closing down an attacker on the ball who is within this distance of him and in front, he pushes up to him (at rush speed,
-    /// to the spread range) instead of keeping <see cref="CloseDownGap"/>, metres.
+    /// Closing down an attacker on the ball who is within this distance of him and in front, he always charges him (to
+    /// <see cref="JockeyDistance"/>) instead of keeping <see cref="CloseDownGap"/>, metres.
     /// </summary>
-    public float EngageRange { get; set; } = 7f;
+    public float EngageRange { get; set; } = 8.5f;
+
+    // ---- charging and jockeying ----
+    /// <summary>
+    /// Charging (closing an attacker down at rush speed, through to jockeying range): only while the ball is within this distance
+    /// of the goal centre, metres.
+    /// </summary>
+    public float ChargeRange { get; set; } = 20f;
+    /// <summary>
+    /// He charges once he can get to within <see cref="JockeyDistance"/> of the ball (the attacker coming on toward him) within
+    /// this many seconds, by rushing_out: the time he accepts being caught on the way, before the chip risk is weighed.
+    /// </summary>
+    public RatingRange ChargeTime { get; set; } = new(0.35f, 2.0f);
+    /// <summary>
+    /// The chip risk weighed against a charge: <see cref="ChargeTime"/> is divided by 1 + this x the metres he would end up beyond
+    /// his judged chip-safe depth (for the ball's distance now), by rushing_out (a brave keeper weighs it less), per metre.
+    /// </summary>
+    public RatingRange ChargeChipWeight { get; set; } = new(0.4f, 0f);
+    /// <summary>
+    /// He charges only while the depth where he would meet the attacker is at most this far beyond his judged chip-safe depth for
+    /// the ball's distance now (<see cref="ChargeChipHysteresis"/> more once going), metres, by rushing_out: the chip risk a
+    /// brave keeper accepts.
+    /// </summary>
+    public RatingRange ChargeChipAllowance { get; set; } = new(1f, 6f);
+    /// <summary>Once charging, he carries on up to this much further beyond his chip-safe depth than he would start at, metres.</summary>
+    public float ChargeChipHysteresis { get; set; } = 2f;
+    /// <summary>With the ball up to this much beyond <see cref="ChargeRange"/> and a charge he would make, he holds his depth (no retreat first), metres.</summary>
+    public float ChargeHoldMargin { get; set; } = 4f;
+    /// <summary>A charge is dropped once the time to close exceeds this multiple of what he accepts (plus 0.25 s).</summary>
+    public float ChargeDropFactor { get; set; } = 1.5f;
+    /// <summary>A charge never takes him further than this from the goal mouth, metres.</summary>
+    public float ChargeMaxOut { get; set; } = 14f;
+    /// <summary>
+    /// Charging when a shot winds up, he keeps coming to block it if, coming on until the last <see cref="ChargePlantLead"/>
+    /// seconds and then braking, he would be within <see cref="ChargeBlockDistance"/> metres of the ball at the strike (he may be
+    /// caught still moving, or chipped); otherwise he pulls up at once to be set.
+    /// </summary>
+    public float ChargePlantLead { get; set; } = 0.3f;
+    /// <summary>See <see cref="ChargePlantLead"/>, metres.</summary>
+    public float ChargeBlockDistance { get; set; } = 4.5f;
+    /// <summary>Charging, he closes to this distance from the ball and then jockeys there, metres.</summary>
+    public float JockeyDistance { get; set; } = 2.0f;
+    /// <summary>Jockeying, he gives ground (toward his goal) no faster than this, m/s.</summary>
+    public float JockeyRetreatSpeed { get; set; } = 1.5f;
+
+    /// <summary>
+    /// With the attacker within this distance of the ball (close control, jogging touches), a dive at it still wants his rush
+    /// margin; further from it (a ball pushed past him) he lunges with none, metres.
+    /// </summary>
+    public float ContestedDistance { get; set; } = 1.0f;
     /// <summary>Seconds to commit to a rush from standing (added to the race time when not already rushing).</summary>
     public float RushStartDelay { get; set; } = 0.15f;
     /// <summary>The keeper rushes or claims only a ball whose centre is below this height, metres.</summary>

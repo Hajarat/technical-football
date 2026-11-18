@@ -455,8 +455,8 @@ public partial class PlayerFigure : Node3D
 
         if (IsKeeper)
         {
-            // every keeper state but Rush is drawn by the keeper pose code; Rush reuses the run cycle below and is blended with it
-            bool rushing = f.KeeperAction == FootballSim.Core.KeeperAction.Rush;
+            // every keeper state but Rush and Charge is drawn by the keeper pose code; those reuse the run cycle below, blended with it
+            bool rushing = f.KeeperAction is FootballSim.Core.KeeperAction.Rush or FootballSim.Core.KeeperAction.Charge;
             _wR = rushing ? Math.Min(1f, _wR + dt / 0.12f) : Math.Max(0f, _wR - dt / 0.15f);
             if (!rushing) { UpdateKeeper(f, pos, fwd, right, hv, speed, dt, null); return; }
         }

@@ -133,6 +133,8 @@ public sealed class World
     public PlayerState? BallController => _controller;
     /// <summary>The keeper's numbers for the latest shot.</summary>
     public KeeperReport KeeperReport => _brain.Report;
+    /// <summary>Why the keeper did what he did on the latest tick (a diagnostic for probes; changes nothing).</summary>
+    public KeeperThought KeeperThought => _brain.Thought;
     /// <summary>Number of intents <see cref="Step"/> expects: both teams' players, team 0 first.</summary>
     public int PlayerCount => Teams[0].Count + Teams[1].Count;
     /// <summary>True while the round is being simulated (Live, Strike, Flight or Outcome).</summary>

@@ -33,6 +33,8 @@ public sealed class KeeperReport
     public bool PlantedAtStrike { get; set; }
     /// <summary>True if the keeper rushed out at the ball this round before the first strike.</summary>
     public bool Rushed { get; set; }
+    /// <summary>True if the keeper charged an attacker on the ball (closing him down at rush speed) this round before the first strike.</summary>
+    public bool Charged { get; set; }
     /// <summary>True if the keeper went down in a smother this round before the first strike.</summary>
     public bool Smothered { get; set; }
     /// <summary>True if the keeper got to the ball (a smother, block or claim) this round before the first strike: won from a dribble.</summary>

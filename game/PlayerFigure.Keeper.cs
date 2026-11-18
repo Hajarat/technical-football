@@ -6,9 +6,9 @@ using KDive = FootballSim.Core.KeeperDive;
 namespace FootballSim.Game;
 
 /// <summary>
-/// The keeper's poses (Phase D). Every state is a blend of up to three poses: the standing pose S (Set, Shuffle, Backpedal, Spread, Planted, Reacting, Holding on his feet,
-/// and the end of a get-up), the dive pose D (every dive kind, the smother, lying on the ground and the start of a get-up) and, while rushing, the
-/// outfield run cycle R. The weights move smoothly, so a change of state never snaps a pose. The simulation's values decide what is drawn; nothing
+/// The keeper's poses (Phase D). Every state is a blend of up to three poses: the standing pose S (Set, Shuffle, Backpedal, Spread, Jockey, Planted, Reacting,
+/// Holding on his feet, and the end of a get-up), the dive pose D (every dive kind, the smother, lying on the ground and the start of a get-up) and, while
+/// rushing or charging, the outfield run cycle R. The weights move smoothly, so a change of state never snaps a pose. The simulation's values decide what is drawn; nothing
 /// here decides any timing except the figure's own smoothing.
 /// </summary>
 public partial class PlayerFigure
@@ -59,6 +59,9 @@ public partial class PlayerFigure
             case KAct.Backpedal: legFrac = 0.84f; hw = 2.2f; lean = 0.08f; hf = 0.22f; hd = -0.16f; hs = 0.12f; break;
             // stopped close to the attacker, made big: low and wide, arms out and down to the sides to fill the gaps beside him
             case KAct.Spread: legFrac = 0.70f; hw = 4.4f; lean = 0.30f; hf = 0.10f; hd = -0.30f; hs = 0.40f; break;
+            // jockeying a couple of metres off the attacker: low, on the balls of his feet, a little narrower than spread so he can
+            // step with him, hands low and out ready to go down at the ball
+            case KAct.Jockey: legFrac = 0.72f; hw = 3.4f; lean = 0.32f; hf = 0.16f; hd = -0.27f; hs = 0.28f; break;
             default: legFrac = 0.82f; hw = 2.5f; lean = 0.15f; hf = 0.25f; hd = -0.20f; hs = 0.10f; break;
         }
     }
@@ -69,7 +72,7 @@ public partial class PlayerFigure
         StandTargets(f.KeeperAction, out _kLegFrac, out _kHw, out _kLean, out _kHf, out _kHd, out _kHs);
         var act = f.KeeperAction;
         _wD = act is KAct.Diving or KAct.Smother or KAct.Grounded ? 1f : act == KAct.GettingUp ? GetUpWeight(Mathf.Clamp(f.KeeperActionTime / KeeperView.GetUpSeconds, 0f, 1f)) : 0f;
-        _wR = act == KAct.Rush ? 1f : 0f;
+        _wR = act is KAct.Rush or KAct.Charge ? 1f : 0f;
         _ground = act is KAct.Grounded or KAct.GettingUp;
         _dKind = f.KeeperDive == KDive.None ? KDive.Low : f.KeeperDive;
         _dSmother = act == KAct.Smother;
@@ -87,7 +90,7 @@ public partial class PlayerFigure
         _dAnk[0] = _kf[0].Plant; _dAnk[1] = _kf[1].Plant;
     }
 
-    /// <summary>Draws the keeper for this tick. <paramref name="run"/> is the run-cycle pose when the state is Rush (the outfield code computed it), else null.</summary>
+    /// <summary>Draws the keeper for this tick. <paramref name="run"/> is the run-cycle pose when the state is Rush or Charge (the outfield code computed it), else null.</summary>
     void UpdateKeeper(in FigureFrame f, Vector3 pos, Vector3 fwd, Vector3 right, Vector3 hv, float speed, float dt, KPose? run)
     {
         float k = H / 1.8f;
@@ -142,7 +145,7 @@ public partial class PlayerFigure
             _ground = _dKind is KDive.Low or KDive.Side or KDive.High or KDive.Back;
         }
         else if (act == KAct.Grounded) _ground = true;
-        else if (act is KAct.Set or KAct.Shuffle or KAct.Planted or KAct.Reacting or KAct.Rush or KAct.Backpedal or KAct.Spread) _ground = false;
+        else if (act is KAct.Set or KAct.Shuffle or KAct.Planted or KAct.Reacting or KAct.Rush or KAct.Charge or KAct.Backpedal or KAct.Spread or KAct.Jockey) _ground = false;
         else if (act == KAct.GettingUp && getUp >= 1f) _ground = false;
 
         float target, tau;

@@ -133,7 +133,11 @@ public class KeeperBrainTests
     public void ClosingDownHeHoldsHisDepthButNotBeyondHisChipSafeDepth()
     {
         // Attacker running at goal with the ball 16 m out. A keeper 4 m out (between his closing-down depth and his limits)
-        // holds there; one 11 m out (beyond his chip-safe depth and hold_ground_max_out) comes back.
+        // holds there; one 11 m out (beyond his chip-safe depth and hold_ground_max_out) comes back. Closing down only: with
+        // charging switched off.
+        var t = new Tuning();
+        t.Keeper.ChargeTime = new RatingRange(0f, 0f);
+        t.Keeper.EngageRange = 0f;
         var ball = new Vector3(P.GoalLineX - 16f, 0.11f, 0f);
         var s = new KeeperSituation
         {
@@ -142,7 +146,7 @@ public class KeeperBrainTests
         };
         foreach (var (startOut, holds) in new[] { (4.0f, true), (11.0f, false) })
         {
-            var (brain, keeper, b) = Rig(Wall(), ball);
+            var (brain, keeper, b) = Rig(Wall(), ball, t: t);
             keeper.Position = new Vector3(P.GoalLineX - startOut, 0f, 0f);
             b.Velocity = new Vector3(6f, 0f, 0f);
             for (int i = 0; i < 240; i++) brain.Update(Dt, b, new SimRng(1), s);

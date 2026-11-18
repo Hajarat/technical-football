@@ -114,6 +114,47 @@ public static class Keeper
         return t1 + (distance - d1) / vmax;
     }
 
+    /// <summary>
+    /// Metres covered in <paramref name="time"/> seconds from speed <paramref name="v0"/> along the way (negative = moving away),
+    /// accelerating at <paramref name="accel"/> up to <paramref name="vmax"/> (the inverse of <see cref="TravelTime"/>).
+    /// </summary>
+    public static float DistanceIn(float time, float v0, float accel, float vmax)
+    {
+        if (time <= 0f) return 0f;
+        v0 = Math.Clamp(v0, -vmax, vmax);
+        float t1 = (vmax - v0) / accel;
+        if (time <= t1) return v0 * time + 0.5f * accel * time * time;
+        return (v0 + vmax) * 0.5f * t1 + vmax * (time - t1);
+    }
+
+    /// <summary>
+    /// Seconds for the keeper to get from <paramref name="gap"/> metres away to the attacker on the ball, closing at his rush
+    /// (from <paramref name="v0"/> toward him) while the attacker comes on toward him at <paramref name="approach"/> m/s.
+    /// +infinity beyond 4 s.
+    /// </summary>
+    public static float CloseTime(float gap, float v0, float approach, float accel, float vmax)
+    {
+        if (gap <= 0f) return 0f;
+        approach = MathF.Max(0f, approach);
+        const float tMax = 4f;
+        if (DistanceIn(tMax, v0, accel, vmax) + approach * tMax < gap) return float.PositiveInfinity;
+        float lo = 0f, hi = tMax;
+        for (int i = 0; i < 30; i++)
+        {
+            float mid = 0.5f * (lo + hi);
+            if (DistanceIn(mid, v0, accel, vmax) + approach * mid >= gap) hi = mid; else lo = mid;
+        }
+        return hi;
+    }
+
+    /// <summary>
+    /// How long he accepts closing an attacker down for before he charges, seconds: <c>charge_time</c> by rushing_out, divided by
+    /// 1 + <c>charge_chip_weight</c> (by rushing_out) x <paramref name="chipExcess"/>, the metres he would end up beyond his
+    /// chip-safe depth. A brave keeper weighs the chip less.
+    /// </summary>
+    public static float ChargeTolerance(PlayerSheet s, Tuning t, float chipExcess) =>
+        t.Keeper.ChargeTime.ForRating(s.RushingOut) / (1f + t.Keeper.ChargeChipWeight.ForRating(s.RushingOut) * MathF.Max(0f, chipExcess));
+
     /// <summary>The point a movement decision steers at: <paramref name="to"/>, or the point <paramref name="cap"/> metres along the way to it if further.</summary>
     public static Vector2 CapTarget(Vector2 from, Vector2 to, float cap)
     {
