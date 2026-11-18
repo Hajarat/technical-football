@@ -121,6 +121,19 @@ public sealed class KeeperGallery
             return (_p0 + _fwd * x, _fwd * v);
         };
         MomPh(rush, 1, 0.2f, "a"); MomPh(rush, 1, 0.5f, "b"); MomPh(rush, 1, 0.8f, "c");
+        // backpedalling: 4 m back toward his goal in 1.3 s facing the play (peaking near his backpedal speed), then set
+        var back = S("backpedal"); back.Running = true;
+        back.Phases.Add(Ph(KeeperAction.Set, 0.3f)); back.Phases.Add(Ph(KeeperAction.Backpedal, 1.3f)); back.Phases.Add(Ph(KeeperAction.Set, 0.6f));
+        back.Motion = t =>
+        {
+            float u = Mathf.Clamp((t - 0.3f) / 1.3f, 0f, 1f);
+            float x = 4f - Mathf.SmoothStep(0f, 1f, u) * 4f, v = u > 0f && u < 1f ? 6f * u * (1f - u) * 4f / 1.3f : 0f;
+            return (_p0 + _fwd * x, -_fwd * v);
+        };
+        MomPh(back, 1, 0.25f, "a"); MomPh(back, 1, 0.5f, "b"); MomPh(back, 1, 0.75f, "c");
+        // staying big: from his set stance he stops and spreads, close to an attacker on the ball
+        var spread = S("spread"); spread.Phases.Add(Ph(KeeperAction.Set, 0.4f)); spread.Phases.Add(Ph(KeeperAction.Spread, 0.9f));
+        MomPh(spread, 1, 0.3f, "a"); MomPh(spread, 1, 1f, "end");
         var holdStand = S("holding_standing");
         var catchPos = Rel(0.35f, 0, 1.1f);
         holdStand.Phases.Add(Ph(KeeperAction.Reacting, 0.4f)); holdStand.Phases.Add(Ph(KeeperAction.Diving, 0.3f, KeeperDive.Catch, Reach(Target(KeeperDive.Catch, 1), 0.3f)));

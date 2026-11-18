@@ -6,7 +6,7 @@ using KDive = FootballSim.Core.KeeperDive;
 namespace FootballSim.Game;
 
 /// <summary>
-/// The keeper's poses (Phase D). Every state is a blend of up to three poses: the standing pose S (Set, Shuffle, Planted, Reacting, Holding on his feet,
+/// The keeper's poses (Phase D). Every state is a blend of up to three poses: the standing pose S (Set, Shuffle, Backpedal, Spread, Planted, Reacting, Holding on his feet,
 /// and the end of a get-up), the dive pose D (every dive kind, the smother, lying on the ground and the start of a get-up) and, while rushing, the
 /// outfield run cycle R. The weights move smoothly, so a change of state never snaps a pose. The simulation's values decide what is drawn; nothing
 /// here decides any timing except the figure's own smoothing.
@@ -53,6 +53,10 @@ public partial class PlayerFigure
             case KAct.Planted: legFrac = 0.78f; hw = 3.0f; lean = 0.27f; hf = 0.33f; hd = -0.08f; hs = 0.15f; break;
             case KAct.Reacting: legFrac = 0.73f; hw = 3.2f; lean = 0.35f; hf = 0.34f; hd = -0.05f; hs = 0.17f; break;
             case KAct.Holding: legFrac = 0.94f; hw = 2.4f; lean = 0.05f; hf = 0.30f; hd = -0.12f; hs = 0.05f; break;
+            // moving back toward his goal facing the play: taller, weight a little back, hands up in front ready to spring
+            case KAct.Backpedal: legFrac = 0.84f; hw = 2.2f; lean = 0.08f; hf = 0.22f; hd = -0.16f; hs = 0.12f; break;
+            // stopped close to the attacker, made big: low and wide, arms out and down to the sides to fill the gaps beside him
+            case KAct.Spread: legFrac = 0.70f; hw = 4.4f; lean = 0.30f; hf = 0.10f; hd = -0.30f; hs = 0.40f; break;
             default: legFrac = 0.82f; hw = 2.5f; lean = 0.15f; hf = 0.25f; hd = -0.20f; hs = 0.10f; break;
         }
     }
@@ -136,7 +140,7 @@ public partial class PlayerFigure
             _ground = _dKind is KDive.Low or KDive.Side or KDive.High;
         }
         else if (act == KAct.Grounded) _ground = true;
-        else if (act is KAct.Set or KAct.Shuffle or KAct.Planted or KAct.Reacting or KAct.Rush) _ground = false;
+        else if (act is KAct.Set or KAct.Shuffle or KAct.Planted or KAct.Reacting or KAct.Rush or KAct.Backpedal or KAct.Spread) _ground = false;
         else if (act == KAct.GettingUp && getUp >= 1f) _ground = false;
 
         float target, tau;
