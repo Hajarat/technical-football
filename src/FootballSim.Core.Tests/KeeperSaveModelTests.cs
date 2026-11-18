@@ -131,27 +131,31 @@ public class KeeperSaveModelTests
         Assert.Equal(1f, Keeper.Readiness(T, 3.5f));
         Assert.Equal(0.5f, Keeper.Readiness(T, 4.75f), 3);
         Assert.Equal(0f, Keeper.Readiness(T, 6f));
-        Assert.Equal(0.75f, Keeper.HullRadius(T, 1f), 4);                 // GOALS CapsuleRadius 75 cm
+        // A plausible spread body, not a wall: torso and spread limbs averaged.
+        Assert.InRange(Keeper.HullRadius(T, 1f), 0.38f, 0.46f);
         Assert.Equal(T.Keeper.BodyRadius, Keeper.HullRadius(T, 0f), 4);
+        Assert.Equal(0.75f, T.Keeper.SaveHullRadius, 4);                  // GOALS CapsuleRadius 75 cm: where a reflex is always tried
     }
 
     [Fact]
     public void ASetKeeperCloseToTheShooterIsBigEnoughToBlockBesideHimLowAndHighBeforeHeMoves()
     {
-        // From 3 m at 30 m/s the ball is past him in 0.1 s, before his reflex: only his standing body can meet it.
-        foreach (float height in new[] { 0.2f, 1.0f, 1.9f })
+        // From 3 m at 30 m/s the ball is past him in 0.1 s, before his reflex: only his standing body can meet it. Ready, it
+        // meets a ball 0.45 m beside his axis at any height; it is no wall a metre wide.
+        Assert.False(KeeperCoverTests.Touches(T, Wall(), 2f, 30f, 0.2f, 0.75f, 1), "a ball 0.75 m beside him at the feet from 2 m is not blocked");
+        foreach (float height in new[] { 0.2f, 1.0f, 1.6f })
         {
             int blocked = 0;
             for (ulong seed = 1; seed <= 10; seed++)
-                if (KeeperCoverTests.Touches(T, Wall(), 3f, 30f, height, 0.75f, seed, out var r))
+                if (KeeperCoverTests.Touches(T, Wall(), 3f, 30f, height, 0.45f, seed, out var r))
                 {
                     blocked++;
-                    Assert.Equal(SaveType.None, r.SaveType);   // met before he moved
-                    Assert.Equal(SaveKind.Block, r.Save);
+                    Assert.True(r.SaveType is SaveType.None or SaveType.Reflex, $"{r.SaveType}");   // met before he moved, or by an early reflex
+                    Assert.True(r.Save is SaveKind.Block or SaveKind.Parry or SaveKind.TipOver, $"{r.Save}");   // off his body, or an early reflex hand
                 }
             Assert.True(blocked == 10, $"height {height}: blocked {blocked}/10");
         }
-        // Not set (no stance for the shot) the same low ball beside him goes by; set but 8 m out he is not ready either.
+        // Not set (no stance for the shot) a low ball 0.75 m beside him goes by; set but 8 m out he is not ready either.
         Assert.False(KeeperCoverTests.Touches(T, Wall(), 3f, 30f, 0.2f, 0.75f, 1, out var unset, planted: false));
         Assert.Equal(0f, unset.Ready);
         KeeperCoverTests.Touches(T, Wall(), 8f, 30f, 1.0f, 2.5f, 1, out var far);

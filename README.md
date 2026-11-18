@@ -207,15 +207,16 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
 - **Ready stance.** In his stance for the shot at the strike (planted, still braking into it, spread or jockeying) he is ready
   by his distance from the ball: fully within `ready_full` (GOALS MaxDistanceForFullyReadyStance 3.5 m), not at all from
   `ready_range`. His standing body, the capsule the ball can hit from the shins to the shoulders until he moves, is his hull:
-  `body_radius` not ready, growing to `hull_radius` (GOALS CapsuleRadius 0.75 m: legs and arms spread) fully ready, so a set
-  keeper close to the shooter is big low and high. Still at the strike, he also holds his hands `hand_span` out to each side at
+  `body_radius` not ready, growing to `hull_radius` (0.42 m: his torso with spread legs and arms, averaged) fully ready, so a
+  set keeper close to the shooter is bigger low and high. The rest of his close-range cover is the reflex. Still at the strike, he also holds his hands `hand_span` out to each side at
   `hand_span_height_fraction` of his height (a ball reaching them before he moves is stopped); his reach grows from the span,
   or from his hull's edge when that is further, rather than from zero.
 - **Reflex and reaction.** From the contact he has a reflex (`reflex_time` by reflexes) and, later, his full reaction
   (`reaction`; both with `reaction_noise`; moving at the strike adds `still_moving_reaction_penalty` to the reaction only). At
   the reflex he plans both saves on the ball's predicted path: if his reaction and dive get to it in time he waits for them;
-  otherwise, if a reflex limb gets to it, he makes a reflex save now (`SaveType.Reflex`); if neither does but the reflex gets
-  closer, within `reflex_attempt_margin` of its range, a reflex attempt (`ReflexAttempt`). A reflex limb starts where his
+  otherwise, if a reflex limb gets to it, he makes a reflex save now (`SaveType.Reflex`); if neither does, a reflex attempt
+  (`ReflexAttempt`) when the ball passes inside his save hull (`save_hull_radius`, GOALS CapsuleRadius 0.75 m), or when the
+  reflex gets closer than the dive, within `reflex_attempt_margin` of its range. A reflex limb starts where his
   stance holds it (a hand at its span, a foot at `stance_foot_offset`, the body at his hull's edge), moves out after its
   execution time (`reflex_execution_easy`..`_hard` by the save's difficulty) at `reflex_speed` to at most `reflex_range`
   (reach, by height), aimed no higher than `reflex_height_fraction` of his height, the body following `reflex_body_follow` of

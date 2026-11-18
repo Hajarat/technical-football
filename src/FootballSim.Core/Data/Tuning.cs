@@ -515,10 +515,15 @@ public sealed class KeeperTuning
     /// <summary>...and not ready at all from this far, linear between, metres.</summary>
     public float ReadyRange { get; set; } = 6f;
     /// <summary>
-    /// Fully ready, his standing body is a hull of this radius around his upright axis (legs and arms spread, GOALS CapsuleRadius
-    /// 0.75 m); not ready it is <see cref="BodyRadius"/>, linear between, metres.
+    /// Fully ready, his standing body (what the ball hits before he moves) has this effective radius around his upright axis: his
+    /// torso with a set keeper's spread legs and arms, averaged; not ready it is <see cref="BodyRadius"/>, linear between, metres.
     /// </summary>
-    public float HullRadius { get; set; } = 0.75f;
+    public float HullRadius { get; set; } = 0.42f;
+    /// <summary>
+    /// His save hull (GOALS CapsuleRadius 0.75 m): a ball his dive will not get to in time that passes within this of his upright
+    /// axis always draws a reflex (a save or an attempt), metres.
+    /// </summary>
+    public float SaveHullRadius { get; set; } = 0.75f;
     /// <summary>A ball that hits the body slower than this is held; faster it is blocked, m/s.</summary>
     public float BodyHoldSpeed { get; set; } = 8f;
 

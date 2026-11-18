@@ -305,8 +305,9 @@ public sealed partial class KeeperBrain
 
     /// <summary>
     /// At his reflex: if his full reaction and dive will get to the ball in time, he waits for them. Otherwise, if a reflex limb
-    /// gets to it, he makes a reflex save now; or, if neither does but the reflex gets closer than the dive would and the ball
-    /// passes within <c>reflex_attempt_margin</c> of his reflex range, a reflex attempt. Returns true if he started one.
+    /// gets to it, he makes a reflex save now; or, if neither does, a reflex attempt when the ball passes inside his save hull
+    /// (<c>save_hull_radius</c>), or when the reflex gets closer than the dive would and the ball passes within
+    /// <c>reflex_attempt_margin</c> of his reflex range. Returns true if he started one.
     /// </summary>
     bool TryReflex(Ball ball, SimRng rng)
     {
@@ -317,7 +318,8 @@ public sealed partial class KeeperBrain
         if (!rf.Found)
         {
             float lateral = new Vector2(rf.Target.X - _k.Position.X, rf.Target.Z - _k.Position.Z).Length();
-            if (!(rf.Short < dive.Short) || lateral > Keeper.ReflexRange(_k.Sheet, _t) + _t.Keeper.ReflexAttemptMargin) return false;
+            bool inHull = lateral <= _t.Keeper.SaveHullRadius;
+            if (!inHull && (!(rf.Short < dive.Short) || lateral > Keeper.ReflexRange(_k.Sheet, _t) + _t.Keeper.ReflexAttemptMargin)) return false;
         }
         StartSave(rf, rng, reflex: true);
         return true;
@@ -400,7 +402,7 @@ public sealed partial class KeeperBrain
     /// <summary>
     /// How far out from his axis a reflex limb of the kind starts: a hand from where his stance holds it (his hand span, or his
     /// hull's edge); a foot from where it stands (<c>stance_foot_offset</c> when he was still, else beside his body), or his
-    /// hull's edge when he was ready and that is further; the body from his hull's edge.
+    /// hull's edge when he was ready and that is further; the body from his hull's edge or his hands' span, whichever is further.
     /// </summary>
     float LimbStart(KeeperDive kind)
     {
@@ -411,7 +413,7 @@ public sealed partial class KeeperBrain
         {
             KeeperDive.ReflexHand => _span,
             KeeperDive.ReflexFoot => MathF.Max(foot, hull),
-            _ => MathF.Max(k.BodyRadius, hull),
+            _ => MathF.Max(MathF.Max(k.BodyRadius, hull), _span),
         };
     }
 

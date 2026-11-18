@@ -200,7 +200,12 @@ public static class DataLoader
                 ("touch.early_execution", t.Touch.EarlyExecution), ("skill.ball_roll_distance", t.Skill.BallRollDistance),
                 ("skill.sided_exit_burst", t.Skill.SidedExitBurst), ("skill.straight_exit_burst", t.Skill.StraightExitBurst),
                 ("shot.ideal_charge", t.Shot.IdealCharge), ("keeper.arc_depth", t.Keeper?.ArcDepth), ("keeper.arc_depth_bearing", t.Keeper?.ArcDepthBearing), ("keeper.near_post_bias", t.Keeper?.NearPostBias),
-                ("keeper.rush_margin", t.Keeper?.RushMargin) })
+                ("keeper.rush_margin", t.Keeper?.RushMargin), ("keeper.difficulty_low", t.Keeper?.DifficultyLow),
+                ("keeper.difficulty_mid", t.Keeper?.DifficultyMid), ("keeper.difficulty_high", t.Keeper?.DifficultyHigh),
+                ("keeper.counter_momentum_penalty", t.Keeper?.CounterMomentumPenalty),
+                ("keeper.catch_range_standing_min", t.Keeper?.CatchRangeStandingMin), ("keeper.catch_range_standing_max", t.Keeper?.CatchRangeStandingMax),
+                ("keeper.catch_range_diving_min", t.Keeper?.CatchRangeDivingMin), ("keeper.catch_range_diving_max", t.Keeper?.CatchRangeDivingMax),
+                ("keeper.catch_range_time", t.Keeper?.CatchRangeTime) })
             {
                 string? bad = curve == null ? "must be an array of [x, y] pairs" : curve.Validate();
                 if (bad != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: {field}: {bad} (default tuning in use)" };
