@@ -198,7 +198,9 @@ static class Cli
 
 /// <summary>
 /// The keeper's side of a batch: what became of parried first shots, how many rounds had a rush or a smother, how often he was
-/// planted at the strike, his mean reaction and his speed at the strike, and the saves and dives he made.
+/// planted at the strike, his mean reaction and his speed at the strike, and the saves and dives he made. Then his closing
+/// down (mean depth off his line as the attacker on the ball first came within each band of the goal centre), the rounds he
+/// won the ball from a dribble (touched it before any shot), the chips tried and scored, and the rounds he was taken round.
 /// </summary>
 sealed class KeeperStats
 {
@@ -207,6 +209,9 @@ sealed class KeeperStats
     int _n, _shots, _rush, _smother, _smotherClaim, _planted, _reactN, _parried;
     double _react, _speed;
     readonly Dictionary<string, int> _after = new(), _save = new(), _dive = new();
+    readonly double[] _bandSum = new double[KeeperReport.DepthBands.Length];
+    readonly int[] _bandN = new int[KeeperReport.DepthBands.Length];
+    int _won, _wonHeld, _chips, _chipsScored, _chipsTipped, _rounded, _roundedScored;
 
     public void Add(RoundRunner.Result r)
     {
@@ -215,6 +220,16 @@ sealed class KeeperStats
         if (k.Rushed) _rush++;
         if (k.Smothered) _smother++;
         if (r.End == ShotEnd.NoShot && r.Outcome == Outcome.Held && k.Save == SaveKind.Smother) _smotherClaim++;
+        for (int i = 0; i < _bandSum.Length && i < k.DepthAtBandM.Length; i++)
+            if (float.IsFinite(k.DepthAtBandM[i])) { _bandSum[i] += k.DepthAtBandM[i]; _bandN[i]++; }
+        if (k.WonBall) { _won++; if (r.End == ShotEnd.NoShot && r.Outcome == Outcome.Held) _wonHeld++; }
+        if (k.Rounded) { _rounded++; if (r.End == ShotEnd.Scored) _roundedScored++; }
+        if (r.Shot is { Type: ShotType.Chip })
+        {
+            _chips++;
+            if (r.End == ShotEnd.Scored) _chipsScored++;
+            if (k.Save == SaveKind.TipOver) _chipsTipped++;
+        }
         if (r.Shot != null)
         {
             _shots++;
@@ -260,5 +275,11 @@ sealed class KeeperStats
         Console.WriteLine($"{prefix}after parry/rebound (% of rounds): {List(_after, Pct)}");
         Console.WriteLine($"{prefix}saves (% of rounds): {List(_save, Pct)}");
         Console.WriteLine($"{prefix}dives (% of rounds): {List(_dive, Pct)}");
+        var bands = KeeperReport.DepthBands;
+        Console.WriteLine($"{prefix}keeper depth off his line as the attacker on the ball came within (m of goal): " + string.Join(", ",
+            bands.Select((b, i) => $"{b.ToString("F0", ic)} m: {(_bandN[i] == 0 ? "-" : (_bandSum[i] / _bandN[i]).ToString("F2", ic))} (n {_bandN[i]})")));
+        Console.WriteLine($"{prefix}keeper won the ball from a dribble (before any shot) {Pct(_won)} of rounds (held {Pct(_wonHeld)}), " +
+                          $"rounded {Pct(_rounded)} (scored after {PctOf(_roundedScored, _rounded)} of those)");
+        Console.WriteLine($"{prefix}chips attempted {Pct(_chips)} of rounds ({_chips}), scored {PctOf(_chipsScored, _chips)} of chips, tipped over {PctOf(_chipsTipped, _chips)}");
     }
 }
