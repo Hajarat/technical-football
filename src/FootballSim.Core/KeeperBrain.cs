@@ -30,8 +30,12 @@ internal readonly struct KeeperSituation
     public static KeeperSituation None => new() { AttackerNextTouch = float.PositiveInfinity, AttackerTouchTick = -1, StrikeIn = float.PositiveInfinity };
 }
 
-/// <summary>What decided the standing keeper's movement on a tick (a diagnostic for probes and traces; it changes no behaviour).</summary>
-public enum KeeperMode { None, Hold, Arc, CloseDown, Charge, Jockey, Spread, Plant, Rush, Anticipate, Smother, Play }
+/// <summary>
+/// What decided the standing keeper's movement on a tick (a diagnostic for probes and traces; it changes no behaviour). Slide and
+/// Poke: going for a ball outside his penalty area with his feet; HoldArea: a close race for a ball outside the area, he comes
+/// to the edge of the area and no further.
+/// </summary>
+public enum KeeperMode { None, Hold, Arc, CloseDown, Charge, Jockey, Spread, Plant, Rush, Anticipate, Smother, Play, Slide, Poke, HoldArea }
 
 /// <summary>Which bound set his closing-down depth on a tick.</summary>
 public enum KeeperLimit { None, Arc, Want, ChipCap, Gap, HoldCap, Kept, Spread }
@@ -61,11 +65,12 @@ public readonly record struct KeeperThought(KeeperMode Mode, KeeperLimit Limit, 
 /// first point on the ball's predicted path inside his dive wedge that his reach can get to in time. The save's difficulty
 /// (the range it needs by the ball's height, more moving the wrong way) sets its execution time, and with the ball's speed and
 /// the time he had, whether he catches, parries, blocks, tips it over the bar or fingertips it (KeeperBrain.Save.cs). After a
-/// dive he lies, then gets up in 1.0 s; a new save can start 0.2 s into getting up.
+/// dive he lies, then gets up in 1.0 s; a new save can start 0.2 s into getting up. He uses his hands only on a ball in his
+/// penalty area; outside it he plays a loose ball with his feet, a slide tackle or a standing poke (KeeperBrain.Feet.cs).
 /// </summary>
 public sealed partial class KeeperBrain
 {
-    enum Phase { Stand, Reacting, Backpedal, Diving, Smother, Held, Grounded, GettingUp }
+    enum Phase { Stand, Reacting, Backpedal, Diving, Smother, Held, Grounded, GettingUp, Slide }
 
     readonly Tuning _t;
     readonly Pitch _pitch;
@@ -187,7 +192,10 @@ public sealed partial class KeeperBrain
                 StepDive(dt);
                 break;
             case Phase.Smother:
-                StepSmother(dt);
+                StepSmother(dt, ball);
+                break;
+            case Phase.Slide:
+                StepFeet(dt);
                 break;
             case Phase.Grounded:
                 Settle(dt);
@@ -273,18 +281,37 @@ public sealed partial class KeeperBrain
         _rushing = false;
         _fromBackpedal = false;
         _contact = false;
+        _handsOff = false;
         if (!_struck) { _roundSmother = true; Report.Smothered = true; }
         _feet0 = _k.Position;
         _home = HomeFor(_k.Position);
         _carry0 = new Vector2(_k.Velocity.X, _k.Velocity.Z);
         _target = point;
         SetAction(KeeperAction.Smother);
-        StepSmother(0f);
+        StepSmother(0f, null);
     }
 
-    void StepSmother(float dt)
+    /// <summary>
+    /// One smother tick. A ball that leaves his penalty area before he has it may not be gathered: he turns the smother into a
+    /// slide or a poke at it when it is still low and within a slide, else he abandons it and is left on the ground.
+    /// </summary>
+    void StepSmother(float dt, Ball? ball)
     {
         var k = _t.Keeper;
+        if (ball != null && !_contact && !HandsAllowedAt(ball.Position))
+        {
+            var b = new Vector2(ball.Position.X, ball.Position.Z);
+            float d = Vector2.Distance(b, new Vector2(_k.Position.X, _k.Position.Z));
+            if (ball.Position.Y <= k.ClaimMaxHeight && d <= k.SlideReach)
+                StartFeet(new Vector3(ball.Position.X, _t.Ball.Radius, ball.Position.Z), poke: ball.Position.Y > k.SlideMaxHeight || d <= k.PokeReach);
+            else
+            {
+                _active = false;
+                Enter(Phase.Grounded);
+                SetAction(KeeperAction.Grounded);
+            }
+            return;
+        }
         Vector3 to = _target - _home;
         float dist = to.Length();
         if (!_contact) _hands = dist > 1e-4f ? _home + to / dist * MathF.Min(k.SmotherSpeed * _phaseTime, dist) : _home;

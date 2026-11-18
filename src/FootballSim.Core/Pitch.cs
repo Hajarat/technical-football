@@ -20,7 +20,8 @@ public readonly record struct BoardHit(float T, Vector3 Point, Vector3 Normal);
 /// two goal-end corners are cut by a straight board <see cref="GoalChamfer"/> long along each wall, so a wide ball is sent back
 /// toward the middle. The walls are effectively full height (the drawn boards are low; an invisible wall carries on above them)
 /// up to a flat ceiling. The only gap is the goal mouth. The goal frame is two vertical posts and a crossbar, each a cylinder; the
-/// goal mouth is centred on (GoalLineX, 0, 0). Lengths come from the scenario, the arena shape from the tuning.
+/// goal mouth is centred on (GoalLineX, 0, 0). In front of the goal is the penalty area (<see cref="InPenaltyArea"/>), the only
+/// place the keeper may use his hands. Lengths come from the scenario, the arena shape from the tuning.
 /// </summary>
 public sealed class Pitch
 {
@@ -51,6 +52,12 @@ public sealed class Pitch
     public float Ceiling { get; }
     public float BoardRestitution { get; }
     public float BoardFriction { get; }
+    /// <summary>Depth of the penalty area from the goal line, metres.</summary>
+    public float PenaltyAreaDepth { get; }
+    /// <summary>Half of the penalty area's width, never more than <see cref="HalfWidth"/> (in a narrow arena its sides are the side walls).</summary>
+    public float PenaltyAreaHalfWidth { get; }
+    /// <summary>X of the penalty area's front line.</summary>
+    public float PenaltyAreaLineX => GoalLineX - PenaltyAreaDepth;
 
     // The outline's straight walls as outward unit normals (in the X-Z plane) and offsets: a point p is inside when
     // dot(n, p) <= c. Kept in a fixed order so sweeps are deterministic.
@@ -75,6 +82,8 @@ public sealed class Pitch
         Ceiling = MathF.Max(arena.Ceiling, BarHeight + 0.5f);
         BoardRestitution = arena.BoardRestitution;
         BoardFriction = arena.BoardFriction;
+        PenaltyAreaDepth = Math.Clamp(spec.PenaltyAreaDepth, 0f, GoalLineX);
+        PenaltyAreaHalfWidth = Math.Clamp(spec.PenaltyAreaWidth / 2f, GoalHalfWidth, HalfWidth);
 
         var n = new List<Vector2> { new(-1f, 0f), new(0f, -1f), new(0f, 1f), new(1f, 0f) };
         var c = new List<float> { 0f, HalfWidth, HalfWidth, GoalLineX };
@@ -99,6 +108,16 @@ public sealed class Pitch
         centre.X - radius > GoalLineX
         && MathF.Abs(centre.Z) + radius <= GoalHalfWidth
         && centre.Y + radius <= BarHeight;
+
+    /// <summary>
+    /// True when a ball (or any point, with <paramref name="radius"/> 0) of the given radius centred at <paramref name="point"/> is
+    /// in the penalty area seen from above: any part of it on or over the area's lines, as in the laws (its centre no more than
+    /// <paramref name="radius"/> outside the front line or the sides). Height does not matter; nor does the goal line, which is
+    /// the end wall. When the area is as wide as the arena its sides are the side walls, so across it everything counts (a
+    /// predicted path that runs on through a board is still in the area).
+    /// </summary>
+    public bool InPenaltyArea(Vector3 point, float radius = 0f) =>
+        point.X >= PenaltyAreaLineX - radius && (PenaltyAreaHalfWidth >= HalfWidth || MathF.Abs(point.Z) <= PenaltyAreaHalfWidth + radius);
 
     /// <summary>True for a ball centre inside the goal mouth opening: between the posts and under the bar.</summary>
     bool InMouth(Vector3 centre) => MathF.Abs(centre.Z) < GoalHalfWidth && centre.Y < BarHeight;

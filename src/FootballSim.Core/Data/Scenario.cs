@@ -10,6 +10,10 @@ public sealed class PitchSpec
     public float Width { get; set; } = 68f;
     public float GoalWidth { get; set; } = 7.32f;
     public float GoalHeight { get; set; } = 2.44f;
+    /// <summary>Depth of the penalty area from the goal line, metres.</summary>
+    public float PenaltyAreaDepth { get; set; } = 16.5f;
+    /// <summary>Width of the penalty area, metres; in an arena narrower than this the area's sides are the side walls.</summary>
+    public float PenaltyAreaWidth { get; set; } = 40.32f;
 }
 
 /// <summary>A start position on the ground, in metres.</summary>

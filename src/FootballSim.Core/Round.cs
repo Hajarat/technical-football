@@ -47,6 +47,8 @@ public sealed class KeeperReport
     public bool Charged { get; set; }
     /// <summary>True if the keeper went down in a smother this round before the first strike.</summary>
     public bool Smothered { get; set; }
+    /// <summary>True if the keeper went into a slide tackle or a poke at a ball outside his penalty area this round before the first strike.</summary>
+    public bool Slid { get; set; }
     /// <summary>True if the keeper got to the ball (a smother, block or claim) this round before the first strike: won from a dribble.</summary>
     public bool WonBall { get; set; }
     /// <summary>True if the attacker took the ball past the keeper (goal-side of him, close by) this round before the first strike.</summary>
@@ -76,8 +78,8 @@ public sealed class KeeperReport
 /// </summary>
 public enum SaveType { None, Catch, Parry, Reflex, ReflexAttempt, FailedAttempt }
 
-/// <summary>How the keeper played the ball when he met it.</summary>
-public enum SaveKind { None, Catch, Parry, Block, TipOver, Fingertip, Smother, LooseReflex }
+/// <summary>How the keeper played the ball when he met it (Slide: knocked away in a slide tackle outside his area).</summary>
+public enum SaveKind { None, Catch, Parry, Block, TipOver, Fingertip, Smother, LooseReflex, Slide }
 
 /// <summary>The record of one round, available when the state reaches Report.</summary>
 public sealed class RoundReport

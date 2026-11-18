@@ -163,7 +163,7 @@ public sealed class ScriptedAttacker
         var a = w.Attacker;
         bool mine = w.BallController == a;
         var kp = w.Keeper;
-        bool rushing = kp.KeeperAction is KeeperAction.Rush or KeeperAction.Smother or KeeperAction.Charge;
+        bool rushing = kp.KeeperAction is KeeperAction.Rush or KeeperAction.Smother or KeeperAction.Slide or KeeperAction.Charge;
         if (_roundSide == 0 && mine && rushing && KeeperToBall(w) <= RoundRange && KeeperInFront(w))
         {
             float dz = w.Ball.Position.Z - kp.Position.Z;
@@ -173,7 +173,7 @@ public sealed class ScriptedAttacker
 
         float dist = ShotModel.GoalDistance(w.Ball.Position, w.Pitch);
         float depth = w.Pitch.GoalLineX - kp.Position.X;
-        bool exposed = mine && dist <= ChipMaxDistance && KeeperInFront(w) && kp.KeeperAction is not (KeeperAction.Diving or KeeperAction.Smother)
+        bool exposed = mine && dist <= ChipMaxDistance && KeeperInFront(w) && kp.KeeperAction is not (KeeperAction.Diving or KeeperAction.Smother or KeeperAction.Slide)
                        && depth > Keeper.ChipSafeDepth(kp.Sheet, a.Sheet, w.Tuning, w.Pitch, dist) + ChipMargin;
         if (!exposed) { _chipRolled = false; _chipWanted = false; return false; }
         if (!_chipRolled)

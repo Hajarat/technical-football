@@ -35,7 +35,8 @@ public partial class Pitch : Node3D
 
     static bool SameShape(FootballSim.Core.Pitch a, FootballSim.Core.Pitch b) =>
         a.GoalLineX == b.GoalLineX && a.HalfWidth == b.HalfWidth && a.CornerRadius == b.CornerRadius && a.GoalChamfer == b.GoalChamfer
-        && a.BoardHeight == b.BoardHeight && a.GoalHalfWidth == b.GoalHalfWidth && a.BarHeight == b.BarHeight && a.PostRadius == b.PostRadius;
+        && a.BoardHeight == b.BoardHeight && a.GoalHalfWidth == b.GoalHalfWidth && a.BarHeight == b.BarHeight && a.PostRadius == b.PostRadius
+        && a.PenaltyAreaDepth == b.PenaltyAreaDepth && a.PenaltyAreaHalfWidth == b.PenaltyAreaHalfWidth;
 
     /// <summary>
     /// The outline, moved <paramref name="inset"/> metres inward (negative = outward), as a closed loop of (x, z) points:
@@ -131,10 +132,41 @@ public partial class Pitch : Node3D
             Seg(new Vector2(boxX, boxZ), new Vector2(sideEnd, boxZ));
         }
 
+        // Penalty area: the core's depth and width, its front line and sides cut off at the outline line the same way.
+        float areaX = L - p.PenaltyAreaDepth;
+        float areaZ = Mathf.Min(p.PenaltyAreaHalfWidth, OutlineHalfWidthAt(p, areaX, OutlineInset));
+        float areaChamferX = L + p.HalfWidth - p.GoalChamfer - OutlineInset * Mathf.Sqrt2 - areaZ;
+        float areaSideEnd = Mathf.Min(L - OutlineInset, areaChamferX);
+        if (areaZ > 0f) Seg(new Vector2(areaX, -areaZ), new Vector2(areaX, areaZ));
+        // In an arena narrower than the area its sides are the boards: no side lines to draw.
+        if (p.PenaltyAreaHalfWidth < p.HalfWidth - OutlineInset && areaSideEnd > areaX)
+        {
+            Seg(new Vector2(areaX, -areaZ), new Vector2(areaSideEnd, -areaZ));
+            Seg(new Vector2(areaX, areaZ), new Vector2(areaSideEnd, areaZ));
+        }
+
         AddMesh("Markings", st.Commit(), Vector3.Zero, MeshKit.Unshaded(Colors.White));
 
         var spot = new MeshInstance3D { Name = "PenaltySpot", Mesh = MeshKit.Ring(0f, 0.22f, 16), Position = new(L - 11f, LineY, 0), MaterialOverride = MeshKit.Unshaded(Colors.White), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         AddChild(spot);
+    }
+
+    /// <summary>
+    /// Half the width of the outline moved <paramref name="inset"/> metres inward at <paramref name="x"/>: the side walls, narrowed
+    /// by a rounded back corner or a goal-end chamfer where <paramref name="x"/> is in one (0 outside the arena).
+    /// </summary>
+    static float OutlineHalfWidthAt(FootballSim.Core.Pitch p, float x, float inset)
+    {
+        float L = p.GoalLineX, h = p.HalfWidth, R = p.CornerRadius, C = p.GoalChamfer;
+        if (x < inset || x > L - inset) return 0f;
+        float z = h - inset;
+        if (C > 0f) z = Mathf.Min(z, L + h - C - inset * Mathf.Sqrt2 - x);
+        if (R > 0f && x < R)
+        {
+            float r = Mathf.Max(0f, R - inset), dx = R - x;
+            z = Mathf.Min(z, dx >= r ? h - R : h - R + Mathf.Sqrt(r * r - dx * dx));
+        }
+        return Mathf.Max(0f, z);
     }
 
     void BuildGoal(FootballSim.Core.Pitch p)

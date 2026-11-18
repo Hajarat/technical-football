@@ -764,6 +764,39 @@ public sealed class KeeperTuning
     /// <summary>A smother that has not met the ball after this long ends on the ground, seconds.</summary>
     public float SmotherMaxSeconds { get; set; } = 0.6f;
 
+    // ---- outside the penalty area: the slide tackle and the poke ----
+    /// <summary>
+    /// Outside his penalty area he may not use his hands, so he plays a loose ball there with his feet: he races for it up to this
+    /// far beyond the area's front line, metres (inside the area <see cref="RushMaxFromGoal"/> still limits him).
+    /// </summary>
+    public float SlideBeyondArea { get; set; } = 3f;
+    /// <summary>He goes into a slide tackle at a ball outside his area from this far away (the leading foot's full reach), metres.</summary>
+    public float SlideReach { get; set; } = 2.4f;
+    /// <summary>How far ahead of his feet the leading foot is when the slide starts, metres.</summary>
+    public float SlideFootStart { get; set; } = 0.3f;
+    /// <summary>Speed of the leading foot along the ground in a slide, m/s.</summary>
+    public float SlideSpeed { get; set; } = 6f;
+    /// <summary>The body travels this fraction of the leading foot's travel in a slide (a poke: a fifth of it).</summary>
+    public float SlideBodyFollow { get; set; } = 0.75f;
+    /// <summary>Radius of the sliding leg the ball can meet, metres.</summary>
+    public float SlideFootRadius { get; set; } = 0.25f;
+    /// <summary>He slides only at a ball whose centre is below this height; a higher one (below the claim height) he pokes at standing, metres.</summary>
+    public float SlideMaxHeight { get; set; } = 0.35f;
+    /// <summary>A slide that has not met the ball ends on the ground after this long at most, seconds.</summary>
+    public float SlideMaxSeconds { get; set; } = 0.7f;
+    /// <summary>A ball met in a slide or a poke is knocked on along the slide's direction at this speed, m/s...</summary>
+    public float SlideKnockSpeedMin { get; set; } = 4f;
+    public float SlideKnockSpeedMax { get; set; } = 8f;
+    /// <summary>...within this angle either side of it, degrees, and lifted a little (vertical part of the unit direction).</summary>
+    public float SlideKnockAngleDeg { get; set; } = 30f;
+    public float SlideKnockLift { get; set; } = 0.1f;
+    /// <summary>A ball outside his area closer than this he pokes at with a foot, standing, instead of sliding, metres.</summary>
+    public float PokeReach { get; set; } = 1.0f;
+    /// <summary>Speed of the foot going to the ball in a poke, m/s.</summary>
+    public float PokeSpeed { get; set; } = 4f;
+    /// <summary>A poke lasts this long before he is set again (he stays on his feet), seconds.</summary>
+    public float PokeSeconds { get; set; } = 0.35f;
+
     // ---- the reflex save ----
     /// <summary>
     /// Seconds from the strike to his reflex, by reflexes (GOALS ReflexesAttributeVersusReflexTime), with the reaction's noise and

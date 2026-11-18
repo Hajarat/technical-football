@@ -55,7 +55,16 @@ public sealed partial class KeeperBrain
         if (!holdLine && !s.ShotInFlight && !s.BallDead)
         {
             var race = Race(ball, s, rng);
-            if (race.Win && race.Smother) { _anticipating = false; StartSmother(race.Point); Think(KeeperMode.Smother); return; }
+            switch (AreaPlayFor(race))
+            {
+                case AreaPlay.Smother:
+                    _anticipating = false; StartSmother(race.Point); Think(KeeperMode.Smother); return;
+                case AreaPlay.Slide:
+                case AreaPlay.Poke:
+                    StartFeet(race.Point, race.Poke); Think(race.Poke ? KeeperMode.Poke : KeeperMode.Slide); return;
+                case AreaPlay.HoldAtLine:
+                    StepHoldAtLine(race.Point, dt); Think(KeeperMode.HoldArea); return;
+            }
             if (race.Win)
             {
                 _rushing = true;
@@ -377,10 +386,48 @@ public sealed partial class KeeperBrain
         _spot = new Vector3(p.X, 0f, p.Y);
     }
 
+    /// <summary>What he does about the rush race this tick, by where the ball he would win is (see <see cref="AreaPlayFor"/>).</summary>
+    enum AreaPlay { None, Smother, Rush, Anticipate, Slide, Poke, HoldAtLine }
+
+    /// <summary>
+    /// His penalty area decides how he plays the ball he races for. Inside it, as always: within a dive he smothers it, further
+    /// he rushes, a close race he anticipates. Outside it he may not use his hands: within reach he slides at it feet first (or
+    /// pokes at it standing, for a bouncing ball or one at his feet), further he rushes on toward it to slide when he gets there,
+    /// and a race he is not yet sure of brings him to the edge of his area and no further (holding the line). A race he cannot win
+    /// leaves him to his spot (None): he retreats to cover the goal as when there is no race.
+    /// </summary>
+    static AreaPlay AreaPlayFor(in RaceResult race)
+    {
+        if (race.Win && race.Smother) return !race.Outside ? AreaPlay.Smother : race.Poke ? AreaPlay.Poke : AreaPlay.Slide;
+        if (race.Win) return AreaPlay.Rush;
+        if (race.Anticipate) return race.Outside ? AreaPlay.HoldAtLine : AreaPlay.Anticipate;
+        return AreaPlay.None;
+    }
+
+    /// <summary>
+    /// A close race for a ball outside his area: he comes toward it at his anticipation speed, but stops on the area's line
+    /// (his spot is taken again once the race is gone).
+    /// </summary>
+    void StepHoldAtLine(Vector3 point, float dt)
+    {
+        var k = _t.Keeper;
+        _anticipating = true;
+        _rushing = false;
+        var to = new Vector3(MathF.Max(point.X, _pitch.PenaltyAreaLineX + Pitch.PlayerRadius), 0f, point.Z);
+        MoveTo(to, Keeper.RushSpeed(_k.Sheet, _t) * k.AnticipateSpeedFraction, Keeper.MoveAccel(_k.Sheet, _t), dt);
+        _hands = HomeFor(_k.Position);
+        SetAction(new Vector2(_k.Velocity.X, _k.Velocity.Z).Length() > k.StillSpeed ? KeeperAction.Rush : KeeperAction.Set);
+    }
+
     readonly struct RaceResult
     {
         public bool Win { get; init; }
+        /// <summary>Won within his go-down reach: a smother inside his area, a slide or a poke outside it.</summary>
         public bool Smother { get; init; }
+        /// <summary>The ball he races for is outside his penalty area at <see cref="Point"/>: he plays it with his feet.</summary>
+        public bool Outside { get; init; }
+        /// <summary>Outside the area, a standing poke rather than a slide (a bouncing ball, or one within <c>poke_reach</c>).</summary>
+        public bool Poke { get; init; }
         /// <summary>Not won, but within his anticipation of winning: he starts toward <see cref="Point"/>.</summary>
         public bool Anticipate { get; init; }
         public Vector3 Point { get; init; }
@@ -393,7 +440,10 @@ public sealed partial class KeeperBrain
     /// going past him), judged with his misjudgement (drawn per attacker
     /// touch). The more time the ball gives him over the attacker, the further out he wins it. Short of the margin by less than
     /// his anticipation (<c>rush_anticipation</c>), he starts toward the ball and aborts if the race turns against him. Only for
-    /// a low ball he can take within the rush limit.
+    /// a low ball he can take within the rush limit inside his penalty area, or up to <c>slide_beyond_area</c> beyond its line
+    /// outside it. A point outside the area (judged by the ball there) he races for with his feet: within <c>slide_reach</c> a
+    /// slide (the foot from <c>slide_foot_start</c> at <c>slide_speed</c>), or a poke within <c>poke_reach</c> (at
+    /// <c>poke_speed</c>) when the ball is above <c>slide_max_height</c> or that close.
     /// </summary>
     RaceResult Race(Ball ball, in KeeperSituation s, SimRng rng)
     {
@@ -401,7 +451,7 @@ public sealed partial class KeeperBrain
         var goal = new Vector2(_pitch.GoalLineX, 0f);
         var b0 = new Vector2(ball.Position.X, ball.Position.Z);
         if (ball.Position.Y > k.ClaimMaxHeight + 0.5f) { _tRaceBlock = "ball high"; return default; }
-        if (Vector2.Distance(b0, goal) > k.RushMaxFromGoal + 4f) { _tRaceBlock = "beyond rush max"; return default; }
+        if (Vector2.Distance(b0, goal) > k.RushMaxFromGoal + 4f && b0.X < _pitch.PenaltyAreaLineX - k.SlideBeyondArea - 4f) { _tRaceBlock = "beyond rush max"; return default; }
         float tAtt = s.AttackerNextTouch;
         var feet = new Vector2(_k.Position.X, _k.Position.Z);
         // The attacker still at the ball (close control, a jog): even a dive at it wants his margin.
@@ -433,24 +483,32 @@ public sealed partial class KeeperBrain
             var p = b.Position;
             if (p.Y > k.ClaimMaxHeight) continue;
             var p2 = new Vector2(p.X, p.Z);
-            if (p.X > _pitch.GoalLineX - 0.3f || Vector2.Distance(p2, goal) > k.RushMaxFromGoal) continue;
+            if (p.X > _pitch.GoalLineX - 0.3f) continue;
+            bool outside = !HandsAllowedAt(p);
+            if (outside ? p.X < _pitch.PenaltyAreaLineX - k.SlideBeyondArea : Vector2.Distance(p2, goal) > k.RushMaxFromGoal) continue;
             var to = p2 - feet;
             float d = to.Length();
             float v0 = d > 1e-4f ? Vector2.Dot(vel, to / d) : 0f;
-            bool dive = d <= k.SmotherReach;
-            float tk = (dive ? 0f : start + Keeper.TravelTime(d - k.SmotherReach, v0, accel, vmax)) + MathF.Min(d, k.SmotherReach) / k.SmotherSpeed;
+            // How he goes down at it: a smother inside his area; outside it a slide, or a poke at a bouncing ball or one at his feet.
+            bool poke = outside && (p.Y > k.SlideMaxHeight || d <= k.PokeReach);
+            float reach = !outside ? k.SmotherReach : poke ? k.PokeReach : k.SlideReach;
+            float goDown = !outside ? MathF.Min(d, reach) / k.SmotherSpeed
+                : poke ? MathF.Min(d, reach) / k.PokeSpeed
+                : MathF.Max(0f, MathF.Min(d, reach) - k.SlideFootStart) / k.SlideSpeed;
+            bool dive = d <= reach;
+            float tk = (dive ? 0f : start + Keeper.TravelTime(d - reach, v0, accel, vmax)) + goDown;
             float perceived = tk - _misjudge;
             float margin = _rushing || dive && !contested ? 0f : Keeper.RushMargin(_k.Sheet, _t, d);
-            var point = new Vector3(p.X, _t.Ball.Radius, p.Z);
+            var point = new Vector3(p.X, poke ? p.Y : _t.Ball.Radius, p.Z);
             bool rest = b.Velocity == Vector3.Zero && b.OnGround;
             // At rest the ball waits for him: he wins it if he gets there before the attacker, whenever that is.
             float arrive = rest ? perceived : tb;
             float short_ = MathF.Max(rest ? 0f : perceived - tb, arrive + margin - tAtt);
             if (short_ < _tRaceShort) _tRaceShort = short_;
             if ((rest || perceived <= tb) && arrive + margin <= tAtt)
-                return new RaceResult { Win = true, Smother = dive, Point = point };
+                return new RaceResult { Win = true, Smother = dive, Outside = outside, Poke = poke, Point = point };
             if (!anticipate.Anticipate && antic > 0f && !dive && (rest || perceived <= tb) && arrive + margin - keepOn <= tAtt)
-                anticipate = new RaceResult { Anticipate = true, Point = point };
+                anticipate = new RaceResult { Anticipate = true, Outside = outside, Point = point };
             if (rest) break;
         }
         return anticipate;
