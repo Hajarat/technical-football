@@ -15,8 +15,10 @@ public enum PlayerRole { Outfield, Keeper }
 /// Grounded: lying after a dive, smother or block. GettingUp: rising from the ground (KeeperActionTime runs 0 to get-up time).
 /// Backpedal: moving back toward his goal facing the play (closing down's retreat, recovering, or under a chip after it is
 /// struck). Spread: stopped close to an attacker on the ball, made big (legs wide, arms low and out), before or during a windup.
+/// Charge: running out at an attacker on the ball to close him down (not yet a race for a loose ball). Jockey: close to an
+/// attacker on the ball, low and spread, stepping with him to stay between the ball and the goal, ready to pounce.
 /// </summary>
-public enum KeeperAction { Set, Shuffle, Rush, Planted, Reacting, Diving, Smother, Holding, Grounded, GettingUp, Backpedal, Spread }
+public enum KeeperAction { Set, Shuffle, Rush, Planted, Reacting, Diving, Smother, Holding, Grounded, GettingUp, Backpedal, Spread, Charge, Jockey }
 
 /// <summary>The kind of save motion while <see cref="KeeperAction.Diving"/> (None otherwise).
 /// Low: diving along the ground. Side: a flat side dive at mid height. High: a leaping dive / tip over the bar.

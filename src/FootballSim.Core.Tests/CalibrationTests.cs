@@ -215,16 +215,19 @@ public class CalibrationTests
     /// once running shots were calibrated to about 60-75% on target. They depend on the keeper (and the running ones on the
     /// dribbling) as much as on the shot, and move when either changes. With D2's keeper (closing down, racing for long
     /// touches) and the scripted attacker's counters, angled run and keeper rush moved (2,000 rounds: 41.1 and 23.8%); their
-    /// bands are about five points around those values until the targets are reset.
+    /// bands are about five points around those values until the targets are reset. With the charging keeper (he runs at an
+    /// attacker coming at him inside 20 m and jockeys him, so the scripted attacker meets a keeper well off his line and chips
+    /// him far more often, mostly over the bar) breakaway, halfway run, angled run and keeper rush moved again (2,000 rounds:
+    /// 22.4, 43.4, 45.3 and 10.8%); their bands are about five points around those values.
     /// </summary>
     [Theory]
     [InlineData("penalty", 72.0, 80.0)]
     [InlineData("edge_of_box", 6.0, 14.0)]
     [InlineData("tight_angle", 2.0, 8.0)]
-    [InlineData("breakaway", 14.0, 22.0)]
-    [InlineData("halfway_run", 30.0, 45.0)]
-    [InlineData("angled_run", 36.0, 46.0)]
-    [InlineData("keeper_rush", 18.0, 29.0)]
+    [InlineData("breakaway", 17.0, 27.0)]
+    [InlineData("halfway_run", 38.0, 49.0)]
+    [InlineData("angled_run", 40.0, 51.0)]
+    [InlineData("keeper_rush", 7.0, 15.0)]
     public void ScoringRateStaysInItsBand(string scenario, double lo, double hi)
     {
         var r = TestData.Rate(TestData.Scenario(scenario), TestData.Player("striker_a"), TestData.Player("the_wall"), N, 1);

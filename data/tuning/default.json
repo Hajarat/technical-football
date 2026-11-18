@@ -370,7 +370,7 @@
       "at99": 1
     },
     "close_down_range": 30,
-    "close_down_min_speed": 3,
+    "close_down_min_speed": 1.5,
     "close_down_gap": 3,
     "urgent_range": 12,
     "backpedal_show_speed": 1,
@@ -389,7 +389,29 @@
     },
     "backpedal_catch_factor": 0.4,
     "pre_spread_range": 3.5,
-    "engage_range": 7,
+    "engage_range": 8.5,
+    "charge_range": 20,
+    "charge_time": {
+      "at1": 0.35,
+      "at99": 2.0
+    },
+    "charge_chip_weight": {
+      "at1": 0.4,
+      "at99": 0
+    },
+    "charge_chip_allowance": {
+      "at1": 1,
+      "at99": 6
+    },
+    "charge_chip_hysteresis": 2,
+    "charge_hold_margin": 4,
+    "charge_drop_factor": 1.5,
+    "charge_max_out": 14,
+    "charge_plant_lead": 0.3,
+    "charge_block_distance": 4.5,
+    "jockey_distance": 2,
+    "jockey_retreat_speed": 1.5,
+    "contested_distance": 1,
     "rush_start_delay": 0.15,
     "claim_max_height": 0.6,
     "attacker_reach": 0.5,

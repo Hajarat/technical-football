@@ -30,11 +30,28 @@ internal readonly struct KeeperSituation
     public static KeeperSituation None => new() { AttackerNextTouch = float.PositiveInfinity, AttackerTouchTick = -1, StrikeIn = float.PositiveInfinity };
 }
 
+/// <summary>What decided the standing keeper's movement on a tick (a diagnostic for probes and traces; it changes no behaviour).</summary>
+public enum KeeperMode { None, Hold, Arc, CloseDown, Charge, Jockey, Spread, Plant, Rush, Anticipate, Smother, Play }
+
+/// <summary>Which bound set his closing-down depth on a tick.</summary>
+public enum KeeperLimit { None, Arc, Want, ChipCap, Gap, HoldCap, Kept, Spread }
+
+/// <summary>
+/// Why the standing keeper did what he did on the latest tick (for probes and traces): the mode, the bound that set his depth,
+/// the depths in play (metres off the goal mouth), the best rush race he saw: the time he was short of winning it by
+/// (negative: he won with that much to spare; +infinity: no race to run, see <see cref="RaceBlock"/>), and the charge decision:
+/// the seconds he needs to close the attacker down and the seconds he accepts (NaN when no charge was weighed).
+/// </summary>
+public readonly record struct KeeperThought(KeeperMode Mode, KeeperLimit Limit, bool Engaged, float Want, float ChipCap, float GapCap,
+    float RaceShort, string RaceBlock, float CloseT = float.NaN, float Tolerance = float.NaN);
+
 /// <summary>
 /// The keeper's decision code (Phase D). Standing, he holds a spot on an arc off his line on the angle to the ball, biased to the
 /// near post and deeper or shallower by his positioning; each new spot carries a positioning error. Once an attacker comes in
 /// with the ball he closes down along the cover line, further out as the ball comes closer, but never beyond the depth he
-/// judges he can recover from a chip. When he can reach a loose ball (between the attacker's touches) before the attacker's
+/// judges he can recover from a chip, unless he charges: with the attacker coming on inside the charge range he runs at him once he
+/// can close him down quickly enough (the time he accepts set by his rushing rating, cut by how far beyond his chip-safe depth it
+/// would take him), and jockeys a couple of metres from the ball, stepping with him. When he can reach a loose ball (between the attacker's touches) before the attacker's
 /// next planned touch, with a margin set by his rushing rating, he rushes it, and dives on it (smother) once it is within a
 /// dive; a close race starts him toward it on anticipation. Close to an attacker he cannot beat to the ball, he stops and
 /// spreads. When a shot winds up he plants. From the strike he reacts after a delay from his reflexes (plus a penalty when he
@@ -93,10 +110,13 @@ public sealed partial class KeeperBrain
     Vector3 _hands;
     bool _tickBegun;
     Vector3 _handsDown;         // where the hands were when he started to get up
-    bool _roundRushed, _roundSmother;
+    bool _roundRushed, _roundSmother, _roundCharged;
 
     /// <summary>The numbers for the most recent shot.</summary>
     public KeeperReport Report { get; private set; } = new();
+
+    /// <summary>Why he did what he did on the latest tick (diagnostic only).</summary>
+    public KeeperThought Thought { get; private set; }
 
     /// <param name="attacker">The attacker's sheet, for the chips he judges his depth against (a default sheet when null).</param>
     internal KeeperBrain(PlayerState keeper, Pitch pitch, Tuning tuning, bool holdLine, PlayerSheet? attacker = null)
@@ -243,6 +263,7 @@ public sealed partial class KeeperBrain
             BallDistanceAtStrikeM = ball == null ? float.NaN : Vector2.Distance(new Vector2(ball.Position.X, ball.Position.Z), new Vector2(_pitch.GoalLineX, 0f)),
             PlantedAtStrike = _phase == Phase.Stand && _k.KeeperAction is KeeperAction.Planted or KeeperAction.Spread && speed <= _t.Keeper.StillSpeed,
             Rushed = _roundRushed,
+            Charged = _roundCharged,
             Smothered = _roundSmother,
             WonBall = _roundWon,
             Rounded = _roundRounded,
@@ -371,6 +392,7 @@ public sealed partial class KeeperBrain
                 break;
         }
         _k.HandPosition = _hands;
+        if (_phase != Phase.Stand) Thought = new KeeperThought(KeeperMode.Play, KeeperLimit.None, _engaged, float.NaN, float.NaN, float.NaN, float.PositiveInfinity, "");
     }
 
     // ---- movement ----

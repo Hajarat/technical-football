@@ -12,6 +12,17 @@ public sealed partial class KeeperBrain
     // Rush anticipation.
     bool _anticipating;
 
+    // Charging: closing the attacker on the ball down at rush speed, then jockeying.
+    bool _charging;
+    bool _chargeSoon;           // he would charge but the ball is just outside the charge range: he gives no ground meanwhile
+
+    // The diagnostic for this tick (see KeeperThought).
+    KeeperLimit _tLimit;
+    float _tWant = float.NaN, _tChip = float.NaN, _tGap = float.NaN, _tRaceShort = float.PositiveInfinity, _tCloseT = float.NaN, _tTol = float.NaN;
+    string _tRaceBlock = "";
+
+    void Think(KeeperMode mode) => Thought = new KeeperThought(mode, _tLimit, _engaged, _tWant, _tChip, _tGap, _tRaceShort, _tRaceBlock, _tCloseT, _tTol);
+
     // Round record (before the first strike).
     readonly float[] _bandDepth = NewBands();
     bool _roundRounded, _roundWon;
@@ -31,13 +42,14 @@ public sealed partial class KeeperBrain
     {
         var k = _t.Keeper;
         bool holdLine = _holdLine && !_struck;
+        _tLimit = KeeperLimit.None; _tWant = _tChip = _tGap = _tCloseT = _tTol = float.NaN; _tRaceShort = float.PositiveInfinity; _tRaceBlock = holdLine ? "hold line" : "";
         FaceBall(ball, dt);
         Observe(ball, s);
 
         if (!holdLine && !s.ShotInFlight && !s.BallDead)
         {
             var race = Race(ball, s, rng);
-            if (race.Win && race.Smother) { _anticipating = false; StartSmother(race.Point); return; }
+            if (race.Win && race.Smother) { _anticipating = false; StartSmother(race.Point); Think(KeeperMode.Smother); return; }
             if (race.Win)
             {
                 _rushing = true;
@@ -46,6 +58,7 @@ public sealed partial class KeeperBrain
                 RunAt(race.Point, Keeper.RushSpeed(_k.Sheet, _t), dt);
                 _hands = HomeFor(_k.Position);
                 SetAction(KeeperAction.Rush);
+                Think(KeeperMode.Rush);
                 return;
             }
             if (race.Anticipate)
@@ -55,11 +68,12 @@ public sealed partial class KeeperBrain
                 RunAt(race.Point, Keeper.RushSpeed(_k.Sheet, _t) * k.AnticipateSpeedFraction, dt);
                 _hands = HomeFor(_k.Position);
                 SetAction(KeeperAction.Rush);
+                Think(KeeperMode.Anticipate);
                 return;
             }
             if (_rushing || _anticipating) { _rushing = false; _anticipating = false; _hasSpot = false; }
         }
-        else { _rushing = false; _anticipating = false; }
+        else { _rushing = false; _anticipating = false; if (!holdLine) _tRaceBlock = s.ShotInFlight ? "shot in flight" : "ball dead"; }
 
         var goal = new Vector2(_pitch.GoalLineX, 0f);
         var ball2 = new Vector2(ball.Position.X, ball.Position.Z);
@@ -69,13 +83,28 @@ public sealed partial class KeeperBrain
         bool close = !holdLine && inFront && toBall < k.PreSpreadRange;
         bool inRange = Vector2.Distance(ball2, goal) <= k.SetRange;
         // He plants for the strike: in its last plant_lead, or earlier if he needs longer than that to brake to a stop.
-        float plantLead = MathF.Max(k.PlantLead, new Vector2(_k.Velocity.X, _k.Velocity.Z).Length() / k.PlantDecel + 0.05f);
+        float brake = new Vector2(_k.Velocity.X, _k.Velocity.Z).Length() / k.PlantDecel + 0.05f;
+        bool blocking = _charging && s.Windup && BlockReach(toBall, ball2, feet, s) <= k.ChargeBlockDistance;
+        float plantLead = MathF.Max(k.PlantLead, blocking ? MathF.Min(brake, k.ChargePlantLead) : brake);
         if (s.Windup && s.StrikeIn <= plantLead && inRange && !s.BallDead)
         {
             Brake(k.PlantDecel, dt);
             _hands = HomeFor(_k.Position);
             _shuffling = false;
             SetAction(close ? KeeperAction.Spread : KeeperAction.Planted);
+            Think(KeeperMode.Plant);
+            return;
+        }
+
+        // Charging: an attacker who has come in with the ball, in front of him and inside the charge range. Once he can close
+        // him down quickly enough (the chip risk weighed), he runs at him and jockeys a couple of metres from the ball.
+        bool chargeable = !holdLine && _engaged && s.AttackerHasBall && inFront && !s.BallDead && !s.ShotInFlight;
+        _chargeSoon = false;
+        _charging = chargeable && ChargeDecision(ball, s, toBall, feet, rng);
+        if (_charging)
+        {
+            StepCharge(dt, ball, toBall);
+            Think(_k.KeeperAction == KeeperAction.Charge ? KeeperMode.Charge : KeeperMode.Jockey);
             return;
         }
 
@@ -87,22 +116,22 @@ public sealed partial class KeeperBrain
             _hands = HomeFor(_k.Position);
             _shuffling = false;
             SetAction(KeeperAction.Spread);
+            Think(KeeperMode.Spread);
             return;
         }
 
         // Hold the arc (or the line), or close down an attacker who has come in with the ball.
         var look = ball.Position + new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z) * k.ArcLookahead;
         Vector3 ideal = holdLine ? Keeper.LineSpot(look, _pitch, _t) : Keeper.ArcTarget(look, _pitch, _t, _k.Sheet);
-        bool engage = false;
-        if (!holdLine && !s.BallDead && !s.ShotInFlight && _engaged) ideal = CloseDownSpot(look, ideal, s.AttackerHasBall && inFront && toBall < k.EngageRange, rng, out engage);
+        if (!holdLine && !s.BallDead && !s.ShotInFlight && _engaged) ideal = CloseDownSpot(look, ideal, rng);
         // Not closing down yet, but the attacker has the ball in front of him: he keeps the depth he has within his limits
         // rather than dropping back to his arc only to come out again a moment later.
-        else if (!holdLine && !s.BallDead && !s.ShotInFlight && s.AttackerHasBall && inFront) ideal = CloseDownSpot(look, ideal, false, rng, out _, advance: false);
+        else if (!holdLine && !s.BallDead && !s.ShotInFlight && s.AttackerHasBall && inFront) ideal = CloseDownSpot(look, ideal, rng, advance: false);
         if (!holdLine && s.AttackerHasBall && !s.BallDead) ideal = Committed(ideal);
         if (!_hasSpot || Vector3.Distance(ideal, _spotIdeal) > k.RepositionThreshold) TakeSpot(ideal, look, holdLine, rng);
         float dist = new Vector2(_spot.X - _k.Position.X, _spot.Z - _k.Position.Z).Length();
         // Getting back goal-side (recovering after being drawn out or rounded) close to goal is a run, not a jog.
-        bool urgent = engage || !holdLine && Keeper.MouthDistance(new Vector2(look.X, look.Z), _pitch) <= k.UrgentRange
+        bool urgent = !holdLine && Keeper.MouthDistance(new Vector2(look.X, look.Z), _pitch) <= k.UrgentRange
                       && Keeper.MouthDistance(new Vector2(_spot.X, _spot.Z), _pitch) < Keeper.MouthDistance(feet, _pitch) - 0.5f;
         float vmax = dist <= k.JogThreshold ? Keeper.ShuffleSpeed(_k.Sheet, _t)
             : urgent ? Keeper.RushSpeed(_k.Sheet, _t) : Keeper.JogSpeed(_k.Sheet, _t);
@@ -116,6 +145,7 @@ public sealed partial class KeeperBrain
         var face = new Vector2(MathF.Cos(_k.Facing), MathF.Sin(_k.Facing));
         bool back = Vector2.Dot(vel, face) < -k.BackpedalShowSpeed;
         SetAction(back ? KeeperAction.Backpedal : _shuffling ? KeeperAction.Shuffle : KeeperAction.Set);
+        Think(holdLine ? KeeperMode.Hold : _engaged ? KeeperMode.CloseDown : KeeperMode.Arc);
     }
 
     /// <summary>
@@ -135,15 +165,13 @@ public sealed partial class KeeperBrain
     }
 
     /// <summary>
-    /// Closing down: the spot on the cover line from the ball at the depth he wants for the ball's distance (see
+    /// Closing down (not charging): the spot on the cover line from the ball at the depth he wants for the ball's distance (see
     /// <see cref="Keeper.CloseDownDistance"/>), never shallower than his arc. He does not come further out than his judged
     /// chip-safe depth, than <c>close_down_gap</c> short of the ball, or than <c>hold_ground_max_out</c>; between what he wants
-    /// and those limits he holds the depth he has (no backpedalling while the attacker runs at him). With the attacker on the
-    /// ball within <c>engage_range</c> of him (<paramref name="near"/>) he pushes up to the attacker, to just inside his spread
-    /// range, whatever he wanted (<paramref name="engage"/>). With <paramref name="advance"/> false he only holds: he wants no
-    /// more than his arc.
+    /// and those limits he holds the depth he has (no backpedalling while the attacker runs at him). With
+    /// <paramref name="advance"/> false he only holds: he wants no more than his arc.
     /// </summary>
-    Vector3 CloseDownSpot(Vector3 look, Vector3 arc, bool near, SimRng rng, out bool engage, bool advance = true)
+    Vector3 CloseDownSpot(Vector3 look, Vector3 arc, SimRng rng, bool advance = true)
     {
         var k = _t.Keeper;
         var b = new Vector2(look.X, look.Z);
@@ -152,18 +180,111 @@ public sealed partial class KeeperBrain
         float want = advance ? Keeper.CloseDownDistance(_k.Sheet, _t, bMouth, arcD) : arcD;
         float chipCap = MathF.Min(ChipSafeJudged(Vector2.Distance(b, new Vector2(_pitch.GoalLineX, 0f)), rng), k.HoldGroundMaxOut);
         float mine = Keeper.MouthDistance(new Vector2(_k.Position.X, _k.Position.Z), _pitch);
-        if (near)
-        {
-            // Pushing up: on to just inside his spread range of the ball, never back while the attacker comes at him.
-            float to = MathF.Max(arcD, MathF.Min(chipCap, MathF.Max(mine, bMouth - (k.PreSpreadRange - 0.3f))));
-            engage = to > mine + 0.3f;
-            return Keeper.CoverSpot(look, _pitch, _t, to, halfWay: false);
-        }
-        engage = false;
         float cap = MathF.Min(chipCap, bMouth - k.CloseDownGap);
         float lo = MathF.Max(arcD, MathF.Min(want, cap));
         float hi = MathF.Max(lo, cap);
+        if (_chargeSoon) hi = MathF.Max(hi, MathF.Min(mine, k.ChargeMaxOut));
+        _tWant = want; _tChip = chipCap; _tGap = bMouth - k.CloseDownGap;
+        float got = Math.Clamp(mine, lo, hi);
+        _tLimit = got <= arcD + 1e-3f && arcD >= MathF.Min(want, cap) ? KeeperLimit.Arc
+            : got > lo + 1e-3f ? KeeperLimit.Kept
+            : want <= cap ? KeeperLimit.Want
+            : bMouth - k.CloseDownGap < chipCap ? KeeperLimit.Gap
+            : chipCap >= k.HoldGroundMaxOut - 1e-3f ? KeeperLimit.HoldCap : KeeperLimit.ChipCap;
         return Keeper.CoverSpot(look, _pitch, _t, Math.Clamp(mine, lo, hi), halfWay: false);
+    }
+
+    /// <summary>
+    /// Whether he charges the attacker on the ball this tick. Never if where he would meet him is further beyond his judged
+    /// chip-safe depth (for the ball's distance now) than <c>charge_chip_allowance</c> (by rushing_out; once going,
+    /// <c>charge_chip_hysteresis</c> more). Else, inside <c>engage_range</c> of the ball he always does. Otherwise, with the
+    /// ball inside <c>charge_range</c> of the goal, he weighs the time he needs to get to <c>jockey_distance</c> of it
+    /// (running at rush speed while the attacker comes on toward him, <see cref="Keeper.CloseTime"/>) against the time he accepts
+    /// (<see cref="Keeper.ChargeTolerance"/>: his rushing rating's, cut by how far beyond his judged chip-safe depth for the
+    /// ball's distance now the meeting point would take him). He starts within it and, once going, carries on until it exceeds
+    /// <c>charge_drop_factor</c> times it (plus 0.25 s): an attacker who stops or turns away lets him drop back. With the ball
+    /// up to <c>charge_hold_margin</c> beyond the range and a charge he would make, he holds the depth he has instead of giving
+    /// ground only to come out again a moment later.
+    /// </summary>
+    bool ChargeDecision(Ball ball, in KeeperSituation s, float toBall, Vector2 feet, SimRng rng)
+    {
+        var k = _t.Keeper;
+        var b = new Vector2(ball.Position.X, ball.Position.Z);
+        float bd = Vector2.Distance(b, new Vector2(_pitch.GoalLineX, 0f));
+        float range = k.ChargeRange + (_charging ? 2f : 0f);
+        if (bd > range + k.ChargeHoldMargin) return false;
+        var dir = toBall > 1e-3f ? (b - feet) / toBall : new Vector2(-1f, 0f);
+        float v0 = Vector2.Dot(new Vector2(_k.Velocity.X, _k.Velocity.Z), dir);
+        float approach = -Vector2.Dot(new Vector2(s.AttackerVelocity.X, s.AttackerVelocity.Z), dir);
+        float tClose = Keeper.CloseTime(toBall - k.JockeyDistance, v0, approach, Keeper.MoveAccel(_k.Sheet, _t), Keeper.RushSpeed(_k.Sheet, _t));
+        // Where they would meet: the ball that much closer, him jockeying short of it; beyond his chip-safe depth for the ball's
+        // distance now, a chip on the way is the risk he weighs.
+        float bMouth = Keeper.MouthDistance(b, _pitch);
+        float meet = MathF.Min(k.ChargeMaxOut, bMouth - MathF.Max(0f, approach) * (float.IsFinite(tClose) ? tClose : 0f) - k.JockeyDistance);
+        float chipSafe = ChipSafeJudged(bd, rng);
+        float excess = meet - chipSafe;
+        float tol = Keeper.ChargeTolerance(_k.Sheet, _t, excess);
+        _tCloseT = tClose; _tTol = tol; _tChip = chipSafe;
+        // Further beyond his chip-safe depth than his rushing rating accepts, he does not go (or carries on): the attacker would
+        // only have to lift it over him.
+        if (excess > k.ChargeChipAllowance.ForRating(_k.Sheet.RushingOut) + (_charging ? k.ChargeChipHysteresis : 0f)) return false;
+        // Just outside the range, a charge he would make soon keeps him where he is rather than giving ground first.
+        if (bd > range) { _chargeSoon = tClose <= tol; return false; }
+        if (toBall <= k.EngageRange) return true;
+        return _charging ? tClose <= tol * k.ChargeDropFactor + 0.25f : tClose <= tol;
+    }
+
+    /// <summary>
+    /// Charging and jockeying: on the cover line from the ball (looked ahead) <c>jockey_distance</c> short of it, never shallower
+    /// than his arc or further out than <c>charge_max_out</c>, run at rush speed (slowing to arrive). Giving ground toward his goal
+    /// he moves no faster than <c>jockey_retreat_speed</c> away from the ball, so an attacker who runs at him closes the gap.
+    /// Shown as Charge while further than a metre beyond jockeying range, else Jockey.
+    /// </summary>
+    void StepCharge(float dt, Ball ball, float toBall)
+    {
+        var k = _t.Keeper;
+        var look = ball.Position + new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z) * k.ArcLookahead;
+        var lb = new Vector2(look.X, look.Z);
+        float bMouth = Keeper.MouthDistance(lb, _pitch);
+        var arc = Keeper.ArcTarget(look, _pitch, _t, _k.Sheet);
+        float arcD = Keeper.MouthDistance(new Vector2(arc.X, arc.Z), _pitch);
+        float to = MathF.Max(arcD, MathF.Min(bMouth - k.JockeyDistance, k.ChargeMaxOut));
+        var target = Keeper.CoverSpot(look, _pitch, _t, to, halfWay: false);
+        var pos = new Vector2(_k.Position.X, _k.Position.Z);
+        var d = Keeper.CapTarget(pos, new Vector2(target.X, target.Z), k.MoveTargetCap) - pos;
+        float dist = d.Length();
+        float accel = Keeper.MoveAccel(_k.Sheet, _t);
+        Vector2 desired = dist > 0.01f ? d / dist * MathF.Min(Keeper.RushSpeed(_k.Sheet, _t), MathF.Sqrt(2f * accel * MathF.Max(0f, dist - 0.01f))) : Vector2.Zero;
+        var fromBall = pos - lb;
+        if (fromBall.LengthSquared() > 1e-4f)
+        {
+            var away = Vector2.Normalize(fromBall);
+            float back = Vector2.Dot(desired, away);
+            if (back > k.JockeyRetreatSpeed) desired -= away * (back - k.JockeyRetreatSpeed);
+        }
+        Steer(desired, accel, dt);
+        _hands = HomeFor(_k.Position);
+        _hasSpot = false;
+        _shuffling = false;
+        if (!_struck) { _roundCharged = true; Report.Charged = true; }
+        SetAction(toBall > k.JockeyDistance + 1f ? KeeperAction.Charge : KeeperAction.Jockey);
+    }
+
+    /// <summary>
+    /// Charging into a wind-up: how close to the ball he would be at the strike if he kept coming at the speed he has until the
+    /// last <c>charge_plant_lead</c> and then braked, with the attacker coming on at his speed now, metres.
+    /// </summary>
+    float BlockReach(float toBall, Vector2 ball, Vector2 feet, in KeeperSituation s)
+    {
+        var k = _t.Keeper;
+        var dir = toBall > 1e-3f ? (ball - feet) / toBall : new Vector2(-1f, 0f);
+        float v = MathF.Max(0f, Vector2.Dot(new Vector2(_k.Velocity.X, _k.Velocity.Z), dir));
+        float approach = MathF.Max(0f, -Vector2.Dot(new Vector2(s.AttackerVelocity.X, s.AttackerVelocity.Z), dir));
+        float tIn = float.IsFinite(s.StrikeIn) ? s.StrikeIn : 0f;
+        float run = MathF.Max(0f, tIn - k.ChargePlantLead);
+        float stopT = MathF.Min(MathF.Min(k.ChargePlantLead, tIn), v / k.PlantDecel);
+        float covered = v * run + v * stopT - 0.5f * k.PlantDecel * stopT * stopT;
+        return toBall - covered - approach * tIn;
     }
 
     /// <summary>His chip-safe depth for a ball <paramref name="ballDistance"/> metres from the goal centre, as he judges it.</summary>
@@ -262,7 +383,8 @@ public sealed partial class KeeperBrain
     /// <summary>
     /// The rush race: the earliest point on the loose ball's predicted path he can reach (to within a smother dive) before the
     /// ball gets there and before the attacker's next touch, with the margin his rushing rating wants (none once he is rushing,
-    /// and none for a ball within a dive: he lunges at a ball going past him), judged with his misjudgement (drawn per attacker
+    /// and none for a ball within a dive unless the attacker is within <c>contested_distance</c> of it: he lunges at a ball
+    /// going past him), judged with his misjudgement (drawn per attacker
     /// touch). The more time the ball gives him over the attacker, the further out he wins it. Short of the margin by less than
     /// his anticipation (<c>rush_anticipation</c>), he starts toward the ball and aborts if the race turns against him. Only for
     /// a low ball he can take within the rush limit.
@@ -272,15 +394,18 @@ public sealed partial class KeeperBrain
         var k = _t.Keeper;
         var goal = new Vector2(_pitch.GoalLineX, 0f);
         var b0 = new Vector2(ball.Position.X, ball.Position.Z);
-        if (ball.Position.Y > k.ClaimMaxHeight + 0.5f) return default;
-        if (Vector2.Distance(b0, goal) > k.RushMaxFromGoal + 4f) return default;
+        if (ball.Position.Y > k.ClaimMaxHeight + 0.5f) { _tRaceBlock = "ball high"; return default; }
+        if (Vector2.Distance(b0, goal) > k.RushMaxFromGoal + 4f) { _tRaceBlock = "beyond rush max"; return default; }
         float tAtt = s.AttackerNextTouch;
         var feet = new Vector2(_k.Position.X, _k.Position.Z);
+        // The attacker still at the ball (close control, a jog): even a dive at it wants his margin.
+        bool contested = Vector2.Distance(new Vector2(s.AttackerPosition.X, s.AttackerPosition.Z), b0) <= k.ContestedDistance;
         float accel = Keeper.MoveAccel(_k.Sheet, _t), vmax = Keeper.RushSpeed(_k.Sheet, _t);
         bool going = _rushing || _anticipating;
         // Quick rejection: even running flat out from now he cannot reach the ball's current spot before the attacker.
         float dNow = Vector2.Distance(feet, b0);
-        if (!going && Keeper.TravelTime(dNow - k.SmotherReach - 8f, 0f, accel, vmax) > tAtt) return default;
+        if (!going && Keeper.TravelTime(dNow - k.SmotherReach - 8f, 0f, accel, vmax) > tAtt) { _tRaceBlock = "quick reject"; return default; }
+        _tRaceBlock = "race";
         if (s.AttackerTouchTick != _misjudgeTick)
         {
             _misjudgeTick = s.AttackerTouchTick;
@@ -309,11 +434,13 @@ public sealed partial class KeeperBrain
             bool dive = d <= k.SmotherReach;
             float tk = (dive ? 0f : start + Keeper.TravelTime(d - k.SmotherReach, v0, accel, vmax)) + MathF.Min(d, k.SmotherReach) / k.SmotherSpeed;
             float perceived = tk - _misjudge;
-            float margin = _rushing || dive ? 0f : Keeper.RushMargin(_k.Sheet, _t, d);
+            float margin = _rushing || dive && !contested ? 0f : Keeper.RushMargin(_k.Sheet, _t, d);
             var point = new Vector3(p.X, _t.Ball.Radius, p.Z);
             bool rest = b.Velocity == Vector3.Zero && b.OnGround;
             // At rest the ball waits for him: he wins it if he gets there before the attacker, whenever that is.
             float arrive = rest ? perceived : tb;
+            float short_ = MathF.Max(rest ? 0f : perceived - tb, arrive + margin - tAtt);
+            if (short_ < _tRaceShort) _tRaceShort = short_;
             if ((rest || perceived <= tb) && arrive + margin <= tAtt)
                 return new RaceResult { Win = true, Smother = dive, Point = point };
             if (!anticipate.Anticipate && antic > 0f && !dive && (rest || perceived <= tb) && arrive + margin - keepOn <= tAtt)

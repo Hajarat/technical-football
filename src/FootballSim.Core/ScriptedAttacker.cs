@@ -15,7 +15,7 @@ namespace FootballSim.Core;
 /// <para>
 /// Against the keeper (<see cref="Counters"/>) it reads only what a player sees: the keeper's position and whether he is running
 /// out. With the keeper near the ball it shortens its touches: jogging touches within <see cref="JogRange"/>, close control
-/// within <see cref="CloseControlRange"/>. A keeper committing to it close (rushing out,
+/// within <see cref="CloseControlRange"/>. A keeper committing to it close (rushing or charging out,
 /// within <see cref="RoundRange"/>) it tries to take round, pushing the ball <see cref="RoundAngleDeg"/> off the line to goal on
 /// the side away from him, and holds its shot until it is past him. A keeper standing further off his line than he can
 /// recover from a chip (<see cref="Keeper.ChipSafeDepth"/>, plus <see cref="ChipMargin"/>) it chips, with a chance that grows
@@ -163,7 +163,7 @@ public sealed class ScriptedAttacker
         var a = w.Attacker;
         bool mine = w.BallController == a;
         var kp = w.Keeper;
-        bool rushing = kp.KeeperAction is KeeperAction.Rush or KeeperAction.Smother;
+        bool rushing = kp.KeeperAction is KeeperAction.Rush or KeeperAction.Smother or KeeperAction.Charge;
         if (_roundSide == 0 && mine && rushing && KeeperToBall(w) <= RoundRange && KeeperInFront(w))
         {
             float dz = w.Ball.Position.Z - kp.Position.Z;
