@@ -5,8 +5,21 @@ namespace FootballSim.Core;
 /// <summary>What a player is doing in the match.</summary>
 public enum PlayerRole { Outfield, Keeper }
 
-/// <summary>The keeper's visible state, so a view can lean the body.</summary>
-public enum KeeperAction { Set, Reacting, Diving, Holding }
+/// <summary>
+/// The keeper's visible state (Phase D contract; the game's KeeperView animates from it with
+/// <see cref="PlayerState.KeeperDive"/>, <see cref="PlayerState.KeeperActionTime"/>, Velocity, Facing and HandPosition).
+/// Set: standing on the arc in stance, still or near-still. Shuffle: side-stepping/jogging along the arc to a new spot.
+/// Rush: running out at the ball. Planted: the attacker is winding up a shot, keeper decelerated to still, knees bent.
+/// Reacting: the ball is struck, keeper has not reacted yet. Diving: hands moving to the ball (see KeeperDive for the kind).
+/// Smother: diving at the attacker's feet / loose ball during a rush. Holding: ball in his hands.
+/// Grounded: lying after a dive, smother or block. GettingUp: rising from the ground (KeeperActionTime runs 0 to get-up time).
+/// </summary>
+public enum KeeperAction { Set, Shuffle, Rush, Planted, Reacting, Diving, Smother, Holding, Grounded, GettingUp }
+
+/// <summary>The kind of save motion while <see cref="KeeperAction.Diving"/> (None otherwise).
+/// Low: diving along the ground. Side: a flat side dive at mid height. High: a leaping dive / tip over the bar.
+/// Feet: a standing block at the feet (legs and body spread, no dive). Catch: a standing catch at the body, no dive.</summary>
+public enum KeeperDive { None, Low, Side, High, Feet, Catch }
 
 /// <summary>The round state machine ("Round contract" in the spec).</summary>
 public enum RoundState { Setup, Live, Strike, Flight, Outcome, Report }
