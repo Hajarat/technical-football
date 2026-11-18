@@ -199,6 +199,7 @@ public partial class Match
             var intents = new TickIntent[World.PlayerCount];
             intents[0] = _replay != null ? _replay.IntentAt(World.Tick) : FromPad(pad);
             _closeControl = intents[0].CloseControl;
+            _intent = intents[0];
             World.Step(intents);
             if (World.State == RoundState.Report) FinishRound();
         }

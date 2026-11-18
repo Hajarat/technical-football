@@ -99,10 +99,14 @@ public sealed class PlayerState
     public BallAction? TouchAction { get; internal set; }
     /// <summary>The touch before <see cref="TouchAction"/> still in its follow-through, or null.</summary>
     internal BallAction? PrevTouchAction;
+    /// <summary>Read-only view of the touch before <see cref="TouchAction"/> still in its follow-through, shots or not (for the view: <see cref="PreviousAction"/> hides it during a shot).</summary>
+    public BallAction? PreviousTouchAction => PrevTouchAction;
     /// <summary>The shot under way, from the press to the end of its recovery, or null. Shown as <see cref="Action"/>.</summary>
     internal BallAction? ShotAction;
     /// <summary>Simulation seconds until which the shooter is stunned after a strike: slowed, and no touches.</summary>
     internal float StunUntil = -100f;
+    /// <summary>Read-only view of <see cref="StunUntil"/> for the presentation (the simulation seconds the stun after a strike ends).</summary>
+    public float StunEndTime => StunUntil;
     /// <summary>Seconds from now to <see cref="Action"/>'s contact while it waits, else NaN.</summary>
     public float ActionContactEta { get; internal set; } = float.NaN;
     /// <summary>The steering correction added to the velocity on the latest tick to bring the ball into the contact zone, m/s.</summary>

@@ -61,6 +61,9 @@ public partial class Match : Node3D
         if (_args.TopCam) Camera.UseTopDown();
         else if (_args.CloseCam) Camera.UseCloseUp();
         if (_args.ShotDir != null) _shots = new ShotTool(this, _args.ShotDir);
+        // A burst wants one frame per tick: at most one physics tick per rendered frame (a slow renderer then runs the game slower
+        // than real time instead of skipping ticks between frames), drawn without interpolation so each frame is exactly its tick.
+        if (_shots != null && _args.BurstCount > 0) { Engine.MaxPhysicsStepsPerFrame = 1; GetTree().PhysicsInterpolation = false; }
 
         if (_args.FrameTimes)
             GD.Print($"DISPLAY refresh_hz={DisplayServer.ScreenGetRefreshRate()} vsync={DisplayServer.WindowGetVsyncMode()} max_fps={Engine.MaxFps} " +
@@ -216,6 +219,7 @@ public partial class Match : Node3D
             GD.Print(FootStats.TouchFootLine());
             GD.Print(FootStats.TouchMissLine());
             if (Attacker.Figure.IsSkinned) GD.Print(FootStats.SkinLine());
+            foreach (var line in FootStats.JumpLines()) GD.Print(line);
         }
         if (_args.FrameTimes)
         {
