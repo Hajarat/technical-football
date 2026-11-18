@@ -16,6 +16,10 @@ using FootballSim.Core;
 //   ... --write-skill-replays <dir>             writes one replay per skill move (edge_of_box start) for game screenshots
 //   ... --write-keeper-replays <dir>            searches scripted rounds for each visible keeper action and writes one replay each
 //   ... --scenario <id> --trace-keeper <seed>   prints the keeper's state, tick by tick, for one scripted round
+//   ... --keeper-probe [--seeds 40] [--rushing 1,50,99] [--only sprint,...] [--timeline 1]
+//                                               human-style attacker plans (TickIntent per tick, no ScriptedAttacker) against the keeper
+//   ... --write-probe-replays <dir>             writes keeper-probe showcase replays (charge, jockey, step-over, chip) for screenshots
+//   ... --probe-replays <dir|file> [--every 30]  re-runs play-test replays (round-*.json) with the keeper's timeline every 0.25 s
 //   ... --counters off                          the scripted attacker ignores the keeper (no shorter touches, rounding or chips)
 
 return Cli.Run(args);
@@ -29,7 +33,7 @@ static class Cli
         {
             if (!args[i].StartsWith("--")) { Console.Error.WriteLine($"Unexpected argument '{args[i]}'"); return 2; }
             string key = args[i][2..];
-            if (key is "dump-tuning" or "skill-probe") { opts[key] = "1"; continue; }
+            if (key is "dump-tuning" or "skill-probe" or "keeper-probe") { opts[key] = "1"; continue; }
             if (i + 1 >= args.Length) { Console.Error.WriteLine($"Missing value for --{key}"); return 2; }
             opts[key] = args[++i];
         }
@@ -47,6 +51,9 @@ static class Cli
 
         if (opts.TryGetValue("replay", out var replayPath)) return RunReplay(replayPath, dataDir, tuning);
         if (opts.ContainsKey("skill-probe")) return SkillProbe.Run(opts, dataDir, tuning);
+        if (opts.ContainsKey("keeper-probe")) return KeeperProbe.Run(opts, dataDir, tuning);
+        if (opts.TryGetValue("write-probe-replays", out var probeDir)) return KeeperProbe.WriteReplays(probeDir, dataDir, tuning);
+        if (opts.TryGetValue("probe-replays", out var probeReplays)) return KeeperProbe.RunReplays(probeReplays, dataDir, tuning, opts);
         if (opts.TryGetValue("write-skill-replays", out var skillDir)) return SkillProbe.WriteReplays(skillDir, dataDir, tuning);
         if (opts.TryGetValue("write-keeper-replays", out var keeperDir)) return KeeperReplays.WriteReplays(keeperDir, dataDir, tuning);
         if (opts.TryGetValue("probe", out var probe))
@@ -209,7 +216,7 @@ sealed class KeeperStats
 {
     readonly List<float> _depth = new(), _dist = new();
     int _onTarget;
-    int _n, _shots, _rush, _smother, _smotherClaim, _planted, _reactN, _parried;
+    int _n, _shots, _rush, _charge, _smother, _smotherClaim, _planted, _reactN, _parried;
     double _react, _speed;
     readonly Dictionary<string, int> _after = new(), _save = new(), _dive = new();
     readonly double[] _bandSum = new double[KeeperReport.DepthBands.Length];
@@ -222,6 +229,7 @@ sealed class KeeperStats
         _n++;
         var k = r.Keeper;
         if (k.Rushed) _rush++;
+        if (k.Charged) _charge++;
         if (k.Smothered) _smother++;
         if (r.End == ShotEnd.NoShot && r.Outcome == Outcome.Held && k.Save == SaveKind.Smother) _smotherClaim++;
         for (int i = 0; i < _bandSum.Length && i < k.DepthAtBandM.Length; i++)
@@ -273,7 +281,7 @@ sealed class KeeperStats
     public void Print(string prefix)
     {
         var ic = CultureInfo.InvariantCulture;
-        Console.WriteLine($"{prefix}keeper: rush {Pct(_rush)} of rounds, smother {Pct(_smother)} (claimed before a shot {Pct(_smotherClaim)}), " +
+        Console.WriteLine($"{prefix}keeper: charge {Pct(_charge)} of rounds, rush {Pct(_rush)}, smother {Pct(_smother)} (claimed before a shot {Pct(_smotherClaim)}), " +
                           $"planted at strike {PctOf(_planted, _shots)} of shots, mean reaction {(_react / Math.Max(1, _reactN)).ToString("F3", ic)} s, " +
                           $"mean speed at strike {(_speed / Math.Max(1, _shots)).ToString("F2", ic)} m/s");
         Console.WriteLine($"{prefix}shots on target (unhindered flight inside the goal) {PctOf(_onTarget, _shots)} of {_shots} shots");

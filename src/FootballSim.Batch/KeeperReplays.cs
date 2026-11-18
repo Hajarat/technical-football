@@ -71,6 +71,10 @@ static class KeeperReplays
             if (strike < 1) return null;
             return f[strike - 1].Depth - f[0].Depth >= 2.5f ? (f[0].Tick, f[strike - 1].Tick) : null;
         }, new[] { "halfway_run" }),
+        new("keeper-charge", "Charge: running out at the attacker on the ball to close him down", f => First(f, x => x.Action == KeeperAction.Charge, 24),
+            new[] { "halfway_run", "keeper_rush" }),
+        new("keeper-jockey", "Jockey: low and spread a couple of metres off the attacker, stepping with him", f => First(f, x => x.Action == KeeperAction.Jockey, 12),
+            new[] { "keeper_rush", "halfway_run" }),
         new("keeper-spread", "Spread: stopped close to the attacker on the ball, made big", f => First(f, x => x.Action == KeeperAction.Spread, 12),
             new[] { "keeper_rush", "halfway_run" }),
         new("keeper-wins-long-touch", "Rush then Smother: winning a long sprint touch before the attacker gets back to it", f =>
