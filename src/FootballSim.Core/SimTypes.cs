@@ -13,13 +13,17 @@ public enum PlayerRole { Outfield, Keeper }
 /// Reacting: the ball is struck, keeper has not reacted yet. Diving: hands moving to the ball (see KeeperDive for the kind).
 /// Smother: diving at the attacker's feet / loose ball during a rush. Holding: ball in his hands.
 /// Grounded: lying after a dive, smother or block. GettingUp: rising from the ground (KeeperActionTime runs 0 to get-up time).
+/// Backpedal: moving back toward his goal facing the play (closing down's retreat, recovering, or under a chip after it is
+/// struck). Spread: stopped close to an attacker on the ball, made big (legs wide, arms low and out), before or during a windup.
 /// </summary>
-public enum KeeperAction { Set, Shuffle, Rush, Planted, Reacting, Diving, Smother, Holding, Grounded, GettingUp }
+public enum KeeperAction { Set, Shuffle, Rush, Planted, Reacting, Diving, Smother, Holding, Grounded, GettingUp, Backpedal, Spread }
 
 /// <summary>The kind of save motion while <see cref="KeeperAction.Diving"/> (None otherwise).
 /// Low: diving along the ground. Side: a flat side dive at mid height. High: a leaping dive / tip over the bar.
-/// Feet: a standing block at the feet (legs and body spread, no dive). Catch: a standing catch at the body, no dive.</summary>
-public enum KeeperDive { None, Low, Side, High, Feet, Catch }
+/// Feet: a standing block at the feet (legs and body spread, no dive). Catch: a standing catch at the body, no dive.
+/// Back: a backward leap after backpedalling under a chip, body extended and falling back toward his goal, reaching up and
+/// back for the ball.</summary>
+public enum KeeperDive { None, Low, Side, High, Feet, Catch, Back }
 
 /// <summary>The round state machine ("Round contract" in the spec).</summary>
 public enum RoundState { Setup, Live, Strike, Flight, Outcome, Report }

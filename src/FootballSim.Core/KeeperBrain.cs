@@ -22,6 +22,9 @@ internal readonly struct KeeperSituation
     public bool AttackerHasBall { get; init; }
     /// <summary>The round is over (outcome showing): the keeper only settles.</summary>
     public bool BallDead { get; init; }
+    /// <summary>The attacker's feet and velocity (closing down starts when he comes at goal with the ball).</summary>
+    public Vector3 AttackerPosition { get; init; }
+    public Vector3 AttackerVelocity { get; init; }
 
     /// <summary>No attacker information: the keeper holds his arc and reacts to strikes only.</summary>
     public static KeeperSituation None => new() { AttackerNextTouch = float.PositiveInfinity, AttackerTouchTick = -1, StrikeIn = float.PositiveInfinity };
@@ -29,21 +32,25 @@ internal readonly struct KeeperSituation
 
 /// <summary>
 /// The keeper's decision code (Phase D). Standing, he holds a spot on an arc off his line on the angle to the ball, biased to the
-/// near post and deeper or shallower by his positioning; each new spot carries a positioning error. When he can reach a loose
-/// ball before the attacker's next planned touch, with a margin set by his rushing rating, he rushes it, and dives on it
-/// (smother) once it is within a dive. When a shot winds up he plants. From the strike he reacts after a delay from his
-/// reflexes (plus a penalty when he was still moving), then dives at the first point on the ball's predicted path inside his
-/// dive wedge that his reach can get to in time, catching, parrying, blocking at the feet, tipping over the bar or
-/// fingertipping by the ball's speed and where he meets it. After a dive he lies, then gets up in 1.0 s; a new save can start
-/// 0.2 s into getting up.
+/// near post and deeper or shallower by his positioning; each new spot carries a positioning error. Once an attacker comes in
+/// with the ball he closes down along the cover line, further out as the ball comes closer, but never beyond the depth he
+/// judges he can recover from a chip. When he can reach a loose ball (between the attacker's touches) before the attacker's
+/// next planned touch, with a margin set by his rushing rating, he rushes it, and dives on it (smother) once it is within a
+/// dive; a close race starts him toward it on anticipation. Close to an attacker he cannot beat to the ball, he stops and
+/// spreads. When a shot winds up he plants. From the strike he reacts after a delay from his reflexes (plus a penalty when he
+/// was still moving); a chip going over him he backpedals for and leaps at; otherwise he dives at the first point on the
+/// ball's predicted path inside his dive wedge that his reach can get to in time, catching, parrying, blocking at the feet,
+/// tipping over the bar or fingertipping by the ball's speed and where he meets it. After a dive he lies, then gets up in
+/// 1.0 s; a new save can start 0.2 s into getting up.
 /// </summary>
-public sealed class KeeperBrain
+public sealed partial class KeeperBrain
 {
-    enum Phase { Stand, Reacting, Diving, Smother, Held, Grounded, GettingUp }
+    enum Phase { Stand, Reacting, Backpedal, Diving, Smother, Held, Grounded, GettingUp }
 
     readonly Tuning _t;
     readonly Pitch _pitch;
     readonly PlayerState _k;
+    readonly PlayerSheet _attacker;
     readonly bool _holdLine;
 
     Phase _phase = Phase.Stand;
@@ -91,12 +98,14 @@ public sealed class KeeperBrain
     /// <summary>The numbers for the most recent shot.</summary>
     public KeeperReport Report { get; private set; } = new();
 
-    internal KeeperBrain(PlayerState keeper, Pitch pitch, Tuning tuning, bool holdLine)
+    /// <param name="attacker">The attacker's sheet, for the chips he judges his depth against (a default sheet when null).</param>
+    internal KeeperBrain(PlayerState keeper, Pitch pitch, Tuning tuning, bool holdLine, PlayerSheet? attacker = null)
     {
         _k = keeper;
         _pitch = pitch;
         _t = tuning;
         _holdLine = holdLine;
+        _attacker = attacker ?? new PlayerSheet();
         _hands = HomeFor(keeper.Position);
         keeper.HandPosition = _hands;
         keeper.KeeperAction = KeeperAction.Set;
@@ -214,6 +223,7 @@ public sealed class KeeperBrain
     {
         Enter(Phase.Stand);
         _hasSpot = false;
+        _fromBackpedal = false;
         SetAction(KeeperAction.Set);
         _hands = HomeFor(_k.Position);
         _k.HandPosition = _hands;
@@ -231,9 +241,14 @@ public sealed class KeeperBrain
             SpeedAtStrikeMs = speed,
             DepthAtStrikeM = _pitch.GoalLineX - _k.Position.X,
             BallDistanceAtStrikeM = ball == null ? float.NaN : Vector2.Distance(new Vector2(ball.Position.X, ball.Position.Z), new Vector2(_pitch.GoalLineX, 0f)),
-            PlantedAtStrike = _phase == Phase.Stand && _k.KeeperAction == KeeperAction.Planted && speed <= _t.Keeper.StillSpeed,
+            PlantedAtStrike = _phase == Phase.Stand && _k.KeeperAction is KeeperAction.Planted or KeeperAction.Spread && speed <= _t.Keeper.StillSpeed,
             Rushed = _roundRushed,
             Smothered = _roundSmother,
+            WonBall = _roundWon,
+            Rounded = _roundRounded,
+            DepthAtBandM = (float[])_bandDepth.Clone(),
+            DepthReversals = _reversals,
+            DepthReversalsFirst2S = _reversals2,
         };
         _spread = 0f;
         if (ball != null)
@@ -247,7 +262,7 @@ public sealed class KeeperBrain
             float d = toBall.Length();
             var k = _t.Keeper;
             if (d > 1e-3f) _faceAxis = toBall / d;
-            if (_phase == Phase.Stand && _k.KeeperAction == KeeperAction.Planted && d < k.SpreadRange)
+            if (_phase == Phase.Stand && _k.KeeperAction is KeeperAction.Planted or KeeperAction.Spread && d < k.SpreadRange)
             {
                 _spread = Math.Clamp((k.SpreadRange - d) / (k.SpreadRange - k.SpreadFull), 0f, 1f);
                 _spreadAxis = d > 1e-3f ? toBall / d : new Vector2(-1f, 0f);
@@ -261,6 +276,7 @@ public sealed class KeeperBrain
             case Phase.Smother when _active:
                 return; // already going down at the ball: the body is in the way or not
             case Phase.Diving when _active:
+            case Phase.Backpedal when _active:
                 return;
             case Phase.Diving:
             case Phase.Smother:
@@ -280,6 +296,8 @@ public sealed class KeeperBrain
         Enter(Phase.Reacting);
         _active = true;
         _rushing = false;
+        _anticipating = false;
+        _fromBackpedal = false;
         _pendingStrike = false;
         _since = elapsed;
         _reaction = Keeper.ReactionAtStrike(_k.Sheet, _t, rng, speed);
@@ -320,7 +338,15 @@ public sealed class KeeperBrain
                 _since += dt;
                 CarryMomentum(dt);
                 _hands = HomeFor(_k.Position);
-                if (_since >= _reaction) StartDive(ball, rng);
+                if (_since >= _reaction)
+                {
+                    if (ChipOverHim(ball)) BeginBackpedal();
+                    else StartDive(ball, rng);
+                }
+                break;
+            case Phase.Backpedal:
+                _since += dt;
+                StepBackpedal(dt, ball, rng);
                 break;
             case Phase.Diving:
                 _since += dt;
@@ -347,171 +373,6 @@ public sealed class KeeperBrain
         _k.HandPosition = _hands;
     }
 
-    // ---- standing: arc, rush, plant ----
-
-    void StepStanding(float dt, Ball ball, SimRng rng, in KeeperSituation s)
-    {
-        var k = _t.Keeper;
-        bool holdLine = _holdLine && !_struck;
-        FaceBall(ball, dt);
-
-        if (!holdLine && !s.ShotInFlight && !s.BallDead)
-        {
-            var race = Race(ball, s, rng);
-            if (race.Win && race.Smother) { StartSmother(race.Point); return; }
-            if (race.Win)
-            {
-                _rushing = true;
-                if (!_struck) { _roundRushed = true; Report.Rushed = true; }
-                RunAt(race.Point, dt);
-                _hands = HomeFor(_k.Position);
-                SetAction(KeeperAction.Rush);
-                return;
-            }
-            if (_rushing) { _rushing = false; _hasSpot = false; }
-        }
-        else _rushing = false;
-
-        var goal = new Vector2(_pitch.GoalLineX, 0f);
-        bool inRange = Vector2.Distance(new Vector2(ball.Position.X, ball.Position.Z), goal) <= k.SetRange;
-        if (s.Windup && s.StrikeIn <= k.PlantLead && inRange && !s.BallDead)
-        {
-            Brake(k.PlantDecel, dt);
-            _hands = HomeFor(_k.Position);
-            _shuffling = false;
-            SetAction(KeeperAction.Planted);
-            return;
-        }
-
-        // Hold the arc (or the line).
-        var look = ball.Position + new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z) * k.ArcLookahead;
-        Vector3 ideal = holdLine ? Keeper.LineSpot(look, _pitch, _t) : Keeper.ArcTarget(look, _pitch, _t, _k.Sheet);
-        // A one-on-one with him already off his line: he holds his ground (no backpedalling) and only moves across.
-        if (!holdLine && !s.BallDead && s.AttackerHasBall && HoldGroundSpot(look, ball, ideal) is Vector3 hold) ideal = hold;
-        if (!_hasSpot || Vector3.Distance(ideal, _spotIdeal) > k.RepositionThreshold) TakeSpot(ideal, look, holdLine, rng);
-        float dist = new Vector2(_spot.X - _k.Position.X, _spot.Z - _k.Position.Z).Length();
-        float vmax = dist > k.JogThreshold ? Keeper.JogSpeed(_k.Sheet, _t) : Keeper.ShuffleSpeed(_k.Sheet, _t);
-        MoveTo(_spot, vmax, Keeper.MoveAccel(_k.Sheet, _t), dt);
-        _hands = HomeFor(_k.Position);
-        float speed = new Vector2(_k.Velocity.X, _k.Velocity.Z).Length();
-        dist = new Vector2(_spot.X - _k.Position.X, _spot.Z - _k.Position.Z).Length();
-        if (_shuffling) { if (speed < 0.2f && dist < 0.1f) _shuffling = false; }
-        else if (speed > k.StillSpeed || dist > 0.15f) _shuffling = true;
-        SetAction(_shuffling ? KeeperAction.Shuffle : KeeperAction.Set);
-    }
-
-    /// <summary>
-    /// Holding his ground in a one-on-one: once the attacker is on the ball inside shooting range (<c>hold_ground_range</c> of
-    /// the goal mouth) and running at goal at <c>hold_ground_min_speed</c> or more, a keeper who is further out than his arc
-    /// spot but no more than <c>hold_ground_max_out</c> from the mouth keeps that distance on the cover line instead of
-    /// backpedalling. Null otherwise: further out than that he recovers to his arc, whatever his start.
-    /// </summary>
-    Vector3? HoldGroundSpot(Vector3 look, Ball ball, Vector3 arc)
-    {
-        var k = _t.Keeper;
-        var b = new Vector2(look.X, look.Z);
-        if (Keeper.MouthDistance(b, _pitch) > k.HoldGroundRange) return null;
-        var toGoal = new Vector2(_pitch.GoalLineX, 0f) - new Vector2(ball.Position.X, ball.Position.Z);
-        float len = toGoal.Length();
-        if (len < 1e-3f) return null;
-        if (Vector2.Dot(new Vector2(ball.Velocity.X, ball.Velocity.Z), toGoal / len) < k.HoldGroundMinSpeed) return null;
-        var feet = new Vector2(_k.Position.X, _k.Position.Z);
-        float mine = Keeper.MouthDistance(feet, _pitch);
-        if (mine > k.HoldGroundMaxOut) return null;   // caught too far out: he recovers to his arc
-        if (mine <= Keeper.MouthDistance(new Vector2(arc.X, arc.Z), _pitch) + 0.05f) return null;
-        Vector2 dir = Keeper.CoverDirection(b, _pitch, _t);
-        float lo = 0f, hi = Vector2.Distance(b, new Vector2(arc.X, arc.Z));
-        if (Keeper.MouthDistance(b, _pitch) <= mine) return null;
-        for (int i = 0; i < 24; i++)
-        {
-            float mid = 0.5f * (lo + hi);
-            if (Keeper.MouthDistance(b + dir * mid, _pitch) > mine) lo = mid; else hi = mid;
-        }
-        var p = b + dir * (0.5f * (lo + hi));
-        return new Vector3(p.X, 0f, p.Y);
-    }
-
-    /// <summary>A new spot: the ideal plus a positioning error drawn now, across the cover line (and a little along it).</summary>
-    void TakeSpot(Vector3 ideal, Vector3 ball, bool holdLine, SimRng rng)
-    {
-        var k = _t.Keeper;
-        _spotIdeal = ideal;
-        _hasSpot = true;
-        float sd = Keeper.PositionErrorSd(_k.Sheet, _t);
-        float across = Math.Clamp(rng.Normal(0f, sd), -3f * sd, 3f * sd);
-        float along = holdLine ? 0f : Math.Clamp(rng.Normal(0f, 0.5f * sd), -1.5f * sd, 1.5f * sd);
-        Vector2 cover = holdLine ? new Vector2(1f, 0f) : Keeper.CoverDirection(new Vector2(ball.X, ball.Z), _pitch, _t);
-        var lateral = new Vector2(-cover.Y, cover.X);
-        var p = new Vector2(ideal.X, ideal.Z) + lateral * across + cover * along;
-        if (!holdLine) p.X = MathF.Min(p.X, _pitch.GoalLineX - k.ArcMinFromLine);
-        float lim = _pitch.GoalHalfWidth + 1f;
-        p.Y = Math.Clamp(p.Y, -lim, lim);
-        _spot = new Vector3(p.X, 0f, p.Y);
-    }
-
-    readonly struct RaceResult
-    {
-        public bool Win { get; init; }
-        public bool Smother { get; init; }
-        public Vector3 Point { get; init; }
-    }
-
-    /// <summary>
-    /// The rush race: the earliest point on the loose ball's predicted path he can reach (to within a smother dive) before the
-    /// ball gets there and before the attacker's next touch, with the margin his rushing rating wants (none once he is rushing),
-    /// judged with his misjudgement (drawn per attacker touch). Only for a low ball he can take within the rush limit.
-    /// </summary>
-    RaceResult Race(Ball ball, in KeeperSituation s, SimRng rng)
-    {
-        var k = _t.Keeper;
-        var goal = new Vector2(_pitch.GoalLineX, 0f);
-        var b0 = new Vector2(ball.Position.X, ball.Position.Z);
-        if (ball.Position.Y > k.ClaimMaxHeight + 0.5f) return default;
-        if (Vector2.Distance(b0, goal) > k.RushMaxFromGoal + 4f) return default;
-        float tAtt = s.AttackerNextTouch;
-        var feet = new Vector2(_k.Position.X, _k.Position.Z);
-        float accel = Keeper.MoveAccel(_k.Sheet, _t), vmax = Keeper.RushSpeed(_k.Sheet, _t);
-        // Quick rejection: even running flat out from now he cannot reach the ball's current spot before the attacker.
-        float dNow = Vector2.Distance(feet, b0);
-        if (!_rushing && Keeper.TravelTime(dNow - k.SmotherReach - 8f, 0f, accel, vmax) > tAtt) return default;
-        if (s.AttackerTouchTick != _misjudgeTick)
-        {
-            _misjudgeTick = s.AttackerTouchTick;
-            _misjudge = rng.Normal(0f, Keeper.RushMisjudgeSd(_k.Sheet, _t));
-        }
-        float horizon = MathF.Min(k.RushLookahead, tAtt);
-        var vel = new Vector2(_k.Velocity.X, _k.Velocity.Z);
-        float start = _rushing ? 0f : k.RushStartDelay;
-        const float step = 1f / 60f;
-        var b = ball.ScratchB();
-        float tb = 0f;
-        for (int i = 0; tb <= horizon + 1e-4f; i++)
-        {
-            if (i > 0) { b.Step(step, null, null); tb += step; }
-            var p = b.Position;
-            if (p.Y > k.ClaimMaxHeight) continue;
-            var p2 = new Vector2(p.X, p.Z);
-            if (p.X > _pitch.GoalLineX - 0.3f || Vector2.Distance(p2, goal) > k.RushMaxFromGoal) continue;
-            var to = p2 - feet;
-            float d = to.Length();
-            float v0 = d > 1e-4f ? Vector2.Dot(vel, to / d) : 0f;
-            bool dive = d <= k.SmotherReach;
-            float tk = (dive ? 0f : start + Keeper.TravelTime(d - k.SmotherReach, v0, accel, vmax)) + MathF.Min(d, k.SmotherReach) / k.SmotherSpeed;
-            float perceived = tk - _misjudge;
-            float margin = _rushing ? 0f : Keeper.RushMargin(_k.Sheet, _t, d);
-            if (perceived <= tb && tb + margin <= tAtt)
-                return new RaceResult { Win = true, Smother = dive, Point = new Vector3(p.X, _t.Ball.Radius, p.Z) };
-            if (b.Velocity == Vector3.Zero && b.OnGround)
-            {
-                // The ball has come to rest: he wins it if he gets there before the attacker, whenever that is.
-                if (perceived + margin <= tAtt)
-                    return new RaceResult { Win = true, Smother = dive, Point = new Vector3(p.X, _t.Ball.Radius, p.Z) };
-                break;
-            }
-        }
-        return default;
-    }
-
     // ---- movement ----
 
     void FaceBall(Ball ball, float dt)
@@ -534,13 +395,13 @@ public sealed class KeeperBrain
         Steer(desired, accel, dt);
     }
 
-    /// <summary>Runs through a point at rush speed (no slowing to arrive), toward a target at most the move cap away.</summary>
-    void RunAt(Vector3 target, float dt)
+    /// <summary>Runs through a point at <paramref name="speed"/> (no slowing to arrive), toward a target at most the move cap away.</summary>
+    void RunAt(Vector3 target, float speed, float dt)
     {
         var pos = new Vector2(_k.Position.X, _k.Position.Z);
         var d = Keeper.CapTarget(pos, new Vector2(target.X, target.Z), _t.Keeper.MoveTargetCap) - pos;
         float dist = d.Length();
-        Vector2 desired = dist > 0.01f ? d / dist * Keeper.RushSpeed(_k.Sheet, _t) : Vector2.Zero;
+        Vector2 desired = dist > 0.01f ? d / dist * speed : Vector2.Zero;
         Steer(desired, Keeper.MoveAccel(_k.Sheet, _t), dt);
     }
 
@@ -598,6 +459,7 @@ public sealed class KeeperBrain
         var home2 = new Vector2(_home.X, _home.Z);
         float prevSide = Vector2.Dot(new Vector2(ball.Position.X, ball.Position.Z) - home2, _planeN);
         Vector3 prev = ball.Position;
+        float leap = Keeper.ChipReachHeight(sheet, _t);
         for (int i = 1; i <= steps; i++)
         {
             b.Step(dt, null, null);
@@ -606,10 +468,11 @@ public sealed class KeeperBrain
             float side = Vector2.Dot(new Vector2(p.X, p.Z) - home2, _planeN);
             if (!passed && prevSide < 0f && side >= 0f) passed = true;
             float need = Vector3.Distance(p, _home);
-            if (need < bestNeed) { bestNeed = need; closest = p; tClosest = t; }
+            if (need < bestNeed && p.Y <= leap) { bestNeed = need; closest = p; tClosest = t; }
             // The ball will hit him where he stands: he stays big and blocks it rather than diving out of its way.
             if (p.X <= _pitch.GoalLineX && SegmentDistance(p, body.A, body.B) <= body.Radius) { target = p; tTarget = t; found = true; block = true; break; }
-            if (p.X <= _pitch.GoalLineX && Keeper.InWedge(_feet0, facing, p, _t))
+            // Above his leap he cannot get a hand to it; after backpedalling he leaps backward, outside his usual wedge.
+            if (p.X <= _pitch.GoalLineX && p.Y <= leap && (_fromBackpedal || Keeper.InWedge(_feet0, facing, p, _t)))
             {
                 float deficit = need - Reach(t);
                 if (deficit <= 0f) { target = p; tTarget = t; found = true; break; }
@@ -633,7 +496,7 @@ public sealed class KeeperBrain
         _planePoint = beyond > 0f ? new Vector2(_home.X, _home.Z) + _planeN * beyond : new Vector2(_home.X, _home.Z);
         float needed = Vector3.Distance(target, _home);
         _jitter = rng.NextFloat() * Keeper.SaveJitterMax(sheet, _t, needed);
-        _dive = Keeper.DiveKindFor(_feet0, target, _t);
+        _dive = _fromBackpedal ? KeeperDive.Back : Keeper.DiveKindFor(_feet0, target, _t);
         if (block && _dive is not (KeeperDive.Catch or KeeperDive.Feet))
             _dive = target.Y < k.FeetBlockHeight ? KeeperDive.Feet : KeeperDive.Catch;
         Report.Dive = _dive;
@@ -718,6 +581,7 @@ public sealed class KeeperBrain
         Enter(Phase.Smother);
         _active = true;
         _rushing = false;
+        _fromBackpedal = false;
         _contact = false;
         if (!_struck) { _roundSmother = true; Report.Smothered = true; }
         _feet0 = _k.Position;
@@ -797,7 +661,9 @@ public sealed class KeeperBrain
         bool early = _phase == Phase.Reacting || _phase == Phase.Diving && DiveTau <= 0f;
         bool feet = _phase == Phase.Diving && _dive == KeeperDive.Feet;
         bool standing = early || _phase == Phase.Diving && _dive == KeeperDive.Catch;
-        float catchSpeed = body ? k.BodyHoldSpeed
+        if (!_struck) { _roundWon = true; Report.WonBall = true; }
+        float catchSpeed = _fromBackpedal && _phase == Phase.Diving ? Keeper.DivingCatchSpeed(sheet, _t) * k.BackpedalCatchFactor
+            : body ? k.BodyHoldSpeed
             : smother ? k.SmotherHoldSpeed
             : feet ? Keeper.CatchSpeed(sheet, _t) * k.FeetCatchFactor
             : standing ? Keeper.CatchSpeed(sheet, _t)

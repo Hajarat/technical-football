@@ -123,27 +123,32 @@ public class KeeperBrainTests
             Assert.True(n >= 25);
             return sum / n;
         }
-        // Starting on his line or on his arc he is in the same place at the strike. (Starting well off his line, within
-        // hold_ground_max_out, he may hold that depth once the attacker is in range: see the hold-ground test.)
+        // Starting on his line or on his arc he is in the same place at the strike. (Starting well off his line, within his
+        // limits, he may hold that depth while closing down: see the closing-down test.)
         double arc = MeanDepth(false, null), line = MeanDepth(true, null);
         Assert.InRange(line, arc - 0.15, arc + 0.15);
     }
 
     [Fact]
-    public void HeHoldsHisGroundOnlyInsideShootingRangeAndAtAReasonableDepth()
+    public void ClosingDownHeHoldsHisDepthButNotBeyondHisChipSafeDepth()
     {
-        // Attacker running at goal 14 m out. A keeper 3 m out holds there; one 11 m out (beyond hold_ground_max_out) recovers.
+        // Attacker running at goal with the ball 16 m out. A keeper 4 m out (between his closing-down depth and his limits)
+        // holds there; one 11 m out (beyond his chip-safe depth and hold_ground_max_out) comes back.
         var ball = new Vector3(P.GoalLineX - 16f, 0.11f, 0f);
-        var s = new KeeperSituation { AttackerNextTouch = 0.05f, AttackerTouchTick = 1, AttackerHasBall = true, StrikeIn = float.PositiveInfinity };
-        foreach (var (startOut, holds) in new[] { (3.0f, true), (11.0f, false) })
+        var s = new KeeperSituation
+        {
+            AttackerNextTouch = 0.05f, AttackerTouchTick = 1, AttackerHasBall = true, StrikeIn = float.PositiveInfinity,
+            AttackerVelocity = new Vector3(6f, 0f, 0f),
+        };
+        foreach (var (startOut, holds) in new[] { (4.0f, true), (11.0f, false) })
         {
             var (brain, keeper, b) = Rig(Wall(), ball);
             keeper.Position = new Vector3(P.GoalLineX - startOut, 0f, 0f);
             b.Velocity = new Vector3(6f, 0f, 0f);
-            for (int i = 0; i < 120; i++) brain.Update(Dt, b, new SimRng(1), s);
+            for (int i = 0; i < 240; i++) brain.Update(Dt, b, new SimRng(1), s);
             float now = P.GoalLineX - keeper.Position.X;
             if (holds) Assert.InRange(now, startOut - 0.4f, startOut + 0.4f);
-            else Assert.True(now < startOut - 1.5f, $"still {now} m out");
+            else Assert.True(now < startOut - 1.5f && now <= T.Keeper.HoldGroundMaxOut + 0.3f, $"still {now} m out");
         }
     }
 

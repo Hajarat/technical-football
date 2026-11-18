@@ -15,7 +15,7 @@ World coordinates are metres: X toward the attacked goal (goal line 52.5), Y up,
 | Re-run a replay in the batch tool | `dotnet run -c Release --project src/FootballSim.Batch -- --replay game/tests/smoke_replay.json` |
 | Skill-move probe (scripted gestures per move, side, entry pace and skill_moves 1/50/99; the not-built elastico, heel-to-heel and spin rows should read recognised 100, made 0) | `dotnet run -c Release --project src/FootballSim.Batch -- --skill-probe` |
 | Write one replay per skill move (edge_of_box start) for screenshots | `dotnet run -c Release --project src/FootballSim.Batch -- --write-skill-replays out/skill-replays` |
-| Write one replay per visible keeper action (shuffle, rush, planted then reacting, each dive kind, tip over the bar, smother, parry then grounded then getting up) for screenshots; prints each file with the tick range of its action | `dotnet run -c Release --project src/FootballSim.Batch -- --write-keeper-replays out/keeper-replays` |
+| Write one replay per visible keeper action (shuffle, rush, planted then reacting, each dive kind, tip over the bar, smother, closing down, spread, a long sprint touch won, a backpedal under a chip, taken round, parry then grounded then getting up) for screenshots; prints each file with the tick range of its action | `dotnet run -c Release --project src/FootballSim.Batch -- --write-keeper-replays out/keeper-replays` |
 | Print the keeper's state tick by tick for one scripted round | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario tight_angle --trace-keeper 1` |
 | Smoke run: replay through the game scene, no window | `godot-mono --headless --path game -- --replay tests/smoke_replay.json --quit-after-round` |
 | Smoke comparison (game report vs batch report) | `game/tests/smoke.sh` |
@@ -130,7 +130,8 @@ before the strike (the gamepad's low shot) counts as driven held.
 
 ## The keeper
 
-The keeper's decisions are in `src/FootballSim.Core/KeeperBrain.cs`, his rating-derived numbers and geometry in `Keeper.cs`,
+The keeper's decisions are in `src/FootballSim.Core/KeeperBrain.cs` (standing, closing down and the rush race in
+`KeeperBrain.Standing.cs`, chips in `KeeperBrain.Chip.cs`), his rating-derived numbers and geometry in `Keeper.cs`,
 and every number in the `keeper` section of `data/tuning/default.json`. Each tick he publishes `KeeperAction`, `KeeperDive`
 (set only while Diving), `KeeperActionTime` (0 on the tick the action changes), `Velocity`, `Facing` and `HandPosition`.
 
@@ -141,16 +142,38 @@ and every number in the `keeper` section of `data/tuning/default.json`. Each tic
   near-post side of the ball-to-centre line). A new spot is taken only when the ideal one moves more than
   `reposition_threshold`, with a positioning error drawn then (`position_error`). He side-steps or jogs there with
   rating-based speeds and `move_accel`. Penalties (`keeper_hold_line` in the scenario) keep him on his line until the strike.
-  Once an attacker running at goal is inside `hold_ground_range` of the mouth, a keeper already further out than his arc
-  but within `hold_ground_max_out` (his rush zone) stops backpedalling, so he can still win a race for a long sprint touch;
-  caught further out, he recovers to his arc.
-- **Rush and smother.** Each tick he races for a loose ball: the earliest point on its predicted path he can reach (to within
-  `smother_reach`) before it gets there and before the attacker's next planned touch, with a `rush_margin` (by distance,
-  scaled by rushing_out) and a misjudgement drawn per attacker touch (`rush_misjudge`), only within `rush_max_from_goal`.
-  Movement targets are capped at `move_target_cap`. Within a dive he smothers the ball and holds it if slower than
-  `smother_hold_speed`.
-- **Set.** In the last `plant_lead` seconds of a shot's wind-up (ball within `set_range`) he plants, braking at
-  `plant_decel`. Planted close to the shooter he spreads (`spread_*`), which widens the body the ball can hit.
+- **Close down.** Once an attacker comes at goal with the ball (within `close_down_range` of the mouth, at
+  `close_down_min_speed` or more; from then on for the round) he comes off his arc along the cover line to
+  `close_down_depth` (by the ball's distance from the mouth, its excess over the arc scaled by `close_down_positioning`), so his
+  depth grows as the attacker comes closer. He comes no further than his chip-safe depth as he judges it, no closer than
+  `close_down_gap` to the ball and no further than `hold_ground_max_out` from the mouth; between what he wants and those
+  limits he keeps the depth he has (no backpedalling while the attacker runs at him). Before closing down starts, an attacker
+  on the ball in front of him still makes him keep his depth within those limits rather than drop back to his arc. Moving off
+  or toward his line, he does not turn round for a new spot less than `reverse_threshold` the other way from where his
+  braking would stop him; he settles there instead. With the attacker on the ball within
+  `engage_range` of him and in front, he pushes up to just inside `pre_spread_range` of the ball at rush speed. A reposition
+  back toward goal close to it (inside `urgent_range`: drawn out or taken round) is run, not jogged. Moving away from the ball
+  faster than `backpedal_show_speed` shows as `Backpedal`.
+- **Chip-safe depth.** The furthest he can stand off his line and still recover from a chip struck from the ball's distance:
+  the attacker's chip at the ideal charge for that distance (`ShotModel`, mean backspin, straight at goal) either passes
+  within his leap (`chip_reach_height_fraction` of his height) or he can backpedal (`backpedal_speed` by positioning, from his
+  mean reaction) to within `chip_tip_reach` of where it has dropped to `chip_take_height_fraction` of his height,
+  `chip_leap_lead` before it gets there. From close in an ideal chip cannot rise over him, so the limit only binds from
+  about 13 m out. He judges it with an error drawn once a round (`chip_judge_error`, by positioning).
+- **Rush and smother.** Each tick he races for the ball whenever it is off the attacker's foot (between touches, a long sprint
+  touch or a loose ball): the earliest point on its predicted path he can reach (to within `smother_reach`) before it gets
+  there and before the attacker's next planned touch, with a `rush_margin` (by distance, scaled by rushing_out; none for a
+  ball already within a dive, so he lunges at a ball pushed past him) and a misjudgement drawn per attacker touch
+  (`rush_misjudge`), only within `rush_max_from_goal`. The longer the ball runs ahead of the attacker, the further out he wins
+  it. A race short of the margin by less than `rush_anticipation` (by rushing_out) starts him toward the ball at
+  `anticipate_speed_fraction` of his rush speed; he aborts back to his spot if it turns against him. A close-control dribbler
+  (a touch every step) gives him no such race. Movement targets are capped at `move_target_cap`. Within a dive he smothers the
+  ball and holds it if slower than `smother_hold_speed`.
+- **Stay big.** Within `pre_spread_range` of an attacker on the ball in front of him that he cannot beat to it, he stops and
+  spreads (`Spread`); once the ball is level with him or past, he goes back to covering the goal (and recovers toward it).
+- **Set.** In the last `plant_lead` seconds of a shot's wind-up (ball within `set_range`; earlier if he needs longer to brake
+  to a stop) he plants, braking at `plant_decel`, so he stops advancing. Planted (or spread) close to the shooter he spreads
+  (`spread_*`), which widens the body the ball can hit; within `pre_spread_range` it shows as `Spread`.
 - **Set stance.** Still at the strike, he holds his hands `hand_span` out to each side at `hand_span_height_fraction` of his
   height: a ball reaching them before he reacts is stopped, and his reach grows from the span rather than from zero.
 - **React and save.** From the contact he reacts after a reflexes-based delay (`reaction`, `reaction_noise`), plus
@@ -162,13 +185,27 @@ and every number in the `keeper` section of `data/tuning/default.json`. Each tic
   tips over the bar (above `tip_over_bar_height` of the goal height within `tip_over_bar_distance` of his line) or, at the
   outer `fingertip_zone_fraction` of his stretch, fingertips it (`fingertip_speed_kept`, bent away from goal by up to
   `fingertip_max_bend_deg`; it can still go in).
+- **Chips.** After his reaction he reads the struck ball's flight (never the shot type): on target and passing over him above
+  his leap, he backpedals (`Backpedal`) facing back up the pitch, to the first point on its path where it has dropped to his
+  take height that he can reach in time (else to where it crosses the line), and leaps for it once his reach gets there in
+  time: a backward leap (`KeeperDive.Back`: springing up and back, arms over his head toward the ball, falling back toward his
+  goal) that tips it over the bar or, below `backpedal_catch_factor` of his diving catch speed, catches it. No dive target is
+  above his leap.
 - **Recover.** After a dive or smother he lies for `grounded_seconds`, then gets up in `get_up_seconds`; a new save can start
   `get_up_save_after` into getting up.
 
 The batch tool prints, under the scoring table, the keeper's distance off his line and the ball's distance from goal at the
 strike (mean, p10, p90), what became of parried first shots, the share of rounds with a rush or a
-smother before the shot, how often he was planted at the strike, his mean reaction, and the saves and dives he made. A first
-shot touched by the keeper that carries on into the net counts as scored.
+smother before the shot, how often he was planted at the strike, his mean reaction, and the saves and dives he made; then his
+mean depth off his line as the attacker on the ball first came within 20, 15, 10 and 6 m of the goal centre, the rounds he won
+the ball from a dribble (touched it before any shot), the rounds he was taken round, how often his movement off or toward
+his line changed direction before the shot (above 0.3 m/s held 0.1 s; mean, p95 and max, over the round and its first 2 s),
+and the chips tried, scored and tipped over. `--counters off` makes the scripted attacker ignore the keeper. A first shot touched by the keeper that carries on into the net counts as scored.
+
+The scripted attacker (batch and tests) reacts to the keeper as a player would see him: jogging touches once he is within 9 m
+of the ball and close control within 6 m, taking round a keeper rushing out at it within 5 m (holding the shot until past
+him), and, with a chance that grows with composure, chipping a keeper standing further off his line than his chip-safe depth
+(plus 0.5 m) from within 25 m.
 
 Player, tuning and scenario files are re-read every time a round is set up, so editing a JSON file in `data/` shows up next round.
 A file that fails to load keeps its last good version and the HUD warning line names the file and field.

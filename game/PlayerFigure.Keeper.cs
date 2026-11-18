@@ -6,7 +6,7 @@ using KDive = FootballSim.Core.KeeperDive;
 namespace FootballSim.Game;
 
 /// <summary>
-/// The keeper's poses (Phase D). Every state is a blend of up to three poses: the standing pose S (Set, Shuffle, Planted, Reacting, Holding on his feet,
+/// The keeper's poses (Phase D). Every state is a blend of up to three poses: the standing pose S (Set, Shuffle, Backpedal, Spread, Planted, Reacting, Holding on his feet,
 /// and the end of a get-up), the dive pose D (every dive kind, the smother, lying on the ground and the start of a get-up) and, while rushing, the
 /// outfield run cycle R. The weights move smoothly, so a change of state never snaps a pose. The simulation's values decide what is drawn; nothing
 /// here decides any timing except the figure's own smoothing.
@@ -49,10 +49,16 @@ public partial class PlayerFigure
     {
         switch (act)
         {
-            case KAct.Shuffle: legFrac = 0.82f; hw = 2.5f; lean = 0.20f; hf = 0.29f; hd = -0.10f; hs = 0.11f; break;
-            case KAct.Planted: legFrac = 0.78f; hw = 3.0f; lean = 0.27f; hf = 0.33f; hd = -0.08f; hs = 0.15f; break;
-            case KAct.Reacting: legFrac = 0.73f; hw = 3.2f; lean = 0.35f; hf = 0.34f; hd = -0.05f; hs = 0.17f; break;
+            // ready hands like the set stance: low and forward at about the waist, a little higher when the shot is coming,
+            // never up at the chest
+            case KAct.Shuffle: legFrac = 0.82f; hw = 2.5f; lean = 0.20f; hf = 0.22f; hd = -0.19f; hs = 0.10f; break;
+            case KAct.Planted: legFrac = 0.78f; hw = 3.0f; lean = 0.27f; hf = 0.21f; hd = -0.17f; hs = 0.11f; break;
+            case KAct.Reacting: legFrac = 0.73f; hw = 3.2f; lean = 0.35f; hf = 0.21f; hd = -0.16f; hs = 0.12f; break;
             case KAct.Holding: legFrac = 0.94f; hw = 2.4f; lean = 0.05f; hf = 0.30f; hd = -0.12f; hs = 0.05f; break;
+            // moving back toward his goal facing the play: taller, weight a little back, hands up in front ready to spring
+            case KAct.Backpedal: legFrac = 0.84f; hw = 2.2f; lean = 0.08f; hf = 0.22f; hd = -0.16f; hs = 0.12f; break;
+            // stopped close to the attacker, made big: low and wide, arms out and down to the sides to fill the gaps beside him
+            case KAct.Spread: legFrac = 0.70f; hw = 4.4f; lean = 0.30f; hf = 0.10f; hd = -0.30f; hs = 0.40f; break;
             default: legFrac = 0.82f; hw = 2.5f; lean = 0.15f; hf = 0.25f; hd = -0.20f; hs = 0.10f; break;
         }
     }
@@ -133,10 +139,10 @@ public partial class PlayerFigure
         {
             _dSmother = act == KAct.Smother;
             _dKind = act == KAct.Smother ? KDive.Low : dive == KDive.None ? KDive.Side : dive;
-            _ground = _dKind is KDive.Low or KDive.Side or KDive.High;
+            _ground = _dKind is KDive.Low or KDive.Side or KDive.High or KDive.Back;
         }
         else if (act == KAct.Grounded) _ground = true;
-        else if (act is KAct.Set or KAct.Shuffle or KAct.Planted or KAct.Reacting or KAct.Rush) _ground = false;
+        else if (act is KAct.Set or KAct.Shuffle or KAct.Planted or KAct.Reacting or KAct.Rush or KAct.Backpedal or KAct.Spread) _ground = false;
         else if (act == KAct.GettingUp && getUp >= 1f) _ground = false;
 
         float target, tau;
@@ -272,6 +278,8 @@ public partial class PlayerFigure
         {
             case KDive.Side: minT = 55f * Deg; maxT = 80f * Deg; maxOff = 2.4f; break;
             case KDive.High: minT = 20f * Deg; maxT = 62f * Deg; maxOff = 1.8f; break;
+            // a backward leap: the body tips back toward the ball behind and above him, extended, never past flat
+            case KDive.Back: minT = 30f * Deg; maxT = 72f * Deg; maxOff = 1.4f; break;
             case KDive.Feet: minT = 10f * Deg; maxT = 24f * Deg; maxOff = 0.3f; break;
             case KDive.Catch: minT = 6f * Deg; maxT = 16f * Deg; maxOff = 0.3f; break;
             default: minT = 70f * Deg; maxT = 86f * Deg; maxOff = 2.4f; break;
@@ -281,6 +289,14 @@ public partial class PlayerFigure
         Vector3 horiz = new(d.X, 0, d.Z);
         float hl = horiz.Length();
         Vector3 dirT = hl > 0.08f ? horiz / hl : _dDir;
+        // the backward leap always tips him back, away from the way he faces (toward his goal), whatever the hands do at first
+        if (kind == KDive.Back && !lie)
+        {
+            dirT = hl > 0.08f && (horiz / hl).Dot(-fwd) > 0.2f ? horiz / hl : -fwd;
+            // starting from the stance (directions along his front), turn them round at once rather than through zero
+            if (_dDir.Dot(fwd) > 0f) _dDir = -fwd;
+            if (_dTiltDir.Dot(fwd) > 0f) _dTiltDir = -fwd;
+        }
         float tiltT = lie ? 86f * Deg : Mathf.Clamp(Mathf.Atan2(hl, d.Y), minT, maxT);
         // getting up: he rolls from lying onto his front, pushes up onto his knees and rises with the chest forward, so the tilt turns toward his
         // own facing (never sideways) while it eases from flat to the stance's lean
@@ -326,6 +342,8 @@ public partial class PlayerFigure
         {
             case KDive.Side: pelT = 0.50f * H * cos + k * (0.07f * lift + 0.28f * sin); break;
             case KDive.High: pelT = 0.42f * H * cos + k * (0.30f * lift + 0.22f * sin); break;
+            // springing up and back: the hips rise off the ground with the leap, the legs hang straight below them
+            case KDive.Back: pelT = 0.50f * H * cos + k * (0.42f * lift + 0.30f * sin); break;
             case KDive.Feet: pelT = AnkleH + Leg * 0.52f; break;
             case KDive.Catch: pelT = AnkleH + Leg * 0.80f; break;
             default: pelT = 0.50f * H * cos + k * (0.05f * lift + 0.10f * sin); break;
@@ -364,6 +382,12 @@ public partial class PlayerFigure
             Vector3 hip = pel + B * new Vector3(0, -0.01f * H, side * HipW);
             Vector3 at;
             if (kind == KDive.Catch && !lie) at = S.Ank[i];
+            else if (kind == KDive.Back && !lie)
+            {
+                // legs extended in line with the arched body, one trailing a little, feet off the ground
+                at = hip - bodyUp * (Leg * 0.97f) + bodyRight * side * 0.05f * H + B.X * (side * 0.06f * H);
+                at.Y = Math.Max(at.Y, AnkleH);
+            }
             else if (kind == KDive.Feet && !lie)
             {
                 at = new Vector3(pos.X, AnkleH, pos.Z) + right * side * (0.60f * k) + fwd * (0.15f * k);
@@ -385,6 +409,16 @@ public partial class PlayerFigure
                 : (B.X * (1f - flatLeg) + Vector3.Up * (1.2f * flatLeg)).Normalized();
             SolveLeg(hip, _dAnk[i], kneePole, out knee[i], out ank[i]);
             Vector3 ht = hand + bodyRight * side * 0.07f * H;
+            if (kind == KDive.Back && !lie)
+            {
+                // the arms go up over his head and back with the leap at once; the hands follow the simulation's once those are
+                // further up and back than that
+                Vector3 overhead = pel + B * new Vector3(0, shoulderUp + 0.9f * armLen, side * ShoulderW * 0.7f);
+                Vector3 shC = pel + B * new Vector3(0, shoulderUp, 0);
+                if ((ht - shC).Dot(bodyUp) < 0.8f * armLen) ht = overhead;
+                // one arm leads at the ball; the other follows a little lower and short of it
+                if (i == 0) ht += (Vector3.Down * 0.12f - _dTiltDir * 0.08f) * H;
+            }
             if (getting)
             {
                 // hands on the ground under the shoulders (a little ahead), coming up to the thighs as he reaches his knees

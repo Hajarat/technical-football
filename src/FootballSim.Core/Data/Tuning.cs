@@ -577,12 +577,58 @@ public sealed class KeeperTuning
     public float RushMaxFromGoal { get; set; } = 15f;
     /// <summary>Each movement decision moves toward a point at most this far away, metres (GOALS 3.5).</summary>
     public float MoveTargetCap { get; set; } = 3.5f;
-    /// <summary>One-on-one: once the attacker is on the ball within this shooting range of the goal mouth, metres...</summary>
-    public float HoldGroundRange { get; set; } = 20f;
-    /// <summary>...running at goal at least this fast, m/s, a keeper further out than his arc spot stops backpedalling...</summary>
-    public float HoldGroundMinSpeed { get; set; } = 3f;
-    /// <summary>...if he is no further than this from the goal mouth, metres (further out, he still recovers to his arc).</summary>
+    /// <summary>Closing down never takes him (or holds him) further than this from the goal mouth, metres.</summary>
     public float HoldGroundMaxOut { get; set; } = 8.5f;
+    /// <summary>Seconds of slack in a rush race inside which he starts toward the ball before he is sure (anticipation), by rushing_out.</summary>
+    public RatingRange RushAnticipation { get; set; } = new(0.0f, 0.25f);
+    /// <summary>Anticipating a rush, he moves toward the ball at this fraction of his rush speed.</summary>
+    public float AnticipateSpeedFraction { get; set; } = 0.75f;
+
+    // ---- closing down ----
+    /// <summary>
+    /// Closing down: how far out from the goal mouth he comes, metres, by the ball's distance from the mouth, once an attacker
+    /// comes in with the ball (scaled by <see cref="CloseDownPositioning"/>; never shallower than his arc).
+    /// </summary>
+    public Curve CloseDownDepth { get; set; } = new((8f, 5.0f), (12f, 4.6f), (16f, 3.6f), (20f, 2.6f), (25f, 1.7f), (30f, 1.2f));
+    /// <summary>Multiplier on <see cref="CloseDownDepth"/> beyond the arc by positioning: a poorly positioned keeper comes out less.</summary>
+    public RatingRange CloseDownPositioning { get; set; } = new(0.6f, 1.0f);
+    /// <summary>He starts closing down once the ball is within this distance of the goal mouth...</summary>
+    public float CloseDownRange { get; set; } = 30f;
+    /// <summary>...and the attacker comes at goal with it at least this fast, m/s (from then on he keeps closing down this round).</summary>
+    public float CloseDownMinSpeed { get; set; } = 3f;
+    /// <summary>Closing down (not committing), he stays at least this far short of the ball along the cover line, metres.</summary>
+    public float CloseDownGap { get; set; } = 3.0f;
+    /// <summary>A reposition longer than <see cref="JogThreshold"/> is run at rush speed once the ball is this close to the mouth, metres.</summary>
+    public float UrgentRange { get; set; } = 12f;
+    /// <summary>Moving off or toward his line, he turns round only for a new spot at least this much the other way from where he would stop, metres.</summary>
+    public float ReverseThreshold { get; set; } = 1.0f;
+    /// <summary>Moving away from the ball faster than this, he is shown backpedalling, m/s.</summary>
+    public float BackpedalShowSpeed { get; set; } = 1.0f;
+
+    // ---- chips ----
+    /// <summary>Backpedalling speed (facing the ball), m/s, by positioning.</summary>
+    public RatingRange BackpedalSpeed { get; set; } = new(3.5f, 5.0f);
+    /// <summary>The highest ball he can get a hand to with a standing leap, as a fraction of his height (a chip above it is over him).</summary>
+    public float ChipReachHeightFraction { get; set; } = 1.45f;
+    /// <summary>Recovering from a chip, he heads for where it has dropped to this fraction of his height, to leap at it there...</summary>
+    public float ChipTakeHeightFraction { get; set; } = 1.25f;
+    /// <summary>...needing to get within this distance of that point...</summary>
+    public float ChipTipReach { get; set; } = 0.3f;
+    /// <summary>...this long before the ball does (the leap's timing), seconds.</summary>
+    public float ChipLeapLead { get; set; } = 0.2f;
+    /// <summary>Standard deviation of his error judging his chip-safe depth, as a fraction of it, by positioning (drawn once a round).</summary>
+    public RatingRange ChipJudgeError { get; set; } = new(0.30f, 0.05f);
+    /// <summary>A ball met in a backward leap after backpedalling is held only below this fraction of his diving catch speed.</summary>
+    public float BackpedalCatchFactor { get; set; } = 0.4f;
+
+    // ---- staying big ----
+    /// <summary>Within this distance of an attacker on the ball that he cannot beat to it, he stops and spreads (makes himself big), metres.</summary>
+    public float PreSpreadRange { get; set; } = 3.5f;
+    /// <summary>
+    /// Closing down an attacker on the ball who is within this distance of him and in front, he pushes up to him (at rush speed,
+    /// to the spread range) instead of keeping <see cref="CloseDownGap"/>, metres.
+    /// </summary>
+    public float EngageRange { get; set; } = 7f;
     /// <summary>Seconds to commit to a rush from standing (added to the race time when not already rushing).</summary>
     public float RushStartDelay { get; set; } = 0.15f;
     /// <summary>The keeper rushes or claims only a ball whose centre is below this height, metres.</summary>

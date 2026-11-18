@@ -3,15 +3,20 @@ using FootballSim.Core;
 
 /// <summary>
 /// Keeper tools for the batch runner: a per-tick trace of the keeper for one scripted round, and a set of replays, one per visible
-/// keeper action, found by searching scripted rounds over seeds, for game screenshots.
+/// keeper action (and per closing-down, long-touch, chip and rounding situation), found by searching scripted rounds over seeds,
+/// for game screenshots.
 /// </summary>
 static class KeeperReplays
 {
     /// <summary>One wanted replay: its file stem, and a test over the round's per-tick keeper record that finds the tick range.</summary>
-    sealed record Want(string Name, string Shows, Func<List<Frame>, (int From, int To)?> Find, string[]? Prefer = null);
+    sealed record Want(string Name, string Shows, Func<List<Frame>, (int From, int To)?> Find, string[]? Prefer = null, int Seeds = 0);
 
-    /// <summary>The keeper's visible state after one tick.</summary>
-    readonly record struct Frame(int Tick, KeeperAction Action, KeeperDive Dive, SaveKind Save);
+    /// <summary>
+    /// The keeper's visible state after one tick, with his depth off his line, whether the first shot (if struck) is a chip, whether
+    /// he has won the ball from a dribble and whether he has been taken round.
+    /// </summary>
+    readonly record struct Frame(int Tick, KeeperAction Action, KeeperDive Dive, SaveKind Save, float Depth = 0f, bool Struck = false,
+        bool Chip = false, bool Won = false, bool Rounded = false);
 
     static readonly string[] SearchScenarios = { "penalty", "edge_of_box", "tight_angle", "breakaway", "angled_run", "keeper_rush", "halfway_run" };
 
@@ -59,6 +64,43 @@ static class KeeperReplays
         new("keeper-dive-catch", "Diving, Catch: a standing catch at the body", f => Dive(f, KeeperDive.Catch)),
         new("keeper-smother", "Smother: diving at the ball at the attacker's feet", f => First(f, x => x.Action == KeeperAction.Smother),
             new[] { "keeper_rush" }),
+        new("keeper-close-down", "Closing down: coming off his line as the attacker runs in, to the strike", f =>
+        {
+            // From the first tick to the last one before the strike, when he came at least 2.5 m further out over it.
+            int strike = f.FindIndex(x => x.Struck);
+            if (strike < 1) return null;
+            return f[strike - 1].Depth - f[0].Depth >= 2.5f ? (f[0].Tick, f[strike - 1].Tick) : null;
+        }, new[] { "halfway_run" }),
+        new("keeper-spread", "Spread: stopped close to the attacker on the ball, made big", f => First(f, x => x.Action == KeeperAction.Spread, 12),
+            new[] { "keeper_rush", "halfway_run" }),
+        new("keeper-wins-long-touch", "Rush then Smother: winning a long sprint touch before the attacker gets back to it", f =>
+        {
+            int w = f.FindIndex(x => x.Won && !x.Struck);
+            if (w < 0) return null;
+            int start = w;
+            while (start > 0 && f[start - 1].Action is KeeperAction.Rush or KeeperAction.Smother) start--;
+            return f[start].Action is KeeperAction.Rush or KeeperAction.Smother ? (f[start].Tick, f[Math.Min(f.Count - 1, w + 30)].Tick) : null;
+        }, new[] { "keeper_rush" }),
+        new("keeper-backpedal-chip", "Backpedal under a chip over him, then the leap", f =>
+        {
+            int strike = f.FindIndex(x => x.Struck);
+            if (strike < 0 || !f[strike].Chip) return null;
+            // Under the first shot, a chip: he backpedals within its flight.
+            var r = Runs(f, x => x.Action == KeeperAction.Backpedal).Where(x => x.From >= f[strike].Tick && x.From <= f[strike].Tick + 60 && x.To - x.From >= 12)
+                .Select(x => ((int, int)?)x).FirstOrDefault();
+            if (r is not (int from, int to)) return null;
+            int i = f.FindIndex(x => x.Tick == to);
+            int end = i;
+            while (end + 1 < f.Count && f[end + 1].Action == KeeperAction.Diving) end++;
+            return (from, f[end].Tick);
+        }, new[] { "keeper_rush", "breakaway" }),
+        new("keeper-dive-back", "Diving, Back: the backward leap at the end of a backpedal under a chip", f => Dive(f, KeeperDive.Back),
+            new[] { "keeper_rush" }),
+        new("keeper-rounded", "Taken round: the attacker gets the ball past him", f =>
+        {
+            int i = f.FindIndex(x => x.Rounded);
+            return i < 0 ? null : (f[Math.Max(0, i - 60)].Tick, f[Math.Min(f.Count - 1, i + 60)].Tick);
+        }, new[] { "keeper_rush", "halfway_run" }, Seeds: 3000),
         new("keeper-parry-grounded-getting-up", "A diving parry, then Grounded, then GettingUp", f =>
         {
             int i = f.FindIndex(x => x.Action == KeeperAction.Diving && x.Save == SaveKind.Parry);
@@ -93,7 +135,8 @@ static class KeeperReplays
             {
                 var sc = DataLoader.LoadScenario(Path.Combine(dataDir, "scenarios", id + ".json")).Value;
                 if (sc == null) continue;
-                for (ulong seed = 1; seed <= (ulong)maxSeeds && !found; seed++)
+                int seeds = want.Seeds > 0 ? want.Seeds : maxSeeds;
+                for (ulong seed = 1; seed <= (ulong)seeds && !found; seed++)
                 {
                     if (!played.TryGetValue((id, seed), out var round)) played[(id, seed)] = round = Play(tuning, sc, attacker, keeper, seed);
                     if (want.Find(round.Item1) is not (int from, int to)) continue;
@@ -104,7 +147,7 @@ static class KeeperReplays
                 }
                 if (found) break;
             }
-            if (!found) Console.WriteLine($"not found in {maxSeeds} seeds per scenario: {want.Name} ({want.Shows})");
+            if (!found) Console.WriteLine($"not found in {(want.Seeds > 0 ? want.Seeds : maxSeeds)} seeds per scenario: {want.Name} ({want.Shows})");
         }
         return 0;
     }
@@ -124,7 +167,9 @@ static class KeeperReplays
             buf[0] = script.Next(world);
             world.Step(buf);
             var k = world.Keeper;
-            frames.Add(new Frame(world.Tick, k.KeeperAction, k.KeeperDive, world.KeeperReport.Save));
+            var r = world.KeeperReport;
+            frames.Add(new Frame(world.Tick, k.KeeperAction, k.KeeperDive, r.Save, world.Pitch.GoalLineX - k.Position.X, world.Shots.Count > 0,
+                world.Shots.Count > 0 && world.Shots[0].Type == ShotType.Chip, r.WonBall, r.Rounded));
         }
         return (frames, rec.Replay);
     }
