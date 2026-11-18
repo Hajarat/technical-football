@@ -186,6 +186,11 @@ public sealed class BallAction
     internal TouchMode PlanMode;
     /// <summary>The steering correction applied on the latest tick, m/s.</summary>
     internal Vector2 Steer;
+    /// <summary>
+    /// An early turn touch played from further off (turn_reach): the player is stepped toward the ball with the turn's larger,
+    /// quicker steering (turn_steer_max, turn_steer_accel), a plant step rather than a stretched leg.
+    /// </summary>
+    internal bool TurnStep;
     // Skill move state (HoldDirection is the running direction the move started on).
     /// <summary>Running speed along that direction when the move started, m/s.</summary>
     internal float SkillEntry;

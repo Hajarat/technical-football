@@ -221,8 +221,9 @@ public class SkillMoveTests
             // Released after the gesture so the planner does not run off once the move ends.
             buf[0] = i < 0 ? Run(Entry.Jog, tick) : Drag(i, default);
             w.Step(buf);
-            if (w.Events.Any(e => e.Kind == EventKind.SkillMove)) { playerStart = p.Position; end = p.SkillMove!.EndTick; }
-            if (p.SkillMove is { } dm && w.Tick == dm.ContactTick) ballStart = dm.ContactPoint;
+            if (w.Events.Any(e => e.Kind == EventKind.SkillMove)) end = p.SkillMove!.EndTick;
+            // measured from the sole's landing (the reach before it runs on with the ball)
+            if (p.SkillMove is { } dm && w.Tick == dm.ContactTick) { ballStart = dm.ContactPoint; playerStart = p.Position; }
         }
         Assert.True(end > 0);
         Assert.InRange(playerStart.X - p.Position.X, 0.1f, 0.6f);    // stepped back about 0.3 m

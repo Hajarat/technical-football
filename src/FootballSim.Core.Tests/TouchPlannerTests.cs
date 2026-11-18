@@ -277,7 +277,9 @@ public class TouchPlannerTests
                 if (p.SkillMove == null) max = MathF.Max(max, (p.SteerVelocity - prev).Length());
                 prev = p.SteerVelocity;
             }
-            Assert.True(max <= w.Tuning.Touch.SteerAccel * w.Tuning.Dt * 1.001f + 1e-5f, $"seed {seed}: steering changed by {max:F3} m/s in a tick");
+            // a turn step's correction changes at turn_steer_accel, any other at steer_accel
+            float limit = MathF.Max(w.Tuning.Touch.SteerAccel, w.Tuning.Touch.TurnSteerAccel) * w.Tuning.Dt;
+            Assert.True(max <= limit * 1.001f + 1e-5f, $"seed {seed}: steering changed by {max:F3} m/s in a tick");
             Assert.True(p.InPossession);
         }
     }
@@ -316,6 +318,29 @@ public class TouchPlannerTests
         // close-control touches (a foot-to-foot touch on every step sends the ball across by more than the execution angle: a turn)
         Assert.All(kinds, k => Assert.True(k is ActionKind.Close or ActionKind.Turn, k.ToString()));
         Assert.True(w.Attacker.InPossession);
+    }
+
+    [Fact]
+    public void AJogTurnOfNinetyDegreesIsPlayedOnTheNextReachableSwing()
+    {
+        var times = new List<float>();
+        for (ulong seed = 1; seed <= 20; seed++)
+        {
+            var w = Lab(seed);
+            var p = w.Attacker;
+            int pre = 360 + (int)(seed % 10) * 8;   // the turn at every point of the cadence
+            for (int i = 0; i < pre; i++) Step(w, Jog);
+            float t90 = float.NaN;
+            for (int i = 1; i <= 180 && float.IsNaN(t90); i++)
+            {
+                Step(w, Toward(90f));
+                if (MathF.Abs(WrapDeg(Deg(MathF.Atan2(p.Velocity.Z, p.Velocity.X)) - 90f)) <= 9f) t90 = i * w.Tuning.Dt;
+            }
+            Assert.True(p.InPossession, $"seed {seed}: possession lost");
+            times.Add(float.IsNaN(t90) ? 9f : t90);
+        }
+        times.Sort();
+        Assert.True(times[times.Count / 2] <= 0.5f, $"median {times[times.Count / 2]:F2} s to 90% of the turn");
     }
 
     [Fact]

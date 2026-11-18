@@ -150,8 +150,12 @@ public sealed class PlayerState
     internal float SpeedDebt;
     /// <summary>Simulation seconds of the last turn about without the ball (see reverse_turn_deg).</summary>
     internal float ReverseTime = -100f;
+    /// <summary>Until this simulation time the turn rate is at least post_turn_rotation_rate (after a turn or cut touch).</summary>
+    internal float PostTurnUntil = -100f;
     /// <summary>The touch planner's steering correction last tick (world X, Z), m/s: it eases from there (zero during a skill move).</summary>
     internal Vector2 PlannerSteer;
+    /// <summary>True while the planner searches for an early turn touch (the turn's reach and steering apply).</summary>
+    internal bool PlanningTurn;
     internal float TurnRefHeading;
     internal float TurnRefTime;
     /// <summary>Ticks left of a stride-clock lock (0 = free running).</summary>
@@ -245,7 +249,7 @@ public sealed class PlayerState
         Position = o.Position; Velocity = o.Velocity; Facing = o.Facing; HandPosition = o.HandPosition;
         LastTouchTime = o.LastTouchTime; TouchBoostUntil = o.TouchBoostUntil; TouchBoostFactor = o.TouchBoostFactor;
         TouchBoostFrom = o.TouchBoostFrom; KnockOnFrom = o.KnockOnFrom; KnockOnDirection = o.KnockOnDirection;
-        KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PlannerSteer = o.PlannerSteer; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
+        KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PostTurnUntil = o.PostTurnUntil; PlannerSteer = o.PlannerSteer; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction;

@@ -160,6 +160,12 @@ public sealed class MovementTuning
     /// change at the full turn rate). A turn's own angle multiplier on its acceleration, as GOALS' turn acceleration has.
     /// </summary>
     public float TurnEase { get; set; } = 0.05f;
+    /// <summary>
+    /// For post_turn_seconds after a turn or cut touch the turn rate is at least this, degrees per second (GOALS turns at least
+    /// 1080 deg/s after a trap, MinimumPostExecutionRotationRate): the body comes round onto the ball's new line in one step.
+    /// </summary>
+    public float PostTurnRotationRate { get; set; } = 540f;
+    public float PostTurnSeconds { get; set; } = 0.3f;
     public float SharpTurnDeg { get; set; } = 60f;
     public float SharpTurnWindow { get; set; } = 0.2f;
     /// <summary>Fraction of speed lost on a sharp turn (balance rating).</summary>
@@ -313,6 +319,15 @@ public sealed class TouchTuning
     /// rest (at most the contact zone radius), so small misses never move the body.
     /// </summary>
     public float ReachTolerance { get; set; } = 0.08f;
+    /// <summary>
+    /// An early turn touch (the stick turned past the execution angle) may be planned on a swing where the ball is up to this far
+    /// from the foot's contact point, metres, by speed (GOALS' execution radius is 0.6 m): the player steps toward it.
+    /// </summary>
+    public SpeedRange TurnReach { get; set; } = new(0.45f, 0.6f);
+    /// <summary>The steering of such a turn touch: at most this fast, m/s...</summary>
+    public float TurnSteerMax { get; set; } = 1.5f;
+    /// <summary>...changing by at most this, m/s^2 (a plant step).</summary>
+    public float TurnSteerAccel { get; set; } = 15f;
     /// <summary>The steering correction changes by at most this, m/s^2 (0: at once), so it never steps the velocity.</summary>
     public float SteerAccel { get; set; } = 6f;
     /// <summary>With an even steps_per_touch, every this-many-th touch takes one step more so the other foot plays on.</summary>

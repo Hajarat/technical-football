@@ -112,6 +112,7 @@ public static class Movement
                 p.ReverseTime = now;
             }
             float rate = TurnRateDeg(p.Sheet, t) * assist.TurnScale * (1f - m.TurnSpeedPenalty * Math.Clamp(speed / top, 0f, 1f)) * MathF.PI / 180f;
+            if (now < p.PostTurnUntil) rate = MathF.Max(rate, m.PostTurnRotationRate * MathF.PI / 180f);
             float maxTurn = rate * dt;
             // A small heading change eases in (time constant turn_ease) instead of snapping round at the full rate; a large
             // turn runs at the turn rate until it is within rate * turn_ease of the stick.

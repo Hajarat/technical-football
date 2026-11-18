@@ -50,6 +50,14 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   at top speed; a heading change smaller than the rate covers in `turn_ease` (0.05 s) eases in instead of snapping, so the
   small corrections between touches do not jerk the body round.
 - A sharp turn or a cut costs the balance percentage of speed, shed at `balance_deceleration` (12 m/s^2) rather than at once.
+- Turning with the ball: a stick turned past the execution angle plans the turn touch at once on the next swing that can play
+  the ball up to `turn_reach` (0.45 m at rest to 0.6 m at a sprint, after GOALS' 0.6 m execution radius) from the foot, with
+  the body stepped toward it (`turn_steer_max` 1.5 m/s at `turn_steer_accel` 15 m/s^2), not a stretched leg; for
+  `post_turn_seconds` (0.3 s) after a turn or cut touch the body turns at least `post_turn_rotation_rate` (540 deg/s, after
+  GOALS' post-execution rotation rate) onto the ball's new line.
+- Without the ball the turn rate tops out at GOALS' 360 deg/s (`possession.off_ball_turn_bonus` -0.2), and a stick more than
+  `reverse_turn_deg` (135) from the facing above `reverse_min_speed` plants the runner: `reverse_speed_loss` (0.65) of his
+  speed is shed while he turns about.
 - Touches: the stick pushed no further than `walk_max_input` (0.7, GOALS' MaximumInputSizeForWalkTouch) dribbles with
   walking touches, played as close control (a touch every step). A jog touches every two steps, and every
   `foot_switch_every`-th (4th) touch takes one step more so the other foot takes over: an even cadence on both feet.

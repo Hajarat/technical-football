@@ -53,6 +53,8 @@
     },
     "turn_speed_penalty": 0.5,
     "turn_ease": 0.05,
+    "post_turn_rotation_rate": 540,
+    "post_turn_seconds": 0.3,
     "sharp_turn_deg": 60,
     "sharp_turn_window": 0.2,
     "balance_loss": {
@@ -114,6 +116,12 @@
     "steer_max": 0.6,
     "steer_accel": 6,
     "reach_tolerance": 0.08,
+    "turn_reach": {
+      "rest": 0.45,
+      "sprint": 0.6
+    },
+    "turn_steer_max": 1.5,
+    "turn_steer_accel": 15,
     "foot_switch_every": 4,
     "steps_per_touch": {
       "close": 1,
