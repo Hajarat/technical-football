@@ -17,7 +17,28 @@ public sealed class KeeperReport
     /// <summary>Reach minus distance needed: positive means the keeper could get there.</summary>
     public float MarginM { get; set; } = float.NaN;
     public KeeperResult Action { get; set; } = KeeperResult.None;
+    /// <summary>How the ball was played when the keeper met it (None when he did not).</summary>
+    public SaveKind Save { get; set; } = SaveKind.None;
+    /// <summary>The save motion of the dive for this shot (None before he reacted, or for a smother).</summary>
+    public KeeperDive Dive { get; set; } = KeeperDive.None;
+    /// <summary>The keeper's speed at the strike, m/s (NaN before a strike).</summary>
+    public float SpeedAtStrikeMs { get; set; } = float.NaN;
+    /// <summary>The keeper's distance off his goal line at the strike, metres (NaN before a strike).</summary>
+    public float DepthAtStrikeM { get; set; } = float.NaN;
+    /// <summary>The ball's distance from the goal centre at the strike, metres (NaN before a strike).</summary>
+    public float BallDistanceAtStrikeM { get; set; } = float.NaN;
+    /// <summary>True if the shot, flying on unhindered (no keeper, no frame), would cross the goal line inside the goal.</summary>
+    public bool OnTarget { get; set; }
+    /// <summary>True if the keeper was planted (set and still for the shot) at the strike.</summary>
+    public bool PlantedAtStrike { get; set; }
+    /// <summary>True if the keeper rushed out at the ball this round before the first strike.</summary>
+    public bool Rushed { get; set; }
+    /// <summary>True if the keeper went down in a smother this round before the first strike.</summary>
+    public bool Smothered { get; set; }
 }
+
+/// <summary>How the keeper played the ball when he met it.</summary>
+public enum SaveKind { None, Catch, Parry, Block, TipOver, Fingertip, Smother }
 
 /// <summary>The record of one round, available when the state reaches Report.</summary>
 public sealed class RoundReport

@@ -70,9 +70,10 @@ public class ShotModelTests
         var p = Shooter();
         float top = Movement.TopSpeed(p.Sheet, T);
         p.Velocity = new Vector3(top, 0, 0);
-        Assert.Equal(1.5f, Shot(Ctx(p)).Factor("speed"), 3);
+        float slope = T.Shot.SpeedMultiplierSlope;
+        Assert.Equal(1f + slope, Shot(Ctx(p)).Factor("speed"), 3);
         p.Velocity = new Vector3(top / 2, 0, 0);
-        Assert.Equal(1.25f, Shot(Ctx(p)).Factor("speed"), 3);
+        Assert.Equal(1f + slope / 2f, Shot(Ctx(p)).Factor("speed"), 3);
     }
 
     [Fact]

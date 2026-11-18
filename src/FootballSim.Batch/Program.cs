@@ -14,6 +14,8 @@ using FootballSim.Core;
 //   ... --skill-probe [--seeds 50] [--ratings 1,50,99] [--only step_over,...]
 //                                               runs the skill-move probes (scripted right-stick traces) and prints their metrics
 //   ... --write-skill-replays <dir>             writes one replay per skill move (edge_of_box start) for game screenshots
+//   ... --write-keeper-replays <dir>            searches scripted rounds for each visible keeper action and writes one replay each
+//   ... --scenario <id> --trace-keeper <seed>   prints the keeper's state, tick by tick, for one scripted round
 
 return Cli.Run(args);
 
@@ -45,6 +47,7 @@ static class Cli
         if (opts.TryGetValue("replay", out var replayPath)) return RunReplay(replayPath, dataDir, tuning);
         if (opts.ContainsKey("skill-probe")) return SkillProbe.Run(opts, dataDir, tuning);
         if (opts.TryGetValue("write-skill-replays", out var skillDir)) return SkillProbe.WriteReplays(skillDir, dataDir, tuning);
+        if (opts.TryGetValue("write-keeper-replays", out var keeperDir)) return KeeperReplays.WriteReplays(keeperDir, dataDir, tuning);
         if (opts.TryGetValue("probe", out var probe))
         {
             if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble)"); return 2; }
@@ -59,6 +62,9 @@ static class Cli
         var attacker = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", attackerId + ".json")));
         var keeper = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", keeperId + ".json")));
         if (attacker == null || keeper == null) return 1;
+
+        if (opts.TryGetValue("trace-keeper", out var traceSeed))
+            return KeeperReplays.Trace(tuning, sc, attacker, keeper, ulong.Parse(traceSeed, CultureInfo.InvariantCulture));
 
         if (opts.TryGetValue("save-replay", out var savePath))
         {
@@ -94,6 +100,7 @@ static class Cli
                           (field != "" ? $" sweep={(onKeeper ? "keeper." : "attacker.")}{field}" : ""));
         var header = new[] { "value", "n", "scored", "held", "parried", "rebound", "wide", "over", "out", "time_up", "no_shot", "scored_pct", "seconds" };
         var rows = new List<string[]>();
+        var keeperLines = new List<(string Value, KeeperStats Stats)>();
         var total = Stopwatch.StartNew();
         foreach (var v in values)
         {
@@ -104,13 +111,16 @@ static class Cli
                 else { att = attacker.Clone(); att.SetRating(field, val); }
             }
             var counts = new int[Enum.GetValues<ShotEnd>().Length];
+            var stats = new KeeperStats();
             var sw = Stopwatch.StartNew();
             for (int i = 0; i < n; i++)
             {
-                var r = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i);
+                var r = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i, followUp: true);
                 counts[(int)r.End]++;
+                stats.Add(r);
             }
             sw.Stop();
+            keeperLines.Add((v?.ToString() ?? "-", stats));
             int C(ShotEnd e) => counts[(int)e];
             rows.Add(new[]
             {
@@ -124,6 +134,7 @@ static class Cli
         total.Stop();
 
         PrintTable(field == "" ? "-" : field, header, rows);
+        foreach (var (value, st) in keeperLines) st.Print(field == "" ? "" : $"{field}={value}: ");
         Console.WriteLine($"total wall time {total.Elapsed.TotalSeconds:F2} s for {values.Count * n} rounds");
 
         Directory.CreateDirectory(outDir);
@@ -182,5 +193,72 @@ static class Cli
         Console.WriteLine(Line(header.Select((h, i) => i == 0 ? field : h).ToArray()));
         Console.WriteLine(new string('-', widths.Sum() + 2 * (widths.Length - 1)));
         foreach (var r in rows) Console.WriteLine(Line(r));
+    }
+}
+
+/// <summary>
+/// The keeper's side of a batch: what became of parried first shots, how many rounds had a rush or a smother, how often he was
+/// planted at the strike, his mean reaction and his speed at the strike, and the saves and dives he made.
+/// </summary>
+sealed class KeeperStats
+{
+    readonly List<float> _depth = new(), _dist = new();
+    int _onTarget;
+    int _n, _shots, _rush, _smother, _smotherClaim, _planted, _reactN, _parried;
+    double _react, _speed;
+    readonly Dictionary<string, int> _after = new(), _save = new(), _dive = new();
+
+    public void Add(RoundRunner.Result r)
+    {
+        _n++;
+        var k = r.Keeper;
+        if (k.Rushed) _rush++;
+        if (k.Smothered) _smother++;
+        if (r.End == ShotEnd.NoShot && r.Outcome == Outcome.Held && k.Save == SaveKind.Smother) _smotherClaim++;
+        if (r.Shot != null)
+        {
+            _shots++;
+            if (k.PlantedAtStrike) _planted++;
+            if (k.OnTarget) _onTarget++;
+            if (float.IsFinite(k.DepthAtStrikeM)) { _depth.Add(k.DepthAtStrikeM); _dist.Add(k.BallDistanceAtStrikeM); }
+            if (float.IsFinite(k.SpeedAtStrikeMs)) _speed += k.SpeedAtStrikeMs;
+            if (float.IsFinite(k.ReactionS)) { _react += k.ReactionS; _reactN++; }
+            if (k.Save != SaveKind.None) Bump(_save, k.Save.ToString());
+            if (k.Dive != KeeperDive.None) Bump(_dive, k.Dive.ToString());
+        }
+        if (r.End is ShotEnd.Parried or ShotEnd.Rebound)
+        {
+            _parried++;
+            Bump(_after, $"{r.End.ToString().ToLowerInvariant()}->{r.After.Label().ToLowerInvariant()}");
+        }
+    }
+
+    static string Spread(List<float> v)
+    {
+        if (v.Count == 0) return "-";
+        var o = v.OrderBy(x => x).ToArray();
+        var ic = CultureInfo.InvariantCulture;
+        return $"mean {o.Average().ToString("F2", ic)} (p10 {o[(int)(0.1 * (o.Length - 1))].ToString("F2", ic)}, p90 {o[(int)(0.9 * (o.Length - 1))].ToString("F2", ic)})";
+    }
+
+    static void Bump(Dictionary<string, int> d, string key) => d[key] = d.TryGetValue(key, out var c) ? c + 1 : 1;
+
+    string Pct(int c) => (100.0 * c / Math.Max(1, _n)).ToString("F1", CultureInfo.InvariantCulture) + "%";
+    string PctOf(int c, int of) => (100.0 * c / Math.Max(1, of)).ToString("F1", CultureInfo.InvariantCulture) + "%";
+
+    static string List(Dictionary<string, int> d, Func<int, string> f) =>
+        d.Count == 0 ? "-" : string.Join(", ", d.OrderByDescending(e => e.Value).Select(e => $"{e.Key} {f(e.Value)}"));
+
+    public void Print(string prefix)
+    {
+        var ic = CultureInfo.InvariantCulture;
+        Console.WriteLine($"{prefix}keeper: rush {Pct(_rush)} of rounds, smother {Pct(_smother)} (claimed before a shot {Pct(_smotherClaim)}), " +
+                          $"planted at strike {PctOf(_planted, _shots)} of shots, mean reaction {(_react / Math.Max(1, _reactN)).ToString("F3", ic)} s, " +
+                          $"mean speed at strike {(_speed / Math.Max(1, _shots)).ToString("F2", ic)} m/s");
+        Console.WriteLine($"{prefix}shots on target (unhindered flight inside the goal) {PctOf(_onTarget, _shots)} of {_shots} shots");
+        Console.WriteLine($"{prefix}at strike: keeper off his line {Spread(_depth)} m, ball from goal centre {Spread(_dist)} m");
+        Console.WriteLine($"{prefix}after parry/rebound (% of rounds): {List(_after, Pct)}");
+        Console.WriteLine($"{prefix}saves (% of rounds): {List(_save, Pct)}");
+        Console.WriteLine($"{prefix}dives (% of rounds): {List(_dive, Pct)}");
     }
 }

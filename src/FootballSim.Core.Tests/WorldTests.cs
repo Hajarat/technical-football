@@ -76,8 +76,10 @@ public class WorldTests
     public void KeeperStandsOffTheLineOutsidePenalties()
     {
         var w = new World(new Tuning(), TestData.Scenario("edge_of_box"), TestData.Player("striker_a"), TestData.Player("the_wall"), 1);
-        Assert.Equal(w.Pitch.GoalLineX - 1.5f, w.Keeper.Position.X, 3);
+        var arc = Keeper.ArcTarget(w.Ball.Position, w.Pitch, w.Tuning, w.Keeper.Sheet);
+        Assert.Equal(arc.X, w.Keeper.Position.X, 3);
         Assert.Equal(0f, w.Keeper.Position.Z, 3);
+        Assert.InRange(w.Pitch.GoalLineX - w.Keeper.Position.X, w.Tuning.Keeper.ArcMinFromLine, 3f);
     }
 
     [Fact]
@@ -117,13 +119,20 @@ public class WorldTests
     }
 
     [Fact]
-    public void KeeperStaysInsideTheGoalWidthWhileTrackingTheBall()
+    public void KeeperStaysBetweenTheBallAndTheGoalWhileTrackingTheBall()
     {
         var w = TestData.Live("tight_angle");
         w.Ball.Position = new Vector3(24f, 0.11f, 9.5f); // wide, by the chamfer
         var buf = new TickIntent[2];
         for (int i = 0; i < 400; i++) w.Step(buf);
-        Assert.InRange(MathF.Abs(w.Keeper.Position.Z), 0f, w.Pitch.GoalHalfWidth);
+        // Seen from the ball he is inside the angle the posts make (allowing for his positioning error), and goal side of it.
+        var b = new Vector2(w.Ball.Position.X, w.Ball.Position.Z);
+        var k = new Vector2(w.Keeper.Position.X, w.Keeper.Position.Z);
+        float A(float z) => MathF.Atan2(z - b.Y, w.Pitch.GoalLineX - b.X);
+        float ak = MathF.Atan2(k.Y - b.Y, k.X - b.X);
+        float slack = 0.1f;
+        Assert.InRange(ak, A(-w.Pitch.GoalHalfWidth) - slack, A(w.Pitch.GoalHalfWidth) + slack);
+        Assert.True(k.X > b.X && k.X < w.Pitch.GoalLineX);
     }
 
     [Fact]

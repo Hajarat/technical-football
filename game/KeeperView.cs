@@ -2,9 +2,12 @@ using Godot;
 
 namespace FootballSim.Game;
 
-/// <summary>Goalkeeper: the same jointed figure in contrasting kit with larger gloves, in set stance, diving or holding.</summary>
+/// <summary>Goalkeeper: the same jointed figure in contrasting kit with larger gloves, in every state of the keeper contract (stance, shuffle, rush, dives, smother, holding, lying, getting up); the poses are in PlayerFigure.Keeper.cs.</summary>
 public partial class KeeperView : Node3D
 {
+    /// <summary>How long the get-up takes: the figure rises from lying to the set stance over this many seconds (the core's default get-up time).</summary>
+    public const float GetUpSeconds = 1.0f;
+
     readonly PlayerFigure _figure = new() { Name = "Figure", IsKeeper = true };
 
     public PlayerFigure Figure => _figure;
@@ -21,7 +24,7 @@ public partial class KeeperView : Node3D
     public void Apply(Vector3 position, float facing, Vector3? handPosition = null)
     {
         var f = FigureFrame.At(position, facing);
-        if (handPosition is Vector3 h) { f.Diving = true; f.HandPosition = h; }
+        if (handPosition is Vector3 h) { f.KeeperAction = FootballSim.Core.KeeperAction.Diving; f.KeeperDive = FootballSim.Core.KeeperDive.Side; f.HandPosition = h; }
         Apply(f);
     }
 

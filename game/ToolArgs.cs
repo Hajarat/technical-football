@@ -16,6 +16,8 @@ public sealed class ToolArgs
     public int BurstStart, BurstCount, BurstStep = 1;
     public string? DataDir;
     public string? ReplayPath;
+    /// <summary>--keeper-gallery &lt;dir&gt;: play every keeper state from a script (no simulation) and write screenshots there.</summary>
+    public string? GalleryDir;
     public bool Background;
     /// <summary>"skinned" (rigged human models, the default) or "procedural" (primitive meshes).</summary>
     public string Figure = "skinned";
@@ -39,6 +41,7 @@ public sealed class ToolArgs
                 case "--close-keeper": a.CloseCam = true; a.CloseKeeper = true; break;
                 case "--data": a.DataDir = Next(); break;
                 case "--replay": a.ReplayPath = Next(); break;
+                case "--keeper-gallery": a.GalleryDir = Next(); break;
                 case "--figure":
                     a.Figure = (Next() ?? "").ToLowerInvariant();
                     if (a.Figure != "skinned" && a.Figure != "procedural") { GD.PushWarning($"--figure expects skinned or procedural, got '{a.Figure}'; using skinned"); a.Figure = "skinned"; }
@@ -58,6 +61,11 @@ public sealed class ToolArgs
                     break;
                 default: GD.PushWarning($"Unknown argument {args[i]}"); break;
             }
+        }
+        if (a.GalleryDir != null)
+        {
+            if (!System.IO.Path.IsPathRooted(a.GalleryDir)) a.GalleryDir = System.IO.Path.Combine(ProjectSettings.GlobalizePath("res://"), a.GalleryDir);
+            DirAccess.MakeDirRecursiveAbsolute(a.GalleryDir);
         }
         if (a.ShotDir != null)
         {

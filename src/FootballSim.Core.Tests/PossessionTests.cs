@@ -401,9 +401,10 @@ public class PossessionTests
     [Fact]
     public void AStrikeEndsPossessionAndAHeldBallIsTheKeepers()
     {
+        // The angled run: its shots are often held (breakaway shots are mostly parried since the Phase D keeper).
         for (ulong seed = 1; seed <= 400; seed++)
         {
-            var w = TestData.Live("breakaway", seed: seed);
+            var w = TestData.Live("angled_run", seed: seed);
             var script = new ScriptedAttacker();
             var buf = new TickIntent[w.PlayerCount];
             for (int i = 0; i < 4000 && w.State != RoundState.Report; i++)
@@ -426,6 +427,6 @@ public class PossessionTests
                 }
             }
         }
-        Assert.Fail("no held shot in 400 breakaways");
+        Assert.Fail("no held shot in 400 angled runs");
     }
 }

@@ -35,8 +35,13 @@ public sealed class Scenario
     public StartSpot Ball { get; set; } = new() { X = 41.5f, Z = 0f };
     /// <summary>Where the attacker starts.</summary>
     public StartSpot Attacker { get; set; } = new() { X = 40.9f, Z = 0f, FacingDeg = 0f };
-    /// <summary>True for penalties: the keeper stands on the goal line instead of in front of it.</summary>
+    /// <summary>The keeper starts on his goal line instead of on his arc. He then plays as usual unless <see cref="KeeperHoldLine"/>.</summary>
     public bool KeeperOnLine { get; set; }
+    /// <summary>
+    /// Penalties: the keeper stays on his goal line until the strike (he may shuffle along it, but does not come off it or rush).
+    /// After the strike he plays as usual.
+    /// </summary>
+    public bool KeeperHoldLine { get; set; }
     /// <summary>
     /// Where the keeper starts: this far off his goal line on the line from the ball to the goal centre, metres. Null starts him
     /// on his set spot. He then moves as usual.
