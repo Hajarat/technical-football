@@ -77,7 +77,7 @@ public sealed class KeeperReport
 public enum SaveType { None, Catch, Parry, Reflex, ReflexAttempt, FailedAttempt }
 
 /// <summary>How the keeper played the ball when he met it.</summary>
-public enum SaveKind { None, Catch, Parry, Block, TipOver, Fingertip, Smother }
+public enum SaveKind { None, Catch, Parry, Block, TipOver, Fingertip, Smother, LooseReflex }
 
 /// <summary>The record of one round, available when the state reaches Report.</summary>
 public sealed class RoundReport

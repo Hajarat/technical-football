@@ -264,7 +264,12 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
 - **Contact.** At the hands he holds a ball within his catch range for its speed (`catch_range_standing_min`..`_max` or
   `catch_range_diving_min`..`_max` by handling; at the feet or after backpedalling as for a ball `feet_catch_factor` or
   `backpedal_catch_factor` slower in effect) scaled by `catch_range_time` for the seconds since the strike, and no harder than
-  `catch_max_difficulty`; his body or a smother holds a ball slower than `body_hold_speed` or `smother_hold_speed`. Otherwise
+  `catch_max_difficulty`; his body or a smother holds a ball slower than `body_hold_speed` or `smother_hold_speed`. A reflex
+  limb's touch that is not held can be loose (GOALS' uncontrolled reflex deflections), with a chance of `reflex_loose_edge` by
+  how off-centre the ball meets the limb (0 head-on, 1 a graze) plus `reflex_loose_difficulty` by the save's difficulty, times
+  `reflex_loose_speed` by the ball's speed and `reflex_loose_rating` by the mean of handling and reflexes: the ball keeps
+  `reflex_loose_speed_min`..`_max` of its speed and bends away from the limb by a half to the whole of
+  `reflex_loose_max_bend_deg` (down to `reflex_loose_graze_bend` of it for a graze), so it can still go in. Otherwise
   his body, feet, a smother, a reflex foot or body block, or a ball that meets him before he moves blocks it (a quarter to
   near half the speed, at least `block_speed`); high near his line he tips it over the bar (above `tip_over_bar_height` of the
   goal height within `tip_over_bar_distance` of his line); a dive at least `fingertip_difficulty` hard fingertips it
@@ -283,7 +288,7 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
 The batch tool prints, under the scoring table, the keeper's distance off his line and the ball's distance from goal at the
 strike (mean, p10, p90), what became of parried first shots, the share of rounds with a charge, a rush or a
 smother before the shot, how often he was planted at the strike, his action at the strike (with his speed band), his mean
-reaction, the saves and dives he made, the first shot's save counts (catch, parry, block, tip, fingertip, smother, beaten)
+reaction, the saves and dives he made, the first shot's save counts (catch, parry, block, tip, fingertip, smother, loose reflex, beaten)
 and save types (catch, parry, reflex, reflex attempt, failed attempt, none: met before he moved), with the mean difficulty and
 how often and how ready he was at the strike; then his
 mean depth off his line as the attacker on the ball first came within 20, 15, 10 and 6 m of the goal centre, the rounds he won

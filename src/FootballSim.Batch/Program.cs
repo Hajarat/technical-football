@@ -310,7 +310,7 @@ sealed class KeeperStats
         Console.WriteLine($"{prefix}dives (% of rounds): {List(_dive, Pct)}");
         int S(SaveKind kind) => _saveCount[(int)kind];
         Console.WriteLine($"{prefix}first-shot save counts: catch {S(SaveKind.Catch)}, parry {S(SaveKind.Parry)}, block {S(SaveKind.Block)}, " +
-                          $"tip {S(SaveKind.TipOver)}, fingertip {S(SaveKind.Fingertip)}, smother {S(SaveKind.Smother)}, beaten {_beaten} (of {_shots} shots)");
+                          $"tip {S(SaveKind.TipOver)}, fingertip {S(SaveKind.Fingertip)}, smother {S(SaveKind.Smother)}, loose reflex {S(SaveKind.LooseReflex)}, beaten {_beaten} (of {_shots} shots)");
         int T(SaveType type) => _typeCount[(int)type];
         Console.WriteLine($"{prefix}first-shot save types (what he went for): catch {T(SaveType.Catch)}, parry {T(SaveType.Parry)}, reflex {T(SaveType.Reflex)}, " +
                           $"reflex attempt {T(SaveType.ReflexAttempt)}, failed attempt {T(SaveType.FailedAttempt)}, none {T(SaveType.None)}; " +

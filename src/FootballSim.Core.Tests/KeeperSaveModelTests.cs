@@ -264,6 +264,114 @@ public class KeeperSaveModelTests
         Assert.Equal(SaveKind.Fingertip, brain.Report.Save);
     }
 
+    // ---- the loose reflex touch ----
+
+    [Fact]
+    public void HowOffCentreTheBallMeetsTheLimbIsZeroHeadOnAndOneAtAGraze()
+    {
+        var limb = new Vector3(10f, 1f, 0f);
+        var v = new Vector3(20f, 0f, 0f);
+        float r = T.Keeper.HandRadius + T.Ball.Radius;
+        Assert.Equal(0f, Keeper.ContactEdge(limb - new Vector3(r, 0f, 0f), limb, v, T), 4);
+        Assert.Equal(0.5f, Keeper.ContactEdge(limb + new Vector3(-0.8f * r, 0f, 0.5f * r), limb, v, T), 3);
+        Assert.Equal(1f, Keeper.ContactEdge(limb + new Vector3(0f, r, 0f), limb, v, T), 3);
+    }
+
+    [Fact]
+    public void AReflexTouchIsLooseMoreOftenAtTheLimbsEdgeWhenHarderFasterAndForAWorseKeeper()
+    {
+        var wall = Wall();
+        var poor = Wall(); poor.Handling = 40; poor.Reflexes = 40;
+        // Head-on and easy: never loose.
+        Assert.Equal(0f, Keeper.LooseReflexChance(wall, T, 0.1f, 0.2f, 25f));
+        Assert.Equal(0f, Keeper.LooseReflexChance(poor, T, 0.1f, 0.2f, 30f));
+        float graze = Keeper.LooseReflexChance(wall, T, 0.8f, 0.2f, 22f);
+        Assert.True(graze > 0.05f, $"{graze}");
+        Assert.True(Keeper.LooseReflexChance(wall, T, 0.5f, 0.2f, 22f) < graze);
+        Assert.True(Keeper.LooseReflexChance(wall, T, 0.8f, 0.9f, 22f) > graze);   // harder
+        Assert.True(Keeper.LooseReflexChance(wall, T, 0.8f, 0.2f, 29f) > graze);   // faster
+        Assert.True(Keeper.LooseReflexChance(poor, T, 0.8f, 0.2f, 22f) > graze);   // worse handling and reflexes
+    }
+
+    /// <summary>
+    /// A set keeper 4 m from the shooter, a low shot passing <paramref name="offset"/> metres to his side: what he went for, how
+    /// the touch ended and the ball's speed before and after it, or null if he did not touch it.
+    /// </summary>
+    static (KeeperReport Report, float Before, Vector3 After)? ReflexTouch(PlayerSheet sheet, float offset, ulong seed)
+    {
+        var feet = new Vector3(P.GoalLineX - 2f, 0f, 0f);
+        var ball = new Ball(T.Ball) { Position = new Vector3(feet.X - 4f, 0.5f, 0f) };
+        var keeper = new PlayerState(1, 0, PlayerRole.Keeper, sheet) { Position = feet, Facing = MathF.PI };
+        var brain = new KeeperBrain(keeper, P, T, holdLine: false);
+        var windup = new KeeperSituation
+        {
+            AttackerNextTouch = 0.1f, AttackerTouchTick = 1, Windup = true, StrikeIn = 0.1f, AttackerHasBall = true,
+            AttackerPosition = ball.Position - new Vector3(0.5f, 0f, 0f),
+        };
+        var rng = new SimRng(seed);
+        for (int i = 0; i < 6; i++) brain.Update(T.Dt, ball, rng, windup);
+        keeper.Position = feet;
+        keeper.Velocity = Vector3.Zero;
+        var h = Vector2.Normalize(new Vector2(4f, offset)) * 24f;
+        ball.Velocity = new Vector3(h.X, 0.5f * 9.81f * 4f / 24f, h.Y);
+        ball.Spin = Vector3.Zero;
+        brain.OnStrike(rng, ball);
+        var flying = new KeeperSituation { AttackerNextTouch = float.PositiveInfinity, AttackerTouchTick = -1, StrikeIn = float.PositiveInfinity, ShotInFlight = true };
+        for (int i = 0; i < 240; i++)
+        {
+            brain.Update(T.Dt, ball, rng, flying);
+            var res = ball.Step(T.Dt, null, brain.HandsSphere, brain.BodyCapsule, brain.HandsCapsule);
+            if (res.SphereHit)
+            {
+                float before = ball.Velocity.Length();
+                brain.Contact(ball, res.SpherePoint, rng, out _, res.BodyHit);
+                return (brain.Report, before, ball.Velocity);
+            }
+            if (ball.Position.X > feet.X + 1.5f) return null;
+        }
+        return null;
+    }
+
+    [Fact]
+    public void AReflexTouchAtTheEdgeOfHisReachSometimesLetsTheBallGoOnAndMoreOftenWithWorseHandling()
+    {
+        // Handling only: worse reflexes would also shorten his reach and so change which touches he gets to.
+        var poor = Wall(); poor.Handling = 20;
+        int Loose(PlayerSheet sheet)
+        {
+            int loose = 0;
+            for (ulong seed = 1; seed <= 40; seed++)
+                foreach (float offset in new[] { 0.9f, 1.1f, 1.3f })
+                {
+                    var t = ReflexTouch(sheet, offset, seed);
+                    if (t is not { } r) continue;
+                    Assert.True(r.Report.SaveType is SaveType.Reflex or SaveType.ReflexAttempt, $"{r.Report.SaveType}");
+                    if (r.Report.Save != SaveKind.LooseReflex) continue;
+                    loose++;
+                    // It keeps most of its speed and still goes on toward the goal.
+                    float kept = r.After.Length() / r.Before;
+                    Assert.InRange(kept, T.Keeper.ReflexLooseSpeedMin - 0.01f, T.Keeper.ReflexLooseSpeedMax + 0.01f);
+                    Assert.True(r.After.X > 0f, $"{r.After}");
+                }
+            return loose;
+        }
+        int wall = Loose(Wall()), worse = Loose(poor);
+        Assert.True(wall > 0, "the_wall never let a touch at the edge of his reach go on");
+        Assert.True(worse > wall, $"loose touches: the_wall {wall}, handling 20 {worse}");
+    }
+
+    [Fact]
+    public void AHeadOnTouchOfTheReadyBodyStillBlocks()
+    {
+        for (ulong seed = 1; seed <= 20; seed++)
+        {
+            var t = ReflexTouch(Wall(), 0.05f, seed);
+            Assert.True(t.HasValue, $"seed {seed}");
+            Assert.Equal(SaveKind.Block, t!.Value.Report.Save);
+            Assert.True(t.Value.After.X < 0f, $"seed {seed}: {t.Value.After}");
+        }
+    }
+
     // ---- the covered angle ----
 
     /// <summary>

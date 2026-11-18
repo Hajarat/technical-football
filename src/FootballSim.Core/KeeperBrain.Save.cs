@@ -535,7 +535,8 @@ public sealed partial class KeeperBrain
     /// The ball's path met the hands (or the smothering body, or his standing body) at <paramref name="contact"/>. Held when it
     /// is slow enough for the body or a smother, or, at the hands, within his catch range for its speed and the time he had (a
     /// standing or diving range; at the feet or after backpedalling as for a faster ball) and the save no harder than
-    /// <c>catch_max_difficulty</c>. Otherwise blocked (the body, at the feet, a smother, a reflex foot or body block, or before he
+    /// <c>catch_max_difficulty</c>. A reflex limb's touch can be loose (<see cref="Keeper.LooseReflexChance"/>: off-centre, hard,
+    /// fast, a keeper with worse handling and reflexes), and the ball goes on. Otherwise blocked (the body, at the feet, a smother, a reflex foot or body block, or before he
     /// moved), tipped over the bar (high, near his line), fingertipped (a dive at least <c>fingertip_difficulty</c> hard) or
     /// parried. Returns true if held.
     /// </summary>
@@ -582,6 +583,17 @@ public sealed partial class KeeperBrain
         }
 
         Record(contact, home, KeeperResult.Parried);
+        if (reflex && !body)
+        {
+            float edge = Keeper.ContactEdge(contact, _hands, v, _t);
+            float chance = Keeper.LooseReflexChance(sheet, _t, edge, difficulty, speedAtContact);
+            if (chance > 0f && rng.NextFloat() < chance)
+            {
+                LooseReflex(ball, v, contact, edge, rng);
+                Report.Save = SaveKind.LooseReflex;
+                return false;
+            }
+        }
         if (smother || feet || early || body || reflex && _dive != KeeperDive.ReflexHand)
         {
             Block(ball, v, rng);
@@ -659,6 +671,26 @@ public sealed partial class KeeperBrain
         }
         ball.Velocity = new Vector3(dirH.X * MathF.Cos(phi), MathF.Sin(phi), dirH.Y * MathF.Cos(phi)) * speed;
         ball.Spin = Vector3.Zero;
+    }
+
+    /// <summary>
+    /// A loose reflex touch: the ball keeps <c>reflex_loose_speed_min</c> to <c>reflex_loose_speed_max</c> of its speed and its
+    /// path bends away from the limb, by a half to the whole of <c>reflex_loose_max_bend_deg</c> for a head-on touch, down to
+    /// <c>reflex_loose_graze_bend</c> of that for a graze. It can still go in.
+    /// </summary>
+    void LooseReflex(Ball ball, Vector3 v, Vector3 contact, float edge, SimRng rng)
+    {
+        var k = _t.Keeper;
+        float speed = v.Length();
+        if (speed < 1e-3f) return;
+        Vector3 dir = v / speed;
+        Vector3 off = contact - _hands;
+        Vector3 axis = Vector3.Cross(dir, off - Vector3.Dot(off, dir) * dir);
+        float kept = rng.Uniform(k.ReflexLooseSpeedMin, k.ReflexLooseSpeedMax);
+        float bend = rng.Uniform(0.5f, 1f) * k.ReflexLooseMaxBendDeg * (1f - (1f - k.ReflexLooseGrazeBend) * edge) * MathF.PI / 180f;
+        if (axis.LengthSquared() > 1e-8f) dir = Vector3.Transform(dir, Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), bend));
+        ball.Velocity = dir * speed * kept;
+        ball.Spin *= kept;
     }
 
     /// <summary>

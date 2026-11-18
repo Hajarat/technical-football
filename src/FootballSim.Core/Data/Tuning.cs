@@ -881,6 +881,24 @@ public sealed class KeeperTuning
     public float FingertipSpeedKept { get; set; } = 0.70f;
     /// <summary>...and bends its path away from the goal by up to this much, degrees.</summary>
     public float FingertipMaxBendDeg { get; set; } = 40f;
+    /// <summary>
+    /// The chance a reflex touch is loose (the ball keeps going, bent a little: GOALS' uncontrolled reflex deflections) is the sum of
+    /// this, by how off-centre the ball meets the limb (0 head-on, 1 a graze)...
+    /// </summary>
+    public Curve ReflexLooseEdge { get; set; } = new((0.2f, 0f), (1f, 1.8f));
+    /// <summary>...and this, by the save's difficulty...</summary>
+    public Curve ReflexLooseDifficulty { get; set; } = new((0.3f, 0f), (1f, 0.8f));
+    /// <summary>...times this, by the ball's speed at the touch, m/s...</summary>
+    public Curve ReflexLooseSpeed { get; set; } = new((15f, 0.5f), (25f, 1f), (30f, 1.3f));
+    /// <summary>...and this, by the mean of handling and reflexes.</summary>
+    public RatingRange ReflexLooseRating { get; set; } = new(1.5f, 0.7f);
+    /// <summary>A loose reflex touch keeps between these fractions of the ball's speed...</summary>
+    public float ReflexLooseSpeedMin { get; set; } = 0.65f;
+    public float ReflexLooseSpeedMax { get; set; } = 0.9f;
+    /// <summary>...and bends its path away from the limb by a half to the whole of this for a head-on touch, degrees...</summary>
+    public float ReflexLooseMaxBendDeg { get; set; } = 40f;
+    /// <summary>...and of this fraction of it for a graze.</summary>
+    public float ReflexLooseGrazeBend { get; set; } = 0.5f;
     /// <summary>A dive that has not met the ball ends (the keeper lands) this long after its reach stops growing, seconds...</summary>
     public float DiveLandSeconds { get; set; } = 0.15f;
     /// <summary>...and no later than this after the reaction, seconds. A standing save lasts at least <see cref="StandSaveSeconds"/>.</summary>
