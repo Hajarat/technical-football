@@ -15,7 +15,8 @@ World coordinates are metres: X toward the attacked goal (goal line 52.5), Y up,
 | Re-run a replay in the batch tool | `dotnet run -c Release --project src/FootballSim.Batch -- --replay game/tests/smoke_replay.json` |
 | Skill-move probe (scripted gestures per move, side, entry pace and skill_moves 1/50/99; the not-built elastico, heel-to-heel and spin rows should read recognised 100, made 0) | `dotnet run -c Release --project src/FootballSim.Batch -- --skill-probe` |
 | Write one replay per skill move (edge_of_box start) for screenshots | `dotnet run -c Release --project src/FootballSim.Batch -- --write-skill-replays out/skill-replays` |
-| Write one replay per visible keeper action (shuffle, rush, planted then reacting, each dive kind, tip over the bar, smother, closing down, charging, jockeying, spread, a long sprint touch won, a backpedal under a chip, taken round, parry then grounded then getting up) for screenshots; prints each file with the tick range of its action | `dotnet run -c Release --project src/FootballSim.Batch -- --write-keeper-replays out/keeper-replays` |
+| Write one replay per visible keeper action (shuffle, rush, planted then reacting, each dive kind, tip over the bar, each reflex save, a block by the ready keeper's hull, smother, closing down, charging, jockeying, spread, a long sprint touch won, a backpedal under a chip, taken round, parry then grounded then getting up) for screenshots; prints each file with the tick range of its action | `dotnet run -c Release --project src/FootballSim.Batch -- --write-keeper-replays out/keeper-replays` |
+| Covered-angle table: the angle a set, planted keeper covers by shot distance (2-20 m), speed (20/25/30 m/s) and height | `dotnet test src/FootballSim.Core.Tests --filter KeeperCoverTests --logger "console;verbosity=detailed"` |
 | Print the keeper's state tick by tick for one scripted round | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario tight_angle --trace-keeper 1` |
 | Smoke run: replay through the game scene, no window | `godot-mono --headless --path game -- --replay tests/smoke_replay.json --quit-after-round` |
 | Smoke comparison (game report vs batch report) | `game/tests/smoke.sh` |
@@ -144,8 +145,9 @@ before the strike (the gamepad's low shot) counts as driven held.
 ## The keeper
 
 The keeper's decisions are in `src/FootballSim.Core/KeeperBrain.cs` (standing, closing down and the rush race in
-`KeeperBrain.Standing.cs`, chips in `KeeperBrain.Chip.cs`), his rating-derived numbers and geometry in `Keeper.cs`,
-and every number in the `keeper` section of `data/tuning/default.json`. Each tick he publishes `KeeperAction`, `KeeperDive`
+`KeeperBrain.Standing.cs`, chips in `KeeperBrain.Chip.cs`, the save in `KeeperBrain.Save.cs`), his rating-derived numbers and
+geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number in the `keeper` section of
+`data/tuning/default.json`. Each tick he publishes `KeeperAction`, `KeeperDive`
 (set only while Diving), `KeeperActionTime` (0 on the tick the action changes), `Velocity`, `Facing` and `HandPosition`.
 
 - **Hold the arc.** He stands on the bisector of the angle the posts make at the ball, `arc_radius` plus `arc_depth` (by the
@@ -200,19 +202,45 @@ and every number in the `keeper` section of `data/tuning/default.json`. Each tic
 - **Set.** In the last `plant_lead` seconds of a shot's wind-up (ball within `set_range`; earlier if he needs longer to brake
   to a stop) he plants, braking at `plant_decel`, so he stops advancing. Charging into a wind-up, he keeps coming to block it
   if, braking only in the last `charge_plant_lead` seconds, he would be within `charge_block_distance` of the ball at the
-  strike (he may be caught still moving); otherwise he pulls up at once. Planted (or spread) close to the shooter he spreads
-  (`spread_*`), which widens the body the ball can hit; within `pre_spread_range` it shows as `Spread`.
-- **Set stance.** Still at the strike, he holds his hands `hand_span` out to each side at `hand_span_height_fraction` of his
-  height: a ball reaching them before he reacts is stopped, and his reach grows from the span rather than from zero.
-- **React and save.** From the contact he reacts after a reflexes-based delay (`reaction`, `reaction_noise`), plus
-  `still_moving_reaction_penalty` if he was still moving. He then dives at the first point on the ball's predicted path inside
-  his dive wedge (`wedge_*`) that his reach (`arm_sweep`, `dive_speed`, `stretch`) gets to in time, after a random
-  `save_time_jitter_*` delay; if none, at the point he gets closest to. A ball that will hit his body anyway is blocked
-  standing. He catches below the catch speed (handling; `diving_catch_factor` in a dive) inside `catch_zone_fraction` of his
-  stretch, otherwise parries (40-60% of the speed, at least `min_parry_speed`), blocks at the feet (at least `block_speed`),
-  tips over the bar (above `tip_over_bar_height` of the goal height within `tip_over_bar_distance` of his line) or, at the
-  outer `fingertip_zone_fraction` of his stretch, fingertips it (`fingertip_speed_kept`, bent away from goal by up to
-  `fingertip_max_bend_deg`; it can still go in).
+  strike (he may be caught still moving); otherwise he pulls up at once. Within `pre_spread_range` of the shooter it shows as
+  `Spread` (and stays `Spread`, not `Reacting`, after the strike while he is at least half ready).
+- **Ready stance.** In his stance for the shot at the strike (planted, still braking into it, spread or jockeying) he is ready
+  by his distance from the ball: fully within `ready_full` (GOALS MaxDistanceForFullyReadyStance 3.5 m), not at all from
+  `ready_range`. His standing body, the capsule the ball can hit from the shins to the shoulders until he moves, is his hull:
+  `body_radius` not ready, growing to `hull_radius` (0.42 m: his torso with spread legs and arms, averaged) fully ready, so a
+  set keeper close to the shooter is bigger low and high. The rest of his close-range cover is the reflex. Still at the strike, he also holds his hands `hand_span` out to each side at
+  `hand_span_height_fraction` of his height (a ball reaching them before he moves is stopped); his reach grows from the span,
+  or from his hull's edge when that is further, rather than from zero.
+- **Reflex and reaction.** From the contact he has a reflex (`reflex_time` by reflexes) and, later, his full reaction
+  (`reaction`; both with `reaction_noise`; moving at the strike adds `still_moving_reaction_penalty` to the reaction only). At
+  the reflex he plans both saves on the ball's predicted path: if his reaction and dive get to it in time he waits for them;
+  otherwise, if a reflex limb gets to it, he makes a reflex save now (`SaveType.Reflex`); if neither does, a reflex attempt
+  (`ReflexAttempt`) when the ball passes inside his save hull (`save_hull_radius`, GOALS CapsuleRadius 0.75 m), or when the
+  reflex gets closer than the dive, within `reflex_attempt_margin` of its range. A reflex limb starts where his
+  stance holds it (a hand at its span, a foot at `stance_foot_offset`, the body at his hull's edge), moves out after its
+  execution time (`reflex_execution_easy`..`_hard` by the save's difficulty) at `reflex_speed` to at most `reflex_range`
+  (reach, by height), aimed no higher than `reflex_height_fraction` of his height, the body following `reflex_body_follow` of
+  it: a foot for a ball below `reflex_foot_height` (`KeeperDive.ReflexFoot`), the body when he was at least half ready and it is
+  below `reflex_body_height` (`BodyBlock`), else a hand (`ReflexHand`). He stays on his feet.
+- **Dive.** At his reaction he dives at the first point on the ball's predicted path inside his dive wedge (`wedge_*`) that his
+  reach gets to in time (`arm_sweep` over `arm_sweep_time`, then `dive_speed` once the save's execution time has passed, up to
+  `stretch`), after a random delay up to `save_time_jitter_easy`..`_hard` by its difficulty; if none, at the point he gets
+  closest to (`FailedAttempt`). A ball that will hit his standing body anyway is blocked standing. He goes for a catch when the
+  ball's speed and the time he will have put the target inside his catch range, else a parry.
+- **Difficulty.** A save's difficulty is the lateral range it needs as a fraction of his stretch through `difficulty_low`,
+  `difficulty_mid` or `difficulty_high` by the ball's height (linear between `difficulty_*_height`), plus
+  `counter_momentum_penalty` by his speed away from it (moving the wrong way). It sets the execution time (`save_execution_easy`
+  to `_hard` by reflexes, GOALS SaveExecutionTimeEasy/Hard), the start delay's spread, and what happens at contact.
+- **Contact.** At the hands he holds a ball within his catch range for its speed (`catch_range_standing_min`..`_max` or
+  `catch_range_diving_min`..`_max` by handling; at the feet or after backpedalling as for a ball `feet_catch_factor` or
+  `backpedal_catch_factor` slower in effect) scaled by `catch_range_time` for the seconds since the strike, and no harder than
+  `catch_max_difficulty`; his body or a smother holds a ball slower than `body_hold_speed` or `smother_hold_speed`. Otherwise
+  his body, feet, a smother, a reflex foot or body block, or a ball that meets him before he moves blocks it (a quarter to
+  near half the speed, at least `block_speed`); high near his line he tips it over the bar (above `tip_over_bar_height` of the
+  goal height within `tip_over_bar_distance` of his line); a dive at least `fingertip_difficulty` hard fingertips it
+  (`fingertip_speed_kept`, bent away from goal by up to `fingertip_max_bend_deg`; it can still go in); else he parries it
+  (40-60% of the speed, at least `min_parry_speed`, steered wide by handling, less so and with a wider error the harder the
+  save).
 - **Chips.** After his reaction he reads the struck ball's flight (never the shot type): on target and passing over him above
   his leap, he backpedals (`Backpedal`) facing back up the pitch, to the first point on its path where it has dropped to his
   take height that he can reach in time (else to where it crosses the line), and leaps for it once his reach gets there in
@@ -224,11 +252,15 @@ and every number in the `keeper` section of `data/tuning/default.json`. Each tic
 
 The batch tool prints, under the scoring table, the keeper's distance off his line and the ball's distance from goal at the
 strike (mean, p10, p90), what became of parried first shots, the share of rounds with a charge, a rush or a
-smother before the shot, how often he was planted at the strike, his mean reaction, and the saves and dives he made; then his
+smother before the shot, how often he was planted at the strike, his action at the strike (with his speed band), his mean
+reaction, the saves and dives he made, the first shot's save counts (catch, parry, block, tip, fingertip, smother, beaten)
+and save types (catch, parry, reflex, reflex attempt, failed attempt, none: met before he moved), with the mean difficulty and
+how often and how ready he was at the strike; then his
 mean depth off his line as the attacker on the ball first came within 20, 15, 10 and 6 m of the goal centre, the rounds he won
 the ball from a dribble (touched it before any shot), the rounds he was taken round, how often his movement off or toward
 his line changed direction before the shot (above 0.3 m/s held 0.1 s; mean, p95 and max, over the round and its first 2 s),
-and the chips tried, scored and tipped over. `--counters off` makes the scripted attacker ignore the keeper. A first shot touched by the keeper that carries on into the net counts as scored.
+and the chips tried, scored and tipped over. `--counters off` makes the scripted attacker ignore the keeper; `--close-down off`
+runs the shallow keeper (`close_down_range` 0: he holds his arc and never charges). A first shot touched by the keeper that carries on into the net counts as scored.
 
 The scripted attacker (batch and tests) reacts to the keeper as a player would see him: jogging touches once he is within 9 m
 of the ball and close control within 6 m, taking round a keeper rushing or charging out at it within 5 m (holding the shot until past

@@ -50,12 +50,14 @@ public class KeeperTests
     public void ReachGrowsOverTimeAndIsCappedByStretch()
     {
         var s = TestData.Sheet(50, height: 1.90f); s.Diving = 50; s.Reach = 50;
-        float v = Keeper.DiveSpeed(s, T), stretch = Keeper.Stretch(s, T);
+        float v = Keeper.DiveSpeed(s, T), stretch = Keeper.Stretch(s, T), exec = Keeper.SaveExecution(s, T, 1f);
         Assert.Equal(0f, Keeper.ReachAt(s, T, -0.1f));
         Assert.Equal(0f, Keeper.ReachAt(s, T, 0f));
         Assert.True(Keeper.ReachAt(s, T, 0.05f) < 0.9f);
-        Assert.Equal(0.9f + v * 0.03f, Keeper.ReachAt(s, T, 0.15f), 3);
-        Assert.Equal(MathF.Min(stretch, 0.9f + v * 0.28f), Keeper.ReachAt(s, T, 0.4f), 3);
+        Assert.Equal(0.9f + v * (0.15f - exec), Keeper.ReachAt(s, T, 0.15f), 3);
+        Assert.Equal(MathF.Min(stretch, 0.9f + v * (0.4f - exec)), Keeper.ReachAt(s, T, 0.4f), 3);
+        // An easier save executes sooner: more reach at the same moment.
+        Assert.True(Keeper.ReachAt(s, T, 0.2f, 0f, Keeper.SaveExecution(s, T, 0f)) > Keeper.ReachAt(s, T, 0.2f) + 0.05f);
         float prev = 0;
         for (float t = 0; t < 1.5f; t += 0.01f)
         {
@@ -76,13 +78,15 @@ public class KeeperTests
     }
 
     [Fact]
-    public void DiveSpeedAndCatchSpeedRunWithRatings()
+    public void DiveSpeedAndCatchRangeRunWithRatings()
     {
         var s = TestData.Sheet(50);
         s.Diving = 1; Assert.Equal(3f, Keeper.DiveSpeed(s, T), 3);
         s.Diving = 99; Assert.Equal(6f, Keeper.DiveSpeed(s, T), 3);
-        s.Handling = 1; Assert.Equal(14f, Keeper.CatchSpeed(s, T), 3);
-        s.Handling = 99; Assert.Equal(26f, Keeper.CatchSpeed(s, T), 3);
+        // Handling 1 holds nothing at 16 m/s standing; handling 99 still holds it most of a metre from his hands.
+        s.Handling = 1; Assert.Equal(0f, Keeper.CatchRange(s, T, 16f, false, 1f), 3);
+        s.Handling = 99; Assert.True(Keeper.CatchRange(s, T, 16f, false, 1f) > 1f);
+        Assert.True(Keeper.CatchRange(s, T, 16f, true, 1f) > Keeper.CatchRange(s, T, 16f, false, 1f), "a dive gets further from his hands");
     }
 
     static Vector3 ClampOnPitch(Vector3 v)

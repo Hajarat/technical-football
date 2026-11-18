@@ -21,6 +21,14 @@ public sealed class KeeperReport
     public SaveKind Save { get; set; } = SaveKind.None;
     /// <summary>The save motion of the dive for this shot (None before he reacted, or for a smother).</summary>
     public KeeperDive Dive { get; set; } = KeeperDive.None;
+    /// <summary>The save he went for, decided when he moved (None when the ball met him before he moved, or for a smother).</summary>
+    public SaveType SaveType { get; set; } = SaveType.None;
+    /// <summary>The difficulty of the save he went for (0 easy, 1 at full stretch, more moving the wrong way; NaN before he moved).</summary>
+    public float Difficulty { get; set; } = float.NaN;
+    /// <summary>How ready he was at the strike, 0..1 (set close to the shooter: his hull is big).</summary>
+    public float Ready { get; set; }
+    /// <summary>Reflex time drawn for the shot, seconds.</summary>
+    public float ReflexS { get; set; } = float.NaN;
     /// <summary>The keeper's speed at the strike, m/s (NaN before a strike).</summary>
     public float SpeedAtStrikeMs { get; set; } = float.NaN;
     /// <summary>The keeper's distance off his goal line at the strike, metres (NaN before a strike).</summary>
@@ -29,6 +37,8 @@ public sealed class KeeperReport
     public float BallDistanceAtStrikeM { get; set; } = float.NaN;
     /// <summary>True if the shot, flying on unhindered (no keeper, no frame), would cross the goal line inside the goal.</summary>
     public bool OnTarget { get; set; }
+    /// <summary>What the keeper was doing at the strike (his action on the tick before it).</summary>
+    public KeeperAction ActionAtStrike { get; set; } = KeeperAction.Set;
     /// <summary>True if the keeper was planted (set and still for the shot) at the strike.</summary>
     public bool PlantedAtStrike { get; set; }
     /// <summary>True if the keeper rushed out at the ball this round before the first strike.</summary>
@@ -58,6 +68,13 @@ public sealed class KeeperReport
 
     static float[] NewBands() { var a = new float[DepthBands.Length]; Array.Fill(a, float.NaN); return a; }
 }
+
+/// <summary>
+/// The save the keeper went for (GOALS EGoalieSaveType), decided when he moved: a dive he expects to hold (Catch) or to push
+/// away (Parry), one that cannot get there in time (FailedAttempt), or, when his full reaction would come too late, a reflex
+/// save that gets to the ball (Reflex) or one that cannot quite (ReflexAttempt).
+/// </summary>
+public enum SaveType { None, Catch, Parry, Reflex, ReflexAttempt, FailedAttempt }
 
 /// <summary>How the keeper played the ball when he met it.</summary>
 public enum SaveKind { None, Catch, Parry, Block, TipOver, Fingertip, Smother }
