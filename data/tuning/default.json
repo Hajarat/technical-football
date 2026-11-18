@@ -488,6 +488,7 @@
     "sole_reach_max": 0.1,
     "sole_reach_tolerance": 0.3,
     "sole_reach_steer": 2.5,
+    "sole_reach_foot_speed": 8,
     "step_over_seconds": 0.25,
     "step_over_still_seconds": 0.15,
     "still_ball_speed": 0.1,

@@ -35,6 +35,8 @@ public static class SkillMoves
     const float ExitTouchWithin = 1.0f;
     /// <summary>The reach is planned this much inside sole_reach_tolerance, for what the prediction does not see, metres.</summary>
     const float ReachMargin = 0.05f;
+    /// <summary>How far from the feet the sole's foot may be when a move starts (half a stride), metres.</summary>
+    const float SoleStrideAllowance = 0.35f;
     /// <summary>The step-over and feint close in so the ball is this much inside step_over_max_ahead at the move's middle, metres ...</summary>
     const float CloseInMargin = 0.05f;
     /// <summary>... running at most this much faster than they came in to do it, m/s.</summary>
@@ -153,8 +155,8 @@ public static class SkillMoves
     /// <summary>
     /// The reach of a sole move: predicts the player running on at his speed along <paramref name="fwd"/> and the free ball,
     /// and returns the first tick offset (0 to sole_reach_max) at which the foot's contact point can be brought within
-    /// sole_reach_tolerance of the ball by steering at most sole_reach_steer, with the miss left there; if none can, the offset
-    /// with the smallest miss.
+    /// sole_reach_tolerance of the ball by steering at most sole_reach_steer and the foot can have got there at
+    /// sole_reach_foot_speed, with the miss left there; if none can, the offset with the smallest miss.
     /// </summary>
     static (int Ticks, float Miss) PlanReach(PlayerState p, Foot foot, Vector2 fwd, Ball ball, float now, Tuning t)
     {
@@ -175,7 +177,11 @@ public static class SkillMoves
             var cp = TouchPlanner.ContactPointFor(c, foot, t);
             float d = new Vector2(b.Position.X - cp.X, b.Position.Z - cp.Z).Length();
             float miss = MathF.Max(0f, d - k.SoleReachSteer * j * t.Dt);
-            if (miss <= k.SoleReachTolerance - ReachMargin) return (j, miss);
+            // The foot needs time to get there from wherever it is in the stride (up to a half stride from the feet): no faster
+            // than sole_reach_foot_speed, so the drawn foot never snaps onto the ball.
+            float fromFeet = new Vector2(b.Position.X - c.Position.X, b.Position.Z - c.Position.Z).Length() + SoleStrideAllowance;
+            bool footThere = j == max || k.SoleReachFootSpeed <= 0f || fromFeet <= k.SoleReachFootSpeed * (j + 1) * t.Dt;
+            if (footThere && miss <= k.SoleReachTolerance - ReachMargin) return (j, miss);
             if (miss < bestMiss) { bestMiss = miss; best = j; }
         }
         return (best, bestMiss);

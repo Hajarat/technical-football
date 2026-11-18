@@ -861,6 +861,8 @@ public sealed class SkillTuning
     public float SoleReachTolerance { get; set; } = 0.3f;
     /// <summary>The largest steering velocity the reach may add to bring the foot to the ball, m/s.</summary>
     public float SoleReachSteer { get; set; } = 2.5f;
+    /// <summary>A sole move's reach lasts at least as long as the foot needs at this speed from up to half a stride off, m/s (0: no floor).</summary>
+    public float SoleReachFootSpeed { get; set; } = 8f;
 
     // ---- the moves ----
     public float StepOverSeconds { get; set; } = 0.25f;
