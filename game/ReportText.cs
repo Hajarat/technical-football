@@ -8,7 +8,7 @@ namespace FootballSim.Game;
 /// <summary>Plain-words report card text built from a RoundReport. No simulation rules here, only formatting.</summary>
 public static class ReportText
 {
-    public const string Footer = "A/Enter next  ·  Y/R retry  ·  View/F flag";
+    public const string Footer = "A/Enter next  ·  Y/Backspace retry  ·  View/M flag";
 
     public static string Title(RoundReport r) => r.Outcome switch
     {

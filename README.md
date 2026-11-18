@@ -214,24 +214,36 @@ A file that fails to load keeps its last good version and the HUD warning line n
 
 Works alongside a gamepad (the larger stick value wins) and when none is detected. Ignored in replay mode.
 
-| Key | Action |
-| --- | --- |
-| Arrow keys or WASD | Run and aim (up = toward the far touchline, right = toward the goal) |
-| Left Shift | Sprint |
-| Left Ctrl or Alt | Shield (close control) |
-| Space (hold, release) | Shoot (Space tapped twice is a low shot, as on the pad) |
-| E / Q / C | Finesse / chip / driven (hold while shooting; C + E is a low finesse) |
-| X | Knock-on |
-| 1 / 2 / 3 / 4 | Step-over / body feint / ball roll / drag-back (side from the arrow keys, right by default) |
-| G | Cancel: pressed within 0.1 s of Space, a fake shot |
-| Arrow key pointing back against the run + E + Q | Drag-back, as the pad's left stick back with both bumpers |
-| Enter | Start the round; at the report, next round |
-| R | At the report, retry with the same seed |
-| `[` / `]` | Previous / next start spot |
-| `,` / `.` | Next attacker / next keeper |
-| O | Toggle the debug overlay |
-| F | Flag the most recent finished round |
-| P or Esc | Pause |
+GOALS steers with the mouse on PC and uses W/A/S/D as buttons; this keyboard runs on WASD instead and keeps every other GOALS
+default that does not clash with that (taken from GOALS' `IMC_Playing` mapping, build 2.01.07). Keys marked "ours" are not
+GOALS bindings.
+
+| Key | Action | GOALS default |
+| --- | --- | --- |
+| WASD | Run and aim (W = toward the far touchline, D = toward the goal) | Mouse steers; W/A/S/D are buttons |
+| Left Ctrl | Sprint | Same |
+| Q | Shield (close control) | W |
+| Left mouse (hold, release) | Shoot; pressed again after the release, before the strike, a low shot | Same |
+| E | Curved (finesse) shot, held while shooting | D |
+| Left Shift | Chip, held while shooting | Same |
+| Right mouse | Cancel: pressed within 0.1 s of shoot, a fake shot | Same (also the ground pass) |
+| Back against the run + E + Left Shift | Drag-back, as the pad's left stick back with both bumpers | Back + D + Left Shift |
+| A / S | GOALS' through / lofted pass: run left / back here | Through / lofted pass |
+| Space, G | Shoot and cancel again, for keyboard-only play (ours) | Space toggles the camera |
+| X | Knock-on (ours; GOALS uses the right stick, middle mouse + mouse on PC) | None |
+| 1 / 2 / 3 / 4 | Step-over / body feint / ball roll / drag-back, side from A/D, right by default (ours) | None |
+| Enter | Start the round; at the report, next round | |
+| Backspace | At the report, retry with the same seed | |
+| Left / Right arrow | Previous / next start spot (the pad's D-pad) | D-pad |
+| Up / Down arrow | Next attacker / next keeper (the pad's D-pad) | D-pad |
+| O | Toggle the debug overlay | |
+| M | Flag the most recent finished round | |
+| P or Esc | Pause | Esc opens the menu |
+| B | Swap the pad's face buttons (see above) | |
+
+GOALS keys not used here: R (its left stick click action), F (switch set-piece taker), Tab (match menu), H (hero select),
+middle mouse (hold to use the mouse as the right stick). There is no driven-shot key: as on the pad, the low shot is shoot
+pressed twice.
 
 ## Session logs
 
