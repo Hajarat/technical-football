@@ -73,6 +73,10 @@ public sealed partial class KeeperBrain
     Phase _phase = Phase.Stand;
     float _phaseTime;
     bool _struck;               // a shot has been struck this round (ends a held line)
+    /// <summary>A held line is kept even when the attacker dribbles off the spot (tests).</summary>
+    internal bool HoldLineThroughDribble { get; init; }
+    bool _lineReleased;         // a penalty taker dribbled off the spot: open play (ends a held line)
+    Vector3? _penaltySpot;      // where the ball sat when he first stood (the spot, in a penalty)
 
     // Standing: the arc spot.
     bool _hasSpot;

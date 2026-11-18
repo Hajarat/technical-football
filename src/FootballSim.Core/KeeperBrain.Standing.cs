@@ -41,7 +41,13 @@ public sealed partial class KeeperBrain
     void StepStanding(float dt, Ball ball, SimRng rng, in KeeperSituation s)
     {
         var k = _t.Keeper;
-        bool holdLine = _holdLine && !_struck;
+        // A penalty keeper stays on his line for the kick; once the taker dribbles the ball off the spot instead (it has
+        // moved more than half a metre with no shot winding up), it is open play and he plays as anywhere else.
+        _penaltySpot ??= ball.Position;
+        if (_holdLine && !HoldLineThroughDribble && !_lineReleased && !s.Windup && !s.ShotInFlight
+            && Vector2.Distance(new Vector2(ball.Position.X, ball.Position.Z), new Vector2(_penaltySpot.Value.X, _penaltySpot.Value.Z)) > 0.5f)
+            _lineReleased = true;
+        bool holdLine = _holdLine && !_struck && !_lineReleased;
         _tLimit = KeeperLimit.None; _tWant = _tChip = _tGap = _tCloseT = _tTol = float.NaN; _tRaceShort = float.PositiveInfinity; _tRaceBlock = holdLine ? "hold line" : "";
         FaceBall(ball, dt);
         Observe(ball, s);

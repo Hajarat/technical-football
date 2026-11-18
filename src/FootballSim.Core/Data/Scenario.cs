@@ -39,9 +39,11 @@ public sealed class Scenario
     public bool KeeperOnLine { get; set; }
     /// <summary>
     /// Penalties: the keeper stays on his goal line until the strike (he may shuffle along it, but does not come off it or rush).
-    /// After the strike he plays as usual.
+    /// After the strike, or once the taker dribbles the ball off the spot instead of shooting, he plays as usual.
     /// </summary>
     public bool KeeperHoldLine { get; set; }
+    /// <summary>Tests: with <see cref="KeeperHoldLine"/>, the keeper stays on his line even when the attacker dribbles.</summary>
+    public bool KeeperHoldLineThroughDribble { get; set; }
     /// <summary>
     /// Where the keeper starts: this far off his goal line on the line from the ball to the goal centre, metres. Null starts him
     /// on his set spot. He then moves as usual.

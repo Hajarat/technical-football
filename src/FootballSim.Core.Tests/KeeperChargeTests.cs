@@ -201,21 +201,36 @@ public class KeeperChargeTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void APenaltyKeeperNeverCharges()
+    public void APenaltyKeeperHoldsHisLineWhileTheBallIsOnTheSpot()
     {
         var s = Keeper(99);
-        var ballAt = new Vector3(P.GoalLineX - 11f, 0.11f, 0f);
-        var b = new Ball(T.Ball) { Position = ballAt };
+        var b = new Ball(T.Ball) { Position = new Vector3(P.GoalLineX - 11f, 0.11f, 0f) };
         var k = new PlayerState(1, 0, PlayerRole.Keeper, s) { Position = new Vector3(P.GoalLineX, 0f, 0f), Facing = MathF.PI };
         var brain = new KeeperBrain(k, P, T, true, Striker);
-        var vel = new Vector3(3f, 0f, 0f);
-        for (int i = 0; i < 120; i++)
+        for (int i = 0; i < 240; i++)
         {
-            b.Position += vel * Dt;
-            brain.Update(Dt, b, new SimRng(1), OnBall(b.Position, vel));
+            brain.Update(Dt, b, new SimRng(1), OnBall(b.Position, Vector3.Zero));
             Assert.NotEqual(KeeperAction.Charge, k.KeeperAction);
             Assert.NotEqual(KeeperAction.Jockey, k.KeeperAction);
         }
         Assert.True(Depth(k) < 0.5f, $"{Depth(k):F2} m off his line");
+    }
+
+    [Fact]
+    public void APenaltyTakerWhoDribblesOffTheSpotFacesAKeeperInOpenPlay()
+    {
+        var s = Keeper(99);
+        var b = new Ball(T.Ball) { Position = new Vector3(P.GoalLineX - 11f, 0.11f, 0f) };
+        var k = new PlayerState(1, 0, PlayerRole.Keeper, s) { Position = new Vector3(P.GoalLineX, 0f, 0f), Facing = MathF.PI };
+        var brain = new KeeperBrain(k, P, T, true, Striker);
+        var vel = new Vector3(3f, 0f, 0f);
+        bool cameOut = false;
+        for (int i = 0; i < 180; i++)
+        {
+            b.Position += vel * Dt;
+            brain.Update(Dt, b, new SimRng(1), OnBall(b.Position, vel));
+            cameOut |= k.KeeperAction is KeeperAction.Charge or KeeperAction.Jockey or KeeperAction.Rush or KeeperAction.Smother || Depth(k) > 1.5f;
+        }
+        Assert.True(cameOut, $"still {Depth(k):F2} m off his line, {k.KeeperAction}");
     }
 }
