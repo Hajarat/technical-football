@@ -276,7 +276,7 @@ static class FeelProbe
                     float d = MathF.Abs(sp - new Vector2(v0.X, v0.Z).Length()) / tuning.Dt;
                     ds.Add(d);
                     if (d > 15f) steps++;
-                    if (d > worstDs) { worstDs = d; worst = $"t={i * tuning.Dt:F2}s:{p.TouchAction?.Kind}"; }
+                    if (d > worstDs) { worstDs = d; worst = $"t={i * tuning.Dt:F2}s:{p.TouchAction?.Kind}@({p.Position.X:F1},{p.Position.Z:F1})"; }
                     wMin = MathF.Min(wMin, sp); wMax = MathF.Max(wMax, sp);
                 }
                 if (touched)
