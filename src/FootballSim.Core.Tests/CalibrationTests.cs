@@ -222,16 +222,20 @@ public class CalibrationTests
     /// stance's hull, save difficulty) a set keeper covers as wide an angle close to the shooter as further out, so the run-ins
     /// fell (2,000 rounds, with a 0.42 m passive hull: breakaway 14.8, halfway run 29.2, angled run 21.8%; keeper rush 10.6%)
     /// and tight angle, where the set keeper 4 m from the shooter covers the goal's whole width with his reflex, fell below its
-    /// 2-8% target to 0.4%; their bands are about five points around those values (tight angle 0-2%) until the targets are
-    /// reset.
+    /// 2-8% target to 0.4%. The run-in targets were then reset from the evidence: 10-60% for a run-in, 2-8% for tight angle.
+    /// With the GOALS-paced dribbling (a slower sprint, the scripted attacker shoots closer in) and a loose reflex touch (a
+    /// reflex that meets the ball off-centre, or a hard one, can leave it going on, bent away from the limb, and some still go
+    /// in), the run-ins measured (2,000 rounds) breakaway 26.6, halfway run 28.1, angled run 21.4% and keeper rush 9.8%, and
+    /// tight angle 2.5%; the run-in bands are about five points around those values, keeper rush's unchanged and tight
+    /// angle's its target.
     /// </summary>
     [Theory]
     [InlineData("penalty", 72.0, 80.0)]
     [InlineData("edge_of_box", 6.0, 14.0)]
-    [InlineData("tight_angle", 0.0, 2.0)]
-    [InlineData("breakaway", 10.0, 19.0)]
-    [InlineData("halfway_run", 24.0, 34.0)]
-    [InlineData("angled_run", 16.0, 25.0)]
+    [InlineData("tight_angle", 2.0, 8.0)]
+    [InlineData("breakaway", 22.0, 32.0)]
+    [InlineData("halfway_run", 23.0, 33.0)]
+    [InlineData("angled_run", 16.0, 26.0)]
     [InlineData("keeper_rush", 7.0, 15.0)]
     public void ScoringRateStaysInItsBand(string scenario, double lo, double hi)
     {

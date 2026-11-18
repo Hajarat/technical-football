@@ -19,7 +19,7 @@ internal enum TouchStepMode
 
 /// <summary>
 /// Touches as committed actions on the stride. In possession every touch is planned: the planner picks a future swing middle
-/// of the stride clock (at least the pre-windup ahead) where the ball can be met, the foot in swing then, and the contact
+/// of the stride clock (at least min_plan_ahead ahead) where the ball can be met, the foot in swing then, and the contact
 /// point ahead of that foot. During the pre-windup and windup the player's velocity is nudged (at most steer_max) so the
 /// ball arrives inside the contact zone. At the contact tick the ball gets its new velocity: for a push the planner picks the
 /// next meet (the swing steps_per_touch steps later, predicted with the stride clock and the movement model) and solves the
@@ -33,6 +33,8 @@ public static class TouchPlanner
 
     static int Ticks(float seconds, Tuning t) => Math.Max(0, (int)MathF.Round(seconds * t.TickRate));
     internal static int PreWindupTicks(Tuning t) => Math.Max(1, Ticks(t.Touch.PreWindup, t));
+    /// <summary>The soonest swing a fresh plan or a next meet may use, ticks (min_plan_ahead).</summary>
+    internal static int PlanAheadTicks(Tuning t) => Math.Max(1, Ticks(t.Touch.MinPlanAhead, t));
     internal static int WindupTicks(Tuning t) => Ticks(t.Touch.Windup, t);
     internal static int RecoveryTicks(Tuning t) => Ticks(t.Touch.Recovery, t);
 
@@ -196,7 +198,7 @@ public static class TouchPlanner
     /// <summary>Updates the smooth stick turn rate from this tick's stick (starting afresh on a round's first tick).</summary>
     static void TrackStick(PlayerState p, in TickIntent intent, int tick, Tuning t)
     {
-        if (tick <= 1) { p.StickAnglePrev = float.NaN; p.StickRate = 0f; p.EarlyTurnTick = -1; }
+        if (tick <= 1) { p.StickAnglePrev = float.NaN; p.StickRate = 0f; p.EarlyTurnTick = -1; p.SpeedDebt = 0f; p.TouchCadenceCount = 0; p.PlannerSteer = Vector2.Zero; p.ReverseTime = -100f; p.PostTurnUntil = -100f; }
         Vector2 m = intent.Move;
         if (m.Length() < t.Touch.StickThreshold) { p.StickAnglePrev = float.NaN; p.StickRate = 0f; return; }
         float a = MathF.Atan2(m.Y, m.X);
@@ -223,17 +225,19 @@ public static class TouchPlanner
         if (!inPossession)
         {
             p.Recovering = false;
+            p.PlannerSteer = Vector2.Zero;
             legs = intent;
             float top = Movement.TopSpeed(p.Sheet, t);
             return Stunned(p, now)
-                ? new MoveAssist(top * t.Shot.StunSpeedFraction, 1f + t.Possession.OffBallTurnBonus, Vector2.Zero, HardCap: top * t.Shot.StunSpeedFraction)
-                : new MoveAssist(top, 1f + t.Possession.OffBallTurnBonus, Vector2.Zero);
+                ? new MoveAssist(top * t.Shot.StunSpeedFraction, 1f + t.Possession.OffBallTurnBonus, Vector2.Zero, HardCap: top * t.Shot.StunSpeedFraction, TurnAbout: true)
+                : new MoveAssist(top, 1f + t.Possession.OffBallTurnBonus, Vector2.Zero, TurnAbout: true);
         }
 
         // A skill move owns the legs while it lasts; on the tick it ends, the planner takes over at once.
         if (p.SkillAction is { } skill)
         {
-            if (tick < skill.EndTick) return SkillMoves.BeginTick(p, ball, tick, t, out legs);
+            // The move moves the player itself; the planner's steering starts again from nothing after it.
+            if (tick < skill.EndTick) { p.PlannerSteer = Vector2.Zero; return SkillMoves.BeginTick(p, ball, tick, t, out legs); }
             SkillMoves.Finish(p, intent, ball, tick, now, t);
             UpdatePhases(p, tick, t);
         }
@@ -242,7 +246,8 @@ public static class TouchPlanner
         UpdatePhases(p, tick, t);
 
         var a = p.TouchAction is { Pending: true } pa ? pa : null;
-        Vector2 steer = Vector2.Zero;
+        // The steering correction changes at no more than steer_accel: it eases in for a touch and back out after it.
+        Vector2 steer = SteerToward(p, Vector2.Zero, t);
         if (a != null)
         {
             legs = LegsFor(p, a.Legs, a.HoldDirection, intent, ball, t);
@@ -250,6 +255,7 @@ public static class TouchPlanner
             a.Steer = steer;
         }
         else legs = p.Recovering && live ? ChaseIntent(p, ball, t) : intent;
+        p.PlannerSteer = steer;
         float cap = Possession.SpeedCap(p, true, p.Recovering && a == null, t);
         if (Stunned(p, now))
         {
@@ -322,26 +328,37 @@ public static class TouchPlanner
             if (a.Legs != LegsMode.Hold) { a.Legs = LegsMode.Hold; a.HoldDirection = FacingDir(p); }
             return;
         }
-        if (change > k.ReplanAngle) { Drop(p, a); return; }
+        var wanted = new Vector3(stick.X, 0f, stick.Y);
+        if (change > k.ReplanAngle)
+        {
+            // Turned past the replan angle: planned again, as an early turn touch when the ball is to be turned.
+            float turnBy = TouchModel.TurnAngleDeg(p, ball, wanted);
+            if (!restricted && turnBy > k.ExecutionAngle && p.RunSpeed > k.ExecutionMinSpeed) EarlyTurn(p, a, turnBy, t);
+            else Drop(p, a);
+            return;
+        }
         var mode = TouchModel.ModeFor(intent, t);
         if (Speed(mode) != Speed(a.PlanMode)) { Drop(p, a); return; }
         if (change <= k.ExecutionAngle || restricted || a.Legs == LegsMode.Hold) return;
-        var wanted = new Vector3(stick.X, 0f, stick.Y);
         float turnDeg = TouchModel.TurnAngleDeg(p, ball, wanted);
-        if (turnDeg > k.ExecutionAngle)
-        {
-            // An early turn touch: no sooner after the previous touch than the early fraction of the cadence this touch had.
-            int last = (int)MathF.Round(p.LastTouchTime / t.Dt);
-            float cadence = MathF.Max(0f, (a.ContactTick - last) * t.Dt);
-            int from = last + Ticks(MathF.Max(k.EarlyMinInterval, EarlyFraction(p, turnDeg, t) * cadence), t);
-            Drop(p, a);
-            p.EarlyTurnTick = from;
-            return;
-        }
+        if (turnDeg > k.ExecutionAngle) { EarlyTurn(p, a, turnDeg, t); return; }
         if (!PlanHolds(p, a, intent, ball, tick, now, t, pitch)) { Drop(p, a); return; }
         a.PlanStickAngle = angle;
         a.Legs = LegsMode.Stick;
         a.HoldDirection = Vector2.Zero;
+    }
+
+    /// <summary>
+    /// Drops a waiting plan for an early turn touch: planned again at once, on a swing no sooner after the previous touch than
+    /// the early fraction of the cadence this touch had (and with the turn's reach and steering).
+    /// </summary>
+    static void EarlyTurn(PlayerState p, BallAction a, float turnDeg, Tuning t)
+    {
+        int last = (int)MathF.Round(p.LastTouchTime / t.Dt);
+        float cadence = MathF.Max(0f, (a.ContactTick - last) * t.Dt);
+        int from = last + Ticks(MathF.Max(t.Touch.EarlyMinInterval, EarlyFraction(p, turnDeg, t) * cadence), t);
+        Drop(p, a);
+        p.EarlyTurnTick = from;
     }
 
     /// <summary>
@@ -363,7 +380,7 @@ public static class TouchPlanner
             if (i < moves - 1) b.Step(t.Dt, null, null);
         }
         if (c.IsStepping && c.SwingFoot != a.Foot) return false;
-        float budget = k.ContactZoneRadius + 0.8f * k.SteerMax * MathF.Min(k.PreWindup, moves * t.Dt);
+        float budget = SteerBudget(moves * t.Dt, t);
         return Horizontal(b.Position, ContactPointFor(c, a.Foot, t)) <= budget && b.Position.Y <= k.MaxBallHeight;
     }
 
@@ -371,12 +388,14 @@ public static class TouchPlanner
 
     /// <summary>
     /// The steering correction for this tick: predicts the player (without steering) and the ball to the contact tick, and
-    /// spreads the miss over the ticks left, capped at steer_max. Updates the action's expected contact point.
+    /// finds the correction that, reached from this tick's one at no more than steer_accel and held at most steer_max, brings
+    /// the ball to within reach_tolerance of the contact point by the contact (the foot reaches the rest of the way). Returns
+    /// this tick's step toward it and sets the action's contact point to where the ball will be.
     /// </summary>
     static Vector2 Steer(PlayerState p, BallAction a, in TickIntent intent, Ball ball, int tick, float now, Tuning t, Pitch? pitch)
     {
         int moves = a.ContactTick - tick + 1;
-        if (moves < 1) return Vector2.Zero;
+        if (moves < 1) return SteerToward(p, Vector2.Zero, t);
         var c = p.Scratch();
         var b = BallScratch(ball);
         float tn = now;
@@ -388,12 +407,79 @@ public static class TouchPlanner
         }
         Vector3 cp = ContactPointFor(c, a.Foot, t);
         var e = new Vector2(b.Position.X - cp.X, b.Position.Z - cp.Z);
+        float el = e.Length(), tol = t.Touch.ReachTolerance;
+        e = el <= tol ? Vector2.Zero : e * (1f - tol / el);
         float span = moves * t.Dt;
-        Vector2 steer = e / span;
-        float max = t.Touch.SteerMax, len = steer.Length();
-        if (len > max) steer *= max / len;
-        a.ContactPoint = new Vector3(cp.X + steer.X * span, cp.Y, cp.Z + steer.Y * span);
-        return steer;
+        float max = a.TurnStep ? t.Touch.TurnSteerMax : t.Touch.SteerMax;
+        var s0 = p.PlannerSteer;
+        float stepMax = a.TurnStep ? MathF.Max(SteerStep(t), t.Touch.TurnSteerAccel * t.Dt) : SteerStep(t);
+        // The held correction whose eased-in path covers the miss (a few fixed-point rounds; the ease shortens the path).
+        Vector2 target = e / span;
+        Vector2 moved = Vector2.Zero;
+        for (int it = 0; it < 4; it++)
+        {
+            float len = target.Length();
+            if (len > max) target *= max / len;
+            moved = SteerPath(s0, target, moves, stepMax, t.Dt);
+            target += (e - moved) / span;
+        }
+        float tl = target.Length();
+        if (tl > max) target *= max / tl;
+        a.ContactPoint = new Vector3(b.Position.X, t.Ball.Radius, b.Position.Z);
+        return Toward(s0, target, stepMax);
+    }
+
+    /// <summary>The largest change of the steering correction in one tick, m/s.</summary>
+    static float SteerStep(Tuning t) => t.Touch.SteerAccel > 0f ? t.Touch.SteerAccel * t.Dt : float.PositiveInfinity;
+
+    /// <summary>
+    /// This tick's steering correction on the way from the last tick's one to <paramref name="target"/> (a turn step's faster
+    /// correction, above steer_max, eases out at the turn's rate).
+    /// </summary>
+    static Vector2 SteerToward(PlayerState p, Vector2 target, Tuning t) =>
+        Toward(p.PlannerSteer, target, p.PlannerSteer.Length() > t.Touch.SteerMax + 1e-4f ? MathF.Max(SteerStep(t), t.Touch.TurnSteerAccel * t.Dt) : SteerStep(t));
+
+    /// <summary>
+    /// The budget of an early turn touch's swing <paramref name="seconds"/> ahead: the zone radius plus 0.9 of what the turn's
+    /// steering covers in that time (at most the pre-windup), and never more than turn_reach by speed.
+    /// </summary>
+    static float TurnBudget(PlayerState p, float seconds, Tuning t)
+    {
+        var k = t.Touch;
+        float time = MathF.Min(k.PreWindup, seconds), max = k.TurnSteerMax, acc = MathF.Max(k.TurnSteerAccel, 1e-3f);
+        float ramp = max / acc;
+        float reach = time <= ramp ? 0.5f * acc * time * time : max * (time - 0.5f * ramp);
+        float top = Movement.TopSpeed(p.Sheet, t);
+        return MathF.Max(SteerBudget(seconds, t), MathF.Min(k.ContactZoneRadius + 0.9f * reach, k.TurnReach.Lerp(top > 0f ? p.RunSpeed / top : 0f)));
+    }
+
+    static Vector2 Toward(Vector2 from, Vector2 to, float maxStep)
+    {
+        var d = to - from;
+        float l = d.Length();
+        return l <= maxStep ? to : from + d * (maxStep / l);
+    }
+
+    /// <summary>The displacement over <paramref name="ticks"/> ticks of a correction easing from <paramref name="s0"/> to <paramref name="target"/>.</summary>
+    static Vector2 SteerPath(Vector2 s0, Vector2 target, int ticks, float stepMax, float dt)
+    {
+        Vector2 s = s0, d = Vector2.Zero;
+        for (int i = 0; i < ticks; i++) { s = Toward(s, target, stepMax); d += s * dt; }
+        return d;
+    }
+
+    /// <summary>
+    /// How far off the contact zone a ball may be predicted for a swing <paramref name="seconds"/> ahead and still be planned:
+    /// the zone radius plus 0.8 of what the steering covers from rest in that time (at most the pre-windup), easing in at
+    /// steer_accel up to steer_max.
+    /// </summary>
+    static float SteerBudget(float seconds, Tuning t)
+    {
+        var k = t.Touch;
+        float time = MathF.Min(k.PreWindup, seconds), max = k.SteerMax;
+        float ramp = k.SteerAccel > 0f ? max / k.SteerAccel : 0f;
+        float reach = time <= ramp ? 0.5f * k.SteerAccel * time * time : max * (time - 0.5f * ramp);
+        return k.ContactZoneRadius + 0.8f * reach;
     }
 
     static Ball BallScratch(Ball b) => b.ScratchA();
@@ -413,17 +499,17 @@ public static class TouchPlanner
     }
 
     /// <summary>
-    /// Looks for the earliest swing middle at least the pre-windup ahead where the ball can be brought into the contact zone,
+    /// Looks for the earliest swing middle at least min_plan_ahead ahead where the ball can be brought into the contact zone,
     /// with the legs in <paramref name="legsMode"/>. When both feet can play it within a step, the preferred foot is used unless
     /// the ball sits on the other foot's side. From a standstill the first step is timed (the stride clock is locked) so its
-    /// swing middle falls exactly one pre-windup ahead.
+    /// swing middle falls exactly min_plan_ahead ahead.
     /// </summary>
     static bool Search(PlayerState p, Ball ball, LegsMode legsMode, Vector2 holdDir, in TickIntent user, float now, Tuning t,
         Pitch? pitch, int minTicks, out Candidate best, int maxTicks = int.MaxValue, int extraTicks = 0)
     {
         var k = t.Touch;
         best = default;
-        int pre = PreWindupTicks(t);
+        int pre = PlanAheadTicks(t);
         int horizon = Math.Max(pre, Ticks(t.Possession.PredictionHorizon, t) + extraTicks);
         var c = p.Scratch();
         var b = BallScratch(ball);
@@ -451,10 +537,11 @@ public static class TouchPlanner
             if (found && j > firstStepEnd) break;
             if (c.SwingMiddleCrossed is not Foot f || j < (idleStart ? pre : minTicks)) continue;
             Vector3 cp = ContactPointFor(c, f, t);
-            float budget = k.ContactZoneRadius + 0.8f * k.SteerMax * MathF.Min(k.PreWindup, j * t.Dt);
+            float budget = p.PlanningTurn ? TurnBudget(p, j * t.Dt, t) : SteerBudget(j * t.Dt, t);
             bool valid = Horizontal(b.Position, cp) <= budget && b.Position.Y <= k.MaxBallHeight;
             if (!valid) continue;
-            var cand = new Candidate { J = j, Foot = f, Cp = cp, Legs = legsMode, HoldDir = holdDir, Lock = idleStart, LockTarget = lockTarget };
+            var cand = new Candidate { J = j, Foot = f, Cp = new Vector3(b.Position.X, t.Ball.Radius, b.Position.Z), Legs = legsMode, HoldDir = holdDir,
+                Lock = idleStart, LockTarget = lockTarget };
             if (!found)
             {
                 best = cand;
@@ -462,7 +549,8 @@ public static class TouchPlanner
                 // Look one more step ahead for the other foot.
                 float freq = MathF.Max(c.StepFrequency, 1f);
                 firstStepEnd = j + (int)MathF.Ceiling(1f / (freq * t.Dt)) + 1;
-                if (f == p.Sheet.PreferredFoot && !BallOnOtherSide(c, b.Position, f, t)) return true;
+                // a turn touch takes the first swing that can play it, whichever foot
+                if (p.PlanningTurn || f == p.Sheet.PreferredFoot && !BallOnOtherSide(c, b.Position, f, t)) return true;
                 continue;
             }
             if (f == best.Foot) continue;
@@ -519,7 +607,7 @@ public static class TouchPlanner
         bool ordered = stickActive && forced != ActionKind.Soft;
 
         Vector2 holdDir = InterceptDirection(p, ball);
-        int minTicks = p.Replanning ? Math.Max(1, WindupTicks(t)) : PreWindupTicks(t);
+        int minTicks = p.Replanning ? Math.Max(1, WindupTicks(t)) : PlanAheadTicks(t);
         float turnDeg = 0f;
         bool early = p.EarlyTurnTick >= 0 && stickActive && forced == null;
         if (early)
@@ -531,6 +619,7 @@ public static class TouchPlanner
         p.EarlyTurnTick = -1;
         Candidate best = default;
         bool any = false;
+        p.PlanningTurn = early;
         if (ordered) any = StickPlan(p, ball, intent, holdDir, now, t, pitch, minTicks, out best);
         else
         {
@@ -541,6 +630,7 @@ public static class TouchPlanner
                 if (!any || c.J < best.J) { best = c; any = true; }
             }
         }
+        p.PlanningTurn = false;
         if (!any)
         {
             p.Recovering = !restricted;
@@ -563,6 +653,7 @@ public static class TouchPlanner
             HoldDirection = best.HoldDir,
             PlanStickAngle = stickActive ? MathF.Atan2(intent.Move.Y, intent.Move.X) : float.NaN,
             PlanMode = mode,
+            TurnStep = early,
         };
         if (best.Lock)
         {
@@ -607,12 +698,13 @@ public static class TouchPlanner
         float sa = MathF.Atan2(intent.Move.Y, intent.Move.X);
         float off = Movement.WrapAngle(MathF.Atan2(toBall.Y, toBall.X) - sa);
         float side = off < 0f ? -1f : 1f;
-        // With the ball on the stick's line a miss is a push that ran long or wide: no bend (a run to the ball, or the
-        // recovery run, catches it up sooner than a bent plan at the dribbling pace).
-        if (MathF.Abs(off) * 180f / MathF.PI <= t.Touch.ExecutionAngle) return any;
+        // With the ball on the stick's line a miss is a push that ran long or wide: only bends up to the execution angle (a
+        // push sent a little wide is followed by easing the run across to it; a run to the ball, or the recovery run, catches
+        // a long one up sooner than a bent plan at the dribbling pace, but slows the run).
+        float maxBend = MathF.Abs(off) * 180f / MathF.PI <= t.Touch.ExecutionAngle ? t.Touch.ExecutionAngle : t.Touch.ApproachMaxStickDeg;
         foreach (float deg in BendsDeg)
         {
-            if (deg > t.Touch.ApproachMaxStickDeg + 1e-3f) break;
+            if (deg > maxBend + 1e-3f) break;
             float r = side * deg * MathF.PI / 180f;
             var bend = new Vector2(MathF.Cos(r), MathF.Sin(r));
             int max = any ? best.J - 1 : int.MaxValue;
@@ -764,13 +856,17 @@ public static class TouchPlanner
         return (TouchModel.SpeedSigma(p.Sheet, frac, t) * footK, TouchModel.DirectionSigmaDeg(p.Sheet, frac, t) * footK);
     }
 
-    /// <summary>Steps of the stride clock to the next meet: steps_per_touch, alternating one either side when it is even so both feet play.</summary>
+    /// <summary>
+    /// Steps of the stride clock to the next meet: steps_per_touch; when that is even (the same foot every touch), every
+    /// foot_switch_every-th touch takes one step more so the other foot plays the next run of touches. The cadence stays even
+    /// (2, 2, 2, 3 for a jog) instead of alternating short and long pushes.
+    /// </summary>
     static int NextSteps(PlayerState p, TouchMode mode, Tuning t)
     {
         int spt = TouchModel.StepsPerTouch(p.Sheet, mode, t);
         if (spt % 2 == 1) return spt;
-        p.TouchRhythm = !p.TouchRhythm;
-        return p.TouchRhythm ? spt - 1 : spt + 1;
+        p.TouchCadenceCount++;
+        return p.TouchCadenceCount % Math.Max(1, t.Touch.FootSwitchEvery) == 0 ? spt + 1 : spt;
     }
 
     struct Meet
@@ -782,13 +878,13 @@ public static class TouchPlanner
 
     /// <summary>
     /// Predicts the player from now with the legs following <paramref name="user"/> and finds the swing middle
-    /// <paramref name="steps"/> steps on (at least the pre-windup ahead), or the one nearest <paramref name="nearTicks"/> when
+    /// <paramref name="steps"/> steps on (at least min_plan_ahead ahead), or the one nearest <paramref name="nearTicks"/> when
     /// that is set.
     /// </summary>
     static bool FindMeet(PlayerState from, in TickIntent user, int steps, int nearTicks, float now, Tuning t, Pitch? pitch, out Meet meet)
     {
         meet = default;
-        int pre = PreWindupTicks(t);
+        int pre = PlanAheadTicks(t);
         var c = from.Scratch();
         int horizon = nearTicks > 0 ? nearTicks + Ticks(1f, t) : Ticks(3f, t);
         int count = 0, bestGap = int.MaxValue;
@@ -820,8 +916,8 @@ public static class TouchPlanner
     static bool RefineMeet(PlayerState from, Ball ball, in TickIntent user, ref Meet meet, float now, Tuning t, Pitch? pitch)
     {
         var k = t.Touch;
-        int pre = PreWindupTicks(t);
-        float budget = k.ContactZoneRadius + 0.8f * k.SteerMax * k.PreWindup;
+        int pre = PlanAheadTicks(t);
+        float budget = SteerBudget(k.PreWindup, t);
         int horizon = Math.Max(meet.J, Ticks(t.Possession.PredictionHorizon, t)) + Ticks(0.5f, t);
         var c = from.Scratch();
         var b = BallScratch(ball);
@@ -1023,16 +1119,18 @@ public static class TouchPlanner
                     if (turnDeg > k.CutDeg && p.RunSpeed > k.CutMinSpeed)
                     {
                         kind = ActionKind.Cut;
-                        // The cut costs the balance percentage of speed; the next meet is found again from the slower run.
-                        float keep = 1f - Movement.BalanceLoss(p.Sheet, t);
-                        var fwd = new Vector3(MathF.Cos(p.Facing), 0f, MathF.Sin(p.Facing));
-                        p.RunSpeed *= keep;
-                        p.Velocity = fwd * p.RunSpeed + p.SteerVelocity;
+                        // The cut costs the balance percentage of speed, shed over the next ticks at balance_deceleration; the next
+                        // meet is found again from the slowing run.
+                        p.SpeedDebt += p.RunSpeed * Movement.BalanceLoss(p.Sheet, t);
                         hasMeet = FindMeet(p, intent, steps, 0, now, t, pitch, out meet);
                         if (hasMeet) target = meet.Cp;
                     }
                 }
-                turnSign = MathF.Sign(Movement.WrapAngle(MathF.Atan2(toTarget.Z, toTarget.X) - MathF.Atan2(ball.Velocity.Z, ball.Velocity.X)));
+                // The side the ball is turned to (it picks the foot's inside or outside): by the stick, as the view expects while the
+                // touch winds up; the push's own direction can fall on the other side of a turn about.
+                var turnTo = kind is ActionKind.Turn or ActionKind.Cut ? new Vector3(intent.Move.X, 0f, intent.Move.Y) : toTarget;
+                turnSign = MathF.Sign(Movement.WrapAngle(MathF.Atan2(turnTo.Z, turnTo.X) - MathF.Atan2(ball.Velocity.Z, ball.Velocity.X)));
+                if (kind is ActionKind.Turn or ActionKind.Cut) p.PostTurnUntil = now + t.Movement.PostTurnSeconds;
                 if (kind is not (ActionKind.KnockOn or ActionKind.First or ActionKind.Slowdown))
                 {
                     p.TouchBoostFrom = now;
@@ -1069,7 +1167,8 @@ public static class TouchPlanner
         a.Kind = kind;
         a.Made = true;
         a.ContactTick = tick;
-        a.ContactPoint = cp;
+        // The foot meets the ball where it is: within the contact zone the foot reaches the last few centimetres itself.
+        a.ContactPoint = new Vector3(ball.Position.X, t.Ball.Radius, ball.Position.Z);
         a.ContactMiss = miss;
         a.BallOutVelocity = v;
         a.BallOutSpin = spin;

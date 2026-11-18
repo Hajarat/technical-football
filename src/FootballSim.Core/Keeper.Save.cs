@@ -117,6 +117,35 @@ public static partial class Keeper
         return KeeperDive.ReflexHand;
     }
 
+    // ---- the loose reflex touch ----
+
+    /// <summary>
+    /// How off-centre a ball meets a limb, 0..1: the distance of the ball's centre <paramref name="ball"/> from the line of its path
+    /// through the limb's centre <paramref name="limb"/>, over the hand's and the ball's radii (0 head-on, 1 a graze).
+    /// </summary>
+    public static float ContactEdge(Vector3 ball, Vector3 limb, Vector3 velocity, Tuning t)
+    {
+        float speed = velocity.Length();
+        if (speed < 1e-3f) return 0f;
+        Vector3 off = ball - limb;
+        Vector3 dir = velocity / speed;
+        Vector3 perp = off - Vector3.Dot(off, dir) * dir;
+        return Math.Clamp(perp.Length() / (t.Keeper.HandRadius + t.Ball.Radius), 0f, 1f);
+    }
+
+    /// <summary>
+    /// The chance a reflex touch that is not held is loose (the ball keeps most of its speed and goes on, bent a little, and may
+    /// still go in): by how off-centre it meets the limb (<see cref="ContactEdge"/>) plus by the save's difficulty, times by the
+    /// ball's speed and by the mean of handling and reflexes.
+    /// </summary>
+    public static float LooseReflexChance(PlayerSheet s, Tuning t, float edge, float difficulty, float speed)
+    {
+        var k = t.Keeper;
+        float c = (k.ReflexLooseEdge.Evaluate(edge) + k.ReflexLooseDifficulty.Evaluate(difficulty))
+            * k.ReflexLooseSpeed.Evaluate(speed) * k.ReflexLooseRating.ForRating(0.5f * (s.Handling + s.Reflexes));
+        return Math.Clamp(c, 0f, 1f);
+    }
+
     // ---- the ready stance ----
 
     /// <summary>

@@ -30,20 +30,18 @@ public static class Movement
     /// <summary>True while the boost from the player's most recent touch lasts.</summary>
     internal static bool TouchBoostActive(PlayerState p, float now) => p.TouchBoostFrom == p.LastTouchTime && now < p.TouchBoostUntil;
 
-    /// <summary>The speed the legs ease toward for an intent under a speed cap: cap * stick deflection * mode fraction, m/s.</summary>
-    internal static float TargetSpeed(in TickIntent intent, float top, Tuning t)
-    {
-        float mag = MathF.Min(1f, intent.Move.Length());
-        if (mag < t.Movement.StickDeadZone) mag = 0f;
-        return top * mag * ModeFraction(intent, t);
-    }
-
-    /// <summary>The fraction of the cap the legs aim for: close control, or jog to sprint by the sprint input.</summary>
-    internal static float ModeFraction(in TickIntent intent, Tuning t)
+    /// <summary>
+    /// The fraction of the speed cap the legs aim for: close control, or jog to sprint by the sprint input. The jog is a fixed
+    /// speed (jog_speed, GOALS' 5.3 m/s for every player), so its fraction is jog_speed over the player's top speed; with the
+    /// ball the cap is lowered by dribbling, and the jog with it.
+    /// </summary>
+    internal static float ModeFraction(in TickIntent intent, PlayerSheet s, Tuning t)
     {
         var m = t.Movement;
-        return intent.CloseControl ? m.CloseControlFraction
-            : m.JogFraction + (m.SprintFraction - m.JogFraction) * Math.Clamp(intent.Sprint, 0f, 1f);
+        if (intent.CloseControl) return m.CloseControlFraction;
+        float top = TopSpeed(s, t);
+        float jog = top > 0f ? MathF.Min(m.SprintFraction, m.JogSpeed / top) : m.SprintFraction;
+        return jog + (m.SprintFraction - jog) * Math.Clamp(intent.Sprint, 0f, 1f);
     }
 
     /// <summary>Turn rate in degrees per second before the speed penalty: agility, scaled by weight.</summary>
@@ -55,7 +53,7 @@ public static class Movement
         return m.TurnRateDeg.ForRating(s.Agility) * weight;
     }
 
-    /// <summary>Fraction of speed lost on a sharp turn (balance).</summary>
+    /// <summary>Fraction of speed lost on a sharp turn or a cut (balance), shed at balance_deceleration.</summary>
     public static float BalanceLoss(PlayerSheet s, Tuning t) => t.Movement.BalanceLoss.ForRating(s.Balance);
 
     /// <summary>Wraps an angle to -pi..pi.</summary>
@@ -91,7 +89,7 @@ public static class Movement
         if (mag > 1f) { stick /= mag; mag = 1f; }
         if (mag < m.StickDeadZone) mag = 0f;
 
-        float target = top * mag * ModeFraction(intent, t);
+        float target = top * mag * ModeFraction(intent, p.Sheet, t);
         var fwd0 = new Vector3(MathF.Cos(p.Facing), 0f, MathF.Sin(p.Facing));
         float speed = MathF.Max(0f, Vector3.Dot(p.Velocity - p.SteerVelocity, fwd0));
         float tau = MathF.Max(TimeConstantAt(p, now, t), dt);
@@ -106,16 +104,28 @@ public static class Movement
         {
             float desired = MathF.Atan2(stick.Y, stick.X);
             float diff = WrapAngle(desired - facing);
+            // Turning about without the ball: a plant and brake, once per turn (the sharp-turn window apart).
+            if (assist.TurnAbout && MathF.Abs(diff) * 180f / MathF.PI > m.ReverseTurnDeg && speed > m.ReverseMinSpeed
+                && now - p.ReverseTime > m.SharpTurnWindow)
+            {
+                p.SpeedDebt = MathF.Max(p.SpeedDebt, speed * m.ReverseSpeedLoss);
+                p.ReverseTime = now;
+            }
             float rate = TurnRateDeg(p.Sheet, t) * assist.TurnScale * (1f - m.TurnSpeedPenalty * Math.Clamp(speed / top, 0f, 1f)) * MathF.PI / 180f;
+            if (now < p.PostTurnUntil) rate = MathF.Max(rate, m.PostTurnRotationRate * MathF.PI / 180f);
             float maxTurn = rate * dt;
+            // A small heading change eases in (time constant turn_ease) instead of snapping round at the full rate; a large
+            // turn runs at the turn rate until it is within rate * turn_ease of the stick.
+            if (m.TurnEase > 0f) maxTurn = MathF.Min(maxTurn, MathF.Abs(diff) * MathF.Min(1f, dt / m.TurnEase));
             facing = WrapAngle(facing + Math.Clamp(diff, -maxTurn, maxTurn));
         }
 
-        // A turn over SharpTurnDeg inside SharpTurnWindow costs the balance percentage of current speed.
+        // A turn over SharpTurnDeg inside SharpTurnWindow costs the balance percentage of current speed. The loss is not taken
+        // at once (a step in the velocity): it is shed at balance_deceleration, on top of the easing toward the target.
         float change = MathF.Abs(WrapAngle(facing - p.TurnRefHeading)) * 180f / MathF.PI;
         if (change > m.SharpTurnDeg && now - p.TurnRefTime <= m.SharpTurnWindow)
         {
-            speed *= 1f - BalanceLoss(p.Sheet, t);
+            p.SpeedDebt += speed * BalanceLoss(p.Sheet, t);
             p.TurnRefHeading = facing;
             p.TurnRefTime = now;
         }
@@ -123,6 +133,13 @@ public static class Movement
         {
             p.TurnRefHeading = facing;
             p.TurnRefTime = now;
+        }
+        if (p.SpeedDebt > 0f)
+        {
+            float shed = MathF.Min(p.SpeedDebt, m.BalanceDeceleration * dt);
+            speed -= shed;
+            p.SpeedDebt -= shed;
+            if (speed <= 0f) p.SpeedDebt = 0f;
         }
 
         speed = MathF.Max(speed, 0f);
@@ -147,7 +164,7 @@ public static class Movement
 /// <summary>
 /// Per-tick movement modifiers: the speed cap, a turn-rate scale, a steering correction velocity (world X, Z) and, for a skill
 /// move, the running speed to use this tick (NaN: the legs ease toward the stick's target as usual), and a running speed never
-/// exceeded this tick (the post-strike stun).
+/// exceeded this tick (the post-strike stun), and whether a stick turned about brakes the run (without the ball).
 /// </summary>
 internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Steer, float RunSpeed = float.NaN,
-    float HardCap = float.PositiveInfinity);
+    float HardCap = float.PositiveInfinity, bool TurnAbout = false);

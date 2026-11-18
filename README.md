@@ -13,6 +13,8 @@ World coordinates are metres: X toward the attacked goal (goal line 52.5), Y up,
 | Batch run, 10 000 scripted rounds | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario penalty --n 10000 --seed 1` |
 | Save a scripted round as a replay | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario breakaway --seed 6 --save-replay game/tests/smoke_replay.json` |
 | Re-run a replay in the batch tool | `dotnet run -c Release --project src/FootballSim.Batch -- --replay game/tests/smoke_replay.json` |
+| Dribble probe: nine scripted stick traces per dribbling rating (possession kept, touches per second, ball ahead, feet, steering, contact miss) | `dotnet run -c Release --project src/FootballSim.Batch -- --probe dribble` |
+| Feel probe: speed surges, per-tick acceleration, touch cadence, ball distance and facing wobble of straight dribbles, and the heading response to a 45/90/180 degree stick turn with and without the ball; `--replays sessions` gives the acceleration and speed-step numbers over recorded play-test rounds, `--trace sprint45` (`jog90`, `sprint90off`, ...) prints one turn tick by tick | `dotnet run -c Release --project src/FootballSim.Batch -- --probe feel` |
 | Skill-move probe (scripted gestures per move, side, entry pace and skill_moves 1/50/99; the not-built elastico, heel-to-heel and spin rows should read recognised 100, made 0) | `dotnet run -c Release --project src/FootballSim.Batch -- --skill-probe` |
 | Write one replay per skill move (edge_of_box start) for screenshots | `dotnet run -c Release --project src/FootballSim.Batch -- --write-skill-replays out/skill-replays` |
 | Write one replay per visible keeper action (shuffle, rush, planted then reacting, each dive kind, tip over the bar, each reflex save, a block by the ready keeper's hull, smother, closing down, charging, jockeying, spread, a long sprint touch won, a backpedal under a chip, taken round, parry then grounded then getting up) for screenshots; prints each file with the tick range of its action | `dotnet run -c Release --project src/FootballSim.Batch -- --write-keeper-replays out/keeper-replays` |
@@ -32,10 +34,38 @@ Game options after `--`: `--data <dir>` (default `data/`), `--replay <file>`, `-
 
 Automated tools and agents must use `game/tests/run-bg.sh` for any windowed run (anything with `--shots`); headless runs need no wrapper.
 
-In replay mode the game also prints `FOOT_EVENT` per touch/strike and, on quit, `FOOT_CONTACT n= mean_m= max_m=` (touching foot's instep to the ball surface at each Touch/Strike) and `FOOT_SLIDE n= mean_m= max_m=` (movement of a planted foot per stance). With `--figure skinned` it also prints `SKIN_CONTACT n= mean_m= max_m=` (the skinned boot's contact surface for the touch's surface — inside, laces, outside or sole — to the ball surface at each touch's contact tick; target max <= 0.03 m), `FOOT_JUMP ctx=<skill|exit|touch|shot|other|all>` lines give, per context of the attacker's tick (a skill move, from a move's end until the first touch after it has recovered, a dribble touch, a shot, anything else), the largest and the 99th-percentile world move of either foot (the larger of its ankle's and boot tip's) in one physics tick (`dt_s`, one rendered frame at 120 Hz) and over two ticks (`max60_m`, one frame at 60 Hz), with the tick and foot of the largest; and `POSE_LIMITS` carries the running-only `run_min_pelvis_ratio`, `run_lean_max_deg` and `run_bob_max_m`; the dribble probe behind these targets is `dotnet run -c Release --project src/FootballSim.Batch -- --probe dribble`.
+In replay mode the game also prints `FOOT_EVENT` per touch/strike and, on quit, `FOOT_CONTACT n= mean_m= max_m=` (touching foot's instep to the ball surface at each Touch/Strike) and `FOOT_SLIDE n= mean_m= max_m=` (movement of a planted foot per stance). With `--figure skinned` it also prints `SKIN_CONTACT n= mean_m= max_m=` (the skinned boot's contact surface for the touch's surface — inside, laces, outside or sole — to the ball surface at each touch's contact tick; target max <= 0.03 m), `FOOT_JUMP ctx=<skill|exit|touch|shot|other|all>` lines give, per context of the attacker's tick (a skill move, from a move's end until the first touch after it has recovered, a dribble touch, a shot, anything else), the largest and the 99th-percentile world move of either foot (the larger of its ankle's and boot tip's) in one physics tick (`dt_s`, one rendered frame at 120 Hz) and over two ticks (`max60_m`, one frame at 60 Hz), with the tick and foot of the largest; `STRIDE n= step_s_mean= step_s_cv= step_m_mean= step_m_cv=` gives the attacker's running steps (plant to plant of alternate feet above 2 m/s, no skill move or shot: time, ground distance and their spread),
+and `POSE_LIMITS` carries the running-only `run_min_pelvis_ratio`, `run_lean_max_deg` and `run_bob_max_m`; the dribble probe behind these targets is `dotnet run -c Release --project src/FootballSim.Batch -- --probe dribble`.
 
 `--skill-probe` prints, per move: gesture recognised, move made, possession kept 2 s after the move, the time from the move's end to 90% of the with-ball top speed with sprint held (`t90_s`), the same for the same turn without the move (`base_t90_s`, both medians), the ball's distance at the move's end, for a step-over or feint the ball's distance ahead of the player at the start, when its own motion begins and when the foot passes over it (`start_ahead_m`, `exec_ahead_m`, `mid_ahead_m`), and for a sole move the ball centre's distance from the foot's contact point when the sole lands (`sole_miss_m`), each as mean/max; `--seeds`, `--ratings` and `--only step_over,...` narrow it.
 Player sheets carry a `skill_moves` rating (1-99): a skill move's exit burst grows with it, and each move chained within 2 s of the previous one uses 0.8 times the previous move's rating. A sheet without it uses its `dribbling`. Skill-move timings and the burst live in the `skill` section of `data/tuning/default.json`.
+
+## Dribbling and movement
+
+Every number is in the `movement` and `touch` sections of `data/tuning/default.json`; where GOALS' shipped data gives one it is used.
+
+- Speeds: a jog is 5.3 m/s for every player (`jog_speed`, GOALS' MaxJogSpeed), a sprint 6.8-8.5 m/s by `sprint_speed`
+  (GOALS' MaxSprintSpeed); with the ball both are lowered by dribbling (`top_speed_with_ball`), and close control runs at 0.35
+  of that lowered top speed.
+- Turning: with the ball up to 450 degrees per second by agility (GOALS' dribbling RotationRate), less with weight and halved
+  at top speed; a heading change smaller than the rate covers in `turn_ease` (0.05 s) eases in instead of snapping, so the
+  small corrections between touches do not jerk the body round.
+- A sharp turn or a cut costs the balance percentage of speed, shed at `balance_deceleration` (12 m/s^2) rather than at once.
+- Turning with the ball: a stick turned past the execution angle plans the turn touch at once on the next swing that can play
+  the ball up to `turn_reach` (0.45 m at rest to 0.6 m at a sprint, after GOALS' 0.6 m execution radius) from the foot, with
+  the body stepped toward it (`turn_steer_max` 1.5 m/s at `turn_steer_accel` 15 m/s^2), not a stretched leg; for
+  `post_turn_seconds` (0.3 s) after a turn or cut touch the body turns at least `post_turn_rotation_rate` (540 deg/s, after
+  GOALS' post-execution rotation rate) onto the ball's new line.
+- Without the ball the turn rate tops out at GOALS' 360 deg/s (`possession.off_ball_turn_bonus` -0.2), and a stick more than
+  `reverse_turn_deg` (135) from the facing above `reverse_min_speed` plants the runner: `reverse_speed_loss` (0.65) of his
+  speed is shed while he turns about.
+- Touches: the stick pushed no further than `walk_max_input` (0.7, GOALS' MaximumInputSizeForWalkTouch) dribbles with
+  walking touches, played as close control (a touch every step). A jog touches every two steps, and every
+  `foot_switch_every`-th (4th) touch takes one step more so the other foot takes over: an even cadence on both feet.
+- Steering into the contact zone: a touch is planned at least `min_plan_ahead` (0.3 s) before its contact and the player is
+  steered during the last `pre_windup` (0.4 s, GOALS' PreWindupTime). The steering correction eases in and out at
+  `steer_accel` (6 m/s^2, at most `steer_max` 0.6 m/s) and only brings the ball to within `reach_tolerance` (0.08 m) of the
+  swinging foot's contact point; the foot reaches the rest, and the contact point is where the ball is.
 
 ## Character models
 
@@ -234,7 +264,12 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
 - **Contact.** At the hands he holds a ball within his catch range for its speed (`catch_range_standing_min`..`_max` or
   `catch_range_diving_min`..`_max` by handling; at the feet or after backpedalling as for a ball `feet_catch_factor` or
   `backpedal_catch_factor` slower in effect) scaled by `catch_range_time` for the seconds since the strike, and no harder than
-  `catch_max_difficulty`; his body or a smother holds a ball slower than `body_hold_speed` or `smother_hold_speed`. Otherwise
+  `catch_max_difficulty`; his body or a smother holds a ball slower than `body_hold_speed` or `smother_hold_speed`. A reflex
+  limb's touch that is not held can be loose (GOALS' uncontrolled reflex deflections), with a chance of `reflex_loose_edge` by
+  how off-centre the ball meets the limb (0 head-on, 1 a graze) plus `reflex_loose_difficulty` by the save's difficulty, times
+  `reflex_loose_speed` by the ball's speed and `reflex_loose_rating` by the mean of handling and reflexes: the ball keeps
+  `reflex_loose_speed_min`..`_max` of its speed and bends away from the limb by a half to the whole of
+  `reflex_loose_max_bend_deg` (down to `reflex_loose_graze_bend` of it for a graze), so it can still go in. Otherwise
   his body, feet, a smother, a reflex foot or body block, or a ball that meets him before he moves blocks it (a quarter to
   near half the speed, at least `block_speed`); high near his line he tips it over the bar (above `tip_over_bar_height` of the
   goal height within `tip_over_bar_distance` of his line); a dive at least `fingertip_difficulty` hard fingertips it
@@ -253,7 +288,7 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
 The batch tool prints, under the scoring table, the keeper's distance off his line and the ball's distance from goal at the
 strike (mean, p10, p90), what became of parried first shots, the share of rounds with a charge, a rush or a
 smother before the shot, how often he was planted at the strike, his action at the strike (with his speed band), his mean
-reaction, the saves and dives he made, the first shot's save counts (catch, parry, block, tip, fingertip, smother, beaten)
+reaction, the saves and dives he made, the first shot's save counts (catch, parry, block, tip, fingertip, smother, loose reflex, beaten)
 and save types (catch, parry, reflex, reflex attempt, failed attempt, none: met before he moved), with the mean difficulty and
 how often and how ready he was at the strike; then his
 mean depth off his line as the attacker on the ball first came within 20, 15, 10 and 6 m of the goal centre, the rounds he won

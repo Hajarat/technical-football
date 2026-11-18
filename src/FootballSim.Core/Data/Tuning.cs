@@ -143,21 +143,48 @@ public sealed class ArenaTuning
 /// <summary>Attacker speed, acceleration, turning, balance and weight.</summary>
 public sealed class MovementTuning
 {
-    public RatingRange SprintSpeed { get; set; } = new(6.0f, 9.8f);
+    /// <summary>Top speed, m/s (sprint_speed rating): GOALS' MaxSprintSpeed 6.8-8.5 m/s.</summary>
+    public RatingRange SprintSpeed { get; set; } = new(6.8f, 8.5f);
     /// <summary>Speed time constant, seconds (acceleration rating).</summary>
     public RatingRange TimeConstant { get; set; } = new(1.10f, 0.45f);
-    /// <summary>Fraction of top speed when not sprinting ("jog is 60%").</summary>
-    public float JogFraction { get; set; } = 0.6f;
+    /// <summary>Jogging speed without the ball, the same for every player (GOALS' MaxJogSpeed 5.3 m/s), m/s.</summary>
+    public float JogSpeed { get; set; } = 5.3f;
     public float SprintFraction { get; set; } = 1.0f;
     public float CloseControlFraction { get; set; } = 0.35f;
-    /// <summary>Turn rate, degrees per second (agility rating).</summary>
-    public RatingRange TurnRateDeg { get; set; } = new(180f, 420f);
+    /// <summary>Turn rate with the ball, degrees per second (agility rating): GOALS' dribbling RotationRate 450 at the top.</summary>
+    public RatingRange TurnRateDeg { get; set; } = new(193f, 450f);
     /// <summary>Turn rate is scaled by (1 - this * speed fraction).</summary>
     public float TurnSpeedPenalty { get; set; } = 0.5f;
+    /// <summary>
+    /// Heading changes smaller than turn rate times this ease in exponentially with this time constant, seconds (0: every
+    /// change at the full turn rate). A turn's own angle multiplier on its acceleration, as GOALS' turn acceleration has.
+    /// </summary>
+    public float TurnEase { get; set; } = 0.05f;
+    /// <summary>
+    /// For post_turn_seconds after a turn or cut touch the turn rate is at least this, degrees per second (GOALS turns at least
+    /// 1080 deg/s after a trap, MinimumPostExecutionRotationRate): the body comes round onto the ball's new line in one step.
+    /// </summary>
+    public float PostTurnRotationRate { get; set; } = 540f;
+    public float PostTurnSeconds { get; set; } = 0.3f;
     public float SharpTurnDeg { get; set; } = 60f;
     public float SharpTurnWindow { get; set; } = 0.2f;
     /// <summary>Fraction of speed lost on a sharp turn (balance rating).</summary>
     public RatingRange BalanceLoss { get; set; } = new(0.50f, 0.15f);
+    /// <summary>
+    /// The rate a sharp turn's or a cut's speed loss is shed at, m/s^2: a planted cut, harder than GOALS' passive Deceleration
+    /// (5 m/s^2, no input); its active deceleration curves are not known.
+    /// </summary>
+    public float BalanceDeceleration { get; set; } = 12f;
+    /// <summary>
+    /// Without the ball, the stick more than this from the facing while running is a turn about (GOALS' moving capsule rotation
+    /// threshold, 135 degrees): the player plants and brakes, losing <see cref="ReverseSpeedLoss"/> of his speed at
+    /// balance_deceleration while he turns (GOALS plays a speed-dependent 180 turn instead of turning on the spot).
+    /// </summary>
+    public float ReverseTurnDeg { get; set; } = 135f;
+    /// <summary>Share of the running speed a turn about without the ball costs (see <see cref="ReverseTurnDeg"/>).</summary>
+    public float ReverseSpeedLoss { get; set; } = 0.65f;
+    /// <summary>A turn about only costs speed above this running speed, m/s.</summary>
+    public float ReverseMinSpeed { get; set; } = 2f;
     public float WeightReference { get; set; } = 75f;
     public float WeightRange { get; set; } = 25f;
     public float WeightTurnSlope { get; set; } = 0.15f;
@@ -232,9 +259,19 @@ public sealed class TouchTuning
     public float SprintThreshold { get; set; } = 0.5f;
     /// <summary>Stick deflection below this asks for no dribble touch; in possession it asks for a stop.</summary>
     public float StickThreshold { get; set; } = 0.1f;
+    /// <summary>A stick pushed no further than this (and no sprint) dribbles with walking touches, played as close control.</summary>
+    public float WalkMaxInput { get; set; } = 0.7f;
 
-    /// <summary>A touch is planned at least this long before its contact, seconds (the pre-windup).</summary>
-    public float PreWindup { get; set; } = 0.30f;
+    /// <summary>
+    /// The pre-windup, seconds (GOALS' PreWindupTime 0.4): the last stretch before a contact in which the player is steered so
+    /// the ball arrives in the contact zone (the windup's included).
+    /// </summary>
+    public float PreWindup { get; set; } = 0.40f;
+    /// <summary>
+    /// A touch is planned at least this long before its contact, seconds (shorter than the pre-windup, so a touch on every
+    /// step of close control still fits; such a touch is in its pre-windup from the moment it is planned).
+    /// </summary>
+    public float MinPlanAhead { get; set; } = 0.30f;
     /// <summary>The windup (the foot drawn back) starts this long before contact, seconds.</summary>
     public float Windup { get; set; } = 0.12f;
     /// <summary>The recovery (follow-through) ends this long after contact, seconds.</summary>
@@ -277,6 +314,24 @@ public sealed class TouchTuning
     public float ApproachMaxStickDeg { get; set; } = 45f;
     /// <summary>Largest correction added to the player's velocity while steering the ball into the contact zone, m/s.</summary>
     public float SteerMax { get; set; } = 0.6f;
+    /// <summary>
+    /// The steering brings the ball only to within this of the swinging foot's contact point, metres; the foot reaches the
+    /// rest (at most the contact zone radius), so small misses never move the body.
+    /// </summary>
+    public float ReachTolerance { get; set; } = 0.08f;
+    /// <summary>
+    /// An early turn touch (the stick turned past the execution angle) may be planned on a swing where the ball is up to this far
+    /// from the foot's contact point, metres, by speed (GOALS' execution radius is 0.6 m): the player steps toward it.
+    /// </summary>
+    public SpeedRange TurnReach { get; set; } = new(0.45f, 0.6f);
+    /// <summary>The steering of such a turn touch: at most this fast, m/s...</summary>
+    public float TurnSteerMax { get; set; } = 1.5f;
+    /// <summary>...changing by at most this, m/s^2 (a plant step).</summary>
+    public float TurnSteerAccel { get; set; } = 15f;
+    /// <summary>The steering correction changes by at most this, m/s^2 (0: at once), so it never steps the velocity.</summary>
+    public float SteerAccel { get; set; } = 6f;
+    /// <summary>With an even steps_per_touch, every this-many-th touch takes one step more so the other foot plays on.</summary>
+    public int FootSwitchEvery { get; set; } = 4;
     /// <summary>Steps of the stride clock between dribble touches, per mode.</summary>
     public StepsPerTouchTuning StepsPerTouch { get; set; } = new();
     /// <summary>Launch angle of touches, degrees.</summary>
@@ -361,8 +416,11 @@ public sealed class PossessionTuning
     public float LoseDistanceFast { get; set; } = 3.5f;
     /// <summary>While the player runs to recover a ball that no touch can be planned for, the speed cap is this fraction of top speed.</summary>
     public float ChaseSpeedFraction { get; set; } = 0.97f;
-    /// <summary>Off possession the turn rate is multiplied by (1 + this).</summary>
-    public float OffBallTurnBonus { get; set; } = 0.15f;
+    /// <summary>
+    /// Off possession the turn rate is multiplied by (1 + this): -0.2 makes the top of the range GOALS' 360 deg/s without the
+    /// ball against 450 with it.
+    /// </summary>
+    public float OffBallTurnBonus { get; set; } = -0.2f;
     /// <summary>How far ahead the touch planner looks for a swing that can play the ball, seconds.</summary>
     public float PredictionHorizon { get; set; } = 1.5f;
 }
@@ -823,6 +881,24 @@ public sealed class KeeperTuning
     public float FingertipSpeedKept { get; set; } = 0.70f;
     /// <summary>...and bends its path away from the goal by up to this much, degrees.</summary>
     public float FingertipMaxBendDeg { get; set; } = 40f;
+    /// <summary>
+    /// The chance a reflex touch is loose (the ball keeps going, bent a little: GOALS' uncontrolled reflex deflections) is the sum of
+    /// this, by how off-centre the ball meets the limb (0 head-on, 1 a graze)...
+    /// </summary>
+    public Curve ReflexLooseEdge { get; set; } = new((0.2f, 0f), (1f, 1.8f));
+    /// <summary>...and this, by the save's difficulty...</summary>
+    public Curve ReflexLooseDifficulty { get; set; } = new((0.3f, 0f), (1f, 0.8f));
+    /// <summary>...times this, by the ball's speed at the touch, m/s...</summary>
+    public Curve ReflexLooseSpeed { get; set; } = new((15f, 0.5f), (25f, 1f), (30f, 1.3f));
+    /// <summary>...and this, by the mean of handling and reflexes.</summary>
+    public RatingRange ReflexLooseRating { get; set; } = new(1.5f, 0.7f);
+    /// <summary>A loose reflex touch keeps between these fractions of the ball's speed...</summary>
+    public float ReflexLooseSpeedMin { get; set; } = 0.65f;
+    public float ReflexLooseSpeedMax { get; set; } = 0.9f;
+    /// <summary>...and bends its path away from the limb by a half to the whole of this for a head-on touch, degrees...</summary>
+    public float ReflexLooseMaxBendDeg { get; set; } = 40f;
+    /// <summary>...and of this fraction of it for a graze.</summary>
+    public float ReflexLooseGrazeBend { get; set; } = 0.5f;
     /// <summary>A dive that has not met the ball ends (the keeper lands) this long after its reach stops growing, seconds...</summary>
     public float DiveLandSeconds { get; set; } = 0.15f;
     /// <summary>...and no later than this after the reaction, seconds. A standing save lasts at least <see cref="StandSaveSeconds"/>.</summary>
@@ -906,6 +982,8 @@ public sealed class SkillTuning
     public float SoleReachTolerance { get; set; } = 0.3f;
     /// <summary>The largest steering velocity the reach may add to bring the foot to the ball, m/s.</summary>
     public float SoleReachSteer { get; set; } = 2.5f;
+    /// <summary>A sole move's reach lasts at least as long as the foot needs at this speed from up to half a stride off, m/s (0: no floor).</summary>
+    public float SoleReachFootSpeed { get; set; } = 8f;
 
     // ---- the moves ----
     public float StepOverSeconds { get; set; } = 0.25f;

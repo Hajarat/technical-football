@@ -193,6 +193,24 @@ public sealed class FigureStats
             yield return $"FOOT_JUMP ctx={JumpNames[i]} dt_s={JumpDt:F5} n={Jump[i].Count} max_m={Max(Jump[i]):F3} p99_m={P99(Jump[i]):F3} max60_m={Max(Jump60[i]):F3} p99_60_m={P99(Jump60[i]):F3} worst_tick={w.Tick} worst_foot={(w.Foot == 1 ? "R" : "L")}";
         }
         yield return $"FOOT_JUMP ctx=all dt_s={JumpDt:F5} n={all.Count} max_m={Max(all):F3} p99_m={P99(all):F3} max60_m={Max(all60):F3} p99_60_m={P99(all60):F3}";
+        yield return StrideLine();
+    }
+
+    /// <summary>
+    /// Running steps of the attacker (speed above 2 m/s, no skill move or shot): the time from one foot's plant to the next foot's plant
+    /// and the ground distance between the two plants. Regular running has a small spread (cv = standard deviation / mean).
+    /// </summary>
+    public readonly List<float> StepTime = new(), StepLen = new();
+
+    public string StrideLine() =>
+        $"STRIDE n={StepTime.Count} step_s_mean={Mean(StepTime):F3} step_s_cv={Cv(StepTime):F3} step_m_mean={Mean(StepLen):F3} step_m_cv={Cv(StepLen):F3}";
+
+    static float Cv(List<float> l)
+    {
+        if (l.Count < 2) return 0;
+        float m = Mean(l), v = 0;
+        foreach (var x in l) v += (x - m) * (x - m);
+        return m > 0 ? MathF.Sqrt(v / (l.Count - 1)) / m : 0;
     }
 
     static float P99(List<float> l)
@@ -318,6 +336,46 @@ public partial class PlayerFigure : Node3D
         public Vector3 RelC; public float Psi;
         public int ContactId = int.MinValue, ContactTick;
     }
+
+    /// <summary>
+    /// Per foot, for the last few touches (by id, whichever slot they are in: a touch moves from pending to previous at its contact): the
+    /// ball-out direction drawn last tick, and the tick each entry was last used.
+    /// </summary>
+    readonly Vector3[,] _odDir = new Vector3[2, 3];
+    readonly int[,] _odId = { { int.MinValue, int.MinValue, int.MinValue }, { int.MinValue, int.MinValue, int.MinValue } };
+    readonly int[,] _odUsed = new int[2, 3];
+    int _odClock;
+
+    /// <summary>The drawn ball-out direction for touch <paramref name="id"/> of foot <paramref name="i"/>: <paramref name="d"/> turned to from last tick's at no more than <see cref="OutDirTurnRate"/>.</summary>
+    Vector3 DrawnOutDir(int i, int id, Vector3 d, float dt)
+    {
+        int slot = -1, oldest = 0;
+        for (int e = 0; e < 3; e++)
+        {
+            if (_odId[i, e] == id) { slot = e; break; }
+            if (_odUsed[i, e] < _odUsed[i, oldest]) oldest = e;
+        }
+        _odClock++;
+        if (slot < 0 || _teleporting)
+        {
+            if (slot < 0) slot = oldest;
+            _odId[i, slot] = id; _odDir[i, slot] = d; _odUsed[i, slot] = _odClock;
+            return d;
+        }
+        Vector3 od = _odDir[i, slot];
+        float from = Mathf.Atan2(od.Z, od.X), to = Mathf.Atan2(d.Z, d.X);
+        float diff = Mathf.Wrap(to - from, -Mathf.Pi, Mathf.Pi), step = OutDirTurnRate * Math.Max(dt, 1e-4f);
+        float yaw = from + Math.Clamp(diff, -step, step);
+        var r = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
+        _odDir[i, slot] = r; _odUsed[i, slot] = _odClock;
+        return r;
+    }
+
+    /// <summary>
+    /// How fast the drawn ball-out direction of a touch may turn, radians per second. Before contact it is the run direction, at contact the
+    /// launch: a turn touch would otherwise swing the foot's contact surface round the ball (and the ankle with it) in one tick.
+    /// </summary>
+    const float OutDirTurnRate = 4f * Mathf.Pi;
     readonly TouchFoot[] _tf = { new(), new() }, _tfUp = { new(), new() };
     /// <summary>Per foot: the touch pose drawn last tick came from an unmade touch (a windup or a predicted touch), its weight, and the ankle drawn
     /// (relative to the pelvis); a fade from that ankle when such a touch vanishes without contact, and how long is left of it.</summary>
@@ -554,7 +612,7 @@ public partial class PlayerFigure : Node3D
                 Vector3 gait;
                 if (stance)
                 {
-                    if (!ft.InStance) { ft.InStance = true; ft.Released = false; ft.Plant = pelXZ + fm * (w * stepLen) + lat; ft.Plant.Y = AnkleH; }
+                    if (!ft.InStance) { ft.InStance = true; ft.Released = false; ft.Plant = pelXZ + fm * (w * stepLen) + lat; ft.Plant.Y = AnkleH; MeasureStep(f, ft.Plant, speed); }
                     // the body gained speed and the planted foot is about to be out of reach: lift it early, to the rear of the cycle
                     if (!ft.Released && Dist2(pelXZ + right * side * HipW, ft.Plant) > 0.97f * hmaxNow) { ft.Released = true; ft.Blend = 0f; ft.BlendFrom = ft.Ankle; }
                     gait = ft.Released ? pelXZ - fm * (w * stepLen) + lat : ft.Plant;
@@ -861,6 +919,21 @@ public partial class PlayerFigure : Node3D
         _jN = Math.Min(_jN + 1, 2);
     }
 
+    // stride measurement: the previous plant's tick and place, and whether the body was running then
+    int _stepTick = -1; Vector3 _stepAt; bool _stepRunning;
+
+    void MeasureStep(in FigureFrame f, Vector3 plant, float speed)
+    {
+        if (IsKeeper || Stats == null) return;
+        bool run = speed > 2f && !_seq && _strikeT < 0f && !f.Skill.Valid && !f.Shot.Valid && f.ShotCharge <= 0.001f;
+        if (run && _stepRunning && _stepTick >= 0 && Stats.Tick > _stepTick)
+        {
+            Stats.StepTime.Add((Stats.Tick - _stepTick) * Stats.JumpDt);
+            Stats.StepLen.Add(new Vector2(plant.X - _stepAt.X, plant.Z - _stepAt.Z).Length());
+        }
+        _stepTick = Stats.Tick; _stepAt = plant; _stepRunning = run;
+    }
+
     /// <summary>The boot's contact surface point relative to the ankle joint in the foot's frame (forward, up, the character's right), metres.</summary>
     Vector3 Off(int foot, BootSurface surface)
     {
@@ -918,6 +991,8 @@ public partial class PlayerFigure : Node3D
                 Vector3 np = new(a.NextMeetPoint.X - centre.X, 0, a.NextMeetPoint.Z - centre.Z);
                 d = !float.IsNaN(a.NextMeetPoint.X) && np.LengthSquared() > 0.09f ? np.Normalized() : fm;
             }
+            // the drawn direction follows the wanted one at a limited rate within one touch (a new touch starts from its own)
+            d = DrawnOutDir(i, a.Id, d, f.Dt);
             Vector3 fd = SurfaceDir(a.Surface, i, d);
             Vector3 rv = new(-fd.Z, 0, fd.X);
             Vector3 off = Off(i, a.Surface);
