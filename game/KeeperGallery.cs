@@ -131,6 +131,22 @@ public sealed class KeeperGallery
             return (_p0 + _fwd * x, -_fwd * v);
         };
         MomPh(back, 1, 0.25f, "a"); MomPh(back, 1, 0.5f, "b"); MomPh(back, 1, 0.75f, "c");
+        // charging: running out at an attacker on the ball (the run cycle, as the rush), then jockeying in front of him
+        var charge = S("charge_jockey"); charge.Running = true;
+        charge.Phases.Add(Ph(KeeperAction.Set, 0.3f)); charge.Phases.Add(Ph(KeeperAction.Charge, 1.2f)); charge.Phases.Add(Ph(KeeperAction.Jockey, 1.4f));
+        charge.Motion = t =>
+        {
+            float u = Mathf.Clamp((t - 0.3f) / 1.2f, 0f, 1f);
+            float x = Mathf.SmoothStep(0f, 1f, u) * 6f, v = u > 0f && u < 1f ? 6f * u * (1f - u) * 6f / 1.2f : 0f;
+            // jockeying: stepping 1.2 m to his right and back with the attacker (starting and ending still), giving a little ground
+            float w = Mathf.Clamp((t - 1.5f) / 1.4f, 0f, 1f);
+            float sn = Mathf.Sin(Mathf.Pi * w);
+            float across = 1.2f * sn * sn, vAcross = 1.2f * Mathf.Pi / 1.4f * Mathf.Sin(2f * Mathf.Pi * w);
+            float back = 0.5f * Mathf.SmoothStep(0f, 1f, w), vBack = 0.5f * 6f * w * (1f - w) / 1.4f;
+            if (t > 1.5f) return (_p0 + _fwd * (x - back) + _right * across, _right * vAcross - _fwd * vBack);
+            return (_p0 + _fwd * x, _fwd * v);
+        };
+        MomPh(charge, 1, 0.3f, "a"); MomPh(charge, 1, 0.75f, "b"); MomPh(charge, 2, 0.25f, "jockey_a"); MomPh(charge, 2, 0.6f, "jockey_b");
         // staying big: from his set stance he stops and spreads, close to an attacker on the ball
         var spread = S("spread"); spread.Phases.Add(Ph(KeeperAction.Set, 0.4f)); spread.Phases.Add(Ph(KeeperAction.Spread, 0.9f));
         MomPh(spread, 1, 0.3f, "a"); MomPh(spread, 1, 1f, "end");
