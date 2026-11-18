@@ -2,7 +2,7 @@ using Godot;
 
 namespace FootballSim.Game;
 
-/// <summary>Goalkeeper: the same jointed figure in contrasting kit with larger gloves, in every state of the keeper contract (stance, shuffle, backpedal, spread, jockey, rush, charge, dives, smother, holding, lying, getting up); the poses are in PlayerFigure.Keeper.cs.</summary>
+/// <summary>Goalkeeper: the same jointed figure in contrasting kit with larger gloves, in every state of the keeper contract (stance, shuffle, backpedal, spread, jockey, rush, charge, dives, reflex saves, smother, holding, lying, getting up); the poses are in PlayerFigure.Keeper.cs.</summary>
 public partial class KeeperView : Node3D
 {
     /// <summary>How long the get-up takes: the figure rises from lying to the set stance over this many seconds (the core's default get-up time).</summary>
