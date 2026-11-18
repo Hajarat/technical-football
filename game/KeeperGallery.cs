@@ -134,6 +134,17 @@ public sealed class KeeperGallery
         // staying big: from his set stance he stops and spreads, close to an attacker on the ball
         var spread = S("spread"); spread.Phases.Add(Ph(KeeperAction.Set, 0.4f)); spread.Phases.Add(Ph(KeeperAction.Spread, 0.9f));
         MomPh(spread, 1, 0.3f, "a"); MomPh(spread, 1, 1f, "end");
+        // the backward leap under a chip: backpedalling, then springing up and back at a ball dropping behind him, then on his back
+        var leap = S("backward_leap"); leap.Running = true;
+        var leapAt = Rel(-1.1f, 0.35f, 2.75f);
+        leap.Phases.Add(Ph(KeeperAction.Backpedal, 0.6f)); leap.Phases.Add(Ph(KeeperAction.Diving, 0.45f, KeeperDive.Back, Reach(leapAt, 0.35f)));
+        leap.Phases.Add(Ph(KeeperAction.Grounded, 0.6f, KeeperDive.None, _ => leapAt));
+        leap.Motion = t =>
+        {
+            float u = Mathf.Clamp(t / 0.9f, 0f, 1f);
+            return (_p0 + _fwd * (2.2f - 2.2f * Mathf.SmoothStep(0f, 1f, u)), -_fwd * (t < 0.9f ? 3.5f * (1f - u) : 0f));
+        };
+        MomPh(leap, 0, 0.6f, "back"); MomPh(leap, 1, 0.35f, "spring"); MomPh(leap, 1, 0.8f, "reach"); MomPh(leap, 2, 1f, "down");
         var holdStand = S("holding_standing");
         var catchPos = Rel(0.35f, 0, 1.1f);
         holdStand.Phases.Add(Ph(KeeperAction.Reacting, 0.4f)); holdStand.Phases.Add(Ph(KeeperAction.Diving, 0.3f, KeeperDive.Catch, Reach(Target(KeeperDive.Catch, 1), 0.3f)));
