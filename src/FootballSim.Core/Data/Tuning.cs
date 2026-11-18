@@ -698,6 +698,16 @@ public sealed class SkillTuning
     public float KnockOnWait { get; set; } = 0.15f;
     /// <summary>Cancel pressed within this long of the shot starting turns it into a fake shot.</summary>
     public float FakeShotWindow { get; set; } = 0.1f;
+    /// <summary>
+    /// Shoot pressed a second time within this long of the first press, the shot still unstruck, turns it into a low shot
+    /// (driven; a finesse shot becomes a low finesse). Inside the wind-up, so the type is settled before the contact.
+    /// </summary>
+    public float LowShotWindow { get; set; } = 0.25f;
+    /// <summary>
+    /// Each step of a heel-to-heel or a spin (a flick held, the stick back at neutral, the next flick) comes within this long
+    /// of the one before. A sprinting forward flick released to neutral holds its knock-on while the next step may still come.
+    /// </summary>
+    public float ComboStepWindow { get; set; } = 0.125f;
     /// <summary>Above this speed the gesture frame's forward is the running direction, below it the facing, m/s.</summary>
     public float FrameMinSpeed { get; set; } = 1.0f;
     /// <summary>A keyboard skill key takes its side from the left stick's sideways deflection beyond this (else right).</summary>

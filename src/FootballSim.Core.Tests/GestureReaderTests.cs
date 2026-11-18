@@ -13,8 +13,11 @@ public class GestureReaderTests
 
     public enum Entry { Standing, Jog, Sprint }
 
-    /// <summary>One tick of a trace in the player's frame: the right stick, and optionally the left stick and a skill key.</summary>
-    record struct Step(Vector2 Right, Vector2 Left = default, SkillKey Key = SkillKey.None);
+    /// <summary>
+    /// One tick of a trace in the player's frame: the right stick, and optionally the left stick, a skill key and the shoulder
+    /// buttons (left = <see cref="TickIntent.Chip"/>, right = <see cref="TickIntent.Finesse"/>).
+    /// </summary>
+    record struct Step(Vector2 Right, Vector2 Left = default, SkillKey Key = SkillKey.None, bool Lb = false, bool Rb = false);
 
     static Vector2 Rot(Vector2 v, float deg)
     {
@@ -50,7 +53,8 @@ public class GestureReaderTests
         {
             var r = Rot(all[i].Right, Heading);
             var l = Rot(all[i].Left, Heading);
-            var it = new TickIntent { RightX = r.X, RightZ = r.Y, MoveX = l.X, MoveZ = l.Y, Sprint = e == Entry.Sprint ? 1f : 0f, SkillKey = all[i].Key };
+            var it = new TickIntent { RightX = r.X, RightZ = r.Y, MoveX = l.X, MoveZ = l.Y, Sprint = e == Entry.Sprint ? 1f : 0f, SkillKey = all[i].Key,
+                Chip = all[i].Lb, Finesse = all[i].Rb };
             var g = GestureReader.Read(p, it, i + 1, t);
             if (g.Kind != Gesture.None) got.Add((i + 1, g));
         }
@@ -80,8 +84,8 @@ public class GestureReaderTests
     public void StepOverIsForwardThenTheSide(Entry e, int side)
     {
         AssertOnly(Read(e, Hold(Fwd(), 6).Concat(Hold(Side(side), 8))), Gesture.StepOver, S(side));
-        // Through neutral, still inside the window.
-        AssertOnly(Read(e, Hold(Fwd(), 4).Concat(Neutral(6)).Concat(Hold(Side(side), 8))), Gesture.StepOver, S(side));
+        // Turned on round the rim (50 degrees, then the side), never through neutral: still a step-over.
+        AssertOnly(Read(e, Hold(Fwd(), 6).Concat(Hold(Rot(Fwd(), side * 50f), 2)).Concat(Hold(Side(side), 8))), Gesture.StepOver, S(side));
         // The side 25 degrees off square (inside the 30 degree step-over tolerance).
         AssertOnly(Read(e, Hold(Fwd(), 5).Concat(Hold(Rot(Side(side), side * -25f), 8))), Gesture.StepOver, S(side));
     }
@@ -110,12 +114,85 @@ public class GestureReaderTests
         }
     }
 
+    static IEnumerable<Step> Drag(int ticks, Vector2 left, bool lb = true, bool rb = true) =>
+        Enumerable.Repeat(new Step(Vector2.Zero, left, Lb: lb, Rb: rb), ticks);
+
     [Theory]
     [MemberData(nameof(Entries))]
-    public void DragBackIsBack(Entry e)
+    public void DragBackIsTheLeftStickBackWithBothShoulders(Entry e)
     {
-        AssertOnly(Read(e, Hold(Back(), 8)), Gesture.DragBack, SkillSide.None);
-        AssertOnly(Read(e, Hold(Rot(Back(), 40f), 8)), Gesture.DragBack, SkillSide.None);
+        AssertOnly(Read(e, Drag(8, Back())), Gesture.DragBack, SkillSide.None);
+        AssertOnly(Read(e, Drag(8, Rot(Back(), 40f))), Gesture.DragBack, SkillSide.None);
+        // Shoulders first, then the stick back: fires when the stick arrives; held on, still one.
+        AssertOnly(Read(e, Drag(5, Vector2.Zero).Concat(Drag(60, Back()))), Gesture.DragBack, SkillSide.None);
+        // One shoulder only, the stick back without shoulders, or both shoulders with the stick sideways: nothing.
+        Assert.Empty(Read(e, Drag(8, Back(), lb: false)));
+        Assert.Empty(Read(e, Drag(8, Back(), rb: false)));
+        Assert.Empty(Read(e, Drag(8, Back(), lb: false, rb: false)));
+        Assert.Empty(Read(e, Drag(8, Side(1))));
+        Assert.Empty(Read(e, Drag(8, Back(0.4f))));
+    }
+
+    [Theory]
+    [MemberData(nameof(Entries))]
+    public void TheRightStickBackAloneDoesNothing(Entry e)
+    {
+        Assert.Empty(Read(e, Hold(Back(), 8)));
+        Assert.Empty(Read(e, Hold(Rot(Back(), 40f), 60)));
+        // Back, released, back again.
+        Assert.Empty(Read(e, Hold(Back(), 6).Concat(Neutral(20)).Concat(Hold(Back(), 6))));
+    }
+
+    [Theory]
+    [MemberData(nameof(SidesAndEntries))]
+    public void ElasticoIsBackThenTheSideAndIsNotBuilt(Entry e, int side)
+    {
+        AssertOnly(Read(e, Hold(Back(), 6).Concat(Hold(Side(side), 8))), Gesture.Elastico, S(side));
+        AssertOnly(Read(e, Hold(Back(), 6).Concat(Hold(Rot(Back(), side * -50f), 2)).Concat(Hold(Side(side), 30))), Gesture.Elastico, S(side));
+        Assert.True(GestureReader.NotBuilt(Gesture.Elastico));
+    }
+
+    [Theory]
+    [MemberData(nameof(Entries))]
+    public void HeelToHeelIsAForwardFlickNeutralThenBackAndIsNotBuilt(Entry e)
+    {
+        var got = Read(e, Hold(Fwd(), 5).Concat(Neutral(4)).Concat(Hold(Back(), 5)));
+        AssertOnly(got, Gesture.HeelToHeel, SkillSide.None);
+        Assert.Equal(10 + 5 + 4 + 1, got[0].Tick); // on the back flick's first tick
+        // The back flick of a heel-to-heel turned to the side is no elastico.
+        AssertOnly(Read(e, Hold(Fwd(), 5).Concat(Neutral(4)).Concat(Hold(Back(), 14)).Concat(Hold(Side(1), 4))), Gesture.HeelToHeel, SkillSide.None);
+        // Too slow a step (a forward hold or a neutral pause past 0.125 s): nothing.
+        Assert.Empty(Read(e, Hold(Fwd(), 20).Concat(Neutral(4)).Concat(Hold(Back(), 5))).Where(x => x.G.Kind != Gesture.KnockOn));
+        Assert.Empty(Read(e, Hold(Fwd(), 5).Concat(Neutral(20)).Concat(Hold(Back(), 5))).Where(x => x.G.Kind != Gesture.KnockOn));
+        Assert.True(GestureReader.NotBuilt(Gesture.HeelToHeel));
+    }
+
+    [Theory]
+    [MemberData(nameof(SidesAndEntries))]
+    public void SpinIsAForwardFlickNeutralThenTheSideAndIsNotBuilt(Entry e, int side)
+    {
+        var got = Read(e, Hold(Fwd(), 5).Concat(Neutral(4)).Concat(Hold(Side(side), 4)));
+        AssertOnly(got, Gesture.SpinAndGo, S(side));
+        Assert.Equal(10 + 5 + 4 + 1, got[0].Tick);
+        // The side held on is still only the spin (no roll after it), and released gives no feint.
+        AssertOnly(Read(e, Hold(Fwd(), 5).Concat(Neutral(4)).Concat(Hold(Side(side), 40))), Gesture.SpinAndGo, S(side));
+        Assert.True(GestureReader.NotBuilt(Gesture.SpinAndGo));
+    }
+
+    [Theory]
+    [MemberData(nameof(SidesAndEntries))]
+    public void StepOverAndSpinAreToldApartByNeutral(Entry e, int side)
+    {
+        // Forward straight on to the side: step-over. Forward, neutral, side: spin. Same timing otherwise.
+        AssertOnly(Read(e, Hold(Fwd(), 6).Concat(Hold(Side(side), 8))), Gesture.StepOver, S(side));
+        AssertOnly(Read(e, Hold(Fwd(), 6).Concat(Neutral(1)).Concat(Hold(Side(side), 8))), Gesture.SpinAndGo, S(side));
+        // A spin needs its forward flick to start from neutral: from a side hold it is a roll then a body feint, not a spin.
+        Assert.DoesNotContain(Read(e, Hold(Side(-side), 20).Concat(Hold(Fwd(), 5)).Concat(Neutral(4)).Concat(Hold(Side(side), 4))),
+            x => x.G.Kind == Gesture.SpinAndGo);
+        // Forward, a long neutral, then a side flick: a body feint (after the knock-on the flick asks for, sprinting).
+        var late = Read(e, Hold(Fwd(), 6).Concat(Neutral(30)).Concat(Hold(Side(side), 4)));
+        AssertOnly(late.Where(x => x.G.Kind != Gesture.KnockOn).ToList(), Gesture.BodyFeint, S(side));
+        Assert.Equal(e == Entry.Sprint ? 1 : 0, late.Count(x => x.G.Kind == Gesture.KnockOn));
     }
 
     [Fact]
@@ -123,9 +200,30 @@ public class GestureReaderTests
     {
         var got = Read(Entry.Sprint, Hold(Fwd(), 8));
         AssertOnly(got, Gesture.KnockOn, SkillSide.None);
-        Assert.Equal(10 + 1 + 18, got[0].Tick); // armed on the first forward tick, fired 0.15 s later
-        // Held forward the whole time: still one knock-on.
-        AssertOnly(Read(Entry.Sprint, Hold(Fwd(), 60)), Gesture.KnockOn, SkillSide.None);
+        // Armed on the first forward tick; the flick released at once could still start a spin or heel-to-heel, so it fires
+        // when that chance has gone: 0.125 s (15 ticks) after the release, past the 0.15 s wait.
+        Assert.Equal(10 + 8 + 15 + 1, got[0].Tick);
+        // Held forward past the wait: fired 0.15 s after arming, as no spin or heel-to-heel can follow.
+        got = Read(Entry.Sprint, Hold(Fwd(), 60));
+        AssertOnly(got, Gesture.KnockOn, SkillSide.None);
+        Assert.Equal(10 + 1 + 18, got[0].Tick);
+        // A flick held longer than a combo step: no wait for the combo either.
+        got = Read(Entry.Sprint, Hold(Fwd(), 17));
+        AssertOnly(got, Gesture.KnockOn, SkillSide.None);
+        Assert.Equal(10 + 1 + 18, got[0].Tick);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(1)]
+    public void ASprintingForwardFlickThatStartsASpinOrHeelToHeelIsNoKnockOn(int side)
+    {
+        // The last flick inside the knock-on's own wait, and after it (a slower, still valid combo).
+        foreach (int pause in new[] { 3, 14 })
+        {
+            AssertOnly(Read(Entry.Sprint, Hold(Fwd(), 6).Concat(Neutral(pause)).Concat(Hold(Side(side), 4))), Gesture.SpinAndGo, S(side));
+            AssertOnly(Read(Entry.Sprint, Hold(Fwd(), 6).Concat(Neutral(pause)).Concat(Hold(Back(), 4))), Gesture.HeelToHeel, SkillSide.None);
+        }
     }
 
     [Theory]
@@ -156,10 +254,10 @@ public class GestureReaderTests
     public void GesturesInsideTheGapAreDropped()
     {
         // A drag-back 4 ticks after a body feint (gap 0.08 s = 10 ticks) is ignored.
-        var got = Read(Entry.Jog, Hold(Side(1), 3).Concat(Neutral(3)).Concat(Hold(Back(), 6)));
+        var got = Read(Entry.Jog, Hold(Side(1), 3).Concat(Neutral(3)).Concat(Drag(6, Back())));
         AssertOnly(got, Gesture.BodyFeint, SkillSide.Right);
         // Twelve ticks later it counts.
-        got = Read(Entry.Jog, Hold(Side(1), 3).Concat(Neutral(12)).Concat(Hold(Back(), 6)));
+        got = Read(Entry.Jog, Hold(Side(1), 3).Concat(Neutral(12)).Concat(Drag(6, Back())));
         Assert.Equal(new[] { Gesture.BodyFeint, Gesture.DragBack }, got.Select(x => x.G.Kind));
     }
 

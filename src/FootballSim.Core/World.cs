@@ -463,7 +463,9 @@ public sealed class World
         if (!it.ShootHeld) _shotCancelled = false;
         bool shootHeld = it.ShootHeld && !_shotCancelled;
         bool knockGesture = gesture.Kind == Gesture.KnockOn;
-        if (gesture.Kind is not (Gesture.None or Gesture.KnockOn)) SkillMoves.Request(p, gesture, Tick);
+        // A gesture with no move yet (elastico, heel-to-heel, spin) is recognised and ignored.
+        if (gesture.Kind is not (Gesture.None or Gesture.KnockOn) && !GestureReader.NotBuilt(gesture.Kind)) SkillMoves.Request(p, gesture, Tick);
+        if (State == RoundState.Strike && _pending.Active && shootHeld && !_shootWasHeld) PressShootAgain(p, it);
         if (State == RoundState.Live && !shootHeld
             && SkillMoves.TryStart(p, Ball, inPossession, Tick, SimTime, tuning) is SimEvent started)
             _events.Add(started);
@@ -582,6 +584,25 @@ public sealed class World
         SkillMoves.Abort(p);
         State = RoundState.Strike;
         ShotCharge = 0f;
+    }
+
+    /// <summary>
+    /// Shoot pressed again after its release, the shot not yet struck: within low_shot_window of the first press it becomes a
+    /// low shot (power to driven, finesse to low finesse; a chip stays a chip, as there is no low chip yet). Shoulder buttons
+    /// held on the second press count as if held through the first.
+    /// </summary>
+    void PressShootAgain(PlayerState p, in TickIntent it)
+    {
+        if (_shotStartTick < 0 || Tick - _shotStartTick > Ticks(Tuning.Skill.LowShotWindow)) return;
+        var t = _pending.Type;
+        bool finesse = t is ShotType.Finesse or ShotType.LowFinesse || it.Finesse;
+        bool chip = t == ShotType.Chip || it.Chip;
+        _pending.Type = ShotModel.TypeFor(finesse, chip, driven: true);
+        if (p.ShotAction is { } shot)
+        {
+            shot.Kind = ShotModel.KindFor(_pending.Type);
+            shot.Surface = ShotModel.SurfaceFor(_pending.Type);
+        }
     }
 
     /// <summary>Lets a player touch the ball and raises the Touch event; a first contact with a loose ball gains possession.</summary>

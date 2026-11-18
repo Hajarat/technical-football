@@ -180,6 +180,15 @@ public sealed class PlayerState
     internal int GZoneStart;
     /// <summary>Latest world tick the right stick was forward.</summary>
     internal int GFwdLastTick = int.MinValue / 2;
+    /// <summary>World tick the right stick last entered forward, and whether it came there from neutral.</summary>
+    internal int GFwdStart = int.MinValue / 2;
+    internal bool GFwdFromNeutral;
+    /// <summary>Latest world tick the right stick was back (the start of an elastico).</summary>
+    internal int GBackLastTick = int.MinValue / 2;
+    /// <summary>The last two directions the right stick held before its current one, newest first (in-between zones skipped).</summary>
+    internal GestureReader.Zone GHist0, GHist1;
+    /// <summary>The left stick back with both shoulder buttons held, on the previous tick (the drag-back fires on the change).</summary>
+    internal bool GDragHeld;
     /// <summary>The side held now has already given a step-over or a roll.</summary>
     internal bool GSideConsumed;
     /// <summary>The forward push held now has already armed a knock-on.</summary>
@@ -233,6 +242,8 @@ public sealed class PlayerState
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction;
         GZone = o.GZone; GPrevZone = o.GPrevZone; GZoneStart = o.GZoneStart; GFwdLastTick = o.GFwdLastTick;
+        GFwdStart = o.GFwdStart; GFwdFromNeutral = o.GFwdFromNeutral; GBackLastTick = o.GBackLastTick;
+        GHist0 = o.GHist0; GHist1 = o.GHist1; GDragHeld = o.GDragHeld;
         GSideConsumed = o.GSideConsumed; GKnockUsed = o.GKnockUsed; GKnockWaitTick = o.GKnockWaitTick; GPrevCancel = o.GPrevCancel;
         LastGesture = o.LastGesture; LastGestureTick = o.LastGestureTick; SkillEffective = o.SkillEffective; SkillChainCount = o.SkillChainCount;
         SkillAction = o.SkillAction; SkillBufKind = o.SkillBufKind; SkillBufSide = o.SkillBufSide; SkillBufCut = o.SkillBufCut;

@@ -255,4 +255,76 @@ public class ShotActionTests
         // A fixed charge overrides the model.
         Assert.Equal(0.5f, RoundRunner.RunFirstShot(t, sc, att, kee, 7, new ScriptedAttacker { Charge = 0.5f }).Shot!.Charge, 1);
     }
+    // ---- the low shot: shoot tapped twice ----
+
+    /// <summary>
+    /// A press of shoot held <paramref name="first"/> ticks, released <paramref name="gap"/> ticks, then pressed again
+    /// <paramref name="second"/> ticks; finesse (RB) and chip (LB) held throughout. Returns the struck shot.
+    /// </summary>
+    static ShotResult DoubleTap(int first, int gap, int second, bool finesse = false, bool chip = false)
+    {
+        var w = TestData.Live("penalty");
+        for (int i = 0; i < first; i++) Step(w, new TickIntent { ShootHeld = true, Finesse = finesse, Chip = chip });
+        for (int i = 0; i < gap; i++) Step(w, new TickIntent { Finesse = finesse, Chip = chip });
+        for (int i = 0; i < second && w.Shots.Count == 0; i++) Step(w, new TickIntent { ShootHeld = true, Finesse = finesse, Chip = chip });
+        StepToStrike(w);
+        return Assert.Single(w.Shots);
+    }
+
+    [Theory]
+    [InlineData(false, false, ShotType.Driven)]      // B, B: low shot
+    [InlineData(true, false, ShotType.LowFinesse)]   // RB + B, B: low curved
+    [InlineData(false, true, ShotType.Chip)]         // LB + B, B: the low chip is not built, a chip
+    public void ShootTappedTwiceIsALowShot(bool finesse, bool chip, ShotType type)
+    {
+        Assert.Equal(type, DoubleTap(8, 6, 6, finesse, chip).Type);
+        // The second press on the last tick of the 0.25 s window still counts.
+        Assert.Equal(type, DoubleTap(8, 30 - 8, 6, finesse, chip).Type);
+    }
+
+    [Theory]
+    [InlineData(false, false, ShotType.Power)]
+    [InlineData(true, false, ShotType.Finesse)]
+    [InlineData(false, true, ShotType.Chip)]
+    public void ASecondPressAfterTheWindowOrASingleTapChangesNothing(bool finesse, bool chip, ShotType type)
+    {
+        Assert.Equal(type, DoubleTap(8, 31 - 8, 6, finesse, chip).Type);   // one tick too late
+        Assert.Equal(type, DoubleTap(8, 0, 0, finesse, chip).Type);        // a single tap
+        Assert.Equal(type, DoubleTap(40, 4, 6, finesse, chip).Type);       // held past the window, then pressed again
+    }
+
+    [Fact]
+    public void TheLowShotKeepsTheFirstPressCharge()
+    {
+        var one = DoubleTap(8, 0, 0);
+        var two = DoubleTap(8, 6, 20);
+        Assert.Equal(one.Charge, two.Charge);
+        Assert.Equal(ShotType.Driven, two.Type);
+    }
+
+    [Fact]
+    public void ShoulderPressedOnlyWithTheSecondTapCountsForTheLowShot()
+    {
+        var w = TestData.Live("penalty");
+        for (int i = 0; i < 8; i++) Step(w, new TickIntent { ShootHeld = true });
+        for (int i = 0; i < 6; i++) Step(w, default);
+        Assert.Equal(ActionKind.Power, w.Attacker.Action!.Kind);
+        for (int i = 0; i < 6; i++) Step(w, new TickIntent { ShootHeld = true, Finesse = true });
+        Assert.Equal(ActionKind.LowFinesse, w.Attacker.Action!.Kind);
+        StepToStrike(w);
+        Assert.Equal(ShotType.LowFinesse, Assert.Single(w.Shots).Type);
+    }
+
+    [Fact]
+    public void ShootThenCancelIsStillAFakeShot()
+    {
+        // B then A (cancel) inside 0.1 s: a fake, no strike, whatever comes after inside the low-shot window.
+        var w = TestData.Live("penalty");
+        for (int i = 0; i < 4; i++) Step(w, new TickIntent { ShootHeld = true });
+        for (int i = 0; i < 4; i++) Step(w, new TickIntent { ShootHeld = true, Cancel = true });
+        for (int i = 0; i < 6; i++) Step(w, default);
+        for (int i = 0; i < 6; i++) Step(w, new TickIntent { ShootHeld = true });
+        Assert.Equal(Gesture.FakeStop, w.Attacker.LastGesture);
+        Assert.Empty(w.Shots);
+    }
 }
