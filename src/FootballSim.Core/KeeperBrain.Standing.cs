@@ -15,6 +15,10 @@ public sealed partial class KeeperBrain
     // Round record (before the first strike).
     readonly float[] _bandDepth = NewBands();
     bool _roundRounded, _roundWon;
+    // Depth reversals: the direction he last held (+1 out, -1 back, 0 none), a new direction and how long it has held.
+    int _depthDir, _depthNew;
+    float _depthNewFor, _clock;
+    int _reversals, _reversals2;
 
     static float[] NewBands()
     {
@@ -91,6 +95,10 @@ public sealed partial class KeeperBrain
         Vector3 ideal = holdLine ? Keeper.LineSpot(look, _pitch, _t) : Keeper.ArcTarget(look, _pitch, _t, _k.Sheet);
         bool engage = false;
         if (!holdLine && !s.BallDead && !s.ShotInFlight && _engaged) ideal = CloseDownSpot(look, ideal, s.AttackerHasBall && inFront && toBall < k.EngageRange, rng, out engage);
+        // Not closing down yet, but the attacker has the ball in front of him: he keeps the depth he has within his limits
+        // rather than dropping back to his arc only to come out again a moment later.
+        else if (!holdLine && !s.BallDead && !s.ShotInFlight && s.AttackerHasBall && inFront) ideal = CloseDownSpot(look, ideal, false, rng, out _, advance: false);
+        if (!holdLine && s.AttackerHasBall && !s.BallDead) ideal = Committed(ideal);
         if (!_hasSpot || Vector3.Distance(ideal, _spotIdeal) > k.RepositionThreshold) TakeSpot(ideal, look, holdLine, rng);
         float dist = new Vector2(_spot.X - _k.Position.X, _spot.Z - _k.Position.Z).Length();
         // Getting back goal-side (recovering after being drawn out or rounded) close to goal is a run, not a jog.
@@ -111,20 +119,37 @@ public sealed partial class KeeperBrain
     }
 
     /// <summary>
+    /// Commitment: moving off or toward his line, he does not turn round for a small change of mind. When the new spot's depth
+    /// is the other way from where his braking would stop him, by less than <c>reverse_threshold</c>, he settles at that
+    /// stopping depth instead (still on the new spot's line across).
+    /// </summary>
+    Vector3 Committed(Vector3 ideal)
+    {
+        var k = _t.Keeper;
+        float vOut = -_k.Velocity.X;
+        if (MathF.Abs(vOut) <= 0.3f) return ideal;
+        float stop = _pitch.GoalLineX - _k.Position.X + vOut * MathF.Abs(vOut) / (2f * Keeper.MoveAccel(_k.Sheet, _t));
+        float want = _pitch.GoalLineX - ideal.X;
+        if (MathF.Sign(want - stop) == MathF.Sign(vOut) || MathF.Abs(want - stop) >= k.ReverseThreshold) return ideal;
+        return new Vector3(MathF.Min(_pitch.GoalLineX - stop, _pitch.GoalLineX - k.ArcMinFromLine), ideal.Y, ideal.Z);
+    }
+
+    /// <summary>
     /// Closing down: the spot on the cover line from the ball at the depth he wants for the ball's distance (see
     /// <see cref="Keeper.CloseDownDistance"/>), never shallower than his arc. He does not come further out than his judged
     /// chip-safe depth, than <c>close_down_gap</c> short of the ball, or than <c>hold_ground_max_out</c>; between what he wants
     /// and those limits he holds the depth he has (no backpedalling while the attacker runs at him). With the attacker on the
     /// ball within <c>engage_range</c> of him (<paramref name="near"/>) he pushes up to the attacker, to just inside his spread
-    /// range, whatever he wanted (<paramref name="engage"/>).
+    /// range, whatever he wanted (<paramref name="engage"/>). With <paramref name="advance"/> false he only holds: he wants no
+    /// more than his arc.
     /// </summary>
-    Vector3 CloseDownSpot(Vector3 look, Vector3 arc, bool near, SimRng rng, out bool engage)
+    Vector3 CloseDownSpot(Vector3 look, Vector3 arc, bool near, SimRng rng, out bool engage, bool advance = true)
     {
         var k = _t.Keeper;
         var b = new Vector2(look.X, look.Z);
         float bMouth = Keeper.MouthDistance(b, _pitch);
         float arcD = Keeper.MouthDistance(new Vector2(arc.X, arc.Z), _pitch);
-        float want = Keeper.CloseDownDistance(_k.Sheet, _t, bMouth, arcD);
+        float want = advance ? Keeper.CloseDownDistance(_k.Sheet, _t, bMouth, arcD) : arcD;
         float chipCap = MathF.Min(ChipSafeJudged(Vector2.Distance(b, new Vector2(_pitch.GoalLineX, 0f)), rng), k.HoldGroundMaxOut);
         float mine = Keeper.MouthDistance(new Vector2(_k.Position.X, _k.Position.Z), _pitch);
         if (near)
@@ -159,6 +184,7 @@ public sealed partial class KeeperBrain
     /// </summary>
     void Observe(Ball ball, in KeeperSituation s)
     {
+        CountReversal();
         if (_struck || !s.AttackerHasBall || s.BallDead) return;
         var k = _t.Keeper;
         var b = new Vector2(ball.Position.X, ball.Position.Z);
@@ -181,6 +207,29 @@ public sealed partial class KeeperBrain
             _roundRounded = true;
             Report.Rounded = true;
         }
+    }
+
+    /// <summary>Counts a reversal of his movement off or toward his line (see <see cref="KeeperReport.DepthReversals"/>).</summary>
+    void CountReversal()
+    {
+        _clock += _t.Dt;
+        if (_struck) return;
+        float vOut = -_k.Velocity.X;
+        int dir = vOut > 0.3f ? 1 : vOut < -0.3f ? -1 : 0;
+        if (dir == 0 || dir == _depthDir) { _depthNew = 0; _depthNewFor = 0f; return; }
+        if (dir != _depthNew) { _depthNew = dir; _depthNewFor = 0f; }
+        _depthNewFor += _t.Dt;
+        if (_depthNewFor <= 0.1f) return;
+        if (_depthDir != 0)
+        {
+            _reversals++;
+            if (_clock <= 2f) _reversals2++;
+            Report.DepthReversals = _reversals;
+            Report.DepthReversalsFirst2S = _reversals2;
+        }
+        _depthDir = dir;
+        _depthNew = 0;
+        _depthNewFor = 0f;
     }
 
     /// <summary>A new spot: the ideal plus a positioning error drawn now, across the cover line (and a little along it).</summary>

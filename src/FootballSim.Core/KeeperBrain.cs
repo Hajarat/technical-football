@@ -247,6 +247,8 @@ public sealed partial class KeeperBrain
             WonBall = _roundWon,
             Rounded = _roundRounded,
             DepthAtBandM = (float[])_bandDepth.Clone(),
+            DepthReversals = _reversals,
+            DepthReversalsFirst2S = _reversals2,
         };
         _spread = 0f;
         if (ball != null)
@@ -494,7 +496,7 @@ public sealed partial class KeeperBrain
         _planePoint = beyond > 0f ? new Vector2(_home.X, _home.Z) + _planeN * beyond : new Vector2(_home.X, _home.Z);
         float needed = Vector3.Distance(target, _home);
         _jitter = rng.NextFloat() * Keeper.SaveJitterMax(sheet, _t, needed);
-        _dive = Keeper.DiveKindFor(_feet0, target, _t);
+        _dive = _fromBackpedal ? KeeperDive.Back : Keeper.DiveKindFor(_feet0, target, _t);
         if (block && _dive is not (KeeperDive.Catch or KeeperDive.Feet))
             _dive = target.Y < k.FeetBlockHeight ? KeeperDive.Feet : KeeperDive.Catch;
         Report.Dive = _dive;

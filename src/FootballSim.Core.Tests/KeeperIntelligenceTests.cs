@@ -249,7 +249,9 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
     /// A chip at the ideal charge for <paramref name="from"/> metres, straight at goal, with the keeper standing
     /// <paramref name="depth"/> off his line. Returns how it ended and whether he backpedalled.
     /// </summary>
-    static (SaveKind Save, bool Goal, bool Backpedalled) Chip(float from, float depth, ulong seed)
+    static (SaveKind Save, bool Goal, bool Backpedalled) Chip(float from, float depth, ulong seed) => Chip(from, depth, seed, out _);
+
+    static (SaveKind Save, bool Goal, bool Backpedalled) Chip(float from, float depth, ulong seed, out KeeperDive dive)
     {
         var s = TestData.Player("the_wall");
         var ballAt = new Vector3(P.GoalLineX - from, 0.11f, 0f);
@@ -273,11 +275,13 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
             if (res.SphereHit)
             {
                 brain.Contact(ball, res.SpherePoint, rng, out _, res.BodyHit);
+                dive = brain.Report.Dive;
                 return (brain.Report.Save, false, back);
             }
-            if (P.IsGoal(ball.Position, ball.Radius)) return (SaveKind.None, true, back);
+            if (P.IsGoal(ball.Position, ball.Radius)) { dive = brain.Report.Dive; return (SaveKind.None, true, back); }
             if (ball.Position.X > P.GoalLineX + 1f || ball.Velocity.X < 0f) break;
         }
+        dive = brain.Report.Dive;
         return (SaveKind.None, false, back);
     }
 
@@ -291,8 +295,9 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
         int saved = 0, tipped = 0, back = 0, n = 20;
         for (ulong seed = 1; seed <= (ulong)n; seed++)
         {
-            var r = Chip(from, safe - 0.5f, seed);
+            var r = Chip(from, safe - 0.5f, seed, out var dive);
             if (r.Backpedalled) back++;
+            if (r.Save != SaveKind.None) Assert.Equal(KeeperDive.Back, dive); // the leap at the end of a backpedal is the backward one
             if (r.Save is SaveKind.TipOver or SaveKind.Catch) saved++;
             if (r.Save == SaveKind.TipOver) tipped++;
         }
@@ -320,6 +325,25 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
         // From 8 m the ideal chip peaks under his leap: no backpedal, he saves it where he stands.
         var r = Chip(8f, 3f, 1);
         Assert.False(r.Backpedalled);
+    }
+
+    // ---- commitment ----
+
+    [Fact]
+    public void StartingWellOffHisLineHeDoesNotGoBackAndForth()
+    {
+        // keeper_rush: he starts 8 m out with the attacker running in from 25 m. In the first 2 s his movement off or toward his
+        // line changes direction at most once in 95% of rounds.
+        var sc = TestData.Scenario("keeper_rush");
+        var counts = new List<int>();
+        for (ulong seed = 1; seed <= 200; seed++)
+        {
+            var r = RoundRunner.RunFirstShot(T, sc, Striker, TestData.Player("the_wall"), seed);
+            counts.Add(r.Keeper.DepthReversalsFirst2S);
+        }
+        counts.Sort();
+        output.WriteLine($"reversals in the first 2 s: mean {counts.Average():F2}, p95 {counts[189]}, max {counts[^1]}");
+        Assert.True(counts[189] <= 1, $"p95 {counts[189]}");
     }
 
     // ---- taken round ----

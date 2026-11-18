@@ -20,8 +20,10 @@ public enum KeeperAction { Set, Shuffle, Rush, Planted, Reacting, Diving, Smothe
 
 /// <summary>The kind of save motion while <see cref="KeeperAction.Diving"/> (None otherwise).
 /// Low: diving along the ground. Side: a flat side dive at mid height. High: a leaping dive / tip over the bar.
-/// Feet: a standing block at the feet (legs and body spread, no dive). Catch: a standing catch at the body, no dive.</summary>
-public enum KeeperDive { None, Low, Side, High, Feet, Catch }
+/// Feet: a standing block at the feet (legs and body spread, no dive). Catch: a standing catch at the body, no dive.
+/// Back: a backward leap after backpedalling under a chip, body extended and falling back toward his goal, reaching up and
+/// back for the ball.</summary>
+public enum KeeperDive { None, Low, Side, High, Feet, Catch, Back }
 
 /// <summary>The round state machine ("Round contract" in the spec).</summary>
 public enum RoundState { Setup, Live, Strike, Flight, Outcome, Report }

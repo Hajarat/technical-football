@@ -374,6 +374,7 @@
     "close_down_gap": 3,
     "urgent_range": 12,
     "backpedal_show_speed": 1,
+    "reverse_threshold": 1,
     "backpedal_speed": {
       "at1": 3.5,
       "at99": 5

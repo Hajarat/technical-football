@@ -600,6 +600,8 @@ public sealed class KeeperTuning
     public float CloseDownGap { get; set; } = 3.0f;
     /// <summary>A reposition longer than <see cref="JogThreshold"/> is run at rush speed once the ball is this close to the mouth, metres.</summary>
     public float UrgentRange { get; set; } = 12f;
+    /// <summary>Moving off or toward his line, he turns round only for a new spot at least this much the other way from where he would stop, metres.</summary>
+    public float ReverseThreshold { get; set; } = 1.0f;
     /// <summary>Moving away from the ball faster than this, he is shown backpedalling, m/s.</summary>
     public float BackpedalShowSpeed { get; set; } = 1.0f;
 

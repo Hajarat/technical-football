@@ -44,6 +44,12 @@ public sealed class KeeperReport
     /// of the goal centre before the first strike, metres (NaN for a band not reached).
     /// </summary>
     public float[] DepthAtBandM { get; set; } = NewBands();
+    /// <summary>
+    /// Times his movement off or toward his line reversed before the first strike: the sign of his depth speed changed, each
+    /// direction held above 0.3 m/s for more than 0.1 s. <see cref="DepthReversalsFirst2S"/> counts those in the round's first 2 s.
+    /// </summary>
+    public int DepthReversals { get; set; }
+    public int DepthReversalsFirst2S { get; set; }
 
     /// <summary>The attacker's distances from the goal centre at which <see cref="DepthAtBandM"/> is sampled, metres.</summary>
     public static readonly float[] DepthBands = { 20f, 15f, 10f, 6f };

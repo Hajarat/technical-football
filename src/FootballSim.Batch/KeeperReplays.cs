@@ -94,6 +94,8 @@ static class KeeperReplays
             while (end + 1 < f.Count && f[end + 1].Action == KeeperAction.Diving) end++;
             return (from, f[end].Tick);
         }, new[] { "keeper_rush", "breakaway" }),
+        new("keeper-dive-back", "Diving, Back: the backward leap at the end of a backpedal under a chip", f => Dive(f, KeeperDive.Back),
+            new[] { "keeper_rush" }),
         new("keeper-rounded", "Taken round: the attacker gets the ball past him", f =>
         {
             int i = f.FindIndex(x => x.Rounded);

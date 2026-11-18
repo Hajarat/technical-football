@@ -16,6 +16,7 @@ using FootballSim.Core;
 //   ... --write-skill-replays <dir>             writes one replay per skill move (edge_of_box start) for game screenshots
 //   ... --write-keeper-replays <dir>            searches scripted rounds for each visible keeper action and writes one replay each
 //   ... --scenario <id> --trace-keeper <seed>   prints the keeper's state, tick by tick, for one scripted round
+//   ... --counters off                          the scripted attacker ignores the keeper (no shorter touches, rounding or chips)
 
 return Cli.Run(args);
 
@@ -76,6 +77,8 @@ static class Cli
             return 0;
         }
 
+        // --counters off: the scripted attacker ignores the keeper (no shorter touches, rounding or chips).
+        bool counters = !(opts.TryGetValue("counters", out var cs) && cs is "off" or "0" or "false");
         int n = opts.TryGetValue("n", out var ns) ? int.Parse(ns, CultureInfo.InvariantCulture) : 10000;
         ulong seed = opts.TryGetValue("seed", out var ss) ? ulong.Parse(ss, CultureInfo.InvariantCulture) : 1UL;
 
@@ -96,7 +99,7 @@ static class Cli
         }
         else values.Add(null);
 
-        Console.WriteLine($"scenario={sc.Id} attacker={attacker.Id} keeper={keeper.Id} n={n} seed={seed}" +
+        Console.WriteLine($"scenario={sc.Id} attacker={attacker.Id} keeper={keeper.Id} n={n} seed={seed}" + (counters ? "" : " counters=off") +
                           (field != "" ? $" sweep={(onKeeper ? "keeper." : "attacker.")}{field}" : ""));
         var header = new[] { "value", "n", "scored", "held", "parried", "rebound", "wide", "over", "out", "time_up", "no_shot", "scored_pct", "seconds" };
         var rows = new List<string[]>();
@@ -115,7 +118,7 @@ static class Cli
             var sw = Stopwatch.StartNew();
             for (int i = 0; i < n; i++)
             {
-                var r = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i, followUp: true);
+                var r = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i, new ScriptedAttacker { Counters = counters }, followUp: true);
                 counts[(int)r.End]++;
                 stats.Add(r);
             }
@@ -212,6 +215,7 @@ sealed class KeeperStats
     readonly double[] _bandSum = new double[KeeperReport.DepthBands.Length];
     readonly int[] _bandN = new int[KeeperReport.DepthBands.Length];
     int _won, _wonHeld, _chips, _chipsScored, _chipsTipped, _rounded, _roundedScored;
+    readonly List<int> _rev = new(), _rev2 = new();
 
     public void Add(RoundRunner.Result r)
     {
@@ -222,6 +226,8 @@ sealed class KeeperStats
         if (r.End == ShotEnd.NoShot && r.Outcome == Outcome.Held && k.Save == SaveKind.Smother) _smotherClaim++;
         for (int i = 0; i < _bandSum.Length && i < k.DepthAtBandM.Length; i++)
             if (float.IsFinite(k.DepthAtBandM[i])) { _bandSum[i] += k.DepthAtBandM[i]; _bandN[i]++; }
+        _rev.Add(k.DepthReversals);
+        _rev2.Add(k.DepthReversalsFirst2S);
         if (k.WonBall) { _won++; if (r.End == ShotEnd.NoShot && r.Outcome == Outcome.Held) _wonHeld++; }
         if (k.Rounded) { _rounded++; if (r.End == ShotEnd.Scored) _roundedScored++; }
         if (r.Shot is { Type: ShotType.Chip })
@@ -280,6 +286,14 @@ sealed class KeeperStats
             bands.Select((b, i) => $"{b.ToString("F0", ic)} m: {(_bandN[i] == 0 ? "-" : (_bandSum[i] / _bandN[i]).ToString("F2", ic))} (n {_bandN[i]})")));
         Console.WriteLine($"{prefix}keeper won the ball from a dribble (before any shot) {Pct(_won)} of rounds (held {Pct(_wonHeld)}), " +
                           $"rounded {Pct(_rounded)} (scored after {PctOf(_roundedScored, _rounded)} of those)");
+        static string Rev(List<int> v)
+        {
+            if (v.Count == 0) return "-";
+            var o = v.OrderBy(x => x).ToArray();
+            return $"mean {o.Average().ToString("F2", CultureInfo.InvariantCulture)}, p95 {o[(int)(0.95 * (o.Length - 1))]}, max {o[^1]}";
+        }
+        Console.WriteLine($"{prefix}keeper depth reversals before the shot (in/out direction changes above 0.3 m/s held 0.1 s): {Rev(_rev)}; " +
+                          $"in the first 2 s: {Rev(_rev2)}");
         Console.WriteLine($"{prefix}chips attempted {Pct(_chips)} of rounds ({_chips}), scored {PctOf(_chipsScored, _chips)} of chips, tipped over {PctOf(_chipsTipped, _chips)}");
     }
 }
