@@ -4,15 +4,17 @@ Run headless from the repository root (see game/assets/characters/SOURCES.md for
 
     /Applications/Blender.app/Contents/MacOS/Blender -b --python tools/characters/build_characters.py -- [--out game/assets/characters] [--preview <dir>]
 
-Only CC0 MakeHuman system assets are used. Output: player.glb (short sleeves) and keeper.glb (long sleeves, gloves).
+Shirts, hair, eyes and the keeper gloves are CC0 MakeHuman assets; the shorts, socks and football boots are generated here from the body's own
+surface (see author_kit). Output: player.glb (short sleeves) and keeper.glb (long sleeves, gloves).
 """
 import math
 import os
 import sys
 
 import addon_utils
+import bmesh
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 from mathutils.geometry import intersect_point_line
 
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -27,18 +29,25 @@ PREVIEW_DIR = arg("--preview")
 HEIGHT_M = 1.80
 RIG = "mixamo"
 
-# Role name -> .mhclo file basename (all CC0, see SOURCES.md). The keeper swaps the shirt and adds gloves.
+# Role name -> .mhclo file basename (all CC0, see SOURCES.md). The keeper swaps the shirt and adds gloves. Shorts, socks and boots are authored (author_kit).
 PLAYER_ASSETS = {
     "shirt": "elvs_crude_t-shirt_male.mhclo",
-    "shorts": "cortu_jeans_shorts.mhclo",
-    "socks": "joepal_crude_high_socks.mhclo",
-    "boots": "toigo_ankle_boots_male.mhclo",
 }
 KEEPER_ASSETS = dict(PLAYER_ASSETS, shirt="toigo_fisherman_sweater.mhclo", gloves="toigo_gloves_short.mhclo")
 BODYPARTS = {"eyes": "low-poly.mhclo", "eyebrows": "eyebrow001.mhclo", "hair": "short02.mhclo"}
 # Athletic adult male: MPFB macro sliders (0..1).
 MACRO = {"gender": 1.0, "age": 0.5, "muscle": 0.62, "weight": 0.42, "proportions": 0.55, "height": 0.62, "cupsize": 0.5, "firmness": 0.5,
          "race": {"asian": 0.1, "caucasian": 0.8, "african": 0.1}}
+
+
+# Non-macro MPFB targets applied after the macro sliders: name -> weight (0..1). Lengthens the upper arm and forearm.
+EXTRA_TARGETS = {"measure-upperarm-length-incr": 1.0, "measure-lowerarm-length-incr": 0.5, "measure-shoulder-dist-incr": 1.0}
+
+
+def apply_extra_targets(base):
+    from bl_ext.user_default.mpfb.services.targetservice import TargetService
+    for name, weight in EXTRA_TARGETS.items():
+        TargetService.load_target(base, TargetService.target_full_path(name), weight=weight, name=name)
 
 
 def enable_mpfb():
@@ -109,10 +118,12 @@ def glove_bone(name, x):
     return short.startswith(side + "Hand") or short == side + "ForeArm"
 
 
-def inflate(obj, amount):
-    """Push a garment's vertices out along their normals so the layer underneath (shorts under a shirt hem) does not poke through."""
+def inflate(obj, amount, hem_z=1.13, hem_extra=0.016):
+    """Push a garment's vertices out along their normals so the layer underneath (shorts under a shirt hem) does not poke through; below hem_z
+    the shirt hangs looser, by up to hem_extra more at its lowest edge."""
     for v in obj.data.vertices:
-        v.co += v.normal * amount
+        loose = hem_extra * min(1.0, max(0.0, (hem_z - v.co.z) / 0.12)) if v.co.z < hem_z and abs(v.co.x) < 0.3 else 0.0
+        v.co += v.normal * (amount + loose)
 
 
 def clean_weights(rig, obj, allowed=None, max_dist=0.5):
@@ -139,6 +150,159 @@ def clean_weights(rig, obj, allowed=None, max_dist=0.5):
     print(f"  weights cleaned on {obj.name}: {dropped} stray influences dropped")
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# Authored kit: shorts, socks and boots are cut from the body's own surface, pushed outward and keep the body's skin weights (they are
+# copies of its faces, so every vertex already carries the right bone weights and the garment deforms exactly like the skin underneath).
+
+WAIST_Z, HEM_Z = 1.03, 0.63          # shorts waistband (navel line) and hem (about 12 cm above the knee), metres, model at 1.80 m
+SOCK_TOP_Z = 0.465                   # just below the knee (the knee joint is at 0.52)
+SOLE_TOP_Z, SOLE_BOTTOM_Z = 0.009, -0.004
+BOOT_UPPER_OFFSET, SOCK_OFFSET = 0.0075, 0.0035
+
+
+def cut_region(base, name, keep_face, seed=None):
+    """A copy of the skin keeping the faces for which keep_face(centre, normal) holds (and, if seed is given, only those connected to the
+    face nearest to that point). The copy keeps the parent, the armature modifier and every vertex group of the skin."""
+    ob = base.copy()
+    ob.data = base.data.copy()
+    ob.name = name
+    base.users_collection[0].objects.link(ob)
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bm.faces.ensure_lookup_table()
+    keep = {f for f in bm.faces if keep_face(f.calc_center_median(), f.normal)}
+    if seed is not None:
+        start = min(keep, key=lambda f: (f.calc_center_median() - Vector(seed)).length)
+        seen, todo = {start}, [start]
+        while todo:
+            f = todo.pop()
+            for e in f.edges:
+                for g in e.link_faces:
+                    if g in keep and g not in seen:
+                        seen.add(g)
+                        todo.append(g)
+        keep = seen
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f not in keep], context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    bm.to_mesh(ob.data)
+    bm.free()
+    return ob
+
+
+def smooth(bm, verts, iterations, factor=0.5):
+    for _ in range(iterations):
+        bmesh.ops.smooth_vert(bm, verts=verts, factor=factor, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+
+
+def edit_mesh(ob, fn):
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    fn(bm)
+    bm.normal_update()
+    bm.to_mesh(ob.data)
+    bm.free()
+    ob.data.update()
+
+
+def author_shorts(base):
+    """Loose football shorts: the pelvis and both thighs between the navel line and mid-thigh, pushed out 1 cm at the waist to 3.5 cm at the hem."""
+    ob = cut_region(base, "shorts", lambda c, n: HEM_Z <= c.z <= WAIST_Z, seed=(0, 0, 0.95))
+
+    def fn(bm):
+        for v in bm.verts:   # straight waistband and hem
+            if v.co.z > WAIST_Z - 0.03:
+                v.co.z = WAIST_Z
+            elif v.co.z < HEM_Z + 0.03:
+                v.co.z = HEM_Z
+        bm.normal_update()
+        for v in bm.verts:   # outward offset, flaring toward the hem
+            t = min(1.0, max(0.0, (WAIST_Z - v.co.z) / (WAIST_Z - HEM_Z)))
+            v.co += v.normal * (0.008 + 0.012 * min(1.0, t * 1.6) + 0.015 * t * t)
+        smooth(bm, list(bm.verts), 3, 0.4)
+    edit_mesh(ob, fn)
+    return ob
+
+
+def author_socks(base):
+    """Knee-high socks: the foot and shin up to just below the knee, 3.5 mm outside the skin."""
+    ob = cut_region(base, "socks", lambda c, n: c.z <= SOCK_TOP_Z)
+
+    def fn(bm):
+        for v in bm.verts:
+            if v.co.z > SOCK_TOP_Z - 0.03:
+                v.co.z = SOCK_TOP_Z
+        bm.normal_update()
+        for v in bm.verts:
+            v.co += v.normal * SOCK_OFFSET
+    edit_mesh(ob, fn)
+    return ob
+
+
+def author_boots(base):
+    """Low-cut football boots: the foot up to just under the ankle bone, a 7.5 mm upper with a slightly pointed toe, a thin sole (material slot 1)
+    and six conical studs under each boot."""
+    def top(y):   # collar height: just below the ankle bone at the heel and sides, rising over the instep
+        return 0.078 + min(0.03, max(0.0, (-0.016 - y) * 0.5))
+    ob = cut_region(base, "boots", lambda c, n: c.z < 0.14 and c.z <= top(c.y))
+    sole_groups = {}
+
+    def fn(bm):
+        for v in bm.verts:   # an even collar line instead of the jagged edge the face selection leaves
+            v.tag = v.is_boundary and v.co.z > 0.04
+            if v.tag:
+                v.co.z = top(v.co.y)
+        bm.normal_update()
+        for v in bm.verts:
+            v.co += v.normal * BOOT_UPPER_OFFSET
+        # the upper is the convex hull of each offset foot (no separate toes, smooth instep), open at the collar
+        for side in (1, -1):
+            verts = [v for v in bm.verts if v.co.x * side > 0.0]
+            bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.verts[0] in verts], context="FACES_ONLY")
+            hull = bmesh.ops.convex_hull(bm, input=verts, use_existing_faces=False)
+            bmesh.ops.delete(bm, geom=hull["geom_interior"] + hull["geom_unused"], context="VERTS")
+            bmesh.ops.delete(bm, geom=[f for f in hull["geom"] if isinstance(f, bmesh.types.BMFace) and all(v.tag for v in f.verts)], context="FACES")
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+        bmesh.ops.bisect_plane(bm, geom=list(bm.verts) + list(bm.edges) + list(bm.faces), plane_co=(0, 0, SOLE_TOP_Z), plane_no=(0, 0, 1))
+        bm.normal_update()
+        for v in bm.verts:   # flat sole
+            if v.co.z < 0.0 and v.normal.z < -0.3:
+                v.co.z = SOLE_BOTTOM_Z
+        for f in bm.faces:
+            f.material_index = 1 if f.calc_center_median().z < SOLE_TOP_Z + 0.002 else 0
+            f.smooth = True
+        # toe box: pull the last 4 cm of each boot forward a little for a pointed toe
+        for side in (1, -1):
+            mine = [v for v in bm.verts if v.co.x * side > 0.0]
+            ymin = min(v.co.y for v in mine)
+            for v in mine:
+                k = max(0.0, 1.0 - (v.co.y - ymin) / 0.06)
+                v.co.y -= 0.014 * k * k
+        # studs: 2 at the heel, 4 under the ball of the foot, on each boot
+        dl = bm.verts.layers.deform.verify()
+        for side, bone in ((1, "Left"), (-1, "Right")):
+            mine = [v for v in bm.verts if v.co.x * side > 0.0]
+            ymin, ymax = min(v.co.y for v in mine), max(v.co.y for v in mine)
+            xmid = sum(v.co.x for v in mine) / len(mine)
+            gi = ob.vertex_groups["mixamorig:" + bone + "Foot"].index
+            length = ymax - ymin
+            for fy, dx in ((0.17, 0.016), (0.17, -0.016), (0.62, 0.022), (0.62, -0.022), (0.80, 0.016), (0.80, -0.016)):
+                cx, cy = xmid + dx * side, ymax - fy * length
+                m = Matrix.Translation((cx, cy, SOLE_BOTTOM_Z - 0.0055)) @ Matrix.Rotation(math.pi, 4, "X")
+                res = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=7, radius1=0.0075, radius2=0.0042, depth=0.011, matrix=m)
+                for v in res["verts"]:
+                    v[dl][gi] = 1.0
+                for f in {f for v in res["verts"] for f in v.link_faces}:
+                    f.material_index = 1
+    edit_mesh(ob, fn)
+    return ob
+
+
+def author_kit(base, parts):
+    parts["shorts"] = author_shorts(base)
+    parts["socks"] = author_socks(base)
+    parts["boots"] = author_boots(base)
+
+
 def build(assets):
     from bl_ext.user_default.mpfb.services.humanservice import HumanService
 
@@ -148,6 +312,7 @@ def build(assets):
         reset_scene()
         macro["height"] = 0.5 * (lo + hi)
         base = HumanService.create_human(mask_helpers=True, detailed_helpers=True, extra_vertex_groups=True, feet_on_ground=True, scale=0.1, macro_detail_dict=macro)
+        apply_extra_targets(base)
         h = body_height(base)
         if abs(h - HEIGHT_M) < 0.004:
             break
@@ -177,17 +342,22 @@ def finish(base, rig, parts):
     for mod in list(base.modifiers):
         if mod.type == "MASK":
             bpy.ops.object.modifier_apply(modifier=mod.name)
+    author_kit(base, parts)
     eye_png = os.path.join(os.path.dirname(find_asset("eyes", "low-poly.mhclo")), "..", "materials", "brown_eye.png")
     mats = {
         "skin": make_material("skin", (0.8, 0.6, 0.46, 1), 0.55), "hair": make_material("hair", (0.13, 0.09, 0.06, 1), 0.7),
         "shirt": make_material("shirt", (1, 1, 1, 1), 0.85), "shorts": make_material("shorts", (1, 1, 1, 1), 0.85),
-        "socks": make_material("socks", (1, 1, 1, 1), 0.9), "boots": make_material("boots", (1, 1, 1, 1), 0.45),
+        "socks": make_material("socks", (1, 1, 1, 1), 0.9), "boots": make_material("boots", (1, 1, 1, 1), 0.45), "sole": make_material("sole", (0.08, 0.08, 0.09, 1), 0.6),
         "gloves": make_material("gloves", (1, 1, 1, 1), 0.55), "eyes": make_material("eyes", (1, 1, 1, 1), 0.3, os.path.normpath(eye_png)),
     }
     role_mat = {"eyebrows": "hair"}
     for role, ob in parts.items():
         ob.data.materials.clear()
         ob.data.materials.append(mats[role_mat.get(role, role)])
+        if role == "boots":
+            ob.data.materials.append(mats["sole"])
+        if role in ("shorts", "socks"):
+            ob.data.materials[0].use_backface_culling = False
     rig.data.pose_position = "REST"
 
 
@@ -205,12 +375,12 @@ def export(rig, parts, path):
 
 
 def preview(path):
-    """Flat Workbench renders (front, side, back) of the figure in rest pose, for a quick look."""
+    """Flat Workbench renders of the figure in rest pose (front, side, back, a close side view of the boot, front and back three-quarter views of the lower body)."""
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_WORKBENCH"
     scene.display.shading.light = "STUDIO"
     scene.display.shading.color_type = "MATERIAL"
-    tint = {"shirt": (0.85, 0.1, 0.1, 1), "shorts": (0.9, 0.9, 0.9, 1), "socks": (0.85, 0.1, 0.1, 1), "boots": (0.1, 0.1, 0.1, 1), "gloves": (0.1, 0.9, 0.9, 1)}
+    tint = {"shirt": (0.85, 0.1, 0.1, 1), "shorts": (0.9, 0.9, 0.9, 1), "socks": (0.85, 0.1, 0.1, 1), "boots": (0.1, 0.1, 0.1, 1), "sole": (0.9, 0.9, 0.2, 1), "gloves": (0.1, 0.9, 0.9, 1)}
     for m in bpy.data.materials:
         if m.name.split(".")[0] in tint:
             m.diffuse_color = tint[m.name.split(".")[0]]
@@ -219,9 +389,13 @@ def preview(path):
     scene.collection.objects.link(cam)
     scene.camera = cam
     cam.data.type = "ORTHO"
-    cam.data.ortho_scale = 2.1
-    for name, loc, rot in (("front", (0, -4, 0.9), (math.radians(90), 0, 0)), ("side", (4, 0, 0.9), (math.radians(90), 0, math.radians(90))), ("back", (0, 4, 0.9), (math.radians(90), 0, math.radians(180)))):
-        cam.location, cam.rotation_euler = loc, rot
+    # name, camera position, look-at point, ortho scale (the body is centred on x = 0; the left foot is at x = 0.2)
+    views = (("front", (0, -4, 0.9), (0, 0, 0.9), 2.1), ("side", (4, 0, 0.9), (0, 0, 0.9), 2.1), ("back", (0, 4, 0.9), (0, 0, 0.9), 2.1),
+             ("foot", (4, 0, 0.12), (0, 0, 0.12), 0.5), ("foot34", (-3, -3, 0.4), (0.2, 0, 0.12), 0.7), ("legs_back34", (-2.5, 2.5, 0.8), (0, 0, 0.6), 1.4))
+    for name, loc, target, ortho in views:
+        cam.location = Vector(loc)
+        cam.rotation_euler = (Vector(target) - Vector(loc)).to_track_quat("-Z", "Y").to_euler()
+        cam.data.ortho_scale = ortho
         scene.render.filepath = os.path.join(path, name + ".png")
         bpy.ops.render.render(write_still=True)
 

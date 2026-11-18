@@ -26,12 +26,33 @@ public sealed class FigureJoints
 /// joints (the limbs are solved with the model's own bone lengths, so a joint is reproduced exactly unless a limb is too short to reach it). The
 /// result is interpolated between physics ticks like the primitive meshes are. Nothing is allocated after loading.
 /// </summary>
+/// <summary>How closely skinned bodies reach the figure's hand joints (replay mode prints the SKIN_FIT line when a skinned figure was active).</summary>
+public static class SkinFit
+{
+    static int _n;
+    static double _handSum;
+    static float _handMax, _shoulderMax;
+
+    /// <summary>One arm of one pose: the distance (m) from the solved hand bone to the figure's hand joint, and how far the shoulder girdle moved from its rest position.</summary>
+    public static void Add(float handErr, float shoulderShift)
+    {
+        _n++; _handSum += handErr;
+        _handMax = Math.Max(_handMax, handErr); _shoulderMax = Math.Max(_shoulderMax, shoulderShift);
+    }
+
+    public static bool Any => _n > 0;
+    public static string Line() => $"SKIN_FIT n={_n} hand_mean_m={(_n == 0 ? 0 : _handSum / _n):F3} hand_max_m={_handMax:F3} shoulder_max_m={_shoulderMax:F3}";
+}
+
 public sealed partial class SkinnedBody : Node3D
 {
     // The glTF model faces +Z with the character's left on +X; the figure faces +X (its right is +Z).
     static readonly Basis ModelToWorld = new(new Vector3(0, 0, -1), Vector3.Up, new Vector3(1, 0, 0));
     static readonly Basis WorldToModel = ModelToWorld.Transposed();
     const float HipDropMax = 0.06f, ShoulderReachMax = 0.14f;
+    /// <summary>The upper arm and forearm are scaled this much (uniformly, so skinning stays undistorted) on top of the build script's longer arms,
+    /// so a keeper's dive reaches the figure's hand joints. The hands keep their size.</summary>
+    const float ArmScale = 1.10f;
 
     Skeleton3D _sk = null!;
     /// <summary>Standing height of the model the build script produces (HEIGHT_M in tools/characters/build_characters.py); the figure scales it to its own.</summary>
@@ -47,7 +68,8 @@ public sealed partial class SkinnedBody : Node3D
     readonly int[] _clav = new int[2], _arm = new int[2], _fore = new int[2], _hand = new int[2];
     readonly int[] _up = new int[2], _leg = new int[2], _foot = new int[2], _toe = new int[2];
     int[] _trunk = Array.Empty<int>();
-    float _thigh0, _shin0, _arm0, _fore0;   // model bone lengths
+    float _thigh0, _shin0, _arm0, _fore0;   // model bone lengths (the arm's are the rest lengths times ArmScale)
+    float[] _cum = Array.Empty<float>();   // accumulated uniform pose scale of each bone (1 unless an arm bone is scaled)
 
     // driven bones in hierarchy order, with the last two physics ticks' local poses for interpolation
     int[] _driven = Array.Empty<int>();
@@ -114,7 +136,14 @@ public sealed partial class SkinnedBody : Node3D
         }
         if (missing.Length > 0) { error = missing; return false; }
         _thigh0 = (_restPos[_leg[0]] - _restPos[_up[0]]).Length(); _shin0 = (_restPos[_foot[0]] - _restPos[_leg[0]]).Length();
-        _arm0 = (_restPos[_fore[0]] - _restPos[_arm[0]]).Length(); _fore0 = (_restPos[_hand[0]] - _restPos[_fore[0]]).Length();
+        _arm0 = (_restPos[_fore[0]] - _restPos[_arm[0]]).Length() * ArmScale; _fore0 = (_restPos[_hand[0]] - _restPos[_fore[0]]).Length() * ArmScale;
+        _cum = new float[n];
+        Array.Fill(_cum, 1f);
+        for (int i = 0; i < 2; i++)
+        {
+            _sk.SetBonePoseScale(_arm[i], Vector3.One * ArmScale);
+            _sk.SetBonePoseScale(_hand[i], Vector3.One / ArmScale);   // the hand inherits the arm's scale; cancel it
+        }
 
         _trunk = new[] { _hips, _spine, _spine1, _spine2, _neck, _head };
         var driven = new List<int> { _hips, _spine, _spine1, _spine2, _neck, _head };
@@ -316,7 +345,8 @@ public sealed partial class SkinnedBody : Node3D
             Vector3 handT = Sk(j.Hand[i]);
             Vector3 toHand = handT - armHead;
             float over = toHand.Length() - (_arm0 + _fore0) * 0.999f;
-            if (over > 0f) armHead += toHand.Normalized() * Math.Min(over, ShoulderReachMax);
+            float shift = over > 0f ? Math.Min(over, ShoulderReachMax) : 0f;
+            if (shift > 0f) armHead += toHand.Normalized() * shift;
             Put(_clav[i], Swing(_restPos[_arm[i]] - _restPos[_clav[i]], Vector3.Up, armHead - clavHead, dT * Vector3.Up), clavHead);
             Vector3 elbowPole = WorldToModel * (j.Elbow[i] - (j.Shoulder[i] + j.Hand[i]) * 0.5f);
             if (elbowPole.LengthSquared() < 1e-6f) elbowPole = -(WorldToModel * j.Torso.X);
@@ -327,6 +357,7 @@ public sealed partial class SkinnedBody : Node3D
             Put(_arm[i], upper, armHead);
             Put(_fore[i], lower, elbow);
             Put(_hand[i], lower, hand);
+            SkinFit.Add((hand - handT).Length() * _scale, shift * _scale);
         }
 
         // local poses (the hips have no driven parent: their local pose is their global one)
@@ -334,12 +365,13 @@ public sealed partial class SkinnedBody : Node3D
         {
             int b = _driven[k];
             Vector3 pos; Quaternion rot;
+            _cum[b] = (k == 0 ? 1f : _cum[_parent[b]]) * (b == _arm[0] || b == _arm[1] ? ArmScale : b == _hand[0] || b == _hand[1] ? 1f / ArmScale : 1f);
             if (k == 0) { pos = _glob[b].Origin; rot = _glob[b].Basis.Orthonormalized().GetRotationQuaternion(); }
             else
             {
                 Transform3D parent = _glob[_parent[b]];
                 Basis inv = parent.Basis.Transposed();
-                pos = inv * (_glob[b].Origin - parent.Origin);
+                pos = inv * (_glob[b].Origin - parent.Origin) / _cum[_parent[b]];   // a scaled parent stretches its children's offsets
                 rot = (inv * _glob[b].Basis).Orthonormalized().GetRotationQuaternion();
             }
             _posPrev[k] = _havePose ? _posCur[k] : pos; _rotPrev[k] = _havePose ? _rotCur[k] : rot;

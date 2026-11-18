@@ -134,6 +134,7 @@ public partial class Match : Node3D
             GD.Print(FootStats.ContactStrikeLine());
             GD.Print(FootStats.PoseLine());
             GD.Print(FootStats.SlideLine());
+            if (SkinFit.Any) GD.Print(SkinFit.Line());
         }
         if (_args.FrameTimes)
         {
