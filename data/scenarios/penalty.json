@@ -21,6 +21,8 @@
     "length": 30.0,
     "width": 20.0,
     "goal_width": 7.32,
-    "goal_height": 2.44
+    "goal_height": 2.44,
+    "penalty_area_depth": 16.5,
+    "penalty_area_width": 40.32
   }
 }

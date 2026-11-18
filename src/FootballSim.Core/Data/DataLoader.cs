@@ -145,6 +145,8 @@ public static class DataLoader
         s.Pitch.Width = Fix(s.Pitch.Width, 10f, 200f, "pitch.width");
         s.Pitch.GoalWidth = Fix(s.Pitch.GoalWidth, 1f, 20f, "pitch.goal_width");
         s.Pitch.GoalHeight = Fix(s.Pitch.GoalHeight, 0.5f, 6f, "pitch.goal_height");
+        s.Pitch.PenaltyAreaDepth = Fix(s.Pitch.PenaltyAreaDepth, 1f, s.Pitch.Length, "pitch.penalty_area_depth");
+        s.Pitch.PenaltyAreaWidth = Fix(s.Pitch.PenaltyAreaWidth, s.Pitch.GoalWidth, 200f, "pitch.penalty_area_width");
         if (s.TeamSize < 1 || s.TeamSize > 11)
         {
             w.Add(new LoadWarning(fileLabel, "team_size", $"{s.TeamSize} is outside 1..11; clamped"));

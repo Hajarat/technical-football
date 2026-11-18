@@ -2,6 +2,11 @@
 
 A 1v1 football shooting game: a simulation core in C# (`src/`), game data in JSON (`data/`) and a Godot 4.7 (.NET) shell (`game/`).
 World coordinates are metres: X toward the attacked goal (goal line 52.5), Y up, Z across (the camera stands on the +Z side).
+The pitch (`src/FootballSim.Core/Pitch.cs`) is a walled arena whose lengths come from the scenario's `pitch` block: `length`,
+`width`, the goal's `goal_width` and `goal_height`, and the penalty area's `penalty_area_depth` (16.5 m from the goal line) and
+`penalty_area_width` (40.32 m; in the scenarios' 20 m wide arena the area runs from wall to wall, so its sides are the boards).
+`Pitch.InPenaltyArea` says whether a ball is in the area (any part of it on or over the line). The game draws the outline, the
+5.5 m goal area, the penalty area's line and the penalty spot.
 
 ## Commands (run from the repo root)
 
@@ -175,7 +180,8 @@ before the strike (the gamepad's low shot) counts as driven held.
 ## The keeper
 
 The keeper's decisions are in `src/FootballSim.Core/KeeperBrain.cs` (standing, closing down and the rush race in
-`KeeperBrain.Standing.cs`, chips in `KeeperBrain.Chip.cs`, the save in `KeeperBrain.Save.cs`), his rating-derived numbers and
+`KeeperBrain.Standing.cs`, chips in `KeeperBrain.Chip.cs`, the save in `KeeperBrain.Save.cs`, his penalty area's hands rule
+and the slide tackle in `KeeperBrain.Feet.cs`), his rating-derived numbers and
 geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number in the `keeper` section of
 `data/tuning/default.json`. Each tick he publishes `KeeperAction`, `KeeperDive`
 (set only while Diving), `KeeperActionTime` (0 on the tick the action changes), `Velocity`, `Facing` and `HandPosition`.
@@ -216,6 +222,23 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
   mean reaction) to within `chip_tip_reach` of where it has dropped to `chip_take_height_fraction` of his height,
   `chip_leap_lead` before it gets there. From close in an ideal chip cannot rise over him, so the limit only binds from
   about 13 m out. He judges it with an error drawn once a round (`chip_judge_error`, by positioning).
+- **His penalty area.** He may use his hands only on a ball in his penalty area, judged by where the ball is at the contact
+  (any part of it on or over the line). A hand touch on a ball outside it is refused: his hands are pulled away for the rest of
+  that save and the ball carries on untouched; his body, a foot block or a smother outside the area block the ball and never
+  hold it. He never plans a hand save outside the area: a point on a shot's path outside it counts only for a foot block or a
+  reflex foot or body block, and a save that would end up outside it is played as one of those. For a loose ball outside the
+  area he plays with his feet (`Slide`): he races for it as for any loose ball (below), up to `slide_beyond_area` beyond the
+  area's line, and within `slide_reach` he goes into a slide tackle, feet first along the ground, the leading foot moving from
+  `slide_foot_start` ahead of him at `slide_speed`, the body following `slide_body_follow` of it. A bouncing ball (above
+  `slide_max_height`) or one within `poke_reach` he pokes at standing instead (shown as `Diving` with `KeeperDive.Feet`, at
+  `poke_speed`, set again after `poke_seconds`). A slide or poke that meets the ball knocks it on along the slide's direction,
+  within `slide_knock_angle_deg`, at `slide_knock_speed_min`..`_max` (`SaveKind.Slide`, or `Block` for a poke); a slide ends
+  Grounded and he gets up as after a dive (after `slide_max_seconds` at most). A close race for a ball outside the area
+  (within his anticipation) brings him to the area's line and no further (`KeeperMode.HoldArea`); a race he cannot win sends him
+  back to his spot. A smother whose ball leaves the area before he has it becomes a slide or poke at it when it is low and
+  within `slide_reach`, else he abandons it on the ground. Inside the area he plays as below. `KeeperReport.Slid` records a
+  slide or poke before the first strike. Inside the area `rush_max_from_goal` (15 m) still limits his rushes, so in front of
+  goal he does not race for a ball between 15 m and the area's line at 16.5 m.
 - **Rush and smother.** Each tick he races for the ball whenever it is off the attacker's foot (between touches, a long sprint
   touch or a loose ball): the earliest point on its predicted path he can reach (to within `smother_reach`) before it gets
   there and before the attacker's next planned touch, with a `rush_margin` (by distance, scaled by rushing_out; none for a

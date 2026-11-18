@@ -17,8 +17,10 @@ public enum PlayerRole { Outfield, Keeper }
 /// struck). Spread: stopped close to an attacker on the ball, made big (legs wide, arms low and out), before or during a windup.
 /// Charge: running out at an attacker on the ball to close him down (not yet a race for a loose ball). Jockey: close to an
 /// attacker on the ball, low and spread, stepping with him to stay between the ball and the goal, ready to pounce.
+/// Slide: a slide tackle at a loose ball outside his penalty area, feet first along the ground (he may not use his hands
+/// there); he ends Grounded. A standing poke at a ball outside the area shows as Diving with <see cref="KeeperDive.Feet"/>.
 /// </summary>
-public enum KeeperAction { Set, Shuffle, Rush, Planted, Reacting, Diving, Smother, Holding, Grounded, GettingUp, Backpedal, Spread, Charge, Jockey }
+public enum KeeperAction { Set, Shuffle, Rush, Planted, Reacting, Diving, Smother, Holding, Grounded, GettingUp, Backpedal, Spread, Charge, Jockey, Slide }
 
 /// <summary>The kind of save motion while <see cref="KeeperAction.Diving"/> (None otherwise).
 /// Low: diving along the ground. Side: a flat side dive at mid height. High: a leaping dive / tip over the bar.

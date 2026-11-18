@@ -7,7 +7,7 @@ namespace FootballSim.Game;
 
 /// <summary>
 /// The keeper's poses (Phase D). Every state is a blend of up to three poses: the standing pose S (Set, Shuffle, Backpedal, Spread, Jockey, Planted, Reacting,
-/// Holding on his feet, and the end of a get-up), the dive pose D (every dive kind, the smother, lying on the ground and the start of a get-up) and, while
+/// Holding on his feet, and the end of a get-up), the dive pose D (every dive kind, the smother, the slide tackle, lying on the ground and the start of a get-up) and, while
 /// rushing or charging, the outfield run cycle R. The weights move smoothly, so a change of state never snaps a pose. The simulation's values decide what is drawn; nothing
 /// here decides any timing except the figure's own smoothing.
 /// </summary>
@@ -27,6 +27,7 @@ public partial class PlayerFigure
     bool _kInit, _ground, _hasLatch;
     KDive _dKind = KDive.Low;
     bool _dSmother;
+    bool _slid;      // the latest ground action was a slide tackle: he lies in its pose until he gets up
     Vector3 _latchHand;
     // smoothed standing parameters
     float _kLegFrac, _kHw, _kLean, _kHf, _kHd, _kHs;
@@ -71,9 +72,10 @@ public partial class PlayerFigure
         _kInit = true;
         StandTargets(f.KeeperAction, out _kLegFrac, out _kHw, out _kLean, out _kHf, out _kHd, out _kHs);
         var act = f.KeeperAction;
-        _wD = act is KAct.Diving or KAct.Smother or KAct.Grounded ? 1f : act == KAct.GettingUp ? GetUpWeight(Mathf.Clamp(f.KeeperActionTime / KeeperView.GetUpSeconds, 0f, 1f)) : 0f;
+        _wD = act is KAct.Diving or KAct.Smother or KAct.Grounded or KAct.Slide ? 1f : act == KAct.GettingUp ? GetUpWeight(Mathf.Clamp(f.KeeperActionTime / KeeperView.GetUpSeconds, 0f, 1f)) : 0f;
         _wR = act is KAct.Rush or KAct.Charge ? 1f : 0f;
-        _ground = act is KAct.Grounded or KAct.GettingUp;
+        _ground = act is KAct.Grounded or KAct.GettingUp or KAct.Slide;
+        _slid = act == KAct.Slide;
         _dKind = f.KeeperDive == KDive.None ? KDive.Low : f.KeeperDive;
         _dSmother = act == KAct.Smother;
         _hasLatch = false;
@@ -138,20 +140,22 @@ public partial class PlayerFigure
     /// <summary>Latches whether he is on the ground and moves the weight toward the dive pose.</summary>
     void KeeperMode(KAct act, KDive dive, float getUp, float dt)
     {
-        if (act is KAct.Diving or KAct.Smother)
+        if (act == KAct.Slide) { _slid = true; _dSmother = false; _ground = true; }
+        else if (act is KAct.Diving or KAct.Smother)
         {
+            _slid = false;
             _dSmother = act == KAct.Smother;
             _dKind = act == KAct.Smother ? KDive.Low : dive == KDive.None ? KDive.Side : dive;
             _ground = _dKind is KDive.Low or KDive.Side or KDive.High or KDive.Back;
         }
         else if (act == KAct.Grounded) _ground = true;
-        else if (act is KAct.Set or KAct.Shuffle or KAct.Planted or KAct.Reacting or KAct.Rush or KAct.Charge or KAct.Backpedal or KAct.Spread or KAct.Jockey) _ground = false;
+        else if (act is KAct.Set or KAct.Shuffle or KAct.Planted or KAct.Reacting or KAct.Rush or KAct.Charge or KAct.Backpedal or KAct.Spread or KAct.Jockey) { _ground = false; _slid = false; }
         else if (act == KAct.GettingUp && getUp >= 1f) _ground = false;
 
         float target, tau;
         switch (act)
         {
-            case KAct.Diving: case KAct.Smother: target = 1f; tau = 0.05f; break;
+            case KAct.Diving: case KAct.Smother: case KAct.Slide: target = 1f; tau = 0.05f; break;
             case KAct.Grounded: target = 1f; tau = 0.08f; break;
             case KAct.Holding: target = _ground ? 1f : 0f; tau = _ground ? 0.10f : 0.15f; break;
             default: target = 0f; tau = 0.12f; break;
@@ -265,6 +269,7 @@ public partial class PlayerFigure
     KPose KeeperDiveShape(in FigureFrame f, Vector3 pos, Vector3 fwd, Vector3 right, in KPose S, float dt, float k)
     {
         var act = f.KeeperAction;
+        if (act == KAct.Slide || _slid && act == KAct.Grounded) return SlideShape(pos, fwd, right, dt, k, act == KAct.Grounded);
         bool diving = act is KAct.Diving or KAct.Smother;
         bool lie = act is KAct.Grounded or KAct.GettingUp || (act == KAct.Holding && _ground);
         bool holdBall = act == KAct.Holding;
@@ -484,6 +489,55 @@ public partial class PlayerFigure
             pole[i] = (pb * (1f - flat) + Vector3.Up * (1.2f * flat)).Normalized();
         }
         return new KPose { Pel = pel, Q = B.GetRotationQuaternion(), Knee = knee, Ank = ank, Dir = dir, Hand = handW, Pole = pole };
+    }
+
+    /// <summary>
+    /// A simple slide tackle (a placeholder until real motion clips): sitting on the ground leaning back away from the way he slides (his
+    /// facing), the right leg out straight along the ground at the ball, the left bent under him with the knee up, the left hand down on the ground
+    /// behind and the right arm out to the side. <paramref name="lying"/> (Grounded after the slide) leans a little further back. It moves the dive
+    /// state too, so the get-up that follows starts from it.
+    /// </summary>
+    KPose SlideShape(Vector3 pos, Vector3 fwd, Vector3 right, float dt, float k, bool lying)
+    {
+        float a = 1f - Mathf.Exp(-dt / 0.05f);
+        _dTilt += ((lying ? 68f : 58f) * Deg - _dTilt) * a;
+        _dDir = fwd; _dOff = 0f;
+        Vector3 nt = _dTiltDir + (-fwd - _dTiltDir) * a;
+        _dTiltDir = nt.LengthSquared() > 1e-6f ? nt.Normalized() : -fwd;
+        Vector3 nf = _dFace + (fwd - _dFace) * a;
+        _dFace = nf.LengthSquared() > 1e-6f ? nf.Normalized() : fwd;
+        Vector3 faceRight = new(-_dFace.Z, 0, _dFace.X);
+        _dPelY += (0.16f * k - _dPelY) * (1f - Mathf.Exp(-dt / 0.04f));
+
+        float sin = Mathf.Sin(_dTilt), cos = Mathf.Cos(_dTilt);
+        Vector3 axis = Vector3.Up.Cross(_dTiltDir * sin + Vector3.Up * cos);
+        Quaternion q = axis.LengthSquared() > 1e-8f ? new Quaternion(axis.Normalized(), _dTilt) : Quaternion.Identity;
+        Basis B = new Basis(q) * new Basis(_dFace, Vector3.Up, faceRight);
+        Vector3 pel = new(pos.X, _dPelY, pos.Z);
+        float shoulderUp = 0.035f * H + TorsoLen - 0.03f * H;
+
+        var knee = new Vector3[2]; var ank = new Vector3[2]; var dir = new Vector3[2]; var hand = new Vector3[2]; var pole = new Vector3[2];
+        for (int i = 0; i < 2; i++)
+        {
+            float side = i == 0 ? -1f : 1f;
+            bool lead = i == 1;
+            Vector3 hip = pel + B * new Vector3(0, -0.01f * H, side * HipW);
+            Vector3 at = lead
+                ? new Vector3(pos.X, AnkleH + 0.04f * k, pos.Z) + fwd * (0.95f * Leg) + right * (0.06f * k)
+                : new Vector3(pos.X, AnkleH, pos.Z) + fwd * (0.40f * Leg) - right * (0.10f * k);
+            _dAnk[i] += (at - _dAnk[i]) * a;
+            SolveLeg(hip, _dAnk[i], Vector3.Up, out knee[i], out ank[i]);
+            dir[i] = fwd;
+            Vector3 sh = pel + B * new Vector3(0, shoulderUp, side * ShoulderW);
+            Vector3 ht = lead
+                ? sh + right * (0.40f * k) + fwd * (0.10f * k) + Vector3.Down * (0.10f * k)
+                : new Vector3(pel.X, 0.06f * k, pel.Z) - fwd * (0.22f * H) - right * (0.20f * H);
+            ht.Y = Math.Max(ht.Y, 0.06f * k);
+            _dHand[i] += (ht - _dHand[i]) * a;
+            hand[i] = _dHand[i];
+            pole[i] = (B * new Vector3(-0.3f, -1f, side * 0.6f)).Normalized();
+        }
+        return new KPose { Pel = pel, Q = B.GetRotationQuaternion(), Knee = knee, Ank = ank, Dir = dir, Hand = hand, Pole = pole };
     }
 
     // ---------------------------------------------------------------------------------------------------------------

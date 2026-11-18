@@ -355,7 +355,8 @@ public sealed class World
         if (State == RoundState.Flight && Ball.OnGround && Ball.Velocity == Vector3.Zero) State = RoundState.Live;
         TrackLanding(prev, Ball.Position);
         _brain.ObservePlane(prev, Ball.Position);
-        if (res.SphereHit)
+        // His hands meeting a ball outside his penalty area is no touch: he pulls them away and the ball carries on.
+        if (res.SphereHit && !_brain.RefuseHands(res.SpherePoint, res.BodyHit))
         {
             float v;
             bool held = _brain.Contact(Ball, res.SpherePoint, _keeperRng, out v, res.BodyHit);

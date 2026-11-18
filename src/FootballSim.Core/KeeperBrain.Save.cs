@@ -33,9 +33,14 @@ public sealed partial class KeeperBrain
     bool _pendingStrike;        // a strike came while he was down; he reacts once he may
     float _pendingSince;
 
-    /// <summary>The sphere the ball's path is tested against: the hands (or the body spread in a smother) plus the ball radius. Null when not live.</summary>
+    /// <summary>
+    /// The sphere the ball's path is tested against: the hands (or the body spread in a smother, or the leading foot in a slide
+    /// or a poke) plus the ball radius. Null when not live, or once his hands were refused a ball outside his area.
+    /// </summary>
     internal SweepSphere? HandsSphere =>
-        _active && _phase is Phase.Reacting or Phase.Diving or Phase.Smother
+        !_active ? null
+        : _phase == Phase.Slide ? new SweepSphere(_foot, _t.Keeper.SlideFootRadius + _t.Ball.Radius)
+        : !_handsOff && _phase is Phase.Reacting or Phase.Diving or Phase.Smother
             ? new SweepSphere(_hands, (_phase == Phase.Smother ? _t.Keeper.SmotherRadius : _t.Keeper.HandRadius) + _t.Ball.Radius)
             : null;
 
@@ -96,6 +101,7 @@ public sealed partial class KeeperBrain
         Enter(Phase.Diving);
         _active = true;
         _contact = false;
+        _handsOff = false;
         _reflex = false;
         _reaction = 0f;
         _jitter = 0f;
@@ -138,6 +144,7 @@ public sealed partial class KeeperBrain
             Rushed = _roundRushed,
             Charged = _roundCharged,
             Smothered = _roundSmother,
+            Slid = _roundSlid,
             WonBall = _roundWon,
             Rounded = _roundRounded,
             DepthAtBandM = (float[])_bandDepth.Clone(),
@@ -165,12 +172,14 @@ public sealed partial class KeeperBrain
             case Phase.Held:
                 return;
             case Phase.Smother when _active:
-                return; // already going down at the ball: the body is in the way or not
+            case Phase.Slide when _active:
+                return; // already going down at the ball: the body (or the leg) is in the way or not
             case Phase.Diving when _active:
             case Phase.Backpedal when _active:
                 return;
             case Phase.Diving:
             case Phase.Smother:
+            case Phase.Slide:
             case Phase.Grounded:
                 _ready = 0f;
                 _pendingStrike = true; _pendingSince = 0f;
@@ -192,6 +201,7 @@ public sealed partial class KeeperBrain
         _anticipating = false;
         _fromBackpedal = false;
         _pendingStrike = false;
+        _handsOff = false;
         _reflex = false;
         _reflexDecided = false;
         _since = elapsed;
@@ -247,7 +257,8 @@ public sealed partial class KeeperBrain
     /// time set by that point's difficulty; else, as a best effort, the point in the wedge he gets closest to in time (or, with
     /// none in the wedge, the ball's closest pass). For a reflex (from now): the first point below his reflex height that a reflex
     /// limb gets to in time (horizontally from his upright axis), else the one it gets closest to. A ball that will hit his
-    /// standing body is a block, found either way.
+    /// standing body is a block, found either way. Outside his penalty area a point counts only for a save without the hands: a
+    /// foot block (a low ball close to him) or a reflex foot or body block.
     /// </summary>
     SavePlan PlanSave(Ball ball, float lead, bool reflex)
     {
@@ -279,12 +290,13 @@ public sealed partial class KeeperBrain
             float lateral = new Vector2(p.X - feet.X, p.Z - feet.Z).Length();
             float need = reflex ? lateral : Vector3.Distance(p, home);
             float speed = b.Velocity.Length();
-            if (need < bestNeed && p.Y <= top) { bestNeed = need; closest = p; tClosest = t; vClosest = speed; }
+            bool allowed = HandsAllowedAt(p) || !IsHandsKind(reflex ? Keeper.ReflexKindFor(feet, p, _ready, _t) : Keeper.DiveKindFor(feet, p, _t));
+            if (allowed && need < bestNeed && p.Y <= top) { bestNeed = need; closest = p; tClosest = t; vClosest = speed; }
             // The ball will hit him where he stands: he stays big and blocks it rather than moving out of its way.
             if (p.X <= _pitch.GoalLineX && SegmentDistance(p, body.A, body.B) <= body.Radius)
                 return new SavePlan { Found = true, Block = true, Target = p, T = t, Speed = speed, PlaneN = planeN };
             // Above his leap he cannot get a hand to it; after backpedalling he leaps backward, outside his usual wedge.
-            bool candidate = p.X <= _pitch.GoalLineX && p.Y <= top && (reflex || _fromBackpedal || Keeper.InWedge(feet, facing, p, _t));
+            bool candidate = allowed && p.X <= _pitch.GoalLineX && p.Y <= top && (reflex || _fromBackpedal || Keeper.InWedge(feet, facing, p, _t));
             if (candidate)
             {
                 float d = Keeper.Difficulty(sheet, _t, feet, vel, p);
@@ -343,6 +355,7 @@ public sealed partial class KeeperBrain
         _carry0 = new Vector2(_k.Velocity.X, _k.Velocity.Z);
         _reachedFor = 0f;
         _contact = false;
+        _handsOff = false;
         _targetT = plan.T;
         _planeN = plan.PlaneN;
         _difficulty = Keeper.Difficulty(sheet, _t, _feet0, _k.Velocity, plan.Target);
@@ -359,9 +372,12 @@ public sealed partial class KeeperBrain
         float beyond = Vector2.Dot(new Vector2(target.X - _home.X, target.Z - _home.Z), _planeN);
         _planePoint = beyond > 0f ? new Vector2(_home.X, _home.Z) + _planeN * beyond : new Vector2(_home.X, _home.Z);
         _jitter = rng.NextFloat() * Keeper.SaveJitterMax(_t, _difficulty);
+        // Outside his area he never goes for it with his hands: a foot or body block instead.
+        bool hands = HandsAllowedAt(target);
         if (reflex)
         {
             _dive = Keeper.ReflexKindFor(_feet0, target, _ready, _t);
+            if (!hands && IsHandsKind(_dive)) _dive = target.Y <= k.ReflexFootHeight ? KeeperDive.ReflexFoot : KeeperDive.BodyBlock;
             _limbStart = LimbStart(_dive);
         }
         else
@@ -369,12 +385,13 @@ public sealed partial class KeeperBrain
             _dive = _fromBackpedal ? KeeperDive.Back : Keeper.DiveKindFor(_feet0, target, _t);
             if (plan.Block && _dive is not (KeeperDive.Catch or KeeperDive.Feet))
                 _dive = target.Y < k.FeetBlockHeight ? KeeperDive.Feet : KeeperDive.Catch;
+            if (!hands && IsHandsKind(_dive)) _dive = KeeperDive.Feet;
         }
         Report.Dive = _dive;
         Report.Difficulty = _difficulty;
         Report.SaveType = reflex ? (plan.Found ? SaveType.Reflex : SaveType.ReflexAttempt)
             : !plan.Found ? SaveType.FailedAttempt
-            : ExpectsCatch(plan) ? SaveType.Catch : SaveType.Parry;
+            : hands && ExpectsCatch(plan) ? SaveType.Catch : SaveType.Parry;
         SetAction(KeeperAction.Diving, _dive);
         StepDive(0f);
     }
@@ -433,7 +450,7 @@ public sealed partial class KeeperBrain
     /// radius) from the strike until his save gets going. Null when he was not set at the strike, or once he moves.
     /// </summary>
     internal SweepCapsule? HandsCapsule =>
-        _active && _span > 0f && (_phase == Phase.Reacting || _phase == Phase.Diving && DiveTau <= 0f)
+        _active && !_handsOff && _span > 0f && (_phase == Phase.Reacting || _phase == Phase.Diving && DiveTau <= 0f)
             ? new SweepCapsule(HandRest(-1f), HandRest(1f), _t.Keeper.HandRadius + _t.Ball.Radius)
             : null;
 
@@ -538,7 +555,9 @@ public sealed partial class KeeperBrain
     /// <c>catch_max_difficulty</c>. A reflex limb's touch can be loose (<see cref="Keeper.LooseReflexChance"/>: off-centre, hard,
     /// fast, a keeper with worse handling and reflexes), and the ball goes on. Otherwise blocked (the body, at the feet, a smother, a reflex foot or body block, or before he
     /// moved), tipped over the bar (high, near his line), fingertipped (a dive at least <c>fingertip_difficulty</c> hard) or
-    /// parried. Returns true if held.
+    /// parried. The ball's place at the contact decides whether he may use his hands: outside his penalty area a touch with the
+    /// hands is refused (<see cref="RefuseHands"/>: the ball carries on untouched), and his body, feet or a smother never hold it
+    /// (they block it). A slide or a poke knocks it away (<see cref="FeetContact"/>). Returns true if held.
     /// </summary>
     internal bool Contact(Ball ball, Vector3 contact, SimRng rng, out float speedAtContact, bool body = false)
     {
@@ -546,6 +565,9 @@ public sealed partial class KeeperBrain
         var sheet = _k.Sheet;
         Vector3 v = ball.Velocity;
         speedAtContact = v.Length();
+        if (_phase == Phase.Slide) return FeetContact(ball, contact, rng, out speedAtContact);
+        if (RefuseHands(contact, body)) return false;
+        bool inside = HandsAllowedAt(contact);
         Vector3 home = _phase == Phase.Reacting ? HomeFor(_k.Position) : _home;
         float distance = (contact - home).Length();
         _active = false;
@@ -568,6 +590,7 @@ public sealed partial class KeeperBrain
                 : Keeper.CatchRange(sheet, _t, speedAtContact, !standing, _since);
             held = distance <= range && difficulty <= k.CatchMaxDifficulty;
         }
+        held &= inside;
         if (held)
         {
             Record(contact, home, KeeperResult.Held);
