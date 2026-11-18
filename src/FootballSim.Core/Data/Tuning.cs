@@ -169,6 +169,16 @@ public sealed class MovementTuning
     /// (5 m/s^2, no input); its active deceleration curves are not known.
     /// </summary>
     public float BalanceDeceleration { get; set; } = 12f;
+    /// <summary>
+    /// Without the ball, the stick more than this from the facing while running is a turn about (GOALS' moving capsule rotation
+    /// threshold, 135 degrees): the player plants and brakes, losing <see cref="ReverseSpeedLoss"/> of his speed at
+    /// balance_deceleration while he turns (GOALS plays a speed-dependent 180 turn instead of turning on the spot).
+    /// </summary>
+    public float ReverseTurnDeg { get; set; } = 135f;
+    /// <summary>Share of the running speed a turn about without the ball costs (see <see cref="ReverseTurnDeg"/>).</summary>
+    public float ReverseSpeedLoss { get; set; } = 0.65f;
+    /// <summary>A turn about only costs speed above this running speed, m/s.</summary>
+    public float ReverseMinSpeed { get; set; } = 2f;
     public float WeightReference { get; set; } = 75f;
     public float WeightRange { get; set; } = 25f;
     public float WeightTurnSlope { get; set; } = 0.15f;
@@ -391,8 +401,11 @@ public sealed class PossessionTuning
     public float LoseDistanceFast { get; set; } = 3.5f;
     /// <summary>While the player runs to recover a ball that no touch can be planned for, the speed cap is this fraction of top speed.</summary>
     public float ChaseSpeedFraction { get; set; } = 0.97f;
-    /// <summary>Off possession the turn rate is multiplied by (1 + this).</summary>
-    public float OffBallTurnBonus { get; set; } = 0.15f;
+    /// <summary>
+    /// Off possession the turn rate is multiplied by (1 + this): -0.2 makes the top of the range GOALS' 360 deg/s without the
+    /// ball against 450 with it.
+    /// </summary>
+    public float OffBallTurnBonus { get; set; } = -0.2f;
     /// <summary>How far ahead the touch planner looks for a swing that can play the ball, seconds.</summary>
     public float PredictionHorizon { get; set; } = 1.5f;
 }

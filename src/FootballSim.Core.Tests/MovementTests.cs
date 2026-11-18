@@ -87,6 +87,26 @@ public class MovementTests
     }
 
     [Fact]
+    public void WithoutTheBallATurnAboutBrakesAndTheTurnRateTopsOutAtGoalsThreeSixty()
+    {
+        var s = TestData.Sheet(50); s.Agility = 99; s.WeightKg = 75;
+        Assert.InRange(Movement.TurnRateDeg(s, T) * (1f + T.Possession.OffBallTurnBonus), 359f, 361f);
+        var p = TestData.Outfield(s, facing: 0f);
+        p.Velocity = new Vector3(5f, 0, 0);
+        var assist = new MoveAssist(Movement.TopSpeed(s, T), 1f + T.Possession.OffBallTurnBonus, Vector2.Zero, TurnAbout: true);
+        float now = 0f, min = float.MaxValue;
+        for (int i = 0; i < 120; i++)
+        {
+            now += Dt;
+            Movement.Step(p, new TickIntent { MoveX = -1 }, Dt, now, assist, T, null);
+            min = MathF.Min(min, p.Speed);
+        }
+        // the plant costs reverse_speed_loss of the 5 m/s, shed over several ticks, while he turns round
+        Assert.True(min < 5f * (1f - 0.8f * T.Movement.ReverseSpeedLoss), $"lowest speed {min:F2}");
+        Assert.InRange(MathF.Abs(Movement.WrapAngle(p.Facing - MathF.PI)), 0f, 0.05f);
+    }
+
+    [Fact]
     public void HeavierPlayersTurnSlower()
     {
         var light = TestData.Sheet(50, weight: 55); var heavy = TestData.Sheet(50, weight: 100);

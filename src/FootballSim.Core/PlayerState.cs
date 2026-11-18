@@ -148,6 +148,8 @@ public sealed class PlayerState
     internal float MoveTime;
     /// <summary>Running speed still to be shed after a sharp turn or a cut (at balance_deceleration), m/s.</summary>
     internal float SpeedDebt;
+    /// <summary>Simulation seconds of the last turn about without the ball (see reverse_turn_deg).</summary>
+    internal float ReverseTime = -100f;
     /// <summary>The touch planner's steering correction last tick (world X, Z), m/s: it eases from there (zero during a skill move).</summary>
     internal Vector2 PlannerSteer;
     internal float TurnRefHeading;
@@ -243,7 +245,7 @@ public sealed class PlayerState
         Position = o.Position; Velocity = o.Velocity; Facing = o.Facing; HandPosition = o.HandPosition;
         LastTouchTime = o.LastTouchTime; TouchBoostUntil = o.TouchBoostUntil; TouchBoostFactor = o.TouchBoostFactor;
         TouchBoostFrom = o.TouchBoostFrom; KnockOnFrom = o.KnockOnFrom; KnockOnDirection = o.KnockOnDirection;
-        KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; PlannerSteer = o.PlannerSteer; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
+        KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PlannerSteer = o.PlannerSteer; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction;

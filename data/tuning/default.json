@@ -60,6 +60,9 @@
       "at99": 0.15
     },
     "balance_deceleration": 12,
+    "reverse_turn_deg": 135,
+    "reverse_speed_loss": 0.65,
+    "reverse_min_speed": 2,
     "weight_reference": 75,
     "weight_range": 25,
     "weight_turn_slope": 0.15,
@@ -182,7 +185,7 @@
     "lose_distance_slow": 2,
     "lose_distance_fast": 3.5,
     "chase_speed_fraction": 0.97,
-    "off_ball_turn_bonus": 0.15,
+    "off_ball_turn_bonus": -0.2,
     "prediction_horizon": 1.5
   },
   "shot": {

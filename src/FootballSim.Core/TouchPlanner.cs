@@ -198,7 +198,7 @@ public static class TouchPlanner
     /// <summary>Updates the smooth stick turn rate from this tick's stick (starting afresh on a round's first tick).</summary>
     static void TrackStick(PlayerState p, in TickIntent intent, int tick, Tuning t)
     {
-        if (tick <= 1) { p.StickAnglePrev = float.NaN; p.StickRate = 0f; p.EarlyTurnTick = -1; p.SpeedDebt = 0f; p.TouchCadenceCount = 0; p.PlannerSteer = Vector2.Zero; }
+        if (tick <= 1) { p.StickAnglePrev = float.NaN; p.StickRate = 0f; p.EarlyTurnTick = -1; p.SpeedDebt = 0f; p.TouchCadenceCount = 0; p.PlannerSteer = Vector2.Zero; p.ReverseTime = -100f; }
         Vector2 m = intent.Move;
         if (m.Length() < t.Touch.StickThreshold) { p.StickAnglePrev = float.NaN; p.StickRate = 0f; return; }
         float a = MathF.Atan2(m.Y, m.X);
@@ -229,8 +229,8 @@ public static class TouchPlanner
             legs = intent;
             float top = Movement.TopSpeed(p.Sheet, t);
             return Stunned(p, now)
-                ? new MoveAssist(top * t.Shot.StunSpeedFraction, 1f + t.Possession.OffBallTurnBonus, Vector2.Zero, HardCap: top * t.Shot.StunSpeedFraction)
-                : new MoveAssist(top, 1f + t.Possession.OffBallTurnBonus, Vector2.Zero);
+                ? new MoveAssist(top * t.Shot.StunSpeedFraction, 1f + t.Possession.OffBallTurnBonus, Vector2.Zero, HardCap: top * t.Shot.StunSpeedFraction, TurnAbout: true)
+                : new MoveAssist(top, 1f + t.Possession.OffBallTurnBonus, Vector2.Zero, TurnAbout: true);
         }
 
         // A skill move owns the legs while it lasts; on the tick it ends, the planner takes over at once.

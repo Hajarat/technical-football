@@ -104,6 +104,13 @@ public static class Movement
         {
             float desired = MathF.Atan2(stick.Y, stick.X);
             float diff = WrapAngle(desired - facing);
+            // Turning about without the ball: a plant and brake, once per turn (the sharp-turn window apart).
+            if (assist.TurnAbout && MathF.Abs(diff) * 180f / MathF.PI > m.ReverseTurnDeg && speed > m.ReverseMinSpeed
+                && now - p.ReverseTime > m.SharpTurnWindow)
+            {
+                p.SpeedDebt = MathF.Max(p.SpeedDebt, speed * m.ReverseSpeedLoss);
+                p.ReverseTime = now;
+            }
             float rate = TurnRateDeg(p.Sheet, t) * assist.TurnScale * (1f - m.TurnSpeedPenalty * Math.Clamp(speed / top, 0f, 1f)) * MathF.PI / 180f;
             float maxTurn = rate * dt;
             // A small heading change eases in (time constant turn_ease) instead of snapping round at the full rate; a large
@@ -156,7 +163,7 @@ public static class Movement
 /// <summary>
 /// Per-tick movement modifiers: the speed cap, a turn-rate scale, a steering correction velocity (world X, Z) and, for a skill
 /// move, the running speed to use this tick (NaN: the legs ease toward the stick's target as usual), and a running speed never
-/// exceeded this tick (the post-strike stun).
+/// exceeded this tick (the post-strike stun), and whether a stick turned about brakes the run (without the ball).
 /// </summary>
 internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Steer, float RunSpeed = float.NaN,
-    float HardCap = float.PositiveInfinity);
+    float HardCap = float.PositiveInfinity, bool TurnAbout = false);
