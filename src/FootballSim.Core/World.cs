@@ -206,7 +206,7 @@ public sealed class World
             p.Facing = MathF.PI;
             ResetPlayer(p);
         }
-        _brain = new KeeperBrain(Keeper, Pitch, Tuning, Scenario.KeeperHoldLine);
+        _brain = new KeeperBrain(Keeper, Pitch, Tuning, Scenario.KeeperHoldLine, Attacker.Sheet);
         IdealCharge = ShotModel.IdealCharge(ShotModel.GoalDistance(Ball.Position, Pitch), Tuning);
     }
 
@@ -439,6 +439,8 @@ public sealed class World
             Windup = a.ShotAction is { Made: false },
             StrikeIn = a.ShotAction is { Made: false } shot ? MathF.Max(0f, (shot.ContactTick - Tick) * _dt) : float.PositiveInfinity,
             ShotInFlight = State == RoundState.Flight,
+            AttackerPosition = a.Position,
+            AttackerVelocity = a.Velocity,
         };
     }
 

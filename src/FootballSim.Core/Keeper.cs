@@ -174,10 +174,19 @@ public static class Keeper
     public static Vector3 ArcTarget(Vector3 ball, Pitch pitch, Tuning t, PlayerSheet s)
     {
         var b = new Vector2(ball.X, ball.Z);
-        float ballDistance = Vector2.Distance(b, new Vector2(pitch.GoalLineX, 0f));
+        return CoverSpot(ball, pitch, t, ArcDistance(s, t, MouthDistance(b, pitch), Bearing(b, pitch)));
+    }
+
+    /// <summary>
+    /// The point on the cover line from the ball (see <see cref="CoverDirection"/>) <paramref name="want"/> metres from the goal
+    /// mouth, never closer than <c>arc_min_from_line</c> to the goal line, and at least half way from the ball to that limit
+    /// (or, with <paramref name="halfWay"/> false, at least a metre from the ball).
+    /// </summary>
+    public static Vector3 CoverSpot(Vector3 ball, Pitch pitch, Tuning t, float want, bool halfWay = true)
+    {
+        var b = new Vector2(ball.X, ball.Z);
         Vector2 dir = CoverDirection(b, pitch, t);
         float ballMouth = MouthDistance(b, pitch);
-        float want = ArcDistance(s, t, ballMouth, Bearing(b, pitch));
         // Walk the cover line from the ball toward the goal line: the mouth distance falls along it (convex), so bisect.
         float tMax = (pitch.GoalLineX - t.Keeper.ArcMinFromLine - b.X) / MathF.Max(1e-3f, dir.X);
         if (tMax <= 0f) return new Vector3(pitch.GoalLineX - t.Keeper.ArcMinFromLine, 0f, Math.Clamp(ball.Z, -pitch.GoalHalfWidth, pitch.GoalHalfWidth));
@@ -191,7 +200,7 @@ public static class Keeper
                 if (MouthDistance(b + dir * mid, pitch) > want) lo = mid; else hi = mid;
             }
         // A ball closer to the mouth than the arc: he stands at least half way from it to his line.
-        float along = Math.Clamp(0.5f * (lo + hi), 0.5f * tMax, tMax);
+        float along = Math.Clamp(0.5f * (lo + hi), halfWay ? 0.5f * tMax : MathF.Min(1f, tMax), tMax);
         var p = b + dir * along;
         return new Vector3(p.X, 0f, p.Y);
     }
@@ -208,6 +217,123 @@ public static class Keeper
         float z = b.Y + dir.Y * along;
         float lim = pitch.GoalHalfWidth - t.Keeper.LineInset;
         return new Vector3(pitch.GoalLineX, 0f, Math.Clamp(z, -lim, lim));
+    }
+
+    // ---- closing down and chips ----
+
+    /// <summary>
+    /// How far out from the goal mouth he comes closing down an attacker on the ball <paramref name="ballMouthDistance"/> metres
+    /// from the mouth: the arc distance plus <c>close_down_depth</c>'s excess over it, scaled by <c>close_down_positioning</c>.
+    /// </summary>
+    public static float CloseDownDistance(PlayerSheet s, Tuning t, float ballMouthDistance, float arcDistance)
+    {
+        float extra = MathF.Max(0f, t.Keeper.CloseDownDepth.Evaluate(ballMouthDistance) - arcDistance);
+        return arcDistance + extra * t.Keeper.CloseDownPositioning.ForRating(s.Positioning);
+    }
+
+    /// <summary>Backpedalling speed, m/s (positioning).</summary>
+    public static float BackpedalSpeed(PlayerSheet s, Tuning t) => t.Keeper.BackpedalSpeed.ForRating(s.Positioning);
+
+    /// <summary>The highest ball he can get a hand to with a standing leap, metres.</summary>
+    public static float ChipReachHeight(PlayerSheet s, Tuning t) => s.HeightM * t.Keeper.ChipReachHeightFraction;
+
+    /// <summary>The height a chip has dropped to where he plans to leap at it after backpedalling, metres.</summary>
+    public static float ChipTakeHeight(PlayerSheet s, Tuning t) => s.HeightM * t.Keeper.ChipTakeHeightFraction;
+
+    /// <summary>Standard deviation of his error judging his chip-safe depth, as a fraction of it (positioning).</summary>
+    public static float ChipJudgeErrorSd(PlayerSheet s, Tuning t) => t.Keeper.ChipJudgeError.ForRating(s.Positioning);
+
+    const float ChipTableStep = 0.5f, ChipTableMin = 2f, ChipTableMax = 40f;
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Tuning, Dictionary<string, float[]>> ChipTables = new();
+
+    /// <summary>
+    /// The chip-safe depth: the furthest he can stand off his line, on the line from the ball to the goal, and still recover from
+    /// a chip struck at <paramref name="ballDistance"/> metres from the goal. The chip is <paramref name="attacker"/>'s, at the
+    /// ideal charge for that distance (mean backspin, straight at goal). At a depth the ball passes over above his leap
+    /// (<see cref="ChipReachHeight"/>), he must backpedal from his mean reaction to within <c>chip_tip_reach</c> of a point where it
+    /// has dropped to <see cref="ChipTakeHeight"/>, on or before the goal line, <c>chip_leap_lead</c> before it gets there. Every depth from the line out to the one
+    /// returned is safe. A chip that would clear the bar is no threat (the distance itself is returned).
+    /// </summary>
+    public static float ChipSafeDepth(PlayerSheet keeper, PlayerSheet attacker, Tuning t, Pitch pitch, float ballDistance)
+    {
+        string key = FormattableString.Invariant($"{keeper.Reflexes}|{keeper.Positioning}|{keeper.RushingOut}|{keeper.HeightM}|{attacker.ShotPower}|{pitch.BarHeight}");
+        float[] table;
+        lock (ChipTables)
+        {
+            var byKey = ChipTables.GetOrCreateValue(t);
+            if (!byKey.TryGetValue(key, out table!))
+            {
+                int n = (int)MathF.Round((ChipTableMax - ChipTableMin) / ChipTableStep) + 1;
+                table = new float[n];
+                for (int i = 0; i < n; i++) table[i] = ComputeChipSafeDepth(keeper, attacker, t, pitch.BarHeight, ChipTableMin + i * ChipTableStep);
+                byKey[key] = table;
+            }
+        }
+        float f = (Math.Clamp(ballDistance, ChipTableMin, ChipTableMax) - ChipTableMin) / ChipTableStep;
+        int i0 = Math.Min((int)f, table.Length - 1), i1 = Math.Min(i0 + 1, table.Length - 1);
+        return table[i0] + (table[i1] - table[i0]) * (f - i0);
+    }
+
+    static float ComputeChipSafeDepth(PlayerSheet keeper, PlayerSheet attacker, Tuning t, float barHeight, float distance)
+    {
+        var k = t.Keeper;
+        float gx = 0f; // the goal line, with the ball at -distance on the X axis
+        float charge = ShotModel.IdealCharge(distance, t);
+        float speed = ShotModel.IntendedSpeed(attacker, ShotType.Chip, charge, t);
+        float elev = ShotModel.ElevationDeg(ShotType.Chip, charge, t) * MathF.PI / 180f;
+        var ball = new Ball(t.Ball)
+        {
+            Position = new Vector3(gx - distance, t.Ball.Radius, 0f),
+            Velocity = new Vector3(MathF.Cos(elev), MathF.Sin(elev), 0f) * speed,
+            // Backspin for a ball heading +X: spin = v x up, about +Z (as the shot model sets it).
+            Spin = new Vector3(0f, 0f, 1f) * (0.5f * (t.Shot.ChipBackspinMinRev + t.Shot.ChipBackspinMaxRev) * 2f * MathF.PI),
+        };
+        var xs = new List<float>(); var ys = new List<float>(); var ts = new List<float>();
+        float dt = t.Dt, time = 0f;
+        xs.Add(distance); ys.Add(ball.Position.Y); ts.Add(0f);
+        while (time < 4f)
+        {
+            ball.Step(dt, null, null);
+            time += dt;
+            xs.Add(gx - ball.Position.X); ys.Add(ball.Position.Y); ts.Add(time);
+            if (ball.Position.X >= gx) break;
+            if (ball.OnGround && ball.Velocity.Y <= 0f && time > 0.2f) break;
+        }
+        float reachH = ChipReachHeight(keeper, t), takeH = ChipTakeHeight(keeper, t);
+        // Where it crosses the goal line (or the last point if it lands short): over the bar is no threat.
+        if (ball.Position.X >= gx && ys[^1] > t.Ball.Radius && HeightAt(xs, ys, 0f) > barHeight + t.Ball.Radius) return distance;
+        float react = ReactionMean(keeper, t);
+        float accel = MoveAccel(keeper, t), vb = BackpedalSpeed(keeper, t);
+        float safe = 0f;
+        for (float x = 0f; x <= distance - 0.5f; x += 0.1f)
+        {
+            if (!SafeAt(x)) break;
+            safe = x;
+        }
+        return safe;
+
+        bool SafeAt(float x)
+        {
+            if (HeightAt(xs, ys, x) <= reachH) return true;   // it passes within his leap: a save as usual
+            for (int i = 0; i < xs.Count; i++)
+            {
+                if (xs[i] > x || xs[i] < 0f || ys[i] > takeH) continue;
+                if (react + TravelTime(x - xs[i] - k.ChipTipReach, 0f, accel, vb) + k.ChipLeapLead <= ts[i]) return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>The chip's height when it passes <paramref name="x"/> metres from the goal line (first pass), from the sampled flight.</summary>
+    static float HeightAt(List<float> xs, List<float> ys, float x)
+    {
+        for (int i = 1; i < xs.Count; i++)
+            if (xs[i] <= x)
+            {
+                float f = (xs[i - 1] - x) / MathF.Max(1e-5f, xs[i - 1] - xs[i]);
+                return ys[i - 1] + (ys[i] - ys[i - 1]) * f;
+            }
+        return ys[^1];
     }
 
     // ---- saves ----

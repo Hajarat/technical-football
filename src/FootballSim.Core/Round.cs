@@ -35,6 +35,20 @@ public sealed class KeeperReport
     public bool Rushed { get; set; }
     /// <summary>True if the keeper went down in a smother this round before the first strike.</summary>
     public bool Smothered { get; set; }
+    /// <summary>True if the keeper got to the ball (a smother, block or claim) this round before the first strike: won from a dribble.</summary>
+    public bool WonBall { get; set; }
+    /// <summary>True if the attacker took the ball past the keeper (goal-side of him, close by) this round before the first strike.</summary>
+    public bool Rounded { get; set; }
+    /// <summary>
+    /// The keeper's distance off his goal line when an attacker on the ball first came within each of <see cref="DepthBands"/>
+    /// of the goal centre before the first strike, metres (NaN for a band not reached).
+    /// </summary>
+    public float[] DepthAtBandM { get; set; } = NewBands();
+
+    /// <summary>The attacker's distances from the goal centre at which <see cref="DepthAtBandM"/> is sampled, metres.</summary>
+    public static readonly float[] DepthBands = { 20f, 15f, 10f, 6f };
+
+    static float[] NewBands() { var a = new float[DepthBands.Length]; Array.Fill(a, float.NaN); return a; }
 }
 
 /// <summary>How the keeper played the ball when he met it.</summary>
