@@ -19,14 +19,21 @@ public struct TickIntent
     public float MoveZ;
     /// <summary>0..1, analog sprint.</summary>
     public float Sprint;
+    /// <summary>Held: close control (the gamepad's shield button, left trigger).</summary>
     public bool CloseControl;
-    /// <summary>True while the shoot button is held. Power charges while held; release strikes.</summary>
+    /// <summary>
+    /// True while the shoot button is held. Power charges while held; release strikes. Pressed again after the release,
+    /// before the strike, it makes the shot a low one (as <see cref="Driven"/>).
+    /// </summary>
     public bool ShootHeld;
-    /// <summary>Held: finesse shot (with <see cref="Driven"/>, a low finesse shot).</summary>
+    /// <summary>
+    /// Held: finesse shot (with <see cref="Driven"/> or shoot tapped twice, a low finesse shot); the right bumper. With
+    /// <see cref="Chip"/> and the left stick back, a drag-back.
+    /// </summary>
     public bool Finesse;
-    /// <summary>Held: chip shot. Wins over every other modifier.</summary>
+    /// <summary>Held: chip shot. Wins over every other modifier. The left bumper (see <see cref="Finesse"/> for the drag-back).</summary>
     public bool Chip;
-    /// <summary>Held: driven shot (with <see cref="Finesse"/>, a low finesse shot).</summary>
+    /// <summary>Held: driven shot (with <see cref="Finesse"/>, a low finesse shot). The keyboard's modifier and the scripted attacker's; the gamepad taps shoot twice instead.</summary>
     public bool Driven;
     /// <summary>True on the tick a knock-on (a heavy touch far ahead) is asked for; one tick per press.</summary>
     public bool KnockOn;
