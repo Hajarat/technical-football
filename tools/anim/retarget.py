@@ -15,7 +15,7 @@ Method (spec appendix D):
   does; local rotations follow from the parent chain.
 * Proportions: the hips' rest is rolled by a constant (at most 8 deg) so both feet stand level where the subject stands still on both;
   a subject whose hip joints are much wider than the model's has both legs turned outward by a constant (over 3 deg only) so the knees
-  do not cross; a hand, foot or upper arm whose CMU solve flips is held within a range and a turning speed (GUARD).
+  do not cross; a hand, foot, upper arm, neck or head whose CMU solve flips is held within a range and a turning speed (GUARD).
 * Root: the hip joints are centred where the subject's are, scaled by the ratio of the keeper's leg length to the subject's (hip to
   ankle along the bones) about the subject's standing ankle height; the clip is turned to face +Z (its first frame, or the mean over
   the clip when it starts off its feet) and moved to start over the origin. Per frame the hips are then lifted or lowered (smoothly)
@@ -66,7 +66,10 @@ MAX_ROLL = math.radians(8)
 MIN_SPLAY = math.radians(3)
 # flip guard (guard_bone): most degrees from rest, most degrees per 60 Hz frame (20 = 1,200 deg/s, under the gallery's 1,500 pop flag)
 GUARD = {"LeftHand": (95.0, 20.0), "RightHand": (95.0, 20.0), "LeftFoot": (85.0, 20.0), "RightFoot": (85.0, 20.0),
-         "LeftArm": (179.0, 22.0), "RightArm": (179.0, 22.0)}
+         "LeftArm": (179.0, 22.0), "RightArm": (179.0, 22.0),
+         # neck and head: CMU's lowerneck/head solves can swap a roll between the two in one frame (getup_back_140_08 at 0.98 s);
+         # 16 deg per frame (960 deg/s) is above every real head turn in the clips
+         "Neck": (60.0, 16.0), "Head": (90.0, 16.0)}
 JOINT_CLEAR = 0.04   # no bone joint closer to the ground than this (the body around a joint is at least that thick)
 
 # SkinnedBody's driven order: trunk, then per side (Left, Right) shoulder, arm, forearm, hand, up-leg, leg, foot, toe.
@@ -704,6 +707,18 @@ def load_clips(path: Path = HERE / "clips.toml") -> list[dict]:
         return tomllib.load(f)["clip"]
 
 
+VERDICTS = ("keep", "trim", "reject")
+
+
+def verdict(clip: dict) -> str:
+    """The audition verdict (clips.toml "verdict"): keep, trim (kept after its frames were narrowed) or reject (written, never matched).
+    A clip without one has not been auditioned yet and counts as keep."""
+    v = clip.get("verdict", "keep")
+    if v not in VERDICTS:
+        raise ValueError(f"{clip['name']}: verdict must be one of {', '.join(VERDICTS)}, got {v!r}")
+    return v
+
+
 def main(argv: list[str]) -> int:
     clips = load_clips()
     only = set(argv)
@@ -722,14 +737,17 @@ def main(argv: list[str]) -> int:
         write_kclip(OUT / f"{c['name']}.kclip", r, names)
         cs = {("left", "right")[s]: spans(r.contacts[:, s]) for s in range(2)}
         index.append({"name": c["name"], "file": f"{c['name']}.kclip", "trial": c["trial"], "frames": c.get("frames"),
-                      "set": c["set"], "side": c.get("side", "none"), "kind": c.get("kind", ""), "loop": r.loop,
+                      "set": c["set"], "tags": list(c.get("tags", [])), "verdict": verdict(c), "side": c.get("side", "none"), "kind": c.get("kind", ""), "loop": r.loop,
                       "events": r.events, "fps": FPS, "frame_count": r.stats["frames"], "seconds": r.stats["seconds"],
                       "contacts": {k: [list(s) for s in v] for k, v in cs.items()},
                       "notes": c.get("notes", ""), "contact_tolerance_cm": float(c.get("contact_tolerance_cm", MAX_CONTACT_H * 100)), "checks": {k: v for k, v in r.stats.items() if k not in ("frames", "seconds")}})
         print(f"wrote {c['name']}: {r.stats['frames']} frames, scale {r.stats['scale']}, dir err {r.stats['max_dir_err_deg']} deg, "
               f"lowest joint {r.stats['lowest_joint_m']} m, contacts L{len(cs['left'])} R{len(cs['right'])}")
     if not only:
-        (OUT / "clips.json").write_text(json.dumps({"fps": FPS, "bones": names, "clips": index}, indent=1) + "\n")
+        # the skeleton the clips were made for, so the game's pose database can run forward kinematics without Godot
+        skeleton = {"parents": t.parent, "offsets": [[round(float(v), 6) for v in o] for o in t.rest_local_t],
+                    "rest": [[round(float(v), 6) for v in q] for q in mats_to_quats(t.rest_local_r)]}
+        (OUT / "clips.json").write_text(json.dumps({"fps": FPS, "bones": names, "skeleton": skeleton, "clips": index}, indent=1) + "\n")
         keep = {e["file"] for e in index}
         for old in OUT.glob("*.kclip"):
             if old.name not in keep:

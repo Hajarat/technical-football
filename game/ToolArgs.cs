@@ -24,6 +24,8 @@ public sealed class ToolArgs
     public bool Video;
     /// <summary>--clip-only a,b: the clip gallery shows only these clips.</summary>
     public readonly HashSet<string> ClipOnly = new();
+    /// <summary>--gallery-only a,b: the keeper gallery plays only the scripts whose names start with one of these.</summary>
+    public readonly List<string> GalleryOnly = new();
     public bool Background;
     /// <summary>--controls-panel keyboard|xbox|playstation|nintendo: open the controls panel for that device (for screenshots; no pad needed).</summary>
     public string? ControlsPanel;
@@ -31,6 +33,13 @@ public sealed class ToolArgs
     public bool ControlsHintOnly;
     /// <summary>"skinned" (rigged human models, the default) or "procedural" (primitive meshes).</summary>
     public string Figure = "skinned";
+    /// <summary>--keeper-anim procedural|mocap: the keeper's body from the hand-built poses (the default) or from motion clips (needs the skinned figure).</summary>
+    public string KeeperAnim = "procedural";
+    /// <summary>--keeper-anim-log: print a KEEPER_MM line at every mocap switch (clip, frame, playback rate).</summary>
+    public bool KeeperAnimLog;
+
+    /// <summary>The options of this run (the latest <see cref="Parse"/>), for views created after it.</summary>
+    public static ToolArgs? Current { get; private set; }
 
     public static ToolArgs Parse()
     {
@@ -57,6 +66,9 @@ public sealed class ToolArgs
                 case "--clip-only":
                     foreach (var s in (Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) a.ClipOnly.Add(s);
                     break;
+                case "--gallery-only":
+                    a.GalleryOnly.AddRange((Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                    break;
                 case "--controls-panel":
                     a.ControlsPanel = (Next() ?? "").ToLowerInvariant();
                     if (a.ControlsPanel.EndsWith(":hint")) { a.ControlsHintOnly = true; a.ControlsPanel = a.ControlsPanel[..^5]; }
@@ -67,6 +79,11 @@ public sealed class ToolArgs
                     a.Figure = (Next() ?? "").ToLowerInvariant();
                     if (a.Figure != "skinned" && a.Figure != "procedural") { GD.PushWarning($"--figure expects skinned or procedural, got '{a.Figure}'; using skinned"); a.Figure = "skinned"; }
                     break;
+                case "--keeper-anim":
+                    a.KeeperAnim = (Next() ?? "").ToLowerInvariant();
+                    if (a.KeeperAnim != "procedural" && a.KeeperAnim != "mocap") { GD.PushWarning($"--keeper-anim expects procedural or mocap, got '{a.KeeperAnim}'; using procedural"); a.KeeperAnim = "procedural"; }
+                    break;
+                case "--keeper-anim-log": a.KeeperAnimLog = true; break;
                 case "--shots": a.ShotDir = Next(); break;
                 case "--shot-ticks":
                     foreach (var s in (Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))
@@ -104,6 +121,7 @@ public sealed class ToolArgs
                 a.ShotDir = null;
             }
         }
+        Current = a;
         return a;
     }
 }

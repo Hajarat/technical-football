@@ -106,3 +106,23 @@ def test_every_mapped_bone_follows_its_source_direction():
     assert r.stats["max_dir_err_deg"] < R.MAX_DIR_DEG
     assert set(r.events) == {"takeoff", "contact", "landing"}
     assert r.events["takeoff"] < r.events["contact"] < r.events["landing"] < len(r.hips)
+
+
+def test_every_clip_has_a_known_verdict():
+    clips = R.load_clips()
+    assert all(R.verdict(c) in R.VERDICTS for c in clips)
+    rejected = {c["name"] for c in clips if R.verdict(c) == "reject"}
+    assert rejected == {"body_block_144_07", "body_block_144_26", "back_leap_jump_81_12", "smother_roll_90_34"}
+    with pytest.raises(ValueError):
+        R.verdict({"name": "x", "verdict": "maybe"})
+
+
+def test_guard_spreads_a_neck_head_roll_swap():
+    """getup_back_140_08's neck and head swapped a roll in one frame; the guard turns them at most 16 deg per frame."""
+    most, step = R.GUARD["Head"]
+    rest = np.array([0, 0, 0, 1.0])
+    ang = np.radians([30, 31, 32, 0, 1, 2, 3, 4])
+    q = np.stack([np.array([0, 0, math.sin(a / 2), math.cos(a / 2)]) for a in ang])
+    out, hit = R.guard_bone(q, rest, most, step)
+    steps = np.degrees(2 * np.arccos(np.clip(np.abs(np.sum(out[1:] * out[:-1], axis=1)), 0, 1)))
+    assert steps.max() <= step + 1e-6 and hit[3]

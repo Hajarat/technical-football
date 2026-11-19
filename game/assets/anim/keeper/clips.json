@@ -24,6 +24,278 @@
   "mixamorig_RightFoot",
   "mixamorig_RightToeBase"
  ],
+ "skeleton": {
+  "parents": [
+   -1,
+   0,
+   1,
+   2,
+   3,
+   4,
+   3,
+   6,
+   7,
+   8,
+   0,
+   10,
+   11,
+   12,
+   3,
+   14,
+   15,
+   16,
+   0,
+   18,
+   19,
+   20
+  ],
+  "offsets": [
+   [
+    -0.001838,
+    1.017063,
+    0.012588
+   ],
+   [
+    0.0,
+    0.095315,
+    0.0
+   ],
+   [
+    0.0,
+    0.103036,
+    -0.0
+   ],
+   [
+    -0.0,
+    0.138759,
+    -0.0
+   ],
+   [
+    0.0,
+    0.221644,
+    -0.0
+   ],
+   [
+    0.002226,
+    0.038199,
+    0.01986
+   ],
+   [
+    0.066028,
+    0.18751,
+    0.011786
+   ],
+   [
+    -0.0,
+    0.146764,
+    0.0
+   ],
+   [
+    -0.0,
+    0.26458,
+    0.0
+   ],
+   [
+    0.0,
+    0.271822,
+    -0.0
+   ],
+   [
+    0.114476,
+    -0.049465,
+    -0.011858
+   ],
+   [
+    0.0,
+    0.450376,
+    0.0
+   ],
+   [
+    -0.0,
+    0.44869,
+    0.0
+   ],
+   [
+    0.0,
+    0.15664,
+    0.0
+   ],
+   [
+    -0.064371,
+    0.177663,
+    0.017188
+   ],
+   [
+    0.0,
+    0.143275,
+    -0.0
+   ],
+   [
+    -0.0,
+    0.26458,
+    0.0
+   ],
+   [
+    -0.0,
+    0.271822,
+    0.0
+   ],
+   [
+    -0.109236,
+    -0.053779,
+    -0.006703
+   ],
+   [
+    -0.0,
+    0.450376,
+    0.0
+   ],
+   [
+    0.0,
+    0.44869,
+    0.0
+   ],
+   [
+    -0.0,
+    0.15664,
+    -0.0
+   ]
+  ],
+  "rest": [
+   [
+    0.078159,
+    -0.010727,
+    -0.010511,
+    0.996828
+   ],
+   [
+    -0.170575,
+    0.007869,
+    0.011781,
+    0.985243
+   ],
+   [
+    -0.114094,
+    0.001848,
+    0.000212,
+    0.993468
+   ],
+   [
+    0.341759,
+    -0.0,
+    -0.0,
+    0.939788
+   ],
+   [
+    -0.288277,
+    0.0,
+    -0.0,
+    0.957547
+   ],
+   [
+    0.162558,
+    0.004465,
+    0.00607,
+    0.98667
+   ],
+   [
+    0.458345,
+    0.195149,
+    -0.718118,
+    0.485946
+   ],
+   [
+    0.136949,
+    -0.290059,
+    -0.111873,
+    0.940529
+   ],
+   [
+    0.26104,
+    0.056895,
+    0.293132,
+    0.917984
+   ],
+   [
+    0.016357,
+    -0.037773,
+    -0.063097,
+    0.997158
+   ],
+   [
+    0.027102,
+    -0.113702,
+    -0.991118,
+    0.063426
+   ],
+   [
+    -0.054649,
+    0.02864,
+    -0.00156,
+    0.998094
+   ],
+   [
+    0.605674,
+    0.058753,
+    0.095017,
+    0.787832
+   ],
+   [
+    -0.035196,
+    0.983838,
+    -2.2e-05,
+    0.17557
+   ],
+   [
+    0.468355,
+    -0.240496,
+    0.69105,
+    0.495233
+   ],
+   [
+    0.176201,
+    0.320985,
+    0.117595,
+    0.923089
+   ],
+   [
+    0.260092,
+    -0.055756,
+    -0.293973,
+    0.918054
+   ],
+   [
+    0.033568,
+    0.150537,
+    0.068294,
+    0.985671
+   ],
+   [
+    0.047707,
+    0.115635,
+    0.99127,
+    0.04167
+   ],
+   [
+    -0.054649,
+    -0.02865,
+    0.001558,
+    0.998093
+   ],
+   [
+    0.575863,
+    -0.210013,
+    -0.210357,
+    0.761594
+   ],
+   [
+    -0.009999,
+    0.274649,
+    -0.033746,
+    0.9609
+   ]
+  ]
+ },
  "clips": [
   {
    "name": "stance_ready_77_03",
@@ -34,6 +306,10 @@
     600
    ],
    "set": "stance",
+   "tags": [
+    "idle"
+   ],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -88,6 +364,8 @@
     520
    ],
    "set": "stance",
+   "tags": [],
+   "verdict": "keep",
    "side": "right",
    "kind": "",
    "loop": false,
@@ -146,6 +424,8 @@
     420
    ],
    "set": "stance",
+   "tags": [],
+   "verdict": "keep",
    "side": "right",
    "kind": "",
    "loop": false,
@@ -196,6 +476,8 @@
     600
    ],
    "set": "stance",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -262,6 +544,8 @@
     420
    ],
    "set": "backpedal",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -328,6 +612,8 @@
     660
    ],
    "set": "backpedal",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -394,6 +680,8 @@
     162
    ],
    "set": "run",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -452,6 +740,8 @@
     332
    ],
    "set": "run",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -514,6 +804,8 @@
     300
    ],
    "set": "run",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -568,6 +860,8 @@
     185
    ],
    "set": "run",
+   "tags": [],
+   "verdict": "keep",
    "side": "left",
    "kind": "",
    "loop": false,
@@ -630,6 +924,8 @@
     240
    ],
    "set": "catch",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -702,6 +998,8 @@
     480
    ],
    "set": "catch",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -766,6 +1064,8 @@
     240
    ],
    "set": "catch",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -826,6 +1126,8 @@
     330
    ],
    "set": "reflex_hand",
+   "tags": [],
+   "verdict": "keep",
    "side": "left",
    "kind": "",
    "loop": false,
@@ -878,6 +1180,8 @@
     2580
    ],
    "set": "reflex_hand",
+   "tags": [],
+   "verdict": "keep",
    "side": "left",
    "kind": "",
    "loop": false,
@@ -930,6 +1234,8 @@
     500
    ],
    "set": "reflex_hand",
+   "tags": [],
+   "verdict": "keep",
    "side": "right",
    "kind": "",
    "loop": false,
@@ -982,6 +1288,8 @@
     2500
    ],
    "set": "reflex_hand",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1038,6 +1346,8 @@
     1250
    ],
    "set": "reflex_foot",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1102,6 +1412,8 @@
     960
    ],
    "set": "reflex_foot",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1159,6 +1471,8 @@
     1540
    ],
    "set": "body_block",
+   "tags": [],
+   "verdict": "reject",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1219,6 +1533,8 @@
     1620
    ],
    "set": "body_block",
+   "tags": [],
+   "verdict": "reject",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1275,6 +1591,8 @@
     140
    ],
    "set": "dive_side",
+   "tags": [],
+   "verdict": "keep",
    "side": "left",
    "kind": "",
    "loop": false,
@@ -1330,6 +1648,8 @@
     300
    ],
    "set": "dive_high",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1392,6 +1712,8 @@
     520
    ],
    "set": "dive_high",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1454,6 +1776,8 @@
     2340
    ],
    "set": "dive_low",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1509,6 +1833,8 @@
     340
    ],
    "set": "back_leap",
+   "tags": [],
+   "verdict": "reject",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1571,6 +1897,8 @@
     620
    ],
    "set": "lie_front",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1617,6 +1945,8 @@
     300
    ],
    "set": "lie_back",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1676,6 +2006,8 @@
     1250
    ],
    "set": "lie_side",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1736,6 +2068,8 @@
     300
    ],
    "set": "smother",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1807,6 +2141,8 @@
     570
    ],
    "set": "smother",
+   "tags": [],
+   "verdict": "reject",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1873,6 +2209,8 @@
     600
    ],
    "set": "getup",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -1941,6 +2279,8 @@
     760
    ],
    "set": "getup",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -2021,6 +2361,8 @@
     660
    ],
    "set": "getup",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
@@ -2063,7 +2405,9 @@
     "max_dir_err_deg": 0.025,
     "lowest_joint_m": 0.047,
     "guarded_frames": {
-     "RightHand": 25
+     "RightHand": 25,
+     "Neck": 1,
+     "Head": 2
     },
     "flat_foot_frames": [
      239,
@@ -2087,6 +2431,8 @@
     600
    ],
    "set": "getup",
+   "tags": [],
+   "verdict": "keep",
    "side": "none",
    "kind": "",
    "loop": false,
