@@ -103,7 +103,7 @@ public class CycleMotionTests
         // close control: walk and jog; the game's jog: jog and the upright run; its sprint: the upright and the athletic run
         CycleMotion.TargetWeights(cycles, 2.6f, w); Assert.True(w[0] > 0.5f && w[1] > 0.3f && Math.Abs(w.Sum() - 1f) < 1e-5f);
         CycleMotion.TargetWeights(cycles, 4.85f, w); Assert.True(w[1] > 0.4f && w[2] > 0.4f && w[3] == 0f);
-        CycleMotion.TargetWeights(cycles, 7.36f, w); Assert.True(w[2] > 0.4f && w[3] > 0.4f && w[1] == 0f);
+        CycleMotion.TargetWeights(cycles, 7.36f, w); Assert.True(w[2] > 0.5f && w[3] > 0.3f && w[1] == 0f);
         CycleMotion.TargetWeights(cycles, 10.5f, w); Assert.Equal(new[] { 0f, 0f, 0f, 1f }, w);
     }
 
