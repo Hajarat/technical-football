@@ -196,7 +196,11 @@ a file of key poses in `tools/anim/moves/` (pelvis, chest and head angles, feet 
 ball, hands, knee and elbow directions, the ball's path, events and timings), which `tools/anim/author.py` solves onto the 22
 driven bones of `player.glb`, mirrors to the other side and checks (no joint under the ground, no leg past its length, no bone
 over 1,500 deg/s, the sole within 1 cm of the ball while it is on it, no boot more than 1 cm inside the ball, a named foot's
-boot on the ball at each touch event). Nothing in the game plays them yet.
+boot on the ball at each touch event). The game plays the six moves the simulation makes (`game/SkillClipLayer.cs`, `--skill-anim clips`, the
+default): it reads `entry_speed` to blend each move's standing and running clips, the events to time the clip onto the core's ticks, `ball.on`
+and `ball.touch` for where the playing foot is pinned to the live ball, `ball.track` for the contact direction on the ball, `contacts` for the
+planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its hips from the first frame to the last. The elastico, spin and
+heel-to-heel clips load with the rest but no move plays them yet.
 
 | Move file | Clips | What it shows |
 | --- | --- | --- |

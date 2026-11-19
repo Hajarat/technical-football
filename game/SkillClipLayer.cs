@@ -288,7 +288,7 @@ public sealed class SkillClipLayer
         if (float.IsNaN(from)) return 0f;
         float c0 = Math.Min(_map!.ClipStart, from);
         if (ct < from) w = from - c0 > 1e-4f ? Ramp((ct - c0) / (from - c0)) : 1f;
-        else if (ct <= to) { w = 1f; exact = true; }
+        else if (ct <= to) { w = 1f; exact = ct < to - 1e-4f; }   // (on the end tick the core's exit touch may already move the ball: the pin holds where it was)
         else w = 1f - Smooth((ct - to) / PinRampOut);
         return w;
     }
