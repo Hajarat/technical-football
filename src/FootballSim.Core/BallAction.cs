@@ -182,6 +182,12 @@ public sealed class BallAction
     internal Vector2 HoldDirection;
     /// <summary>Stick direction (radians) when the action was planned, for the replan test; NaN with the stick released.</summary>
     internal float PlanStickAngle = float.NaN;
+    /// <summary>The stick angle the waiting touch was last checked against for drift, radians (NaN: the plan's own).</summary>
+    internal float CheckStickAngle = float.NaN;
+    /// <summary>The world tick the waiting touch was last checked against the stick (see drift_recheck_deg, recheck_interval).</summary>
+    internal int CheckTick = -1;
+    /// <summary>A drag-back started by the planner as a turn at the feet (no chain, cooldown or exit burst of a skill move).</summary>
+    internal bool FeetTurn;
     /// <summary>Touch mode of the intent when planned, for the replan-on-slowdown test.</summary>
     internal TouchMode PlanMode;
     /// <summary>The steering correction applied on the latest tick, m/s.</summary>

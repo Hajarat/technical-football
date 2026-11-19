@@ -18,7 +18,8 @@ The pitch (`src/FootballSim.Core/Pitch.cs`) is a walled arena whose lengths come
 | Batch run, 10 000 scripted rounds | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario penalty --n 10000 --seed 1` |
 | Save a scripted round as a replay | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario breakaway --seed 6 --save-replay game/tests/smoke_replay.json` |
 | Re-run a replay in the batch tool | `dotnet run -c Release --project src/FootballSim.Batch -- --replay game/tests/smoke_replay.json` |
-| Dribble probe: nine scripted stick traces per dribbling rating (possession kept, touches per second, ball ahead, feet, steering, contact miss) | `dotnet run -c Release --project src/FootballSim.Batch -- --probe dribble` |
+| Dribble probe: scripted stick traces per dribbling rating, the idealised ones and human-like ones at a pad's 60 Hz (a wandering stick, 45 and 100 degree sweeps, a reversal flick through neutral at a jog and in close control): possession kept, touches per second, ball ahead, feet, steering, contact miss, touches dropped at contact, stretched touches, the time from a stick turn past the execution angle to the turn touch, the time for the ball to move along a flicked stick, the lowest speed of the wandering jog; a pooled summary follows the table | `dotnet run -c Release --project src/FootballSim.Batch -- --probe dribble` |
+| Session probe: replays the play-test rounds kept in `src/FootballSim.Core.Tests/TestData/playtest` (or `--replays <dir\|file>`) with the current code and counts touches dropped at contact and slowdown plans with the stick pushed | `dotnet run -c Release --project src/FootballSim.Batch -- --probe sessions` |
 | Feel probe: speed surges, per-tick acceleration, touch cadence, ball distance and facing wobble of straight dribbles, and the heading response to a 45/90/180 degree stick turn with and without the ball; `--replays sessions` gives the acceleration and speed-step numbers over recorded play-test rounds, `--trace sprint45` (`jog90`, `sprint90off`, ...) prints one turn tick by tick | `dotnet run -c Release --project src/FootballSim.Batch -- --probe feel` |
 | Skill-move probe (scripted gestures per move, side, entry pace and skill_moves 1/50/99; the not-built elastico, heel-to-heel and spin rows should read recognised 100, made 0) | `dotnet run -c Release --project src/FootballSim.Batch -- --skill-probe` |
 | Write one replay per skill move (edge_of_box start) for screenshots | `dotnet run -c Release --project src/FootballSim.Batch -- --write-skill-replays out/skill-replays` |
@@ -71,6 +72,23 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   steered during the last `pre_windup` (0.4 s, GOALS' PreWindupTime). The steering correction eases in and out at
   `steer_accel` (6 m/s^2, at most `steer_max` 0.6 m/s) and only brings the ball to within `reach_tolerance` (0.08 m) of the
   swinging foot's contact point; the foot reaches the rest, and the contact point is where the ball is.
+- A waiting touch is checked again whenever the stick has drifted `drift_recheck_deg` (3) since the last check, and every
+  `recheck_interval` (0.05 s) in the pre-windup: if the legs no longer bring the ball within the steering's reach it is planned
+  again at once (inside the windup the run holds instead, and a change of touch mode waits for the next touch). Predictions
+  carry the stick's turn rate on only over `stick_lead_time` (0.15 s), easing out, and never longer than the stick has been
+  turning. A replan with the stick pushed off the ball's travel takes the next swing within `turn_reach`, with the turn's
+  steering; one after a push whose meet was lost may use a swing as close as the windup.
+- At contact a ball up to `stretch_reach` (0.25 m) from the contact point is still played, stretched, with the rated errors
+  (with the contact point 0.25-0.45 m ahead of the body that keeps it within about GOALS' 0.6 m execution radius); only a
+  ball further off is dropped.
+- With the stick pushed a slowdown (easing off) is planned only on a swing at most `slowdown_max_ahead` (0.6 s, about a jog
+  cadence) ahead and a step sooner than running on would play the ball; a recovering player never eases off.
+- A stick released for no longer than `release_debounce` (0.04 s; a pad polled at 60 Hz can read neutral for a tick or two
+  in a flick) reads as still held; a longer release is a stop. Not while shoot is held.
+- Turning at the feet: a stick at least `feet_turn_deg` (120) from the ball's travel (the facing for a still ball) while
+  running, with the ball low and within `feet_turn_reach` (0.6 m, GOALS' execution radius) of the body and no touch already
+  winding up, turns the ball at once with the drag-back's sole motion, pulled onto the stick's line instead of straight back
+  (the drag-back's timings and distance; no chain, exit burst or gesture), and the exit touch sends it along the stick.
 
 ## Character models
 

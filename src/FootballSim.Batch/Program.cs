@@ -10,7 +10,10 @@ using FootballSim.Core;
 //   ... --save-replay <file>                    plays one scripted round (use --seed) and saves its replay
 //   ... --dump-tuning                           prints the built-in tuning as JSON (the format of data/tuning/default.json)
 //   ... --probe dribble [--seeds 50] [--ratings 1,50,99] [--exact 1] [--only straight_jog,...]
-//                                               runs the nine dribble probes (no keeper involved) and prints their metrics
+//   ... --probe dribble --only close_reverse_flick --save-replay <file> [--index 0] [--in halfway_run]
+//                                               plays one probe trace in a real scenario and saves its replay (for screenshots)
+//                                               runs the dribble probes (no keeper involved) and prints their metrics
+//   ... --probe sessions [--replays <dir|file>]  re-runs play-test rounds and counts touches dropped at contact and slowdown plans
 //   ... --probe feel [--seeds 20] [--replays <dir|file>]
 //                                               speed surges, acceleration, touch cadence and heading response of dribbling
 //   ... --skill-probe [--seeds 50] [--ratings 1,50,99] [--only step_over,...]
@@ -62,7 +65,8 @@ static class Cli
         if (opts.TryGetValue("probe", out var probe))
         {
             if (probe == "feel") return FeelProbe.Run(opts, dataDir, tuning);
-            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel)"); return 2; }
+            if (probe == "sessions") return SessionProbe.Run(opts, root ?? Directory.GetCurrentDirectory(), dataDir, tuning);
+            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, sessions)"); return 2; }
             return DribbleProbe.Run(opts, dataDir, tuning);
         }
 
