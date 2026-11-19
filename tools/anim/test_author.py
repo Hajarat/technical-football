@@ -180,3 +180,16 @@ def test_ball_roll_passes_its_checks_and_keeps_the_sole_on_the_ball(rig, tmp_pat
     k = R.read_kclip(tmp_path / entry["file"])
     assert k["events"] == real.events and np.allclose(k["hips"], real.hips, atol=1e-6)
     assert entry["set"] == "skill:ball_roll" and entry["side"] == "left" and len(entry["ball"]["track"]) == len(real.hips)
+
+
+def test_every_move_file_passes_and_pairs_its_entries(rig):
+    moves = [A.load_move(p) for p in sorted(A.MOVES.glob("*.toml"))]
+    for c in A.build(moves, rig):
+        assert not c.problems, (c.name, c.problems)
+        assert list(c.events) == ["start", "contact", "release", "end"], c.name
+    # a move's standing and running files share their event layout, so the runtime can blend them by entry speed
+    by = {}
+    for m in moves:
+        by.setdefault(m["move"], []).append(m)
+    for name, ms in by.items():
+        assert len({tuple(m["events"].items()) for m in ms}) == 1, name
