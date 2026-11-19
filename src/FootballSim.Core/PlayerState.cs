@@ -200,8 +200,6 @@ public sealed class PlayerState
     /// </summary>
     internal int ShotEarliestTick = -1;
     internal bool ShotCommitAllowed;
-    /// <summary>The shot's foot chosen at the press (<see cref="ShotModel.StrikingFoot"/>), whose swing the strike looks for first.</summary>
-    internal Foot ShotFoot;
     /// <summary>The strike is never forecast sooner than this tick (one tick before the latest estimate published), or -1.</summary>
     internal int ShotNotBeforeTick = -1;
     internal int StrikeContactTick = -1;

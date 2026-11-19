@@ -208,9 +208,8 @@ before the strike (the gamepad's low shot) counts as driven held.
   0.45 s after the press (the wind-up) and 0.12 s after the release (the earliest strike tick), and it takes the place of the
   attacker's next touch: from the press no dribble touch is committed (one already committed is played), and the strike is
   the touch controller's first eligible contact from the earliest strike tick on (the first tick of a swing's contact window
-  that meets the ball) on a swing of the striking foot chosen at the press (the preferred foot unless the ball is well over on
-  the other side), or of the other foot when the chosen one cannot meet the ball or would wait more than one step longer. It
-  is committed like a touch one windup before it, on the foot swinging there, and played in that window; from the commit its
+  that meets the ball), on whichever foot is swinging there (a weak-foot strike, with its wider spread, is the cost of a
+  press timed badly). It is committed like a touch one windup before it, on the foot swinging there, and played in that window; from the commit its
   contact tick is fixed. With the ball at the feet at the press (within foot reach, no touch committed) a soft touch keeps it
   there and the strike falls at the earliest strike tick, on the foot chosen at the press, whatever the stride clock's
   swinging foot (the view poses the whole body for the shot itself); if the ball is not strikable then, the next contact

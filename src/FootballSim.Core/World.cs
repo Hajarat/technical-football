@@ -39,7 +39,7 @@ public sealed class World
     float _awayFor;            // seconds the ball has been beyond the controller's lose distance
     bool _softPending;         // shoot pressed with the ball at the feet: the soft touch is still to be made
     bool _shotAtFoot;          // shoot pressed with the ball at the feet: struck at the earliest strike tick if strikable then
-    Foot _strikeFoot;          // foot decided at the press (the swinging foot it strikes with when that differs, once struck)
+    Foot _strikeFoot;          // foot decided at the press for a ball at the feet (else the swinging foot, once struck)
     int _strikeEstMax = -1;    // the latest strike tick published for the shot under way (the estimate never moves earlier)
     int _shotStartTick = -1;   // tick shoot was pressed for the shot under way (for the fake shot), or -1
     bool _shotCancelled;       // the shot was turned into a fake: the rest of this press of shoot is ignored
@@ -542,7 +542,6 @@ public sealed class World
     {
         bool shot = p.ShotAction is { Made: false } && _shotStartTick >= 0;
         p.ShotEarliestTick = shot ? EarliestStrikeTick(Tick) : -1;
-        p.ShotFoot = _strikeFoot;
         p.ShotNotBeforeTick = shot && _strikeEstMax >= 0 ? _strikeEstMax - 1 : -1;
         p.ShotCommitAllowed = shot && _pending.Active && !_shotAtFoot && _controller == p;
     }

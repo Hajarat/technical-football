@@ -137,16 +137,16 @@ public class ShotNextContactTests
                         Assert.True(r.FootOk, $"{id}: struck off the swinging foot's contact window");
                     }
                 }
-        _out.WriteLine($"{runs} shots, {forecast} struck at the controller's contact, {chosenFoot} of them on the foot chosen at the press");
+        _out.WriteLine($"{runs} shots, {forecast} struck at the controller's contact, {chosenFoot} of them on the foot StrikingFoot picks at the press");
         Assert.True(forecast > 0);
     }
 
     /// <summary>
     /// The ball about 1 m ahead right after a sprint push: the strike against the estimate published at the press, never before
     /// the earliest strike tick. The estimate may move later while the run cannot reach the ball, so the strike is not always on
-    /// it. Measured 2026-11-19 (32 lab runs off the feet, strike minus estimate in ticks): -1 x4, 0 x11, +1 x3, +2 x4, +3 x4, +4,
-    /// +5 x2, +13, +56, +66 (18 within one tick; the last two waited for a later swing of the striking foot). The floor is that
-    /// share.
+    /// it. Measured 2026-11-19 (32 lab runs off the feet, strike minus estimate in ticks): -1, 0 x16, +1 x3, +2 x2, +5, +11, +13,
+    /// +20, +21, +22, +25 x2, +30 x2 (20 within one tick; the later ones moved by a swing or more while the run could not reach
+    /// the ball). The floor is just under that share.
     /// </summary>
     [Fact]
     public void WithTheBallAMetreAheadTheStrikeComesAtTheForecastContact()
@@ -169,7 +169,7 @@ public class ShotNextContactTests
         devs.Sort();
         _out.WriteLine($"ball about 1 m ahead: {within}/{n} strikes within one tick of the forecast at the press; strike - forecast, ticks: {string.Join(" ", devs)}");
         Assert.True(n >= 20);
-        Assert.True(within >= 0.55 * n, $"{within}/{n} within one tick");
+        Assert.True(within >= 0.6 * n, $"{within}/{n} within one tick");
     }
 
     [Fact]

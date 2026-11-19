@@ -561,22 +561,11 @@ public static class TouchPlanner
     }
 
     /// <summary>
-    /// The strike's contact: the first tick that meets the ball (the first eligible contact, not the best of its window) on a
-    /// swing of the foot chosen at the press; the other foot's when the chosen foot cannot meet it or would wait more than one
-    /// step longer than the other foot.
+    /// The strike's contact: the first tick that meets the ball (the first eligible contact, not the best of its window), on
+    /// whichever foot is swinging there: the strike takes the place of the next touch.
     /// </summary>
-    static Target StrikeSearch(PlayerState p, Ball ball, int need, int minJ, int maxJ, float now, Tuning t, Pitch? pitch)
-    {
-        var pace = ShotPace(p, t);
-        var any = Search(p, pace, ball, chase: true, need, minJ, maxJ, now, t, pitch, firstTick: true);
-        if (!any.Found || any.Foot == p.ShotFoot) return any;
-        var own = Search(p, pace, ball, chase: true, need, minJ, maxJ, now, t, pitch, firstTick: true, foot: p.ShotFoot);
-        int step = p.StepFrequency > 0f ? (int)MathF.Ceiling(t.TickRate / p.StepFrequency) : 0;
-        return own.Found && own.J <= any.J + step + StrikeFootSlack ? own : any;
-    }
-
-    /// <summary>The chosen foot's swing is still taken this many ticks past one step after the other foot's (the stride clock moves with the speed).</summary>
-    const int StrikeFootSlack = 2;
+    static Target StrikeSearch(PlayerState p, Ball ball, int need, int minJ, int maxJ, float now, Tuning t, Pitch? pitch) =>
+        Search(p, ShotPace(p, t), ball, chase: true, need, minJ, maxJ, now, t, pitch, firstTick: true);
 
     /// <summary>
     /// Commits the shot's strike on the target's swing, one windup before its contact: its contact tick and foot (the foot in
@@ -700,8 +689,7 @@ public static class TouchPlanner
     /// touch, which may also play the ball anywhere within the turn reach of the body.
     /// </summary>
     static Target Search(PlayerState p, in TickIntent user, Ball ball, bool chase, int need, int minJ, int maxJ, float now, Tuning t,
-        Pitch? pitch, float tol = 0f, bool held = false, float trim = 1f, bool turnish = false, bool firstOnly = false, bool firstTick = false,
-        Foot? foot = null)
+        Pitch? pitch, float tol = 0f, bool held = false, float trim = 1f, bool turnish = false, bool firstOnly = false, bool firstTick = false)
     {
         var c = p.Scratch();
         var b = ball.ScratchA();
@@ -722,7 +710,7 @@ public static class TouchPlanner
                 steps++;
                 if (best.Found) return best;   // the window of the step before held a contact
             }
-            bool inWindow = c.IsStepping && InWindow(c.SwingProgress) && (foot == null || c.SwingFoot == foot);
+            bool inWindow = c.IsStepping && InWindow(c.SwingProgress);
             if (inWindow && steps >= need && i >= minJ && b.Position.Y <= t.Touch.MaxBallHeight)
             {
                 looked = true;
