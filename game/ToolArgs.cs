@@ -18,6 +18,12 @@ public sealed class ToolArgs
     public string? ReplayPath;
     /// <summary>--keeper-gallery &lt;dir&gt;: play every keeper state from a script (no simulation) and write screenshots there.</summary>
     public string? GalleryDir;
+    /// <summary>--clip-gallery &lt;dir&gt;: play every keeper clip (res://assets/anim/keeper) and write a contact sheet per clip there.</summary>
+    public string? ClipGalleryDir;
+    /// <summary>--video: the clip gallery also writes every frame, for tools/anim/encode_video.py.</summary>
+    public bool Video;
+    /// <summary>--clip-only a,b: the clip gallery shows only these clips.</summary>
+    public readonly HashSet<string> ClipOnly = new();
     public bool Background;
     /// <summary>--controls-panel keyboard|xbox|playstation|nintendo: open the controls panel for that device (for screenshots; no pad needed).</summary>
     public string? ControlsPanel;
@@ -46,6 +52,11 @@ public sealed class ToolArgs
                 case "--data": a.DataDir = Next(); break;
                 case "--replay": a.ReplayPath = Next(); break;
                 case "--keeper-gallery": a.GalleryDir = Next(); break;
+                case "--clip-gallery": a.ClipGalleryDir = Next(); break;
+                case "--video": a.Video = true; break;
+                case "--clip-only":
+                    foreach (var s in (Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) a.ClipOnly.Add(s);
+                    break;
                 case "--controls-panel":
                     a.ControlsPanel = (Next() ?? "").ToLowerInvariant();
                     if (a.ControlsPanel.EndsWith(":hint")) { a.ControlsHintOnly = true; a.ControlsPanel = a.ControlsPanel[..^5]; }
@@ -76,6 +87,11 @@ public sealed class ToolArgs
         {
             if (!System.IO.Path.IsPathRooted(a.GalleryDir)) a.GalleryDir = System.IO.Path.Combine(ProjectSettings.GlobalizePath("res://"), a.GalleryDir);
             DirAccess.MakeDirRecursiveAbsolute(a.GalleryDir);
+        }
+        if (a.ClipGalleryDir != null)
+        {
+            if (!System.IO.Path.IsPathRooted(a.ClipGalleryDir)) a.ClipGalleryDir = System.IO.Path.Combine(ProjectSettings.GlobalizePath("res://"), a.ClipGalleryDir);
+            DirAccess.MakeDirRecursiveAbsolute(a.ClipGalleryDir);
         }
         if (a.ShotDir != null)
         {

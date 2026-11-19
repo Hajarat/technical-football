@@ -37,7 +37,7 @@ public partial class Match
         string game = ProjectSettings.GlobalizePath("res://");
         _data = new GameData(Path.GetFullPath(_args.DataDir ?? Path.Combine(game, "..", "data")));
         _data.Reload();
-        if (_args.ReplayPath == null && _args.GalleryDir == null) _log = SessionLog.Create(Path.GetFullPath(Path.Combine(game, "..")));
+        if (_args.ReplayPath == null && _args.GalleryDir == null && _args.ClipGalleryDir == null) _log = SessionLog.Create(Path.GetFullPath(Path.Combine(game, "..")));
         _log?.Write("start",
             ("godot", Engine.GetVersionInfo()["string"].AsString()),
             ("refresh_hz", float.IsFinite(DisplayServer.ScreenGetRefreshRate()) ? DisplayServer.ScreenGetRefreshRate() : 0f), // infinite under a virtual display
