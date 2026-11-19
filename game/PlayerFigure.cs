@@ -171,6 +171,13 @@ public sealed class FigureStats
     public string BodyLine() =>
         $"BODY_POSE lean_jog_deg={(LeanJogN > 0 ? LeanJogSum / LeanJogN : float.NaN):F1} lean_sprint_deg={(LeanSprintN > 0 ? LeanSprintSum / LeanSprintN : float.NaN):F1} bank_max_deg={BankMaxDeg:F1}" +
         $" elbow_deg_min={(ElbowMinDeg == float.MaxValue ? float.NaN : ElbowMinDeg):F0} elbow_deg_max={ElbowMaxDeg:F0} run_pelvis_ratio_mean={(RunRatioN > 0 ? RunRatioSum / RunRatioN : float.NaN):F3}";
+    /// <summary>
+    /// The shown pose in --attacker-anim mocap: the lowest toe tip, the fastest bone turn (local, degrees per second; shots left out)
+    /// and where, ticks over 1,500 deg/s, and the ticks measured and those drawn wholly from the cycles.
+    /// </summary>
+    public float MinToeYM = float.MaxValue, BoneMaxDegS; public string BoneMaxAt = "-"; public int BoneFast, MocapTicks, MocapFull;
+    public string MocapLine() =>
+        $"MOCAP_POSE min_toe_y_m={(MinToeYM == float.MaxValue ? float.NaN : MinToeYM):F3} bone_max_deg_s={BoneMaxDegS:F0} at={BoneMaxAt} bone_over_1500={BoneFast} ticks={MocapTicks} full_mocap_ticks={MocapFull}";
     /// <summary>Touches counted, and those where the foot drawn in the swing differs from the simulation's action foot.</summary>
     public int Touches, FootMismatches;
 
@@ -244,7 +251,7 @@ public sealed class FigureStats
     public string TouchFootLine() => $"TOUCH_FOOT n={Touches} mismatches={FootMismatches}";
     public string PoseLine() =>
         $"POSE_LIMITS min_pelvis_ratio={MinPelvisRatio:F3} min_knee_m={MinKneeM:F3} min_limb_y_m={MinLimbYM:F3} lean_deg_min={LeanMinDeg:F1} lean_deg_max={LeanMaxDeg:F1}" +
-        $" run_min_pelvis_ratio={F(RunMinPelvisRatio)} close_min_pelvis_ratio={F(CloseMinPelvisRatio)} run_lean_max_deg={RunLeanMaxDeg:F1} run_bob_max_m={RunBobMaxM:F3}" + "\n" + BodyLine();
+        $" run_min_pelvis_ratio={F(RunMinPelvisRatio)} close_min_pelvis_ratio={F(CloseMinPelvisRatio)} run_lean_max_deg={RunLeanMaxDeg:F1} run_bob_max_m={RunBobMaxM:F3}" + "\n" + BodyLine() + (MocapTicks > 0 || BoneMaxDegS > 0 ? "\n" + MocapLine() : "");
 
     static string F(float v) => v == float.MaxValue ? "n/a" : v.ToString("F3");
     static string Line(string name, List<float> l) => $"{name} n={l.Count} mean_m={Mean(l):F3} max_m={Max(l):F3}";
@@ -694,6 +701,7 @@ public partial class PlayerFigure : Node3D
                 w = Mathf.Clamp(0.85f * hmax / Math.Max(stepLen, 0.01f), 0.04f, 0.5f);
             }
         }
+        MocapBegin(f, pos, fwd, stepping, stepping ? _speedS / Math.Max(f.StepFrequency, 1.5f) : 0f, dt);
         // pelvis bob: one per step, lowest at the swing middle when the body is over the planted foot
         if (stepping)
         {
@@ -730,7 +738,7 @@ public partial class PlayerFigure : Node3D
                 Vector3 gait;
                 if (stance)
                 {
-                    if (!ft.InStance) { ft.InStance = true; ft.Released = false; ft.Plant = pelXZ + fm * (w * stepLen) + lat; ft.Plant.Y = AnkleH; MeasureStep(f, ft.Plant, speed); }
+                    if (!ft.InStance) { ft.InStance = true; ft.Released = false; ft.Plant = pelXZ + fm * (w * stepLen) + lat; ft.Plant.Y = AnkleH; if (_mW < 0.5f) MeasureStep(f, ft.Plant, speed); }
                     // the body gained speed and the planted foot is about to be out of reach: lift it early, to the rear of the cycle
                     if (!ft.Released && Dist2(pelXZ + right * side * HipW, ft.Plant) > 0.97f * hmaxNow) { ft.Released = true; ft.Blend = 0f; ft.BlendFrom = ft.Ankle; }
                     gait = ft.Released ? pelXZ - fm * (w * stepLen) + lat : ft.Plant;
@@ -812,6 +820,7 @@ public partial class PlayerFigure : Node3D
         for (int i = 0; i < 2; i++)
         {
             ank[i] = _feet[i].Ankle; dir[i] = _feet[i].Dir; planted[i] = _feet[i].Planted && !_feet[i].Timed;
+            MocapFoot(i, f, pelXZ, right, hmaxNow, speed, ref ank[i], ref dir[i], ref planted[i], dt);
             tw[i] = TouchOverlay(f, i, pelXZ, hv, fm, k, ref ank[i], ref dir[i], out tsurf[i]);
             if (tw[i] > 0f) planted[i] = false;
             if (_kW > 0f && i == _kFoot)
@@ -846,8 +855,9 @@ public partial class PlayerFigure : Node3D
             }
             if (body)
             {
-                _pitch[i] = _cycPitch[i] * pw; _toeBend[i] = _cycToe[i] * pw;
-                ank[i].Y += PivotLift(_pitch[i]);
+                float mp = MocapPitch(i, _cycPitch[i], ank[i], out float mToe);
+                _pitch[i] = mp * pw; _toeBend[i] = (Mathf.Lerp(_cycToe[i], 0f, _mW) + mToe) * pw;
+                ank[i].Y += PivotLift(_pitch[i]) * (1f - _mW);   // the cycle's ankle already rises as its heel lifts
                 if (_pitch[i] < -0.03f) planted[i] = false;   // the heel is up: the foot rolls on its toes and is no longer planted flat
             }
             if (body)
@@ -875,6 +885,7 @@ public partial class PlayerFigure : Node3D
             float spread = (ank[1] - ank[0]).Dot(fwd);
             float yawT = Mathf.Clamp(PelYawPerM * spread, -PelYawMax, PelYawMax);
             _pelYaw = _teleporting ? yawT : Mathf.Lerp(_pelYaw, yawT, 1f - Mathf.Exp(-dt / PelYawTau));
+            pel = MocapPelvis(pel, right);
         }
         // a touch from a standstill (the first touch of a loose ball) can lie beyond a straight leg: only then the pelvis sinks by what is missing
         // (at most 6 cm); a running player never does, the simulation steers the ball into the zone ahead of the swinging foot
@@ -924,7 +935,7 @@ public partial class PlayerFigure : Node3D
             if (steady && speed >= 6.8f) { Stats.LeanSprintSum += lean * 180f / Mathf.Pi; Stats.LeanSprintN++; }
         }
         // the speed lean tips the whole body forward from the ankles: the pelvis moves ahead of the feet, the trunk leans with it
-        if (body) pel += fwd * (Mathf.Sin(SpeedLean) * LeanFromAnkles * (pel.Y - AnkleH));
+        if (body) pel += fwd * (Mathf.Sin(SpeedLean) * LeanFromAnkles * (pel.Y - AnkleH) * (1f - _mW));
         float counter = Mathf.Lerp(ChestCounterWalk, ChestCounterSprint, sfs);
         if (body)
         {
@@ -934,6 +945,7 @@ public partial class PlayerFigure : Node3D
             float roll = PelDropRad * _stepW * Mathf.Sin(Mathf.Pi * f.GaitPhase);   // + right side down while the right leg swings
             P = new Basis(Vector3.Up, _pelYaw) * new Basis(fwd, _bank + roll) * new Basis(right, -lean * PelvisLeanShare) * yawB;
             B = new Basis(Vector3.Up, -_pelYaw * counter) * new Basis(fwd, _bank - 0.5f * roll) * new Basis(right, -lean) * yawB;
+            P = MocapPelvisBasis(P, fwd, right);
         }
 
         // ---- legs ----
@@ -1004,6 +1016,7 @@ public partial class PlayerFigure : Node3D
             _split = true; _pelB = P;
             _headB = new Basis(hr, -_headPitch) * new Basis(hf, Vector3.Up, hr);
             RenderBody(pel, B, shoulderC, knee, ankEff, dir, handT, elbowPole);
+            MocapShown(f, ankEff, knee, ref pel, ref lean, fwd, dt);
         }
         var posFlat = new Vector3(pos.X, 0, pos.Z);
         // the playing foot's per-tick move (body-relative and world), during the move and the three ticks after it
@@ -1148,7 +1161,7 @@ public partial class PlayerFigure : Node3D
         for (int i = 0; i < 2; i++)
         {
             Vector3 fd = dir[i]; fd.Y = 0; fd = fd.LengthSquared() > 1e-6f ? fd.Normalized() : Vector3.Right;
-            Vector3 toe = ank[i] + fd * (0.8f * FootLen);
+            Vector3 toe = _shown ? _shownToe[i] : ank[i] + fd * (0.8f * FootLen);
             if (_jN >= 1)
             {
                 float m = Math.Max((ank[i] - _jAnk[i, 0]).Length(), (toe - _jToe[i, 0]).Length());
@@ -1864,7 +1877,7 @@ public partial class PlayerFigure : Node3D
         _joints.Pelvis = pel; _joints.Torso = B; _joints.Height = H; _joints.AnkleHeight = AnkleH;
         _joints.SplitTrunk = _split; _joints.PelvisBasis = Pb; _joints.HeadBasis = Hb;
         if (_keeperAnim != null) _keeperAnim.Present(_joints, _animFrame);   // --keeper-anim mocap (PlayerFigure.Keeper.cs)
-        else _body?.Pose(_joints);
+        else if (!MocapPresent()) _body?.Pose(_joints);
     }
 
     /// <summary>Stretches a limb mesh (centred on its midpoint, +Y distal, built for <paramref name="refLen"/> metres plus end caps) between two joints.</summary>

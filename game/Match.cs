@@ -56,6 +56,7 @@ public partial class Match : Node3D
         Attacker.SetTeamColor(new Color(0.85f, 0.1f, 0.1f));
         if (_args.Figure == "skinned") UseSkinnedFigures();
         Attacker.Figure.Stats = FootStats; Attacker.Figure.StatsName = "attacker";
+        Attacker.Figure.AttackerAnimMode = _args.AttackerAnim;
         Keeper.Figure.Stats = FootStats; Keeper.Figure.StatsName = "keeper";
         Overlay.Enabled = true; // default on for now
         if (_args.TopCam) Camera.UseTopDown();

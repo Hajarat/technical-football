@@ -39,6 +39,8 @@ public sealed class ToolArgs
     public string Figure = "skinned";
     /// <summary>--keeper-anim mocap|procedural: the keeper's body from motion clips (the default; needs the skinned figure) or from the hand-built poses (the fallback).</summary>
     public string KeeperAnim = "mocap";
+    /// <summary>--attacker-anim mocap|procedural: the attacker's running body from the motion-captured stride cycles (needs the skinned figure; see AttackerAnimator) or from the procedural run cycle.</summary>
+    public string AttackerAnim = "procedural";
     /// <summary>--keeper-anim-log: print a KEEPER_MM line at every mocap switch (clip, frame, playback rate).</summary>
     public bool KeeperAnimLog;
     /// <summary>--keeper-anim-drop-set a,b: the pose database leaves these clip sets empty (the procedural fallback's check).</summary>
@@ -94,6 +96,10 @@ public sealed class ToolArgs
                     if (a.KeeperAnim != "procedural" && a.KeeperAnim != "mocap") { GD.PushWarning($"--keeper-anim expects mocap or procedural, got '{a.KeeperAnim}'; using mocap"); a.KeeperAnim = "mocap"; }
                     break;
                 case "--keeper-anim-log": a.KeeperAnimLog = true; break;
+                case "--attacker-anim":
+                    a.AttackerAnim = (Next() ?? "").ToLowerInvariant();
+                    if (a.AttackerAnim != "procedural" && a.AttackerAnim != "mocap") { GD.PushWarning($"--attacker-anim expects mocap or procedural, got '{a.AttackerAnim}'; using procedural"); a.AttackerAnim = "procedural"; }
+                    break;
                 case "--keeper-anim-drop-set":
                     a.KeeperAnimDropSets.AddRange((Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                     break;
