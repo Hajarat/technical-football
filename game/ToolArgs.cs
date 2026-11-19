@@ -20,6 +20,10 @@ public sealed class ToolArgs
     public string? GalleryDir;
     /// <summary>--clip-gallery &lt;dir&gt;: play every keeper clip (res://assets/anim/keeper) and write a contact sheet per clip there.</summary>
     public string? ClipGalleryDir;
+    /// <summary>--clip-folder &lt;res:// path&gt;: the clip gallery's clips.json folder (default res://assets/anim/keeper).</summary>
+    public string ClipFolder = "res://assets/anim/keeper";
+    /// <summary>--clip-model &lt;res:// path&gt;: the model the clip gallery plays them on (default res://assets/characters/keeper.glb; any other model wears the attacker's kit).</summary>
+    public string ClipModel = "res://assets/characters/keeper.glb";
     /// <summary>--video: the clip gallery (and the keeper gallery) also writes every frame, for tools/anim/encode_video.py.</summary>
     public bool Video;
     /// <summary>--clip-only a,b: the clip gallery shows only these clips.</summary>
@@ -66,6 +70,8 @@ public sealed class ToolArgs
                 case "--replay": a.ReplayPath = Next(); break;
                 case "--keeper-gallery": a.GalleryDir = Next(); break;
                 case "--clip-gallery": a.ClipGalleryDir = Next(); break;
+                case "--clip-folder": a.ClipFolder = Next() ?? a.ClipFolder; break;
+                case "--clip-model": a.ClipModel = Next() ?? a.ClipModel; break;
                 case "--video": a.Video = true; break;
                 case "--clip-only":
                     foreach (var s in (Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) a.ClipOnly.Add(s);

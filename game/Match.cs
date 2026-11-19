@@ -77,12 +77,12 @@ public partial class Match : Node3D
     KeeperGallery? _gallery;
     ClipGallery? _clipGallery;
 
-    /// <summary>--clip-gallery: the keeper's motion clips play on a body of their own; the match figures, ball, overlay and HUD stay out of the shots.</summary>
+    /// <summary>--clip-gallery: motion clips (the keeper's unless --clip-folder / --clip-model say otherwise) play on a body of their own; the match figures, ball, overlay and HUD stay out of the shots.</summary>
     void StartClipGallery()
     {
         Attacker.Visible = false; Keeper.Visible = false; Ball.Visible = false; Hud.Visible = false;
         Overlay.Enabled = false;
-        _clipGallery = new ClipGallery(this, _args.ClipGalleryDir!, _args.Video, _args.ClipOnly, World.Pitch.GoalLineX);
+        _clipGallery = new ClipGallery(this, _args.ClipGalleryDir!, _args.Video, _args.ClipOnly, World.Pitch.GoalLineX, _args.ClipFolder, _args.ClipModel);
     }
 
     /// <summary>--keeper-gallery: the keeper is driven from a script instead of the simulation; the attacker, overlay and ball ring stay out of the shots.</summary>

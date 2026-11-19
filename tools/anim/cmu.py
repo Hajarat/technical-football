@@ -9,6 +9,7 @@ files are checked by parsing them afterwards).
 
     python3 tools/anim/cmu.py            # fetch what is missing
     python3 tools/anim/cmu.py --list     # print the files clips.toml needs
+    python3 tools/anim/cmu.py --config tools/anim/attacker_clips.toml   # another clip list (the attacker's)
 """
 from __future__ import annotations
 
@@ -34,7 +35,7 @@ def load_clips(path: Path = HERE / "clips.toml") -> list[dict]:
 
 
 def trial_parts(trial: str) -> tuple[str, str]:
-    """'141_05' -> ('141', '05'); subject numbers are written without padding, trials with two digits (as on the site)."""
+    """'141_05' -> ('141', '05'); subject numbers are written without padding here (the URLs pad subjects 1-9, see needed_files), trials with two digits."""
     s, t = trial.split("_")
     return str(int(s)), f"{int(t):02d}"
 
@@ -46,8 +47,9 @@ def needed_files(clips: list[dict]) -> list[tuple[str, str]]:
         if "trial" not in c:   # a clip baked from the procedural keeper (tools/anim/bake_procedural.py) has no trial
             continue
         s, t = trial_parts(c["trial"])
-        out.setdefault(f"{s}.asf", f"{BASE}/{s}/{s}.asf")
-        out.setdefault(f"{s}_{t}.amc", f"{BASE}/{s}/{s}_{t}.amc")
+        p = f"{int(s):02d}"   # the site pads subjects 1-9 to two digits (/subjects/09/09_01.amc); the cache keeps the plain number
+        out.setdefault(f"{s}.asf", f"{BASE}/{p}/{p}.asf")
+        out.setdefault(f"{s}_{t}.amc", f"{BASE}/{p}/{p}_{t}.amc")
     return sorted(out.items())
 
 
@@ -76,8 +78,9 @@ def fetch(url: str, dest: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--list", action="store_true", help="print the needed files and whether they are cached")
+    ap.add_argument("--config", type=Path, default=HERE / "clips.toml", help="clip list to fetch the trials of (default: the keeper's clips.toml)")
     args = ap.parse_args(argv)
-    files = needed_files(load_clips())
+    files = needed_files(load_clips(args.config))
     CACHE.mkdir(exist_ok=True)
     if args.list:
         for name, url in files:

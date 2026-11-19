@@ -60,6 +60,53 @@ The get-ups are trimmed to the part where he rises (the core's get-up lasts 1 s)
 a subject sank back or half rose and fell back before getting up, that stretch is cut (clips.toml "cut"; the motion after a cut
 goes on from the frame before it).
 
+## Attacker locomotion clips
+
+`attacker/*.kclip` and `attacker/clips.json` hold 20 CMU trials retargeted onto `game/assets/characters/player.glb`, listed in
+`tools/anim/attacker_clips.toml` (same keys as `clips.toml`, plus `contact_speed`: the foot speed under which a low foot counts as
+planted, default 0.35 m/s, raised for running feet). They are an offline feasibility study for driving the outfield player's stride
+from motion capture; nothing in the game reads them yet. Same CMU licence and credit as above. `player.glb` and `keeper.glb` have the
+same 52 joints with the same translations and rest rotations, so a clip retargeted onto one is byte for byte the clip retargeted onto
+the other.
+
+20 trials from subjects 9, 10, 11, 16, 78, 104, 127: 09_01, 10_02, 11_01, 16_21, 16_36, 16_37, 16_39, 16_42, 16_44, 16_46, 16_47, 16_48, 16_54, 78_12, 104_06, 104_48, 104_53, 104_56, 127_05, 127_13. Each clip is its whole trial (the trials are 0.6 to 5 s long).
+
+| Trial | Source range | Clip | What it shows |
+| --- | --- | --- | --- |
+| 09_01 | whole trial | `run_09_01` | run, straight, about 3.6 m/s |
+| 10_02 | whole trial | `kick_soccer_10_02` | soccer: walk up and kick the ball |
+| 11_01 | whole trial | `kick_soccer_11_01` | soccer: walk up and kick the ball |
+| 16_21 | whole trial | `walk_brisk_16_21` | straight walk, about 1.7 m/s |
+| 16_36 | whole trial | `jog_16_36` | run/jog, straight, about 2.7 m/s |
+| 16_37 | whole trial | `veer_jog_left_16_37` | jog veering left about 45 degrees |
+| 16_39 | whole trial | `veer_jog_right_16_39` | jog veering right about 45 degrees |
+| 16_42 | whole trial | `turn90_jog_left_16_42` | jog with a 90 degree left turn |
+| 16_44 | whole trial | `turn90_jog_right_16_44` | jog with a 90 degree right turn |
+| 16_46 | whole trial | `run_16_46` | run/jog, straight, about 4.1 m/s |
+| 16_47 | whole trial | `walk_16_47` | straight walk, about 1.3 m/s |
+| 16_48 | whole trial | `veer_run_left_16_48` | run veering left about 45 degrees, about 4 m/s |
+| 16_54 | whole trial | `turn90_run_right_16_54` | run with a 90 degree right turn |
+| 78_12 | whole trial | `run_78_12` | running without a ball, straight, about 4.5 m/s |
+| 104_06 | whole trial | `start_jog_104_06` | standing start into a jog |
+| 104_48 | whole trial | `run_104_48` | run through, straight, about 4.1 m/s |
+| 104_53 | whole trial | `start_run_104_53` | standing start into a run |
+| 104_56 | whole trial | `stop_run_104_56` | run to a stop |
+| 127_05 | whole trial | `stop_run_127_05` | run to a quick stop, turning |
+| 127_13 | whole trial | `sidestep_run_127_13` | run with a side step to his left |
+
+Subjects 141 and 143 (trials 141_01 to 141_34 and 143_01 to 143_42) look sampled at half the stated 120 Hz: their walks step 3 to 3.6
+times a second and their runs 5 to 6, so no clip of theirs is used (the keeper's `141_05`, `141_10` and `143_20` clips come from the same subjects and were not checked). The speeds
+in the table are the subject's own; retargeting scales a clip's travel by the model's leg length over the subject's (1.03 to 1.22).
+
+```sh
+python3 tools/anim/cmu.py --config tools/anim/attacker_clips.toml
+uv run --with numpy python3 tools/anim/retarget.py --config tools/anim/attacker_clips.toml --model game/assets/characters/player.glb --out game/assets/anim/attacker
+game/tests/run-bg.sh -- --clip-gallery ../out/attacker --clip-folder res://assets/anim/attacker --clip-model res://assets/characters/player.glb --video
+uv run --with imageio-ffmpeg python3 tools/anim/encode_video.py out/attacker
+```
+
+`cmu.py` and `retarget.py` default to the keeper's list, model and folder, so the commands above under "Regenerate" are unchanged.
+
 ## Baked clips
 
 CMU has no goalkeeper dives, so a dive (low, side, high) and the smother take off on CMU motion (the clips tagged `takeoff`) and fly
