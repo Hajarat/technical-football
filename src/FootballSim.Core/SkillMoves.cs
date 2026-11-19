@@ -193,8 +193,12 @@ public static class SkillMoves
     /// skill move of the player's: no gesture, no chain, no exit burst; the drag-back's cooldown keeps it from starting again
     /// before the exit touch has sent the ball along the stick.
     /// </summary>
-    internal static BallAction StartFeetTurn(PlayerState p, Vector2 dir, Ball ball, int tick, float now, Tuning t) =>
-        Start(p, ActionKind.DragBack, SkillSide.None, dir, ball, tick, now, t, feetTurn: true);
+    internal static BallAction StartFeetTurn(PlayerState p, Vector2 dir, Ball ball, int tick, float now, Tuning t)
+    {
+        // The body comes round at the post-turn rotation rate, as after a turn touch.
+        p.PostTurnUntil = now + t.Movement.PostTurnSeconds;
+        return Start(p, ActionKind.DragBack, SkillSide.None, dir, ball, tick, now, t, feetTurn: true);
+    }
 
     static BallAction Start(PlayerState p, ActionKind kind, SkillSide side, Vector2 cut, Ball ball, int tick, float now, Tuning t,
         bool feetTurn = false)
@@ -277,7 +281,10 @@ public static class SkillMoves
         var a = p.SkillAction!;
         var k = t.Skill;
         Vector2 fwd = a.HoldDirection;
-        legs = new TickIntent { MoveX = fwd.X, MoveZ = fwd.Y, Sprint = 1f };
+        // A turn at the feet turns the body onto the stick's line while the sole pulls the ball there, so the player comes out
+        // of it facing his new way instead of running on and turning about afterwards.
+        Vector2 face = a.FeetTurn ? a.SkillCut : fwd;
+        legs = new TickIntent { MoveX = face.X, MoveZ = face.Y, Sprint = 1f };
         float cap = Possession.SpeedCap(p, true, false, t);
         float entry = a.SkillEntry;
         if (IsSole(a.Kind) && tick < a.ContactTick) return ReachTick(p, a, ball, tick, cap, t);

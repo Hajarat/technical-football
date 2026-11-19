@@ -287,7 +287,10 @@ public static class TouchPlanner
         p.SetForecast(p.SkillAction is { Made: false } sk && sk.ContactTick >= tick ? sk.ContactTick : -1, p.SkillAction?.Foot ?? Foot.Right,
             p.SkillAction?.ContactPoint ?? Vector3.Zero);
         Vector2 from = p.PlannerSteer + p.SteerCarry;
-        Vector2 steer = Toward(from, m.Steer, MathF.Max(SteerStep(t), SkillSteerAccel * t.Dt));
+        // A turn at the feet moves the player by his run alone, the body coming round onto the stick (no step against the run
+        // that the turning run would then swing into).
+        Vector2 aim = p.SkillAction is { FeetTurn: true } ? Vector2.Zero : m.Steer;
+        Vector2 steer = Toward(from, aim, MathF.Max(SteerStep(t), SkillSteerAccel * t.Dt));
         p.PlannerSteer = Vector2.Zero;
         if (p.SkillAction is not { FeetTurn: true })
         {
@@ -1007,10 +1010,48 @@ public static class TouchPlanner
                 else if (j > nearTicks) break;
                 continue;
             }
-            if (count >= steps) { meet = new Meet { J = j, Foot = f, Cp = ContactPointFor(c, f, t), Swings = count }; return true; }
+            // A push never spans more than max_meet_seconds (a slow stride after a turn would stretch its steps): the last
+            // swing middle inside that is its meet.
+            if (j > Ticks(MaxMeetSeconds, t) && found) return true;
+            meet = new Meet { J = j, Foot = f, Cp = ContactPointFor(c, f, t), Swings = count };
+            found = true;
+            if (count >= steps) return true;
         }
         return found;
     }
+
+    /// <summary>The longest a push is solved for, seconds (inside the 1.5 s the player is always back on the ball).</summary>
+    const float MaxMeetSeconds = 1.2f;
+
+    /// <summary>
+    /// The meet of a reversal: predicts the player on the stick's legs (braking, turning about and running back) and returns
+    /// the first swing middle after his facing has come within <see cref="ReversalAlignDeg"/> of the stick.
+    /// </summary>
+    static bool FindReversalMeet(PlayerState from, in TickIntent user, float now, Tuning t, Pitch? pitch, out Meet meet)
+    {
+        meet = default;
+        var c = from.Scratch();
+        float stick = MathF.Atan2(user.Move.Y, user.Move.X), tn = now;
+        float cap = Possession.SpeedCap(from, true, false, t);
+        bool aligned = false;
+        int count = 0;
+        for (int j = 1; j <= Ticks(2.5f, t); j++)
+        {
+            tn += t.Dt;
+            Movement.Step(c, user, t.Dt, tn, new MoveAssist(cap, 1f, Vector2.Zero), t, pitch);
+            if (c.StepBegun) count++;
+            aligned |= MathF.Abs(Movement.WrapAngle(c.Facing - stick)) * 180f / MathF.PI <= ReversalAlignDeg;
+            if (aligned && j >= WindupTicks(t) && c.SwingMiddleCrossed is Foot f)
+            {
+                meet = new Meet { J = j, Foot = f, Cp = ContactPointFor(c, f, t), Swings = Math.Max(1, count) };
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>A reversal's meet comes once the facing is within this of the stick, degrees.</summary>
+    const float ReversalAlignDeg = 30f;
 
     /// <summary>
     /// Solves the launch speed (bisection on a simulated ball, skid and bounces included) that brings the ball's centre to
@@ -1235,9 +1276,14 @@ public static class TouchPlanner
                     p.TouchBoostFactor = TouchModel.TouchBoostFactor(p.Sheet, turnDeg, t);
                     SkillMoves.ApplyExitBurst(p, now);
                 }
-                hasMeet = FindMeet(p, intent, steps, 0, now, t, pitch, out meet);
+                // A reversal at speed (the stick turned back past feet_turn_deg) is a hook: the ball is turned onto the stick's
+                // line slowly enough to meet the player where his predicted path brings him back to it (he brakes within the
+                // deceleration budget, turns and comes back), never sent away faster than that.
+                bool reversal = !first && turnDeg >= k.FeetTurnDeg && p.RunSpeed > k.ExecutionMinSpeed;
+                hasMeet = reversal ? FindReversalMeet(p, intent, now, t, pitch, out meet) : FindMeet(p, intent, steps, 0, now, t, pitch, out meet);
+                if (reversal && hasMeet) steps = Math.Max(1, meet.Swings);
                 Vector3 target = hasMeet ? meet.Cp : p.Position + new Vector3(intent.Move.X, 0f, intent.Move.Y) * 2f;
-                float minPush = TouchModel.MinPush(mode, t);
+                float minPush = reversal ? 0f : TouchModel.MinPush(mode, t);
                 int ticks = hasMeet ? meet.J : Ticks(0.6f, t);
                 float u = SolveLiftedPush(p, ball, target, ticks, kind, mode, minPush, MathF.Max(k.MaxPush, minPush), t, out var dir,
                     out _, out float lift);

@@ -146,8 +146,8 @@ public static class Movement
         }
         if (p.SpeedDebt > 0f)
         {
-            // Under the speed law the balance loss takes what the legs' own easing off leaves of the budget.
-            float room = law ? budget + speed - speed0 : budget;
+            // The balance loss takes what the legs' own easing off (or a move's own running speed) leaves of the budget.
+            float room = budget + speed - speed0;
             float shed = MathF.Min(p.SpeedDebt, MathF.Max(0f, room));
             speed -= shed;
             p.SpeedDebt -= shed;

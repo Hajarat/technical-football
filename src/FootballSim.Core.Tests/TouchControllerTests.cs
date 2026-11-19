@@ -19,7 +19,7 @@ public class TouchControllerTests
         return t;
     }
 
-    static World Lab(ulong seed, Tuning? t = null, int dribbling = 70)
+    static World Lab(ulong seed, Tuning? t = null, int dribbling = 70, float x = 2f)
     {
         var s = TestData.Sheet(75);
         s.Dribbling = dribbling;
@@ -27,8 +27,8 @@ public class TouchControllerTests
         {
             Id = "lab",
             Pitch = new PitchSpec { Length = 300f, Width = 200f },
-            Ball = new StartSpot { X = 2.5f },
-            Attacker = new StartSpot { X = 2.0f },
+            Ball = new StartSpot { X = x + 0.5f },
+            Attacker = new StartSpot { X = x },
         };
         var w = new World(t ?? new Tuning(), sc, s, TestData.Sheet(50), seed);
         w.Begin();
@@ -298,18 +298,26 @@ public class TouchControllerTests
         }.Select((f, n) => (f, n)))
         for (ulong seed = 1; seed <= 6; seed++)
         {
-            var w = Lab(seed, dribbling: dribbling);
-            int last = -1, unplayedAt = -1, stepsSince = 0;
+            var w = Lab(seed, dribbling: dribbling, x: 150f);   // mid-pitch: the back wall is at X = 0
+            int last = -1, unplayedAt = -1, stepsSince = 0, reversal = -1000;
+            float jog = w.Tuning.Movement.JogSpeed * w.Tuning.Touch.TopSpeedWithBall.ForRating(dribbling);
             for (int i = 0; i < 8 * 120; i++)
             {
                 var waiting = w.Attacker.TouchAction is { Pending: true } pw ? pw : null;
-                Step(w, stick(i));
+                var it = stick(i);
+                // A reversal (the stick 120 degrees or more off the ball's travel) above jog speed may take up to 2 s to its contact.
+                var bv = new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z);
+                if (it.Move.Length() > 0.5f && bv.Length() > 0.3f && w.Attacker.Speed > jog * 1.05f
+                    && MathF.Abs(Movement.WrapAngle(MathF.Atan2(it.MoveZ, it.MoveX) - MathF.Atan2(bv.Y, bv.X))) >= 120f * MathF.PI / 180f)
+                    reversal = w.Tick;
+                Step(w, it);
                 if (waiting is { Made: false, Phase: ActionPhase.Done } && w.Tick >= waiting.ContactTick) { unplayedAt = w.Tick; stepsSince = 0; }
                 if (unplayedAt > 0 && w.Attacker.StepBegun) stepsSince++;
                 if (ContactsOf(w).Any() || w.Attacker.SkillMove != null) { last = w.Tick; unplayedAt = -1; }
                 // A committed touch not played is followed by a played contact within two steps.
                 Assert.True(unplayedAt < 0 || stepsSince <= 3, $"dribbling {dribbling} seed {seed}: no contact two steps after a touch not played at {unplayedAt}");
-                if (last > 0 && i > 120) Assert.True((w.Tick - last) * w.Tuning.Dt <= 1.5f, $"dribbling {dribbling} stick {si} seed {seed}: no contact for {(w.Tick - last) * w.Tuning.Dt:F2} s at tick {w.Tick}, ball {TouchModel.HorizontalDistance(w.Attacker.Position, w.Ball.Position):F2} m at {w.Ball.Velocity.Length():F2} m/s, player {w.Attacker.Speed:F2} m/s, chasing {w.Attacker.Chasing}, eta {w.Attacker.NextTouchEta:F2}");
+                float limit = last <= reversal ? 2.0f : 1.5f;
+                if (last > 0 && i > 120) Assert.True((w.Tick - last) * w.Tuning.Dt <= limit, $"dribbling {dribbling} stick {si} seed {seed}: no contact for {(w.Tick - last) * w.Tuning.Dt:F2} s at tick {w.Tick}, ball {TouchModel.HorizontalDistance(w.Attacker.Position, w.Ball.Position):F2} m at {w.Ball.Velocity.Length():F2} m/s, player {w.Attacker.Speed:F2} m/s, chasing {w.Attacker.Chasing}, eta {w.Attacker.NextTouchEta:F2}");
             }
             Assert.True(w.Attacker.InPossession);
         }
