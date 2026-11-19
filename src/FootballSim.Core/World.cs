@@ -479,7 +479,7 @@ public sealed class World
         // A released shot waiting for its contact still steers the ball into the striking foot's zone (the soft touch).
         bool windup = State == RoundState.Live && shootHeld || State == RoundState.Strike && _pending.Active;
         var assist = TouchPlanner.BeginTick(p, it, Ball, inPossession, State == RoundState.Live || windup, Tick, SimTime, tuning, Pitch, out var legs);
-        if (windup && inPossession && p.SkillAction == null && p.TouchAction is not { Pending: true }) legs = TouchPlanner.ShotWindupLegs(p, legs, tuning);
+        if (windup && inPossession && p.SkillAction == null && p.TouchAction is not { Pending: true }) legs = TouchPlanner.ShotWindupLegs(p, Ball, tuning);
         Movement.Step(p, legs, _dt, SimTime, assist, tuning, Pitch);
 
         // Other players on both teams stand still (no behaviour yet).

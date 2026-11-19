@@ -82,12 +82,10 @@ public static class TouchPlanner
     }
 
     /// <summary>
-    /// The legs while a shot winds up with no touch waiting: with the stick at rest the run holds its speed along the facing,
-    /// so a ball rolling with the shooter (after the soft touch) stays at the striking foot until contact; with the stick pushed
-    /// they follow it.
+    /// The legs while a shot winds up with no touch waiting: from the press to the strike the left stick only aims, so the
+    /// legs run on to the ball (see <see cref="ChaseIntent"/>) and the striking foot meets it whichever way the stick is swung.
     /// </summary>
-    internal static TickIntent ShotWindupLegs(PlayerState p, in TickIntent legs, Tuning t) =>
-        legs.Move.Length() >= t.Touch.StickThreshold ? legs : HoldIntent(p, FacingDir(p), t);
+    internal static TickIntent ShotWindupLegs(PlayerState p, Ball ball, Tuning t) => ChaseIntent(p, ball, t);
 
     /// <summary>
     /// Run to the ball (the recovery run): toward where it will be, at the ball's own speed away plus the gap over the speed
@@ -367,8 +365,9 @@ public static class TouchPlanner
         bool stickActive = stick.Length() >= k.StickThreshold;
         if (a.Kind == ActionKind.Soft)
         {
-            // The soft touch for a shot: the stick let go (the shot released) does not stop the run on to the ball.
-            if (!stickActive && a.Legs == LegsMode.Stick) { a.Legs = LegsMode.Hold; a.HoldDirection = FacingDir(p); }
+            // The soft touch for a shot: the stick only aims, so the legs run on to the ball whatever the stick does.
+            a.Legs = LegsMode.Approach;
+            a.HoldDirection = Vector2.Zero;
             return;
         }
         bool restricted = Possession.CanLoseByDistance(p);
@@ -693,8 +692,8 @@ public static class TouchPlanner
         int n;
         if (forced == ActionKind.Soft)
         {
-            modes[0] = LegsMode.Stick; modes[1] = LegsMode.Hold; n = stickActive ? 2 : 1;
-            if (!stickActive) modes[0] = LegsMode.Hold;
+            // The stick only aims during a shot: the legs run on to the ball.
+            modes[0] = LegsMode.Approach; n = 1;
         }
         else if (!stickActive)
         {
