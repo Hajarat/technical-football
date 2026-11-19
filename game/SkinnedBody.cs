@@ -287,6 +287,29 @@ public sealed partial class SkinnedBody : Node3D
         _number.Transform = rest.AffineInverse() * want;
     }
 
+    /// <summary>
+    /// Gives the fingers (not driven per tick) a static relaxed curl: each finger joint bends by <paramref name="angle"/> radians toward the
+    /// palm side (down in the rest pose), the thumb by <paramref name="thumb"/>. Call once after loading; the pose stays until changed.
+    /// </summary>
+    public void CurlFingers(float angle, float thumb)
+    {
+        for (int b = 0; b < _sk.GetBoneCount(); b++)
+        {
+            string name = _sk.GetBoneName(b);
+            bool isThumb = name.Contains("HandThumb");
+            if (!isThumb && !name.Contains("HandIndex") && !name.Contains("HandMiddle") && !name.Contains("HandRing") && !name.Contains("HandPinky")) continue;
+            int child = -1;
+            for (int c = 0; c < _sk.GetBoneCount(); c++) if (_sk.GetBoneParent(c) == b) { child = c; break; }
+            Vector3 dir = child >= 0 ? _restPos[child] - _restPos[b] : _restPos[b] - _restPos[_parent[b]];
+            Vector3 axis = dir.Cross(Vector3.Down);
+            if (axis.LengthSquared() < 1e-8f) continue;
+            // the turn in skeleton space, expressed in the bone's own rest frame and put after its local rest rotation
+            Basis turn = new Basis(axis.Normalized(), isThumb ? thumb : angle);
+            Basis local = _restBasis[b].Transposed() * turn * _restBasis[b];
+            _sk.SetBonePoseRotation(b, (_sk.GetBoneRest(b).Basis.Orthonormalized() * local).GetRotationQuaternion());
+        }
+    }
+
     /// <summary>Tints the clothing, skin and hair materials and sets the shirt number from the kit.</summary>
     public void ApplyKit(FigureKit kit)
     {
@@ -557,6 +580,9 @@ public sealed partial class SkinnedBody : Node3D
 
     /// <summary>The ankle joint's height above the ground when the boot stands flat on it (world metres at the body's current scale).</summary>
     public float AnkleRestHeight => _restAnkleHeight * _scale;
+
+    /// <summary>The same for a figure of the given height (before the first pose has set the body's scale).</summary>
+    public float AnkleRestHeightFor(float height) => _restAnkleHeight * ScaleFor(height);
 
     /// <summary>The number of driven bones.</summary>
     public int DrivenCount => _driven.Length;
