@@ -605,8 +605,9 @@ public static class SkillMoves
         float scale = ExitScale(a, intent.Move, t);
         if (scale > 0f)
         {
-            p.SkillBoostFactor = 1f + k.Burst.ForRating(a.SkillEffective) * scale;
-            p.SkillBoostDuration = k.BurstDuration.ForRating(a.SkillEffective);
+            bool roll = a.Kind == ActionKind.BallRoll;
+            p.SkillBoostFactor = 1f + (roll ? k.BallRollBurst : k.Burst).ForRating(a.SkillEffective) * scale;
+            p.SkillBoostDuration = (roll ? k.BallRollBurstDuration : k.BurstDuration).ForRating(a.SkillEffective);
             p.SkillBoostCap = k.BurstSpeedCap.ForRating(a.SkillEffective) * scale;
             p.SkillBoostUntil = now + ExitTouchWithin;
         }

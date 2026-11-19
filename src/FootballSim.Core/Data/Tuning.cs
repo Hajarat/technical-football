@@ -1085,6 +1085,12 @@ public sealed class SkillTuning
     /// skill_moves).
     /// </summary>
     public RatingRange Burst { get; set; } = new(0f, 0.7f);
+    /// <summary>
+    /// The ball roll's own exit burst and its duration (it gives back the speed the roll's slower run costs), in place of
+    /// <see cref="Burst"/> and <see cref="BurstDuration"/>.
+    /// </summary>
+    public RatingRange BallRollBurst { get; set; } = new(0.5f, 1.8f);
+    public RatingRange BallRollBurstDuration { get; set; } = new(0.4f, 1.1f);
     /// <summary>How long the exit burst lasts from the exit touch, seconds (effective skill_moves).</summary>
     public RatingRange BurstDuration { get; set; } = new(0.2f, 0.9f);
     /// <summary>

@@ -587,6 +587,14 @@
     "fake_cut_time": 0.5,
     "chain_window": 2,
     "chain_multiplier": 0.8,
+    "ball_roll_burst": {
+      "at1": 0.5,
+      "at99": 1.8
+    },
+    "ball_roll_burst_duration": {
+      "at1": 0.4,
+      "at99": 1.1
+    },
     "burst": {
       "at1": 0,
       "at99": 0.7
