@@ -227,16 +227,19 @@ public class CalibrationTests
     /// reflex that meets the ball off-centre, or a hard one, can leave it going on, bent away from the limb, and some still go
     /// in), the run-ins measured (2,000 rounds) breakaway 26.6, halfway run 28.1, angled run 21.4% and keeper rush 9.8%, and
     /// tight angle 2.5%; the run-in bands are about five points around those values, keeper rush's unchanged and tight
-    /// angle's its target.
+    /// angle's its target. With the closed-loop touch controller (the ball kept closer, sprint pushes the keeper no longer
+    /// collects) and the scripted attacker striking at the distances these bands were first measured at (strike_distance:
+    /// breakaway 11.3, halfway run 12.4, angled run 11.1 m), the run-ins measured (2,000 rounds) breakaway 12.1, halfway run
+    /// 34.6, angled run 31.9 and keeper rush 39.6%; those bands are five points either side of the measured value.
     /// </summary>
     [Theory]
     [InlineData("penalty", 72.0, 80.0)]
     [InlineData("edge_of_box", 6.0, 14.0)]
     [InlineData("tight_angle", 2.0, 8.0)]
-    [InlineData("breakaway", 22.0, 32.0)]
-    [InlineData("halfway_run", 23.0, 33.0)]
-    [InlineData("angled_run", 16.0, 26.0)]
-    [InlineData("keeper_rush", 7.0, 15.0)]
+    [InlineData("breakaway", 7.0, 17.0)]
+    [InlineData("halfway_run", 30.0, 40.0)]
+    [InlineData("angled_run", 27.0, 37.0)]
+    [InlineData("keeper_rush", 35.0, 45.0)]
     public void ScoringRateStaysInItsBand(string scenario, double lo, double hi)
     {
         var r = TestData.Rate(TestData.Scenario(scenario), TestData.Player("striker_a"), TestData.Player("the_wall"), N, 1);

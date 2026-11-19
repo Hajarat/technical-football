@@ -6,8 +6,8 @@ namespace FootballSim.Core;
 internal readonly struct KeeperSituation
 {
     /// <summary>
-    /// Seconds until the attacker can next play the ball as the keeper reads it: his planned touch, the planned meet after a push,
-    /// a shot's contact, or (with no plan) his run to the ball. +infinity when he cannot.
+    /// Seconds until the attacker can next play the ball as the keeper reads it: his committed touch, else the contact his touch
+    /// controller steers for, a skill move's or shot's contact, or (with none) his run to the ball. +infinity when he cannot.
     /// </summary>
     public float AttackerNextTouch { get; init; }
     /// <summary>The world tick of that next touch (-1 none, -2 a run to a loose ball); a change redraws the keeper's misjudgement.</summary>

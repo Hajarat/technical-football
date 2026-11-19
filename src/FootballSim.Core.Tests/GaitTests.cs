@@ -114,6 +114,11 @@ public class GaitTests
         buf[0] = new TickIntent { MoveX = 1, Sprint = 1 };
         for (int i = 0; i < 240; i++) w.Step(buf);
         var p = w.Attacker;
+        // Outside a committed touch's windup (where the touch controller holds the clock to the contact) the clock runs from
+        // the running speed.
+        int unlocked = 0;
+        for (int i = 0; i < 240 && unlocked < 2; i++) { w.Step(buf); unlocked = p.GaitLockTicks == 0 ? unlocked + 1 : 0; }
+        Assert.Equal(2, unlocked);
         Assert.True(p.IsStepping);
         Assert.Equal(Gait.Frequency(p.RunSpeed, w.Tuning), p.StepFrequency, 3);
         Assert.Equal(w.Tick, p.CurrentTick);

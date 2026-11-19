@@ -16,6 +16,7 @@
   "keeper_on_line": false,
   "clock_limit": 20,
   "shoot_distance": 18,
+  "strike_distance": 11.3,
   "pitch": {
     "length": 30.0,
     "width": 20.0,

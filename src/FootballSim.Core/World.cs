@@ -266,11 +266,12 @@ public sealed class World
         p.ShotAction = null;
         p.StunUntil = -100f;
         p.ActionContactEta = float.NaN;
-        p.Recovering = false;
+        p.Chasing = false;
         p.LastTouchKind = ActionKind.First;
         p.KnockOnRequested = false;
-        p.Replanning = false;
-        p.TouchRhythm = false;
+        p.StepsSinceTouch = 0;
+        p.PushSteps = 1;
+        p.ClearForecast();
         p.SoftWaitAction = null;
         p.TouchBoostFrom = float.NaN;
         p.TouchBoostUntil = -100f;
@@ -405,8 +406,9 @@ public sealed class World
     }
 
     /// <summary>
-    /// What the keeper reads of the attacker this tick: when the attacker can next play the ball (his planned touch, the planned
-    /// meet after a push, a skill move's sole contact or a shot's contact; with none planned, his run to the ball, after any stun),
+    /// What the keeper reads of the attacker this tick: when the attacker can next play the ball (his committed touch, else the
+    /// swing his touch controller steers for, a skill move's sole contact or a shot's contact; with none expected, his run to the
+    /// ball, after any stun),
     /// whether a shot is winding up, and whether a struck shot is in flight.
     /// </summary>
     KeeperSituation KeeperSituation()
@@ -421,11 +423,8 @@ public sealed class World
         }
         if (_controller == a)
         {
-            if (a.TouchAction is { } ta)
-            {
-                if (ta.Pending) Take(ta.ContactTick);
-                else if (ta.Made && ta.NextMeetTick > Tick) Take(ta.NextMeetTick);
-            }
+            if (a.TouchAction is { Pending: true } ta) Take(ta.ContactTick);
+            else if (a.ForecastTick >= Tick) Take(a.ForecastTick);
             if (a.SkillAction is { Made: false } sk && sk.ContactTick > Tick && sk.Phase != ActionPhase.Done) Take(sk.ContactTick);
             if (a.ShotAction is { Made: false } sh) Take(sh.ContactTick);
         }

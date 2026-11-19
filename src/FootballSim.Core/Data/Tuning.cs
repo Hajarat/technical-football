@@ -218,8 +218,11 @@ public sealed class StepsPerTouchTuning
 {
     public float Close { get; set; } = 1f;
     public float Jog { get; set; } = 2f;
-    /// <summary>At a sprint, by dribbling rating (rounded to whole steps).</summary>
-    public RatingRange Sprint { get; set; } = new(6f, 4f);
+    /// <summary>
+    /// At a sprint, by dribbling rating (rounded to whole steps: 4 at 1, 3 from about 27 to 70, 2 from about 71; the 1.8 at 99
+    /// moves the two-step band down so a dribbling-72 sprinter's turns meet the latency targets).
+    /// </summary>
+    public RatingRange Sprint { get; set; } = new(4f, 1.8f);
 }
 
 /// <summary>The most steps to the next meet while turning (see <see cref="TouchTuning.TurningStickRateDeg"/>).</summary>
@@ -241,9 +244,9 @@ public sealed class TouchLiftTuning
 }
 
 /// <summary>
-/// Touches. In possession every touch is a committed action planned on the stride: the planner picks the contact tick (the
-/// middle of a swing of the stride clock), the foot in swing then, and the contact point ahead of that foot; the player is
-/// steered so the ball is there; at contact the push speed is solved so the ball meets the foot again a few steps later.
+/// Touches. In possession the touch controller (see TouchPlanner) finds, every tick, the next step whose contact window can
+/// meet the ball, steers the player toward it and commits the touch one windup before its contact; at contact the push speed
+/// is solved so the ball meets the foot again a few steps later.
 /// </summary>
 public sealed class TouchTuning
 {
@@ -263,16 +266,9 @@ public sealed class TouchTuning
     public float WalkMaxInput { get; set; } = 0.7f;
 
     /// <summary>
-    /// The pre-windup, seconds (GOALS' PreWindupTime 0.4): the last stretch before a contact in which the player is steered so
-    /// the ball arrives in the contact zone (the windup's included).
+    /// The windup (the foot drawn back) starts this long before contact, seconds: the touch controller commits a touch (its foot,
+    /// kind and surface) this long before its contact.
     /// </summary>
-    public float PreWindup { get; set; } = 0.40f;
-    /// <summary>
-    /// A touch is planned at least this long before its contact, seconds (shorter than the pre-windup, so a touch on every
-    /// step of close control still fits; such a touch is in its pre-windup from the moment it is planned).
-    /// </summary>
-    public float MinPlanAhead { get; set; } = 0.30f;
-    /// <summary>The windup (the foot drawn back) starts this long before contact, seconds.</summary>
     public float Windup { get; set; } = 0.12f;
     /// <summary>The recovery (follow-through) ends this long after contact, seconds.</summary>
     public float Recovery { get; set; } = 0.15f;
@@ -286,18 +282,17 @@ public sealed class TouchTuning
     public float ExecutionAngle { get; set; } = 10f;
     /// <summary>Speed above which the execution angle applies, m/s.</summary>
     public float ExecutionMinSpeed { get; set; } = 1f;
-    /// <summary>A stick change larger than this before contact drops the planned touch and plans again, degrees.</summary>
-    public float ReplanAngle { get; set; } = 90f;
     /// <summary>
     /// Early execution by the angle between the stick and the ball's travel, degrees: the fraction of the normal cadence a turn
-    /// may cut it to. A stick turn pulls the waiting touch forward to no sooner after the previous touch than this fraction of
-    /// the time the touch had (never below <see cref="EarlyMinInterval"/>), and a turn or cut touch pushes the ball to a meet
-    /// this fraction of the usual steps away (at least one). Multiplied by <see cref="EarlyExecutionDribbling"/>.
+    /// may cut it to. A demand (a stick turn, a release, a waiting gesture, a shot's soft touch) shortens the touch controller's
+    /// cooldown to this fraction of the last push's steps (at least one step, never sooner than <see cref="EarlyMinInterval"/>),
+    /// and a turn or cut touch pushes the ball to a meet this fraction of the usual steps away (at least one). Multiplied by
+    /// <see cref="EarlyExecutionDribbling"/>.
     /// </summary>
     public Curve EarlyExecution { get; set; } = new((10f, 1.0f), (30f, 0.6f), (60f, 0.35f), (90f, 0.25f));
     /// <summary>Multiplier on <see cref="EarlyExecution"/> by the dribbling rating.</summary>
     public RatingRange EarlyExecutionDribbling { get; set; } = new(1.15f, 0.85f);
-    /// <summary>Early turn touches are at least this far apart (from the previous touch), seconds.</summary>
+    /// <summary>Touches are at least this far apart (from the previous touch), seconds.</summary>
     public float EarlyMinInterval { get; set; } = 0.22f;
     /// <summary>
     /// The stick counts as moving (a turn is likely) when its smoothed turn rate is above this, degrees per second; then, as
@@ -307,11 +302,6 @@ public sealed class TouchTuning
     public float TurningStickRateDeg { get; set; } = 20f;
     /// <summary>The most steps to the next meet while turning, per mode.</summary>
     public TurningStepsTuning TurningMaxSteps { get; set; } = new();
-    /// <summary>
-    /// With the stick pushed and no touch possible on the stick's path, the legs may bend this far from the stick toward the
-    /// ball, degrees. Only when no such bend reaches the ball do they run on to it or run to it directly (the last resort).
-    /// </summary>
-    public float ApproachMaxStickDeg { get; set; } = 45f;
     /// <summary>Largest correction added to the player's velocity while steering the ball into the contact zone, m/s.</summary>
     public float SteerMax { get; set; } = 0.6f;
     /// <summary>
@@ -320,23 +310,10 @@ public sealed class TouchTuning
     /// </summary>
     public float ReachTolerance { get; set; } = 0.08f;
     /// <summary>
-    /// An early turn touch (the stick turned past the execution angle) may be planned on a swing where the ball is up to this far
-    /// from the foot's contact point, metres, by speed (GOALS' execution radius is 0.6 m): the player steps toward it.
+    /// A turn, cut, stop or close-control touch plays the ball anywhere within this distance of the body (the feet), metres, by
+    /// speed (GOALS' execution radius is 0.6 m), at its normal rated error.
     /// </summary>
     public SpeedRange TurnReach { get; set; } = new(0.45f, 0.6f);
-    /// <summary>The steering of such a turn touch: at most this fast, m/s...</summary>
-    public float TurnSteerMax { get; set; } = 1.5f;
-    /// <summary>...changing by at most this, m/s^2 (a plant step).</summary>
-    public float TurnSteerAccel { get; set; } = 15f;
-    /// <summary>
-    /// A waiting touch is checked again each time the stick has drifted this far since the last check, degrees (below the
-    /// execution angle): if the stick-following legs no longer bring the ball within the steering's reach at the contact, the
-    /// touch is planned again (inside the windup the run holds instead).
-    /// </summary>
-    public float DriftRecheckDeg { get; set; } = 3f;
-    /// <summary>...and at least this often, seconds, whatever the stick does (a push aimed along a predicted stick turn that never
-    /// came, a meet predicted wrongly after a cut).</summary>
-    public float RecheckInterval { get; set; } = 0.05f;
     /// <summary>
     /// How far ahead the stick's turn rate is carried on in predictions, seconds: the predicted turn eases out over this time
     /// constant (never longer than the stick has been turning), so a thumb that stops turning is not predicted to go on.
@@ -348,11 +325,6 @@ public sealed class TouchTuning
     /// GOALS' 0.6 m execution radius.
     /// </summary>
     public float StretchReach { get; set; } = 0.25f;
-    /// <summary>
-    /// With the stick pushed a slowdown (easing off to let the ball come back) is planned only on a swing at most this far
-    /// ahead, seconds (about one jog cadence); a recovering player never eases off, he runs on to the ball.
-    /// </summary>
-    public float SlowdownMaxAhead { get; set; } = 0.6f;
     /// <summary>
     /// A stick released for no longer than this is read as still held where it was, seconds (a flick through neutral is
     /// polled at 60 Hz, so it can read neutral for a tick or two); a longer release is a stop.
@@ -375,10 +347,10 @@ public sealed class TouchTuning
     /// <summary>Launch angle of touches, degrees.</summary>
     public TouchLiftTuning LiftDeg { get; set; } = new();
 
-    /// <summary>Ball speed after a planned touch never falls below this, m/s.</summary>
+    /// <summary>Ball speed after a dribble push never falls below this, m/s (a reversal's hook excepted).</summary>
     public float MinPush { get; set; } = 2.0f;
     public float CloseControlMinPush { get; set; } = 1.2f;
-    /// <summary>A planned touch never sends the ball faster than this, m/s; a touch that would need more is a heavy touch.</summary>
+    /// <summary>A push never sends the ball faster than this, m/s (nor faster than the player can catch within 1.5 s).</summary>
     public float MaxPush { get; set; } = 12f;
     /// <summary>Standard deviation of the touch speed factor (dribbling), before the speed scaling.</summary>
     public RatingRange SpeedError { get; set; } = new(0.10f, 0.02f);
@@ -459,7 +431,7 @@ public sealed class PossessionTuning
     /// ball against 450 with it.
     /// </summary>
     public float OffBallTurnBonus { get; set; } = -0.2f;
-    /// <summary>How far ahead the touch planner looks for a swing that can play the ball, seconds.</summary>
+    /// <summary>How far ahead the touch controller looks for a step that can play the ball, seconds.</summary>
     public float PredictionHorizon { get; set; } = 1.5f;
 }
 

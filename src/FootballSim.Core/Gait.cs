@@ -6,7 +6,8 @@ namespace FootballSim.Core;
 /// f(v) = base + per_speed * v steps per second and v the running speed (the steering correction left out), so it runs on
 /// smoothly through speed changes. Below the idle speed the current step is finished at the base rate and then the clock
 /// holds at the step boundary (no new step). The middle of a swing (s = 0.5 or 1.5) is when a foot can play the ball.
-/// A planner may lock the clock for a while so a swing middle falls on a given tick (a first step from a standstill).
+/// The touch controller may lock the clock for a while so a committed contact falls on a given phase (over a windup, or a
+/// stride quickened by at most a quarter for a demand).
 /// </summary>
 public static class Gait
 {
@@ -67,6 +68,8 @@ public static class Gait
         p.StepFrequency = ds / dt;
         float s1 = locked && p.GaitLockTicks == 0 ? p.GaitLockTarget : s0 + ds;
         Foot? crossed = null;
+        // A new step begins when the phase passes a whole step (1, or 2 before the wrap).
+        p.StepBegun = s0 < 1f && s1 >= 1f || s0 < 2f && s1 >= 2f;
         if (s0 < 0.5f && s1 >= 0.5f) crossed = Foot.Right;
         else if (s0 < 1.5f && s1 >= 1.5f) crossed = Foot.Left;
         else if (s0 < 2.5f && s1 >= 2.5f) crossed = Foot.Right;
