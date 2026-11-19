@@ -1336,7 +1336,12 @@ public partial class PlayerFigure : Node3D
                 fdUse = new Vector3(Mathf.Cos(tf.Psi), 0, Mathf.Sin(tf.Psi));
             }
             // a predicted immediate touch (re)appearing is eased in, as the hint is: the prediction comes and goes with the stick
-            if (n == 2 && !_teleporting) { wgt = Math.Min(wgt, _upW[i] + f.Dt / HintRise); upW = Math.Max(upW, wgt); }
+            // (but always fast enough to be all there by its contact)
+            if (n == 2 && !_teleporting)
+            {
+                float rise = Math.Max(f.Dt / HintRise, (1f - _upW[i]) * f.Dt / Math.Max(tau, f.Dt));
+                wgt = Math.Min(wgt, _upW[i] + rise); upW = Math.Max(upW, wgt);
+            }
             if (wgt <= best) continue;
             best = wgt; surf = a.Surface;
             _ovWind[i] = !a.Made;
