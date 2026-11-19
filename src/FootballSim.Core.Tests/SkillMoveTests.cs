@@ -144,8 +144,8 @@ public class SkillMoveTests
             var m = o.Move;
             if (kind is ActionKind.BallRoll or ActionKind.DragBack)
             {
-                // The reach: the sole lands at most 0.1 s after the start, the ball centre within 0.30 m of the foot's contact point.
-                Assert.InRange(m.ContactTick - m.StartTick, 0, 12);
+                // The reach: the sole lands at most 0.12 s after the start, the ball centre within 0.30 m of the foot's contact point.
+                Assert.InRange(m.ContactTick - m.StartTick, 0, 15);
                 Assert.Equal(m.ContactTick, m.ExecuteTick);
                 Assert.True(m.Made);
                 Assert.InRange(m.ContactMiss, 0f, 0.30f);
@@ -228,7 +228,7 @@ public class SkillMoveTests
         }
         Assert.True(end > 0);
         Assert.InRange(playerStart.X - p.Position.X, 0.1f, 0.6f);    // stepped back about 0.3 m
-        Assert.InRange(ballStart.X - w.Ball.Position.X, 0.8f, 1.2f); // pulled back about 1.0 m
+        Assert.InRange(ballStart.X - w.Ball.Position.X, 0.5f, 0.8f); // pulled back about 0.65 m
         Assert.True(p.Speed < 0.1f, $"still moving at {p.Speed} m/s");
         Assert.True(p.InPossession);
     }

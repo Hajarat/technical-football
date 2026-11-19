@@ -1014,9 +1014,9 @@ public sealed class SkillTuning
     public float StepOverMaxAhead { get; set; } = 0.5f;
     /// <summary>
     /// A sole move (ball roll, drag-back, fake stop) reaches for the ball for at most this long before the sole lands on it,
-    /// seconds; the ball is free until then.
+    /// seconds; the ball is free until then. (The turn at the feet has its own, <see cref="FeetTurnReachMax"/>.)
     /// </summary>
-    public float SoleReachMax { get; set; } = 0.1f;
+    public float SoleReachMax { get; set; } = 0.12f;
     /// <summary>The sole lands with the ball centre within this of the foot's contact point, metres.</summary>
     public float SoleReachTolerance { get; set; } = 0.3f;
     /// <summary>The largest steering velocity the reach may add to bring the foot to the ball, m/s.</summary>
@@ -1025,9 +1025,9 @@ public sealed class SkillTuning
     public float SoleReachFootSpeed { get; set; } = 8f;
 
     // ---- the moves ----
-    public float StepOverSeconds { get; set; } = 0.25f;
+    public float StepOverSeconds { get; set; } = 0.42f;
     /// <summary>The step-over over a still ball (slower than <see cref="StillBallSpeed"/>).</summary>
-    public float StepOverStillSeconds { get; set; } = 0.15f;
+    public float StepOverStillSeconds { get; set; } = 0.35f;
     /// <summary>A ball slower than this counts as still, m/s.</summary>
     public float StillBallSpeed { get; set; } = 0.1f;
     /// <summary>
@@ -1035,22 +1035,37 @@ public sealed class SkillTuning
     /// lead ahead of him).
     /// </summary>
     public float PaceMatchAhead { get; set; } = 0.25f;
-    public float BodyFeintSeconds { get; set; } = 0.25f;
+    public float BodyFeintSeconds { get; set; } = 0.35f;
     /// <summary>The ball roll when it is the first move of a chain.</summary>
-    public float BallRollFirstSeconds { get; set; } = 0.3f;
+    public float BallRollFirstSeconds { get; set; } = 0.4f;
     /// <summary>The ball roll later in a chain.</summary>
-    public float BallRollChainSeconds { get; set; } = 0.2f;
+    public float BallRollChainSeconds { get; set; } = 0.27f;
+    /// <summary>
+    /// During a ball roll the running speed eases down (no faster than balance_deceleration) to at most this, m/s, while the
+    /// player travels sideways with the ball; the exit burst gives the speed back.
+    /// </summary>
+    public float BallRollForwardSpeed { get; set; } = 1.5f;
     /// <summary>How far the ball is rolled sideways against the player's speed, m/s to metres.</summary>
     public Curve BallRollDistance { get; set; } = new((0f, 0.6f), (4f, 1.0f));
     /// <summary>The player moves sideways this fraction of the roll distance with the ball.</summary>
     public float BallRollFollow { get; set; } = 0.5f;
-    public float DragBackSeconds { get; set; } = 0.25f;
+    public float DragBackSeconds { get; set; } = 0.4f;
     /// <summary>No other move starts until this long after a drag-back.</summary>
     public float DragBackCooldown { get; set; } = 0.2f;
     /// <summary>How far the sole pulls the ball back.</summary>
-    public float DragBackDistance { get; set; } = 1.0f;
+    public float DragBackDistance { get; set; } = 0.65f;
     /// <summary>How far the player steps back (he ends standing).</summary>
     public float DragBackStepBack { get; set; } = 0.3f;
+    /// <summary>
+    /// The turn at the feet (the touch controller's sole turn of a reversed stick, built on the drag-back's motion): its
+    /// duration, the cooldown after it, how far the sole pulls the ball onto the stick's line, the player's step that way, and
+    /// the longest reach before the sole lands, seconds and metres.
+    /// </summary>
+    public float FeetTurnSeconds { get; set; } = 0.25f;
+    public float FeetTurnCooldown { get; set; } = 0.2f;
+    public float FeetTurnDistance { get; set; } = 1.0f;
+    public float FeetTurnStepBack { get; set; } = 0.3f;
+    public float FeetTurnReachMax { get; set; } = 0.1f;
     /// <summary>Fake stop and fake cut.</summary>
     public float FakeSeconds { get; set; } = 0.1f;
     /// <summary>The fake stop leaves the ball at rest this far ahead of where the player stops.</summary>
