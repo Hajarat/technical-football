@@ -105,27 +105,30 @@ public static class SkillMoves
     /// low enough and in the execution radius, or arriving at the foot for the planned touch), before the player moves this
     /// tick. Returns the SkillMove event, or null.
     /// <para>
-    /// With a push in flight (a touch planned within meet_wait_seconds of the gesture) the gesture waits for that touch's
-    /// meet: on its contact tick the ball is at the foot, and the move starts instead of the touch. Without one it waits
-    /// buffer_seconds for the ball to come into reach.
+    /// In possession the gesture waits (at most meet_wait_seconds) on the touch controller's forecast: while it waits the
+    /// controller treats it as a demand and goes to the ball without committing a touch, and the move starts once the ball is
+    /// in reach, at the forecast contact at the latest. A touch already committed when the gesture comes is played first (on a
+    /// one-step push), then the move. Without possession it waits buffer_seconds for the ball to come into reach.
     /// </para>
     /// </summary>
     internal static SimEvent? TryStart(PlayerState p, Ball ball, bool inPossession, int tick, float now, Tuning t)
     {
         var k = t.Skill;
         if (p.SkillBufTick < 0) return null;
-        var meet = p.TouchAction is { Pending: true } pa && pa.ContactTick - p.SkillBufTick <= Ticks(k.MeetWaitSeconds, t) ? pa : null;
-        if (tick - p.SkillBufTick > Ticks(meet != null ? k.MeetWaitSeconds : k.BufferSeconds, t)) { p.SkillBufTick = -1; return null; }
+        if (tick - p.SkillBufTick > Ticks(inPossession ? k.MeetWaitSeconds : k.BufferSeconds, t)) { p.SkillBufTick = -1; return null; }
         if (!inPossession || p.SkillAction != null || now < p.SkillCooldownUntil) return null;
+        if (p.TouchAction is { Pending: true }) return null;
         var kind = KindOf(p.SkillBufKind);
         if (ball.Position.Y >= k.MaxBallHeight) return null;
         float dist = TouchModel.HorizontalDistance(p.Position, ball.Position);
-        // At the meet the ball is being steered into the contact zone ahead of the foot: within the zone's slack of the radius.
-        bool atMeet = meet != null && tick >= meet.ContactTick && dist <= Radius(kind, t) + t.Touch.ContactZoneRadius;
+        // At the forecast contact the ball is being steered into the contact zone ahead of the foot: within the zone's slack of
+        // the radius.
+        bool meet = p.ForecastTick >= 0;
+        bool atMeet = meet && tick >= p.ForecastTick && dist <= Radius(kind, t) + t.Touch.ContactZoneRadius;
         if (dist > Radius(kind, t) && !atMeet) return null;
-        // With a meet still to come, a move that would start awkwardly waits for it: a step-over or feint with the ball too far
-        // ahead for the leg to reach over it, a sole move whose foot cannot land on the ball within the reach.
-        if (meet != null && !atMeet)
+        // With a contact still to come, a move that would start awkwardly waits for it: a step-over or feint with the ball too
+        // far ahead for the leg to reach over it, a sole move whose foot cannot land on the ball within the reach.
+        if (meet && !atMeet)
         {
             Vector2 fwd = GestureReader.FrameForward(p, t);
             if (kind is ActionKind.StepOver or ActionKind.BodyFeint
@@ -193,8 +196,12 @@ public static class SkillMoves
     /// skill move of the player's: no gesture, no chain, no exit burst; the drag-back's cooldown keeps it from starting again
     /// before the exit touch has sent the ball along the stick.
     /// </summary>
-    internal static BallAction StartFeetTurn(PlayerState p, Vector2 dir, Ball ball, int tick, float now, Tuning t) =>
-        Start(p, ActionKind.DragBack, SkillSide.None, dir, ball, tick, now, t, feetTurn: true);
+    internal static BallAction StartFeetTurn(PlayerState p, Vector2 dir, Ball ball, int tick, float now, Tuning t)
+    {
+        // The body comes round at the post-turn rotation rate, as after a turn touch.
+        p.PostTurnUntil = now + t.Movement.PostTurnSeconds;
+        return Start(p, ActionKind.DragBack, SkillSide.None, dir, ball, tick, now, t, feetTurn: true);
+    }
 
     static BallAction Start(PlayerState p, ActionKind kind, SkillSide side, Vector2 cut, Ball ball, int tick, float now, Tuning t,
         bool feetTurn = false)
@@ -210,11 +217,11 @@ public static class SkillMoves
 
         // The waiting touch is dropped; the move owns the ball until it ends.
         if (p.TouchAction is { Pending: true } waiting) waiting.Phase = ActionPhase.Done;
-        p.Replanning = false;
-        p.EarlyTurnTick = -1;
         p.SoftWaitAction = null;
-        p.Recovering = false;
+        p.Chasing = false;
         p.KnockOnRequested = false;
+        // After the move the next touch may be played on the first swing that reaches the ball.
+        p.PushSteps = 1;
 
         bool contactless = kind is ActionKind.StepOver or ActionKind.BodyFeint;
         Vector2 fwd = GestureReader.FrameForward(p, t);
@@ -253,14 +260,13 @@ public static class SkillMoves
             ContactTick = contactless ? tick + reach + dur / 2 : tick + reach,
             EndTick = tick + reach + dur,
             ContactPoint = new Vector3(ball.Position.X, t.Ball.Radius, ball.Position.Z),
-            Legs = LegsMode.Hold,
             HoldDirection = fwd,
             SkillEntry = entry,
             SkillCut = cut,
             SkillEffective = p.SkillEffective,
             FeetTurn = feetTurn,
         };
-        if (p.TouchAction is { Made: true } prev && prev.PhaseAt(tick, TouchPlanner.PreWindupTicks(t), TouchPlanner.WindupTicks(t)) != ActionPhase.Done)
+        if (p.TouchAction is { Made: true } prev && prev.PhaseAt(tick, TouchPlanner.WindupTicks(t), TouchPlanner.WindupTicks(t)) != ActionPhase.Done)
             p.PrevTouchAction = prev;
         else p.PrevTouchAction = null;
         p.TouchAction = a;
@@ -278,7 +284,10 @@ public static class SkillMoves
         var a = p.SkillAction!;
         var k = t.Skill;
         Vector2 fwd = a.HoldDirection;
-        legs = new TickIntent { MoveX = fwd.X, MoveZ = fwd.Y, Sprint = 1f };
+        // A turn at the feet turns the body onto the stick's line while the sole pulls the ball there, so the player comes out
+        // of it facing his new way instead of running on and turning about afterwards.
+        Vector2 face = a.FeetTurn ? a.SkillCut : fwd;
+        legs = new TickIntent { MoveX = face.X, MoveZ = face.Y, Sprint = 1f };
         float cap = Possession.SpeedCap(p, true, false, t);
         float entry = a.SkillEntry;
         if (IsSole(a.Kind) && tick < a.ContactTick) return ReachTick(p, a, ball, tick, cap, t);
@@ -333,8 +342,11 @@ public static class SkillMoves
                 // drag_back_step_back behind where he started.
                 run = entry * MathF.Max(0f, 1f - u1 / DragBackStopShare);
                 float drift = entry * DragBackStopShare * 0.5f * durSec;
-                // A turn at the feet steps toward the stick's line, where the sole pulls the ball.
-                steer = (a.FeetTurn ? a.SkillCut : -fwd) * ((k.DragBackStepBack + drift) / durSec);
+                // A turn at the feet steps toward the stick's line, where the sole pulls the ball. The step rises and falls
+                // (a half sine over the move, the same distance), so the player is at rest when the move ends and nothing is left
+                // to vanish then.
+                float um = u1;
+                steer = (a.FeetTurn ? a.SkillCut : -fwd) * ((k.DragBackStepBack + drift) / durSec * MathF.PI * 0.5f * MathF.Sin(MathF.PI * um));
                 break;
             }
             case ActionKind.FakeStop:
@@ -540,9 +552,7 @@ public static class SkillMoves
         if (a.Kind == ActionKind.DragBack) p.SkillCooldownUntil = now + k.DragBackCooldown;
         if (a.FeetTurn)
         {
-            // The planner's own turn: straight into the exit touch, with no chain window or exit burst.
-            p.Replanning = true;
-            p.Recovering = false;
+            // The controller's own turn: straight into the exit touch, with no chain window or exit burst.
             p.SkillExitTick = tick;
             return;
         }
@@ -558,8 +568,6 @@ public static class SkillMoves
             p.SkillBoostCap = k.BurstSpeedCap.ForRating(a.SkillEffective) * scale;
             p.SkillBoostUntil = now + ExitTouchWithin;
         }
-        p.Replanning = true;
-        p.Recovering = false;
         p.SkillExitTick = tick;
     }
 

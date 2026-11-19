@@ -88,8 +88,6 @@
     "sprint_threshold": 0.5,
     "stick_threshold": 0.1,
     "walk_max_input": 0.7,
-    "pre_windup": 0.4,
-    "min_plan_ahead": 0.3,
     "windup": 0.12,
     "recovery": 0.15,
     "contact_zone_ahead": {
@@ -100,7 +98,6 @@
     "lateral_foot_offset": 0.09,
     "execution_angle": 10,
     "execution_min_speed": 1,
-    "replan_angle": 90,
     "early_execution": [[10, 1], [30, 0.6], [60, 0.35], [90, 0.25]],
     "early_execution_dribbling": {
       "at1": 1.15,
@@ -112,7 +109,6 @@
       "jog": 2,
       "sprint": 3
     },
-    "approach_max_stick_deg": 45,
     "steer_max": 0.6,
     "steer_accel": 6,
     "reach_tolerance": 0.08,
@@ -120,13 +116,8 @@
       "rest": 0.45,
       "sprint": 0.6
     },
-    "turn_steer_max": 1.5,
-    "turn_steer_accel": 15,
-    "drift_recheck_deg": 3,
-    "recheck_interval": 0.05,
     "stick_lead_time": 0.15,
     "stretch_reach": 0.25,
-    "slowdown_max_ahead": 0.6,
     "release_debounce": 0.04,
     "feet_turn_deg": 120,
     "feet_turn_reach": 0.6,
@@ -135,8 +126,8 @@
       "close": 1,
       "jog": 2,
       "sprint": {
-        "at1": 6,
-        "at99": 4
+        "at1": 4,
+        "at99": 1.8
       }
     },
     "lift_deg": {

@@ -74,7 +74,8 @@ public class PlannedTouchTests
     public void ExactStraightDribbleMeetsTheBallAtEveryPlannedContact(int mode, int dribbling)
     {
         // Zero error draws: every planned contact has the ball centre inside the contact zone of the planned contact point,
-        // on the foot in swing at that tick; the push solve (skid included) lands the ball within 0.03 m of the next meet.
+        // on the foot in swing at that tick; the push solve (skid included) and the steering, which stops correcting within
+        // reach_tolerance of the contact point, meet it within that tolerance.
         var t = Exact();
         var s = Sheet(dribbling);
         var it = new TickIntent { MoveX = 1, Sprint = mode == 1 ? 1f : 0f, CloseControl = mode == 2 };
@@ -101,7 +102,7 @@ public class PlannedTouchTests
         _out.WriteLine($"mode {mode} dribbling {dribbling}: {contacts} contacts, L {left} R {right}, worst miss {worst:F3} m, speed {p.Speed:F2}");
         Assert.False(lost, "possession lost");
         Assert.True(contacts >= (mode == 1 ? 4 : 10), $"{contacts} contacts");
-        Assert.True(worst <= 0.03f, $"worst miss {worst:F3} m");
+        Assert.True(worst <= t.Touch.ReachTolerance + 0.01f, $"worst miss {worst:F3} m");
         Assert.True(left > 0 && right > 0, $"feet L {left} R {right}");
     }
 
@@ -196,7 +197,8 @@ public class PlannedTouchTests
         // The press is held until the ball is next in reach (with a low dribbling rating at a sprint, that is the next touch).
         var knock = sprint;
         knock.KnockOn = true;
-        for (int i = 0; i < 240 && !AttackerTouched(w); i++) Steps(w, knock, 1);
+        // A touch already committed when it is pressed is played as committed; the knock-on is the next one.
+        for (int i = 0; i < 240 && !(AttackerTouched(w) && w.Attacker.KnockOnFrom == w.SimTime); i++) Steps(w, knock, 1);
         Assert.True(AttackerTouched(w), "no knock-on touch");
         Assert.Equal(w.SimTime, w.Attacker.KnockOnFrom);
         return w.SimTime;

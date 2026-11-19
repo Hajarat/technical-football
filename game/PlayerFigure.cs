@@ -878,9 +878,10 @@ public partial class PlayerFigure : Node3D
             if (body)
             {
                 // outside a windup and its contact tick (which must be drawn exactly) the foot turns at a limited rate, so handing back from a
-                // touch's sideways contact foot to the stride never swings the boot round in a frame or two
+                // touch's sideways contact foot to the stride never swings the boot round in a frame or two; a shot's striking foot is never
+                // limited (its swing turns the boot onto the strike direction faster, and the kick weight already blends it in and out)
                 float yawW = Mathf.Atan2(dir[i].Z, dir[i].X);
-                if (!_teleporting && _yawOutOk[i] && !_ovWind[i] && tw[i] < 0.999f)
+                if (!_teleporting && _yawOutOk[i] && !_ovWind[i] && tw[i] < 0.999f && kw <= 0f)
                 {
                     float step = FootTurnRate * dt;
                     yawW = _yawOut[i] + Math.Clamp(Mathf.Wrap(yawW - _yawOut[i], -Mathf.Pi, Mathf.Pi), -step, step);

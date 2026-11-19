@@ -185,10 +185,11 @@ public class SkillMoveTests
                 if (before is { } b && b != p.Action && !b.Made) Assert.Equal(ActionPhase.Done, b.Phase);
                 end = p.Action.EndTick;
             }
-            if (end > 0 && w.Tick == end) plannedAfter = p.Action is { Pending: true, IsSkill: false };
+            // On the tick the move ends the controller takes the ball over: an exit touch at once, or a forecast contact.
+            if (end > 0 && w.Tick == end) plannedAfter = !float.IsNaN(p.NextTouchEta) || w.Events.Any(e => e.Kind == EventKind.Touch);
         }
         Assert.True(end > 0);
-        Assert.True(plannedAfter, "the planner did not plan a touch on the tick the move ended");
+        Assert.True(plannedAfter, "the controller did not take the ball over on the tick the move ended");
     }
 
     [Fact]
@@ -259,56 +260,57 @@ public class SkillMoveTests
     public void AGestureWithTheBallOutOfReachWaitsThenIsDropped()
     {
         var t = TestData.Tuning();
+        int wait = (int)MathF.Round(t.Skill.MeetWaitSeconds * t.TickRate), buffer = (int)MathF.Round(t.Skill.BufferSeconds * t.TickRate);
+        // In possession it waits meet_wait_seconds (the touch controller goes to the ball meanwhile), then is dropped.
         var p = TestData.Outfield();
         var ball = new Ball(t.Ball) { Position = new Vector3(2f, t.Ball.Radius, 0f) };
         SkillMoves.Request(p, new GestureRead(Gesture.BodyFeint, SkillSide.Right, Vector2.Zero), 10);
-        for (int tick = 10; tick <= 46; tick++) Assert.Null(SkillMoves.TryStart(p, ball, true, tick, tick * t.Dt, t));
-        Assert.True(p.SkillBufTick >= 0); // still waiting at 0.3 s
-        Assert.Null(SkillMoves.TryStart(p, ball, true, 47, 47 * t.Dt, t));
+        for (int tick = 10; tick <= 10 + wait; tick++) Assert.Null(SkillMoves.TryStart(p, ball, true, tick, tick * t.Dt, t));
+        Assert.True(p.SkillBufTick >= 0);
+        Assert.Null(SkillMoves.TryStart(p, ball, true, 11 + wait, (11 + wait) * t.Dt, t));
         Assert.Equal(-1, p.SkillBufTick); // dropped
-        ball.Position = new Vector3(0.5f, t.Ball.Radius, 0f);
-        Assert.Null(SkillMoves.TryStart(p, ball, true, 48, 48 * t.Dt, t));
+        // Without possession only buffer_seconds.
+        var q = TestData.Outfield();
+        SkillMoves.Request(q, new GestureRead(Gesture.BodyFeint, SkillSide.Right, Vector2.Zero), 10);
+        Assert.Null(SkillMoves.TryStart(q, ball, false, 11 + buffer, (11 + buffer) * t.Dt, t));
+        Assert.Equal(-1, q.SkillBufTick);
 
-        // Within the 0.3 s the ball comes into reach: the move starts.
-        SkillMoves.Request(p, new GestureRead(Gesture.BodyFeint, SkillSide.Right, Vector2.Zero), 100);
+        // The ball comes into reach while it waits: the move starts.
+        SkillMoves.Request(p, new GestureRead(Gesture.BodyFeint, SkillSide.Right, Vector2.Zero), 300);
         ball.Position = new Vector3(2f, t.Ball.Radius, 0f);
-        Assert.Null(SkillMoves.TryStart(p, ball, true, 110, 110 * t.Dt, t));
+        Assert.Null(SkillMoves.TryStart(p, ball, true, 310, 310 * t.Dt, t));
         ball.Position = new Vector3(0.7f, t.Ball.Radius, 0f);
-        Assert.NotNull(SkillMoves.TryStart(p, ball, true, 120, 120 * t.Dt, t));
+        Assert.NotNull(SkillMoves.TryStart(p, ball, true, 400, 400 * t.Dt, t));
         Assert.Equal(ActionKind.BodyFeint, p.SkillMove!.Kind);
     }
 
     [Fact]
-    public void WithAPushInFlightTheGestureWaitsForTheMeetAndTheMoveReplacesTheTouch()
+    public void AGestureWaitsForACommittedTouchAndThenTheForecastContact()
     {
         var t = TestData.Tuning();
         var p = TestData.Outfield();
-        var ball = new Ball(t.Ball) { Position = new Vector3(2f, t.Ball.Radius, 0f) };
-        // A touch planned 1.25 s after the gesture: longer than the 0.3 s buffer, inside the meet wait.
-        var touch = new BallAction { Kind = ActionKind.Sprint, PlanTick = 90, ContactTick = 250 };
+        var ball = new Ball(t.Ball) { Position = new Vector3(0.6f, t.Ball.Radius, 0f) };
+        // A touch already committed is played first: the move never drops it.
+        var touch = new BallAction { Kind = ActionKind.Sprint, PlanTick = 95, ContactTick = 105 };
         p.TouchAction = touch;
         SkillMoves.Request(p, new GestureRead(Gesture.DragBack, SkillSide.None, Vector2.Zero), 100);
-        for (int tick = 100; tick < 250; tick++) Assert.Null(SkillMoves.TryStart(p, ball, true, tick, tick * t.Dt, t));
-        // At the meet the ball arrives at the foot (here just outside the radius, inside the contact zone's slack).
+        for (int tick = 100; tick < 105; tick++) Assert.Null(SkillMoves.TryStart(p, ball, true, tick, tick * t.Dt, t));
+        touch.Made = true;
+        // Then, the ball out of reach, it waits for the forecast contact; there the ball is at the foot (here just outside the
+        // radius, inside the contact zone's slack).
+        p.SetForecast(250, Foot.Right, new Vector3(0.8f, t.Ball.Radius, 0f));
+        ball.Position = new Vector3(2f, t.Ball.Radius, 0f);
+        for (int tick = 106; tick < 250; tick++) Assert.Null(SkillMoves.TryStart(p, ball, true, tick, tick * t.Dt, t));
         ball.Position = new Vector3(0.8f, t.Ball.Radius, 0f);
         Assert.NotNull(SkillMoves.TryStart(p, ball, true, 250, 250 * t.Dt, t));
         Assert.Equal(ActionKind.DragBack, p.SkillMove!.Kind);
-        Assert.Equal(ActionPhase.Done, touch.Phase); // the touch was replaced
-
-        // A meet beyond the wait: the plain 0.3 s buffer applies.
-        var q = TestData.Outfield();
-        q.TouchAction = new BallAction { Kind = ActionKind.Sprint, PlanTick = 90, ContactTick = 100 + 200 };
-        ball.Position = new Vector3(2f, t.Ball.Radius, 0f);
-        SkillMoves.Request(q, new GestureRead(Gesture.DragBack, SkillSide.None, Vector2.Zero), 100);
-        for (int tick = 100; tick <= 136; tick++) Assert.Null(SkillMoves.TryStart(q, ball, true, tick, tick * t.Dt, t));
-        Assert.Null(SkillMoves.TryStart(q, ball, true, 137, 137 * t.Dt, t));
-        Assert.Equal(-1, q.SkillBufTick);
+        Assert.Equal(ActionPhase.Contact, touch.PhaseAt(105, 14, 14));
     }
 
     [Theory]
     [InlineData("step_over")]
     [InlineData("drag_back")]
-    public void AtASprintAGestureRightAfterAPushIsMadeAtTheNextMeet(string move)
+    public void AtASprintAGestureRightAfterAPushIsMadeWhenTheBallIsReached(string move)
     {
         var (trace, kind) = TraceFor(move, 1);
         for (ulong seed = 1; seed <= 4; seed++)
@@ -317,13 +319,54 @@ public class SkillMoveTests
             var p = w.Attacker;
             // Gesture while a sprint push is on its way, the ball far out of reach and its meet more than 0.5 s off.
             var o = Play(Entry.Sprint, (i, it) => trace(i, it), 40, world: w, startWhen: ww =>
-                TouchModel.HorizontalDistance(ww.Attacker.Position, ww.Ball.Position) > 1.3f && ww.Attacker.ActionContactEta > 0.5f);
+                TouchModel.HorizontalDistance(ww.Attacker.Position, ww.Ball.Position) > 1.3f && ww.Attacker.NextTouchEta > 0.5f);
             int gestureAt = p.LastGestureTick;
             Assert.True(o.MoveStart > 0, $"{move} seed {seed}: no move made");
             Assert.Equal(kind, o.Kind);
-            Assert.True(o.MoveStart - gestureAt > 36, $"{move} seed {seed}: made {o.MoveStart - gestureAt} ticks after the gesture (expected the next meet)");
+            // Made once the controller has brought the ball back within reach (it commits no touch while the gesture waits).
+            Assert.True(o.MoveStart >= gestureAt, $"{move} seed {seed}: made before the gesture");
             Assert.False(o.Lost);
             Assert.True(o.InPossessionAtEnd);
+        }
+    }
+
+    [Theory]
+    [InlineData("step_over")]
+    [InlineData("body_feint")]
+    [InlineData("ball_roll")]
+    [InlineData("drag_back")]
+    [InlineData("fake_cut")]
+    public void TheGroundSpeedIsContinuousThroughASkillExit(string move)
+    {
+        // From the move's end the controller takes the step over and eases it out: no change of the ground speed faster than
+        // 15 m/s^2 (a speed step) over the hand-over, except a speed-up no quicker than the speed law under the exit burst.
+        var (trace, _) = TraceFor(move, 1);
+        foreach (var e in new[] { Entry.Jog, Entry.Sprint })
+        for (ulong seed = 1; seed <= 3; seed++)
+        {
+            var w = Field(seed);
+            var p = w.Attacker;
+            var buf = new TickIntent[w.PlayerCount];
+            int end = -1;
+            float prev = 0f, worst = 0f;
+            for (int tick = 1; tick <= 480; tick++)
+            {
+                var it = Run(e, tick);
+                int i = tick - 241;
+                if (i >= 0 && i < 40) it = trace(i, it);
+                buf[0] = it;
+                w.Step(buf);
+                if (w.Events.Any(x => x.Kind == EventKind.SkillMove)) end = p.SkillMove!.EndTick;
+                // A speed-up from the exit burst may be as quick as the speed law makes it (the move's boosted time constant).
+                float law = (w.Tuning.Movement.SprintSpeed.At99 - prev) / Movement.TimeConstantAt(p, w.SimTime, w.Tuning) * w.Tuning.Dt;
+                float change = p.Speed - prev;
+                if (end > 0 && w.Tick > end && w.Tick <= end + 36 && w.Shots.Count == 0)
+                    worst = MathF.Max(worst, change > 0f ? (change > MathF.Max(15f * w.Tuning.Dt, law) ? change : 0f) : -change);
+                prev = p.Speed;
+            }
+            Assert.True(end > 0, $"{move} {e} seed {seed}: no move");
+            Assert.True(worst <= 15f * w.Tuning.Dt, $"{move} {e} seed {seed}: ground speed changed {worst / w.Tuning.Dt:F1} m/s^2 in a tick after the move");
+            Assert.True(p.InPossession);
         }
     }
 

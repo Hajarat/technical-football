@@ -80,8 +80,16 @@ static class DribbleProbe
         new("close_reverse_flick", 5f, (s, seed) => Flick(s, seed, true), CurveStart),
     };
 
+    /// <summary>A committed touch whose stick at contact was turned back to 30 degrees from its commit (internal to the core).</summary>
+    static readonly System.Reflection.FieldInfo ClampedField =
+        typeof(BallAction).GetField("Clamped", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+
+    static readonly System.Reflection.FieldInfo StretchedField =
+        typeof(BallAction).GetField("Stretched", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+
     sealed class Stats
     {
+        public readonly List<float> TurnMiss = new();
         public int Runs, Kept;
         public double TouchesPerSecond;
         public readonly List<float> Ahead = new();
@@ -89,11 +97,12 @@ static class DribbleProbe
         public int Left, Right, NotInSwing;
         public float MaxSteer;
         public readonly Dictionary<ActionKind, int> Kinds = new();
-        public int Drops, Stretched;
+        public int Drops, Stretched, Clamped;
         public readonly List<float> Latency = new();
         public readonly List<float> Align = new();
         public int AlignMissed;
         public float MinSpeedPct = float.PositiveInfinity;
+        public readonly SpeedSteps Steps = new();
     }
 
     public static int Run(Dictionary<string, string> opts, string dataDir, Tuning tuning)
@@ -114,11 +123,32 @@ static class DribbleProbe
         var baseSheet = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", attackerId + ".json")).Value;
         var keeper = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", "the_wall.json")).Value;
         if (baseSheet == null || keeper == null) { Console.Error.WriteLine("players not found"); return 1; }
+        if (opts.TryGetValue("dtrace", out var dtName))
+        {
+            // Diagnostic: one probe at the first --ratings value, seeds --seed.. (--seeds of them), traced tick by tick (--from/--to world
+            // ticks; --steps-only prints only the per-run summary).
+            var probe = Probes.First(x => x.Name == dtName);
+            var sheet = baseSheet.Clone();
+            sheet.Dribbling = ratings[0];
+            int from = opts.TryGetValue("from", out var fs) ? int.Parse(fs, CultureInfo.InvariantCulture) : 0;
+            int to = opts.TryGetValue("to", out var ts) ? int.Parse(ts, CultureInfo.InvariantCulture) : -1;
+            int first = opts.TryGetValue("index", out var ix0) ? int.Parse(ix0, CultureInfo.InvariantCulture) : 0;
+            for (int i = first; i < first + seeds; i++)
+            {
+                var sc = new Scenario { Id = "probe", Pitch = new PitchSpec { Length = 400f, Width = 200f }, Ball = new StartSpot { X = 150.5f, Z = 0f }, Attacker = new StartSpot { X = 150f, Z = 0f } };
+                var w = new World(tuning, sc, sheet, keeper, seed0 + (ulong)i);
+                w.Begin();
+                Console.WriteLine($"== {dtName} dribbling {ratings[0]} index {i}");
+                int idx = i;
+                ReplayTrace.TraceWorld(w, tuning, (int)(probe.Seconds * tuning.TickRate), (j, buf) => buf[0] = probe.Stick(j * tuning.Dt, idx), from, to, opts.ContainsKey("steps-only"), true);
+            }
+            return 0;
+        }
         if (opts.TryGetValue("save-replay", out var replayPath)) return SaveReplay(opts, replayPath, only, dataDir, tuning, baseSheet, keeper, attackerId, seed0);
 
         Console.WriteLine($"dribble probes: attacker={attackerId} (dribbling set per row) seeds={seeds} from {seed0}{(exact ? " errors=0" : "")}");
         var header = new[] { "probe", "dribbling", "kept_pct", "touches_s", "ahead_p10", "ahead_p50", "ahead_p90", "left", "right",
-            "max_steer", "miss_p50", "miss_max", "not_in_swing", "drops", "stretched", "turn_latency_s(p50/p90)", "align_s(p50/p90/miss)", "vmin_pct", "kinds" };
+            "max_steer", "miss_p50", "miss_max", "not_in_swing", "drops", "stretched", "clamped", "turn_miss(p50/p90/max)", "turn_latency_s(p50/p90)", "align_s(p50/p90/miss)", "vmin_pct", "steps", "skill_steps", "kinds" };
         var rows = new List<string[]>();
         var pooled = new List<string>();
         bool allKept = true;
@@ -135,7 +165,7 @@ static class DribbleProbe
                 var st = new Stats();
                 for (int i = 0; i < seeds; i++) RunOne(probe, tuning, sheet, keeper, seed0 + (ulong)i, i, st);
                 allKept &= st.Kept == st.Runs;
-                st.Ahead.Sort(); st.Miss.Sort(); st.Latency.Sort(); st.Align.Sort();
+                st.Ahead.Sort(); st.Miss.Sort(); st.TurnMiss.Sort(); st.Latency.Sort(); st.Align.Sort();
                 lat.AddRange(st.Latency); align.AddRange(st.Align); drops += st.Drops;
                 string F(float v) => v.ToString("F2", CultureInfo.InvariantCulture);
                 string P(List<float> l, double q) => l.Count == 0 ? "-" : F(l[Math.Min(l.Count - 1, (int)(q * l.Count))]);
@@ -145,10 +175,12 @@ static class DribbleProbe
                     (st.TouchesPerSecond / st.Runs).ToString("F2", CultureInfo.InvariantCulture),
                     P(st.Ahead, 0.1), P(st.Ahead, 0.5), P(st.Ahead, 0.9), st.Left.ToString(), st.Right.ToString(), F(st.MaxSteer),
                     P(st.Miss, 0.5), st.Miss.Count == 0 ? "-" : F(st.Miss[^1]), st.NotInSwing.ToString(),
-                    st.Drops.ToString(), st.Stretched.ToString(),
+                    st.Drops.ToString(), st.Stretched.ToString(), st.Clamped.ToString(),
+                    st.TurnMiss.Count == 0 ? "-" : $"{P(st.TurnMiss, 0.5)}/{P(st.TurnMiss, 0.9)}/{F(st.TurnMiss[^1])}",
                     st.Latency.Count == 0 ? "-" : $"{P(st.Latency, 0.5)}/{P(st.Latency, 0.9)}",
                     probe.Flick == null ? "-" : $"{P(st.Align, 0.5)}/{P(st.Align, 0.9)}/{st.AlignMissed}",
                     float.IsFinite(st.MinSpeedPct) ? st.MinSpeedPct.ToString("F0", CultureInfo.InvariantCulture) : "-",
+                    st.Steps.Steps.ToString(), st.Steps.SkillSteps.ToString(),
                     string.Join(" ", st.Kinds.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}:{kv.Value}")),
                 });
             }
@@ -233,7 +265,9 @@ static class DribbleProbe
             var stick = probe.Stick((i - 1) * t.Dt, index);
             buf[0] = stick;
             var waiting = p.TouchAction is { Pending: true } pw ? pw : null;
+            st.Steps.Before(p);
             w.Step(buf);
+            st.Steps.After(p, t.Dt, i > t.TickRate);
             // A touch that was waiting and ended on or after its contact tick without being made: dropped at contact.
             if (waiting != null && !waiting.Made && waiting.Phase == ActionPhase.Done && w.Tick >= waiting.ContactTick) st.Drops++;
             bool pushed = stick.Move.Length() >= t.Touch.StickThreshold;
@@ -276,7 +310,9 @@ static class DribbleProbe
                 if (act.Kind is not (ActionKind.First or ActionKind.Soft) && !act.IsSkill)
                 {
                     st.Miss.Add(act.ContactMiss);
-                    if (act.ContactMiss > t.Touch.ContactZoneRadius + 1e-4f) st.Stretched++;
+                    if ((bool)StretchedField.GetValue(act)!) st.Stretched++;
+                    if (act.Kind is ActionKind.Turn or ActionKind.Cut) st.TurnMiss.Add(act.ContactMiss);
+                    if ((bool)ClampedField.GetValue(act)!) st.Clamped++;
                     if (p.IsStepping && p.SwingFoot != act.Foot) st.NotInSwing++;
                 }
                 // The turn touch: a turn, a cut or a touch at the feet, or any touch that sends the ball along the stick.
@@ -304,8 +340,9 @@ static class DribbleProbe
 }
 
 /// <summary>
-/// Re-runs recorded play-test rounds (round-*.json) with the current code and counts, per round, the touches dropped at their
-/// contact (all, and with the stick pushed) and the slowdown plans made with the stick pushed. The rounds play out differently
+/// Re-runs recorded play-test rounds (round-*.json, a folder searched with its subfolders, so a folder of session folders gives
+/// every round in them) with the current code and counts, per round, the committed touches not played at their contact (all,
+/// and with the stick pushed), and the speed steps in possession (see <see cref="SpeedSteps"/>). The rounds play out differently
 /// from the recording as the simulation changes; the counts are what matters.
 /// </summary>
 static class SessionProbe
@@ -316,12 +353,14 @@ static class SessionProbe
     public static int Run(Dictionary<string, string> opts, string root, string dataDir, Tuning tuning)
     {
         string src = opts.TryGetValue("replays", out var r) ? r : DefaultDir(root);
-        var files = Directory.Exists(src) ? Directory.GetFiles(src, "round-*.json").OrderBy(f => f).ToArray()
+        var files = Directory.Exists(src) ? Directory.GetFiles(src, "round-*.json", SearchOption.AllDirectories).OrderBy(f => f).ToArray()
             : File.Exists(src) ? new[] { src } : Array.Empty<string>();
         if (files.Length == 0) { Console.WriteLine($"session probe: no round-*.json under {src}; skipped"); return 0; }
         Console.WriteLine($"session probe: {files.Length} rounds from {src}");
-        Console.WriteLine($"{"round",-34} {"ticks",6} {"drops",6} {"drops_pushed",13} {"slowdowns_pushed",17} {"slowdown_far_pushed",20}  outcome");
-        int totalPushedDrops = 0, totalSlow = 0;
+        Console.WriteLine("steps = possession ticks whose |d|v||/dt is over 15 m/s^2 (shots excluded, skill moves included; skill = those during a move), acc_max = largest |dv|/dt over the same ticks, m/s^2");
+        Console.WriteLine($"{"round",-50} {"ticks",6} {"unplayed",8} {"unplayed_pushed",15} {"poss_ticks",10} {"steps",6} {"skill",6} {"wall",5} {"acc_max",8}  outcome");
+        int totalDrops = 0, totalPushedDrops = 0;
+        var all = new SpeedSteps();
         foreach (var f in files)
         {
             var rp = Replay.Load(f, out var err);
@@ -331,50 +370,43 @@ static class SessionProbe
             var kee = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", rp.KeeperId + ".json")).Value;
             if (sc == null || att == null || kee == null) { Console.Error.WriteLine($"{f}: scenario or players not found"); return 1; }
             var c = Audit(rp, tuning, sc, att, kee);
-            totalPushedDrops += c.DropsPushed; totalSlow += c.SlowdownsPushed;
-            Console.WriteLine($"{Path.GetFileName(f),-34} {rp.TickCount,6} {c.Drops,6} {c.DropsPushed,13} {c.SlowdownsPushed,17} {c.SlowdownsFarPushed,20}  {c.Outcome}");
+            totalDrops += c.Drops; totalPushedDrops += c.DropsPushed;
+            all.Add(c.Steps);
+            string name = Path.GetFileName(Path.GetDirectoryName(f)) + "/" + Path.GetFileName(f);
+            Console.WriteLine($"{name,-50} {rp.TickCount,6} {c.Drops,8} {c.DropsPushed,15} {c.Steps.Ticks,10} {c.Steps.Steps,6} {c.Steps.SkillSteps,6} {c.Steps.Wall,5} {c.Steps.AccMax,8:F1}  {c.Outcome}");
         }
-        Console.WriteLine($"total: {totalPushedDrops} touches dropped at contact with the stick pushed, {totalSlow} slowdown plans with the stick pushed");
+        Console.WriteLine($"total: {totalDrops} committed touches not played ({totalPushedDrops} with the stick pushed), " +
+                          $"{all.Steps} speed steps in {all.Ticks} possession ticks ({all.PerThousand:F1} per 1000, skill {all.SkillSteps}; {all.Wall} more against the boards), acc_max {all.AccMax:F1} m/s^2");
         return 0;
     }
 
-    public readonly record struct Counts(int Drops, int DropsPushed, int SlowdownsPushed, int SlowdownsFarPushed, string Outcome);
+    public readonly record struct Counts(int Drops, int DropsPushed, SpeedSteps Steps, string Outcome);
 
-    /// <summary>
-    /// Plays a replay's recorded ticks and counts the drops at contact and the slowdown plans made with the stick pushed (far: the
-    /// contact more than 0.6 s off).
-    /// </summary>
+    /// <summary>Plays a replay's recorded ticks and counts the committed touches not played at their contact.</summary>
     public static Counts Audit(Replay rp, Tuning t, Scenario sc, PlayerSheet att, PlayerSheet kee)
     {
         var w = new World(t, sc, att, kee, rp.Seed);
         w.Begin();
         var buf = new TickIntent[w.PlayerCount];
         int per = Math.Max(1, rp.PlayersPerTick);
-        int drops = 0, dropsPushed = 0, slow = 0, slowFar = 0;
+        int drops = 0, dropsPushed = 0;
         var p = w.Attacker;
-        BallAction? seen = null;
+        var steps = new SpeedSteps();
         for (int tick = 0; tick < rp.TickCount && w.State != RoundState.Report; tick++)
         {
             Array.Clear(buf);
             for (int i = 0; i < w.PlayerCount && i < per; i++) buf[i] = rp.Intents[tick * per + i].ToIntent();
             var waiting = p.TouchAction is { Pending: true } pw ? pw : null;
+            steps.Before(p);
             w.Step(buf);
+            if (w.State == RoundState.Live) steps.After(p, t.Dt);
             bool pushed = buf[0].Move.Length() >= t.Touch.StickThreshold;
             if (waiting != null && !waiting.Made && waiting.Phase == ActionPhase.Done && w.Tick >= waiting.ContactTick)
             {
                 drops++;
                 if (pushed) dropsPushed++;
             }
-            if (p.TouchAction is { Pending: true } a && a != seen)
-            {
-                seen = a;
-                if (a.Kind == ActionKind.Slowdown && pushed)
-                {
-                    slow++;
-                    if ((a.ContactTick - w.Tick) * t.Dt > 0.6f) slowFar++;
-                }
-            }
         }
-        return new Counts(drops, dropsPushed, slow, slowFar, w.Report?.Outcome.Label() ?? w.State.ToString());
+        return new Counts(drops, dropsPushed, steps, w.Report?.Outcome.Label() ?? w.State.ToString());
     }
 }
