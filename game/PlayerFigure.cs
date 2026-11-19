@@ -371,6 +371,12 @@ public partial class PlayerFigure : Node3D
         public int ContactId = int.MinValue, ContactTick;
         /// <summary>The surface the windup is drawn with: the one the touch had when its windup began (the core may flip it for a tick or two before the contact).</summary>
         public int SurfId = int.MinValue; public BootSurface Surf;
+        /// <summary>
+        /// The windup's target last tick (relative to the body) and the jump being taken out: when the core moves a committed touch's
+        /// contact point (a re-predicted ball), the target's jump is kept as an offset that shrinks with the time left to the contact,
+        /// so the foot bends its path onto the new point and still meets it exactly at the contact tick.
+        /// </summary>
+        public int TgtId = int.MinValue; public Vector3 TgtRel, TgtStep, TgtOff; public float TgtTau0;
     }
 
     /// <summary>
@@ -1196,7 +1202,7 @@ public partial class PlayerFigure : Node3D
                 float dv = _jN >= 2 ? Math.Max(((ank[i] - _jAnk[i, 0]) - (_jAnk[i, 0] - _jAnk[i, 1])).Length(), ((toe - _jToe[i, 0]) - (_jToe[i, 0] - _jToe[i, 1])).Length()) / dt : float.NaN;
                 float limit = _atkAnim != null ? 0.10f + 1.2f * new Vector2(f.Velocity.X, f.Velocity.Z).Length() * dt : 0.10f;
                 Stats.AddJump(c, i, m, m60, limit, dv);
-                if (MocapLogOn && m > 0.09f) GD.Print($"MOCAP_JUMP tick={Stats.Tick} foot={i} ctx={c} m={m:F3} ank={(ank[i] - _jAnk[i, 0]).Length():F3} toe={(toe - _jToe[i, 0]).Length():F3} tw={tw[i]:F2} w={_mW:F2}");
+                if (MocapLogOn && (m > 0.09f || dv > 6f)) GD.Print($"MOCAP_JUMP tick={Stats.Tick} foot={i} ctx={c} m={m:F3} dv={dv:F2} ank={(ank[i] - _jAnk[i, 0]).Length():F3} toe={(toe - _jToe[i, 0]).Length():F3} tw={tw[i]:F2} w={_mW:F2} act={(f.Action.Valid ? $"{f.Action.Phase}/{(f.Action.Right ? "R" : "L")}/{f.Action.Surface}/eta{f.Action.ContactEta:F3}/made{(f.Action.Made ? 1 : 0)}/id{f.Action.Id}/cp({f.Action.ContactPoint.X:F2},{f.Action.ContactPoint.Z:F2})/tf{_tf[i].Surf}{_tf[i].SurfId}" : "-")} prev={(f.PrevAction.Valid ? $"{f.PrevAction.Phase}/{(f.PrevAction.Right ? "R" : "L")}/eta{f.PrevAction.ContactEta:F3}" : "-")} up={(f.Upcoming.Valid ? "1" : "0")} next={f.NextTouchEta:F3}{(f.NextTouchRight ? "R" : "L")} pitch={_pitch[i]:F2} yaw={Mathf.Atan2(dir[i].Z, dir[i].X):F2}");
             }
             _jAnk[i, 1] = _jAnk[i, 0]; _jToe[i, 1] = _jToe[i, 0];
             _jAnk[i, 0] = ank[i]; _jToe[i, 0] = toe;
@@ -1310,6 +1316,7 @@ public partial class PlayerFigure : Node3D
                 if (tf.Id != a.Id) { tf.Id = a.Id; tf.Span = _hintPrev[i] ? Math.Max(tau, TouchLead) : Math.Max(tau, 0.04f); if (_hintPrev[i]) handover = (a.Id, tau); }
                 wgt = Smooth(1f - tau / tf.Span);
                 target = c0 - hv * tau - d * (0.12f * k * Smooth(tau / tf.Span));
+                target = WindupTargetJump(tf, a.Id, target, pelXZ, tau);
             }
             else
             {
@@ -1348,7 +1355,9 @@ public partial class PlayerFigure : Node3D
             Vector3 d = fm, fd = SurfaceDir(BootSurface.Inside, i, d), rv = new(-fd.Z, 0, fd.X);
             Vector3 off = Off(i, BootSurface.Inside);
             Vector3 c0 = centre - d * r - (fd * off.X + Vector3.Up * off.Y + rv * off.Z);
+            // (rising no faster than over HintRise: the core's forecast can jump inside TouchLead at once)
             float wgt = Smooth(1f - eta / TouchLead);
+            if (!_teleporting) wgt = Math.Min(wgt, _hintW[i] + f.Dt / HintRise);
             Vector3 target = c0 - hv * eta - d * (0.12f * k * Smooth(eta / TouchLead));
             float yaw = Mathf.LerpAngle(Mathf.Atan2(dirv.Z, dirv.X), Mathf.Atan2(fd.Z, fd.X), wgt);
             ank = ank.Lerp(target, wgt);
@@ -1375,9 +1384,34 @@ public partial class PlayerFigure : Node3D
             }
         }
         _ovAnk[i, 1] = _ovAnk[i, 0]; _ovAnk[i, 0] = ank; _ovYaw[i] = Mathf.Atan2(dirv.Z, dirv.X);
-        _hintPrev[i] = hint;
+        _hintPrev[i] = hint; _hintW[i] = hint ? best : 0f;
         return best;
     }
+
+    /// <summary>The windup target with a jump of it (more than <see cref="WindupJumpM"/> off its last step) spread over the time left to the contact.</summary>
+    Vector3 WindupTargetJump(TouchFoot tf, int id, Vector3 target, Vector3 pelXZ, float tau)
+    {
+        Vector3 rel = target - pelXZ;
+        if (tf.TgtId != id || _teleporting) { tf.TgtId = id; tf.TgtRel = rel; tf.TgtStep = Vector3.Zero; tf.TgtOff = Vector3.Zero; tf.TgtTau0 = tau; return target; }
+        Vector3 step = rel - tf.TgtRel;
+        if ((step - tf.TgtStep).Length() > WindupJumpM)
+        {
+            // the new point is taken up from where the target was going: the jump becomes an offset dying away by the contact
+            Vector3 jump = step - tf.TgtStep;
+            float left = tf.TgtOff.LengthSquared() > 0f ? Smooth(tau / Math.Max(tf.TgtTau0, 1e-3f)) : 0f;
+            tf.TgtOff = tf.TgtOff * left - jump;
+            tf.TgtTau0 = Math.Max(tau, 1e-3f);
+            step = tf.TgtStep;
+        }
+        tf.TgtStep = step; tf.TgtRel = rel;
+        if (tf.TgtOff.LengthSquared() <= 0f) return target;
+        return target + tf.TgtOff * Mathf.Clamp(tau / tf.TgtTau0, 0f, 1f);
+    }
+    /// <summary>A windup target's change of step (metres per tick) above which it counts as a jump.</summary>
+    const float WindupJumpM = 0.03f;
+
+    readonly float[] _hintW = new float[2];
+    const float HintRise = 0.08f;
 
     /// <summary>Per foot: last tick drew the early touch hint (see TouchOverlay).</summary>
     readonly bool[] _hintPrev = new bool[2];

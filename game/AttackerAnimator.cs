@@ -259,7 +259,7 @@ public partial class PlayerFigure
     const float MocapOverLean = 0.10f;
 
     static readonly bool Log = System.Environment.GetEnvironmentVariable("ATTACKER_ANIM_LOG") == "1";
-    bool MocapLogOn => Log && _atkAnim != null;
+    bool MocapLogOn => Log && !IsKeeper;
     /// <summary>The cycles' weight this tick (0 when not in mocap mode).</summary>
     public float MocapWeight => _mW;
 
