@@ -17,7 +17,9 @@ Move file (see moves/ball_roll.toml for a full example):
 * [events]: named events at normalised times 0..1 in time order (start, contact, release, end for a skill move). The time between
   two consecutive events is a span; each [[variant]] gives every span's length in seconds (spans = [...]) and a name suffix, so one
   file makes several timings of the same poses (the keys stay where they are inside their spans).
-* [ball]: radius, and on = ["contact", "release"]: the playing foot's sole is on the ball between those events (checked).
+* [ball]: radius; on = ["contact", "release"]: the playing foot's sole is on the ball between those events (checked), or a list
+  of [from, to, foot] spans for moves whose soles take turns (the spin); touch = { contact = "right", contact2 = "left" }: at
+  those events that foot's boot meets the ball (checked).
 * [[key]]: a pose at normalised time t. Every channel is interpolated on its own over the keys that set it, so a key sets only what
   matters at that moment. Channels:
     pelvis  pos = [x, y, z] (the point between the hip joints, ground frame), yaw, pitch, roll
@@ -47,7 +49,8 @@ Checks (after quantisation, as the game will see it); a clip that fails is not w
 * no leg asked to reach past its length;
 * no bone turning faster than 1,500 deg/s between two frames;
 * while the ball span says the sole is on the ball, the playing foot's sole point within 1 cm of the ball's surface;
-* no boot vertex (every third, carried by the foot or toe bone) more than 1 cm inside the ball at any frame.
+* no boot vertex (every third, carried by the foot or toe bone) more than 1 cm inside the ball at any frame;
+* at each [ball] touch event, that foot's boot within 1.5 cm of the ball's surface.
 """
 from __future__ import annotations
 
@@ -75,6 +78,7 @@ MAX_TURN_DEG_S = 1500.0
 MAX_SOLE_OFF = 0.01
 MAX_FOOT_UNDER = 0.01
 MAX_BOOT_IN = 0.01
+MAX_TOUCH_GAP = 0.015
 STRETCH_TOL = 1e-4
 BONES = rt.BONES
 SIDES = ("l", "r")
@@ -310,12 +314,26 @@ def _flip_vec(v):
     return [-v[0], v[1], v[2]]
 
 
+def on_spans(m: dict) -> list[tuple[str, str, str]]:
+    """[ball] on: the spans a sole is on the ball, as (from event, to event, foot): on = ["contact", "release"] (the move's foot)
+    or on = [["contact", "lift", "right"], ["contact2", "release", "left"]]."""
+    on = m.get("ball", {}).get("on", [])
+    if on and isinstance(on[0], str):
+        return [(on[0], on[1], m["foot"])]
+    return [(a, b, f) for a, b, f in on]
+
+
 def mirror_move(m: dict) -> dict:
     """The same move on the other side: left and right channels swapped, x negated, every yaw and roll negated."""
     out = json.loads(json.dumps(m))
     other = {"left": "right", "right": "left"}
     out["side"] = other.get(m["side"], m["side"])
     out["foot"] = other[m["foot"]]
+    bl = out.get("ball", {})
+    if bl.get("on") and not isinstance(bl["on"][0], str):
+        bl["on"] = [[a, b, other[f]] for a, b, f in bl["on"]]
+    if "touch" in bl:
+        bl["touch"] = {e: other[f] for e, f in bl["touch"].items()}
     keys = []
     for k in out["key"]:
         nk = {}
@@ -598,15 +616,16 @@ def check(c: Clip, rig: Rig, stretch: list) -> None:
         p.append(f"bone turning {turn:.0f} deg/s ({turn_at})")
     sole_err = 0.0
     bl = c.move.get("ball", {})
-    if "on" in bl:
-        s = SIDES.index(c.move["foot"][0])
-        a, b = (c.events[e] for e in bl["on"])
+    for a_ev, b_ev, foot in on_spans(c.move):
+        s = SIDES.index(foot[0])
+        a, b = c.events[a_ev], c.events[b_ev]
         sp = sole_points(rig, gr, gt, s)
         r = float(bl.get("radius", 0.11))
         err = np.abs(np.linalg.norm(sp[a:b + 1] - c.ball[a:b + 1], axis=1) - r)
-        sole_err = float(err.max())
-        if sole_err > MAX_SOLE_OFF:
-            p.append(f"sole {sole_err * 100:.1f} cm off the ball at frame {a + int(err.argmax())}")
+        if float(err.max()) > sole_err:
+            sole_err = float(err.max())
+        if float(err.max()) > MAX_SOLE_OFF:
+            p.append(f"{foot} sole {float(err.max()) * 100:.1f} cm off the ball at frame {a + int(err.argmax())}")
     # the boots never pass through the ball (more than MAX_BOOT_IN inside its sphere), on the ball or off it
     deep = 0.0; deep_at = ""
     if "ball" in c.move:
@@ -619,9 +638,22 @@ def check(c: Clip, rig: Rig, stretch: list) -> None:
                 deep = float(d.max()); deep_at = f"{'LR'[s]} boot@{int(d.max(axis=1).argmax())}"
         if deep > MAX_BOOT_IN:
             p.append(f"{deep_at.split('@')[0]} {deep * 100:.1f} cm inside the ball at frame {deep_at.split('@')[1]}")
+    # a touch event: the named foot's boot meets the ball's surface there (its nearest point within MAX_TOUCH_GAP outside it)
+    touches = {}
+    if "ball" in c.move:
+        r = float(c.move["ball"].get("radius", 0.11))
+        for ev, foot in c.move["ball"].get("touch", {}).items():
+            s = SIDES.index(foot[0]); f = c.events[ev]
+            bone, off = rig.boot[s]
+            pts = gt[f, bone] + np.einsum("kij,kj->ki", gr[f, bone], off)
+            gap = float((np.linalg.norm(pts - c.ball[f], axis=1) - r).min())
+            touches[ev] = round(gap, 4)
+            if gap > MAX_TOUCH_GAP:
+                p.append(f"{foot} boot {gap * 100:.1f} cm short of the ball at its {ev} (frame {f})")
     c.stats = {"frames": n, "seconds": round(n / FPS, 3), "lowest_joint_m": round(low, 3), "lowest_joint": BONES[at[1]],
                "max_bone_deg_per_s": round(turn), "max_turn_at": turn_at, "sole_off_ball_max_m": round(sole_err, 4),
-               "lowest_foot_m": round(float(h.min()), 3), "boot_in_ball_max_m": round(deep, 4), "boot_in_ball_at": deep_at}
+               "lowest_foot_m": round(float(h.min()), 3), "boot_in_ball_max_m": round(deep, 4), "boot_in_ball_at": deep_at,
+               "touch_gap_m": touches}
 
 
 # ---------------------------------------------------------------------------------------------------------------- output
@@ -636,7 +668,7 @@ def write(c: Clip, out: Path, names: list[str]) -> dict:
              "kind": m["move"], "loop": False, "events": c.events, "fps": FPS, "frame_count": c.stats["frames"],
              "seconds": c.stats["seconds"], "contacts": cs, "notes": m.get("notes", ""),
              "timing": {"spans": c.tl.spans, "event_seconds": {k: round(v, 4) for k, v in c.tl.events.items()}},
-             "ball": {"radius": float(m.get("ball", {}).get("radius", 0.11)), "on": list(m.get("ball", {}).get("on", [])),
+             "ball": {"radius": float(m.get("ball", {}).get("radius", 0.11)), "on": [list(x) for x in on_spans(m)], "touch": dict(m.get("ball", {}).get("touch", {})),
                       "track": [[round(float(x), 4) for x in b] for b in c.ball]},
              "finger_curl": [[round(float(x), 3) for x in cc] for cc in c.curl],
              "entry": m.get("entry", "stand"), "entry_speed": float(m.get("entry_speed", 0.0)),
