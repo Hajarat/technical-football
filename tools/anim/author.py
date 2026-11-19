@@ -11,8 +11,9 @@ y = 0 under the boots. Angles in the move files are degrees.
 
 Move file (see moves/ball_roll.toml for a full example):
 
-* name, move (the clip set is "skill:<move>"), side (the authored side, "left" or "right": the mirror is the other), foot (the
-  playing foot), notes, and optional [sim] numbers the move was authored to (copied into clips.json).
+* name, move (the clip set is "skill:<move>"), side (the authored side, "left" or "right": the mirror is the other; "none" for a
+  move without a side, such as the drag-back, whose clips are then named by the foot), foot (the playing foot), entry ("stand" or
+  "run") and entry_speed (m/s), notes, and optional [sim] numbers the move was authored to (all copied into clips.json).
 * [events]: named events at normalised times 0..1 in time order (start, contact, release, end for a skill move). The time between
   two consecutive events is a span; each [[variant]] gives every span's length in seconds (spans = [...]) and a name suffix, so one
   file makes several timings of the same poses (the keys stay where they are inside their spans).
@@ -28,10 +29,11 @@ Move file (see moves/ball_roll.toml for a full example):
             knee = [x, y, z], the way the knee points, in the pelvis' heading
     hand_l / hand_r  pos in frame = "shoulder" (from the shoulder joint) or "chest" (from the top of the spine), both turned with the
             chest; elbow = the way the elbow points (chest axes); or, instead of pos, angles: swing (forward), abduct (outward),
-            bend (elbow); curl (finger curl 0..1: the clip has no finger bones, so it is written to clips.json for the runtime)
+            bend (elbow; the forearm bends forward, or with trail = 90 downward and 180 back); curl (finger curl 0..1: the clip has no finger bones, so it is written to clips.json for the runtime)
     ball    pos = [x, y, z] (the ball's centre, ground frame)
   Angles: yaw turns toward his left, pitch tips forward (a foot's pitch lifts the toes), roll tips the top toward his left.
-  ease (0..1) on the key, or inside a channel's table for that channel: 0 passes through the key smoothly, 1 comes to rest on it.
+  ease (0..1) on the key, or inside a channel's table for that channel: 0 passes through the key smoothly, 1 comes to rest on it;
+  a position's ease may be one per axis (ease = [1, 1, 0]: a ball that stops across the body but keeps rolling along the run).
   Between keys the curve is a monotone cubic (it never overshoots a key), its slope at a key scaled by 1 - ease.
 
 Solve, per frame: pelvis and spine rotations; each leg by two-bone IK from its hip joint to the ankle that puts the sole point where
@@ -44,7 +46,8 @@ Checks (after quantisation, as the game will see it); a clip that fails is not w
 * no bone joint under the ground, and no foot point (ankle, toe joint, toe tip) more than 1 cm into it;
 * no leg asked to reach past its length;
 * no bone turning faster than 1,500 deg/s between two frames;
-* while the ball span says the sole is on the ball, the playing foot's sole point within 1 cm of the ball's surface.
+* while the ball span says the sole is on the ball, the playing foot's sole point within 1 cm of the ball's surface;
+* no boot vertex (every third, carried by the foot or toe bone) more than 1 cm inside the ball at any frame.
 """
 from __future__ import annotations
 
@@ -71,6 +74,7 @@ FPS = 60
 MAX_TURN_DEG_S = 1500.0
 MAX_SOLE_OFF = 0.01
 MAX_FOOT_UNDER = 0.01
+MAX_BOOT_IN = 0.01
 STRETCH_TOL = 1e-4
 BONES = rt.BONES
 SIDES = ("l", "r")
@@ -157,7 +161,7 @@ def hinge_rest(root: np.ndarray, mid: np.ndarray, end: np.ndarray, fallback: np.
 class Key:
     t: float           # seconds
     v: object          # a value, or (frame, value) for framed channels
-    ease: float
+    ease: object       # 0..1, or one per component (a ball path eased across but not along)
 
 
 def slopes(ts: np.ndarray, vs: np.ndarray, ease: np.ndarray) -> np.ndarray:
@@ -175,7 +179,7 @@ def slopes(ts: np.ndarray, vs: np.ndarray, ease: np.ndarray) -> np.ndarray:
         lim = 3 * np.minimum(np.abs(d[i - 1]), np.abs(d[i]))
         m[i] = np.where(same, np.clip(w, -lim, lim), 0.0)
     # end keys: never steeper than three times the first or last chord (no overshoot)
-    return m * (1 - ease)[:, None]
+    return m * (1 - ease)
 
 
 def hermite(ts: np.ndarray, vs: np.ndarray, ms: np.ndarray, t: float) -> np.ndarray:
@@ -195,7 +199,7 @@ def interp(keys: list[Key], t: float, resolve=None) -> np.ndarray:
     ball as it is at t), so a channel can pass between frames smoothly."""
     ts = np.array([k.t for k in keys])
     vs = np.array([np.atleast_1d(resolve(k.v, t) if resolve else k.v).astype(float) for k in keys])
-    ease = np.array([k.ease for k in keys])
+    ease = np.array([np.broadcast_to(np.asarray(k.ease, float), vs.shape[1:]) for k in keys])
     return hermite(ts, vs, slopes(ts, vs, ease), t)
 
 
@@ -211,14 +215,15 @@ class Rig:
     rest_mid: np.ndarray     # mid hip joints at rest
     foot_rest_h: np.ndarray  # ankle, toe joint, toe tip heights above the ground at rest
     knee_rest: np.ndarray    # (2,3) the way each rest knee points (off the hip-ankle line; about forward)
+    boot: list = field(default_factory=list)       # per foot: (bone index per vertex, offset in that bone's axes)
 
     def idx(self, b: str) -> int:
         return BONES.index(b)
 
 
-def boot_sole_points(path: Path, rest_t: np.ndarray, lift: float) -> np.ndarray:
-    """Per foot (left, right) the sole point SkinnedBody.BuildSurfaces picks: the lowest boot vertex that is central across the foot
-    and between 40 and 70 % of its length."""
+def boot_vertices(path: Path, rest_t: np.ndarray, lift: float) -> tuple[np.ndarray, list[np.ndarray]]:
+    """Per foot (left, right) the sole point SkinnedBody.BuildSurfaces picks (the lowest boot vertex that is central across the
+    foot and between 40 and 70 % of its length), and the foot's boot vertices at rest (ground at 0)."""
     j, binchunk = rt.read_glb(path)
     verts = []
     for m in j["meshes"]:
@@ -238,6 +243,7 @@ def boot_sole_points(path: Path, rest_t: np.ndarray, lift: float) -> np.ndarray:
     feet = [rest_t[BONES.index("LeftFoot")], rest_t[BONES.index("RightFoot")]]
     left = np.abs(v[:, 0] - feet[0][0]) <= np.abs(v[:, 0] - feet[1][0])
     out = np.zeros((2, 3))
+    boots = [v[left], v[~left]]
     for i, sel in enumerate((left, ~left)):
         p = v[sel]
         outward = 1.0 if i == 0 else -1.0
@@ -248,14 +254,14 @@ def boot_sole_points(path: Path, rest_t: np.ndarray, lift: float) -> np.ndarray:
         central = np.abs(l - lmid) < 0.25 * half
         c = p[mid & central]
         out[i] = c[np.argmin(c[:, 1])]
-    return out
+    return out, boots
 
 
 def load_rig(path: Path = GLB) -> Rig:
     t = rt.load_target(path)
     lift = -t.sole_y
     rest_t = t.rest_glob_t + np.array([0, lift, 0])
-    sole = boot_sole_points(path, t.rest_glob_t, lift)
+    sole, boots = boot_vertices(path, t.rest_glob_t, lift)
     k = BONES.index
     leg = (float(np.linalg.norm(rest_t[k("LeftLeg")] - rest_t[k("LeftUpLeg")])), float(np.linalg.norm(rest_t[k("LeftFoot")] - rest_t[k("LeftLeg")])))
     arm = (float(np.linalg.norm(rest_t[k("LeftForeArm")] - rest_t[k("LeftArm")])), float(np.linalg.norm(rest_t[k("LeftHand")] - rest_t[k("LeftForeArm")])))
@@ -266,7 +272,14 @@ def load_rig(path: Path = GLB) -> Rig:
         u = (a - h) / np.linalg.norm(a - h)
         w = kn - h - np.dot(kn - h, u) * u
         knee.append(w / np.linalg.norm(w))
-    return Rig(t, rest_t, sole, leg, arm, mid, rt.foot_rest_heights(t), np.array(knee))
+    boot = []
+    for s, S in enumerate(("Left", "Right")):
+        ft, toe = k(S + "Foot"), k(S + "ToeBase")
+        vv = boots[s][::3]
+        bone = np.where(vv[:, 2] > rest_t[toe][2], toe, ft)
+        off = np.array([t.rest_glob_r[b].T @ (p - rest_t[b]) for b, p in zip(bone, vv)])
+        boot.append((bone, off))
+    return Rig(t, rest_t, sole, leg, arm, mid, rt.foot_rest_heights(t), np.array(knee), boot)
 
 
 # ---------------------------------------------------------------------------------------------------------------- move files
@@ -301,7 +314,7 @@ def mirror_move(m: dict) -> dict:
     """The same move on the other side: left and right channels swapped, x negated, every yaw and roll negated."""
     out = json.loads(json.dumps(m))
     other = {"left": "right", "right": "left"}
-    out["side"] = other[m["side"]]
+    out["side"] = other.get(m["side"], m["side"])
     out["foot"] = other[m["foot"]]
     keys = []
     for k in out["key"]:
@@ -372,19 +385,19 @@ def channels(m: dict, tl: Timeline, rig: Rig) -> dict[str, list[Key]]:
             if g not in k:
                 continue
             val = k[g]
-            ease = float(val.get("ease", k.get("ease", 0.0)))
+            ease = np.array(val.get("ease", k.get("ease", 0.0)), float)
             if g.startswith("foot") and "pos" in val:
                 ch.setdefault(g + ".pos", []).append(Key(t, (val.get("frame", "ground"), np.array(val["pos"], float)), ease))
             elif g.startswith("hand") and ("pos" in val or "swing" in val):
                 if "pos" in val:
                     v = (val.get("frame", "shoulder"), np.array(val["pos"], float))
                 else:
-                    v = ("angles", np.array([val.get("swing", 0.0), val.get("abduct", 0.0), val.get("bend", 0.0)], float))
+                    v = ("angles", np.array([val.get("swing", 0.0), val.get("abduct", 0.0), val.get("bend", 0.0), val.get("trail", 0.0)], float))
                 ch.setdefault(g + ".pos", []).append(Key(t, v, ease))
             elif "pos" in val:
                 ch.setdefault(g + ".pos", []).append(Key(t, np.array(val["pos"], float), ease))
             for c, v in val.items():
-                if c in ("pos", "frame", "ease", "swing", "abduct", "bend"):
+                if c in ("pos", "frame", "ease", "swing", "abduct", "bend", "trail"):
                     continue
                 ch.setdefault(f"{g}.{c}", []).append(Key(t, np.array(v, float), ease))
     neutral = defaults(rig)
@@ -507,9 +520,11 @@ def solve(m: dict, variant: dict, rig: Rig) -> Clip:
                 if fr == "chest":
                     return Rchest @ v + chest_pt - shoulder
                 if fr == "angles":
-                    sw, ab, bend = v
+                    sw, ab, bend, trail = v
                     d = rx(-sw) @ rz(sign * ab) @ np.array([0, -1.0, 0])
-                    f = np.array([0, 0, 1.0]) - d[2] * d
+                    tr = math.radians(trail)
+                    f = np.array([0, -math.sin(tr), math.cos(tr)])
+                    f = f - np.dot(f, d) * d
                     f = f / np.linalg.norm(f) if np.linalg.norm(f) > 1e-6 else np.array([0, 1.0, 0])
                     c, sn = math.cos(math.radians(bend)), math.sin(math.radians(bend))
                     return Rchest @ (d * rig.arm[0] + (c * d + sn * f) * rig.arm[1])
@@ -537,7 +552,7 @@ def solve(m: dict, variant: dict, rig: Rig) -> Clip:
     qd = np.stack([rt.decode_quats(rt.encode_quats(q[:, b])) for b in range(22)], axis=1)
     events = {nm: int(round(s * FPS)) for nm, s in tl.events.items()}
     suffix = variant.get("suffix", "")
-    clip = Clip(f"{m['name']}_{m['side']}{suffix}", m, tl, hips, qd, np.zeros((n, 2), bool), events, ball, curl)
+    clip = Clip(f"{m['name']}_{m['side'] if m['side'] != 'none' else m['foot']}{suffix}", m, tl, hips, qd, np.zeros((n, 2), bool), events, ball, curl)
     check(clip, rig, stretch)
     return clip
 
@@ -592,9 +607,21 @@ def check(c: Clip, rig: Rig, stretch: list) -> None:
         sole_err = float(err.max())
         if sole_err > MAX_SOLE_OFF:
             p.append(f"sole {sole_err * 100:.1f} cm off the ball at frame {a + int(err.argmax())}")
+    # the boots never pass through the ball (more than MAX_BOOT_IN inside its sphere), on the ball or off it
+    deep = 0.0; deep_at = ""
+    if "ball" in c.move:
+        r = float(c.move["ball"].get("radius", 0.11))
+        for s in range(2):
+            bone, off = rig.boot[s]
+            pts = gt[:, bone] + np.einsum("nkij,kj->nki", gr[:, bone], off)
+            d = r - np.linalg.norm(pts - c.ball[:, None, :], axis=2)
+            if d.max() > deep:
+                deep = float(d.max()); deep_at = f"{'LR'[s]} boot@{int(d.max(axis=1).argmax())}"
+        if deep > MAX_BOOT_IN:
+            p.append(f"{deep_at.split('@')[0]} {deep * 100:.1f} cm inside the ball at frame {deep_at.split('@')[1]}")
     c.stats = {"frames": n, "seconds": round(n / FPS, 3), "lowest_joint_m": round(low, 3), "lowest_joint": BONES[at[1]],
                "max_bone_deg_per_s": round(turn), "max_turn_at": turn_at, "sole_off_ball_max_m": round(sole_err, 4),
-               "lowest_foot_m": round(float(h.min()), 3)}
+               "lowest_foot_m": round(float(h.min()), 3), "boot_in_ball_max_m": round(deep, 4), "boot_in_ball_at": deep_at}
 
 
 # ---------------------------------------------------------------------------------------------------------------- output
@@ -612,6 +639,7 @@ def write(c: Clip, out: Path, names: list[str]) -> dict:
              "ball": {"radius": float(m.get("ball", {}).get("radius", 0.11)), "on": list(m.get("ball", {}).get("on", [])),
                       "track": [[round(float(x), 4) for x in b] for b in c.ball]},
              "finger_curl": [[round(float(x), 3) for x in cc] for cc in c.curl],
+             "entry": m.get("entry", "stand"), "entry_speed": float(m.get("entry_speed", 0.0)),
              "sim": m.get("sim", {}),
              "checks": {k: v for k, v in c.stats.items() if k not in ("frames", "seconds")}}
     return entry
@@ -649,14 +677,14 @@ def main(argv: list[str]) -> int:
     t = rig.t
     skeleton = {"parents": t.parent, "offsets": [[round(float(v), 6) for v in o] for o in t.rest_local_t],
                 "rest": [[round(float(v), 6) for v in q] for q in rt.mats_to_quats(t.rest_local_r)]}
+    if failed:
+        print(f"{len(failed)} clip(s) refused: {', '.join(failed)}; clips.json left as it was")
+        return 1
     (args.out / "clips.json").write_text(json.dumps({"fps": FPS, "bones": names, "skeleton": skeleton, "clips": index}, indent=1) + "\n")
     keep = {e["file"] for e in index}
     for old in args.out.glob("*.kclip"):
-        if old.name not in keep and not failed:
+        if old.name not in keep:
             old.unlink()
-    if failed:
-        print(f"{len(failed)} clip(s) refused: {', '.join(failed)}")
-        return 1
     return 0
 
 

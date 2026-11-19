@@ -140,19 +140,40 @@ def test_checks_refuse_a_sole_off_the_ball(rig):
     assert not A.solve(m, {"spans": [0.2]}, rig).problems
 
 
+def test_checks_refuse_a_boot_through_the_ball(rig):
+    # the right boot standing where the ball is
+    m = still(rig, ball={"pos": [list(rig.sole[1])[0], 0.11, list(rig.sole[1])[2]]})
+    m["ball"] = {"radius": 0.11}
+    c = A.solve(m, {"spans": [0.2]}, rig)
+    assert any("inside the ball" in p for p in c.problems)
+
+
+def test_per_axis_ease():
+    keys = [A.Key(0.0, np.array([0.0, 0.0]), np.array([1.0, 0.0])), A.Key(1.0, np.array([1.0, 1.0]), np.array([1.0, 0.0])),
+            A.Key(2.0, np.array([1.0, 2.0]), np.array([1.0, 0.0]))]
+    v = A.interp(keys, 0.25)
+    assert v[0] == pytest.approx(0.25 * 0.25 * (3 - 0.5)) and v[1] == pytest.approx(0.25)
+
+
 def test_ball_roll_passes_its_checks_and_keeps_the_sole_on_the_ball(rig, tmp_path):
     m = A.load_move(A.MOVES / "ball_roll.toml")
-    clips = A.build([m], rig)
-    assert [c.name for c in clips] == ["ball_roll_left", "ball_roll_left_slow", "ball_roll_right", "ball_roll_right_slow"]
+    run = A.load_move(A.MOVES / "ball_roll_run.toml")
+    clips = A.build([m, run], rig)
+    assert [c.name for c in clips] == ["ball_roll_left", "ball_roll_right", "ball_roll_left_run", "ball_roll_right_run"]
+    assert clips[0].events == clips[2].events                       # the runtime blends standing and running by entry speed
     for c in clips:
         assert not c.problems, (c.name, c.problems)
         assert list(c.events) == ["start", "contact", "release", "end"]
         assert c.stats["sole_off_ball_max_m"] <= A.MAX_SOLE_OFF
         # the ball moves only while the sole is on it, the simulation's 0.6 m from standing
-        assert np.allclose(c.ball[: c.events["contact"] + 1], c.ball[0])
-        assert abs(c.ball[c.events["release"], 0] - c.ball[0, 0]) == pytest.approx(0.6, abs=1e-6)
+        assert np.allclose(c.ball[: c.events["contact"] + 1, 0], c.ball[0, 0])
+        lateral = abs(c.ball[c.events["release"], 0] - c.ball[0, 0])
+        assert lateral == pytest.approx(0.75 if c.name.endswith("_run") else 0.6, abs=1e-3)   # events fall on the nearest 60 Hz frame
+    # the running ball rolls on along the run at 1.5 m/s throughout
+    z = clips[2].ball[:, 2]
+    assert np.allclose(np.diff(z) * A.FPS, 1.5, atol=1e-6)
     real = clips[0]
-    assert real.tl.events["contact"] == pytest.approx(0.1) and real.tl.events["release"] - real.tl.events["contact"] == pytest.approx(0.3)
+    assert real.tl.events["contact"] == pytest.approx(0.12) and real.tl.events["release"] - real.tl.events["contact"] == pytest.approx(0.4)
     # the written clip reads back as solved
     names = [n.replace(":", "_") for n in rig.t.names]
     entry = A.write(real, tmp_path, names)

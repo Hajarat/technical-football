@@ -1,6 +1,6 @@
-# Ball roll: the sole of the right foot rolls the ball across the body to the player's left; author.py writes this side as
-# ball_roll_left and mirrors it into ball_roll_right. Entered from standing (or a slow close-control dribble), exits into a run
-# to the left-forward.
+# Ball roll from standing: the sole of the right foot rolls the ball across the body to the player's left; author.py writes this
+# side as ball_roll_left and mirrors it into ball_roll_right. Exits into a run to the left-forward. ball_roll_run.toml is the same
+# move entered at 1.5 m/s, with the same events at the same normalised times and comparable poses (the runtime blends the two).
 #
 # Units: metres on the 1.80 m model, degrees. Model space: he faces +Z, his left is +X, the ground is y = 0 under the start.
 # Frames for a foot's pos: "ground" (the start's ground), "pelvis", "ball" (from the ball's centre, moving with it).
@@ -12,14 +12,16 @@ name = "ball_roll"
 move = "ball_roll"
 side = "left"           # the ball goes to his left
 foot = "right"          # with the sole of his right foot
-notes = "hand-authored ball roll: sole of the right foot rolls the ball to his left, support-foot hop, exit to the left-forward"
+entry = "stand"
+entry_speed = 0.0
+notes = "ball roll from standing: right sole rolls the ball 0.6 m to his left, support-foot hop, exit to the left-forward"
 
-# What the simulation does (src/FootballSim.Core/SkillMoves.cs, data/tuning/default.json "skill"), authored to here for a player
-# starting from standing; copied into clips.json.
+# What the simulation does (src/FootballSim.Core/SkillMoves.cs, data/tuning/default.json "skill"), with the timing decided for it
+# (0.12 s reach, 0.40 s roll); copied into clips.json.
 [sim]
-reach_max_s = 0.1                 # sole_reach_max: the sole lands at most 0.1 s after the move starts (ContactTick - StartTick)
-roll_s = 0.3                      # ball_roll_first_seconds (0.2 when chained): ContactTick to EndTick
-ball_lateral_m = 0.6              # ball_roll_distance at entry 0 m/s (1.0 m at 4 m/s), eased in and out across the body
+reach_s = 0.12                    # sole_reach_max (to be 0.12; today 0.1): ContactTick - StartTick at most
+roll_s = 0.40                     # ball_roll_first_seconds (to be 0.40, 0.27 chained; today 0.3 / 0.2): ContactTick to EndTick
+ball_lateral_m = 0.6              # ball_roll_distance at entry 0 m/s (1.0 m at 4 m/s), smoothstep across the body
 ball_forward_m = 0.0              # entry speed x roll time along the run (0 from standing)
 player_lateral_m = 0.3            # ball_roll_follow 0.5 x the ball's lateral distance, at a constant sideways speed
 ball_start = [-0.09, 0.11, 0.25]  # contact point: 0.25 m ahead (contact_zone_ahead at rest), 0.09 m to the foot's side
@@ -31,13 +33,9 @@ contact = 0.2                     # the sole lands on the ball
 release = 0.7                     # the sole leaves it (the simulation's EndTick)
 end = 1.0                         # settled into the first running step
 
-[[variant]]                       # the simulation's timing: reach 0.1 s, roll 0.3 s, settle 0.25 s
+[[variant]]
 suffix = ""
-spans = [0.1, 0.3, 0.25]
-
-[[variant]]                       # the timing that reads best in the audition: reach 0.15 s, roll 0.45 s, settle 0.25 s
-suffix = "_slow"
-spans = [0.15, 0.45, 0.25]
+spans = [0.12, 0.40, 0.25]
 
 [ball]
 radius = 0.11
@@ -60,9 +58,9 @@ ball = { pos = [-0.09, 0.11, 0.25] }
 # ------------------------------------------------------------------------------------------------ reach
 [[key]]
 t = 0.11
-label = "reach: weight onto the left leg, right knee up, foot over the ball"
+label = "reach: weight onto the left leg, right knee up and open, foot rising over the ball"
 pelvis = { pos = [0.04, 0.9, 0.01], yaw = 1, pitch = 12, roll = -2 }
-foot_r = { pos = [-0.10, 0.20, 0.14], yaw = -4, pitch = 12, knee = [0, 0.35, 1] }
+foot_r = { pos = [-0.12, 0.23, 0.10], yaw = -10, pitch = 14, knee = [-0.6, 0.3, 1] }
 
 [[key]]
 t = 0.2
@@ -71,9 +69,9 @@ pelvis = { pos = [0.07, 0.875, 0.02], yaw = 4, pitch = 14, roll = -3 }
 chest = { yaw = 10, pitch = 8, roll = -10 }
 head = { yaw = -6, pitch = 34 }
 foot_l = { pos = [0.14, 0.002, 0.10], yaw = 8, knee = [0.2, 0, 1], ease = 1 }
-foot_r = { pos = [0.01, 0.11, 0.0], frame = "ball", yaw = 0, pitch = 12, knee = [0.1, 0.3, 1], ease = 0.3 }
-hand_l = { swing = 15, abduct = 45, bend = 30 }
-hand_r = { swing = 18, abduct = 8, bend = 45 }
+foot_r = { pos = [0.01, 0.11, 0.0], frame = "ball", yaw = -4, pitch = 12, knee = [-0.35, 0.3, 1], ease = 0.3 }
+hand_l = { swing = 10, abduct = 48, bend = 32, trail = 100 }
+hand_r = { swing = 26, abduct = 20, bend = 40 }
 ball = { pos = [-0.09, 0.11, 0.25], ease = 1 }
 
 # ------------------------------------------------------------------------------------------------ roll
@@ -84,12 +82,13 @@ foot_l = { pos = [0.15, 0.002, 0.09], yaw = 9, ease = 1 }
 
 [[key]]
 t = 0.45
-label = "mid-roll: right leg sweeping across, hips turning, support foot hops left"
+label = "mid-roll: right leg sweeping across, hips turning, support foot hops left, chest leaning away"
 pelvis = { pos = [0.16, 0.865, 0.03], yaw = 14, pitch = 14, roll = -2 }
-chest = { yaw = 0, pitch = 8, roll = -8 }
+chest = { yaw = 0, pitch = 8, roll = -13 }
 head = { yaw = -2, pitch = 36 }
 foot_l = { pos = [0.31, 0.035, 0.05], yaw = 15, pitch = -6, knee = [0.25, 0, 1] }
-foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 10, pitch = 12, knee = [0.35, 0.3, 1] }
+foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 10, pitch = 12, knee = [0.2, 0.3, 1] }
+hand_l = { swing = 8, abduct = 52, bend = 30, trail = 110 }
 
 [[key]]
 t = 0.53
@@ -101,18 +100,18 @@ foot_l = { pos = [0.46, 0.002, 0.0], yaw = 20, pitch = 0, knee = [0.3, 0, 1], ea
 t = 0.7
 label = "release: the sole leaves the ball ahead of the left foot's instep"
 pelvis = { pos = [0.28, 0.87, 0.04], yaw = 25, pitch = 13, roll = 0 }
-chest = { yaw = -4, pitch = 7, roll = -4 }
+chest = { yaw = -4, pitch = 7, roll = -2 }
 head = { yaw = 0, pitch = 30 }
 foot_l = { pos = [0.46, 0.002, 0.0], yaw = 20, ease = 1 }
 foot_r = { pos = [-0.01, 0.11, 0.0], frame = "ball", yaw = 20, pitch = 10, knee = [0.4, 0.2, 1], ease = 0 }
-hand_l = { swing = 5, abduct = 50, bend = 35 }
-hand_r = { swing = 15, abduct = 10, bend = 55 }
+hand_l = { swing = 5, abduct = 45, bend = 35, trail = 90 }
+hand_r = { swing = 20, abduct = 18, bend = 50 }
 ball = { pos = [0.51, 0.11, 0.25], ease = 1 }
 
 [[key]]
 t = 0.77
 label = "foot up and back off the ball"
-foot_r = { pos = [0.47, 0.20, 0.12], yaw = 24, pitch = 4 }
+foot_r = { pos = [0.45, 0.25, 0.08], yaw = 24, pitch = 10 }
 
 [[key]]
 t = 0.86
