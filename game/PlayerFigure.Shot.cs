@@ -41,7 +41,7 @@ public partial class PlayerFigure
 
     // the plant: 0 undecided, 1 the stride's own stance foot, 2 a step to beside the ball; its foot, weight, ankle, direction, held flag,
     // the point it lands on, whether it has landed, and the release's progress (0..1)
-    int _plMode, _plFoot; float _plW, _plRel, _plDhLand, _plStartTau; bool _plStarted; Vector3 _plAnkle, _plDir = new(1, 0, 0), _plPoint; bool _plHeld, _plLanded;
+    int _plMode, _plFoot; float _plW, _plRel, _plDhLand, _plStartTau; bool _plStarted; Vector3 _plFrom; Vector3 _plAnkle, _plDir = new(1, 0, 0), _plPoint; bool _plHeld, _plLanded;
 
     /// <summary>The hip-to-ankle ground distance (share of a straight-ish leg's ground reach) at which a held plant foot is let go while the body runs on.</summary>
     const float PlantReleaseReach = 0.80f;
@@ -130,6 +130,9 @@ public partial class PlayerFigure
         int j = 1 - fi;
         bool stepping = f.HasGait && f.IsStepping;
         bool made = f.Shot.Made;
+        // the core moved the strike to the other foot (a touch played in the wind-up, a later swing): a plant step under way on the
+        // old plant foot fades out first, then the plant is decided again
+        if (_plW > 0f && _plFoot != j && !_plLanded) { PlantIdle(dt); if (_plW > 0f) return; _plMode = 0; }
         if (_plMode == 0)
         {
             if (!made && tauD > len) { PlantIdle(dt); return; }
@@ -164,11 +167,15 @@ public partial class PlayerFigure
                 bool down = stepping && (_atkAnim != null && _mW > 0.5f ? _mLock[j].Locked : _feet[j].Planted);
                 if (down && tauD > land + PlantMinStep) { _plW = 0f; _plHeld = false; _plAnkle = pt; return; }
                 _plStarted = true; _plStartTau = Math.Max(tauD, land + 0.05f);
+                _plFrom = _prevAnkWorld[j]; _plFrom.Y = Math.Max(_plFrom.Y, AnkleH);
             }
-            float wp = made ? 1f : Smooth((_plStartTau - tauD) / Math.Max(_plStartTau - land, 0.02f)) * _sqGate;
-            Vector3 a = pt + Vector3.Up * (0.08f * k * Mathf.Sin(Mathf.Pi * wp));
+            // a step of its own from where the foot left the ground to the plant point (taken over from the stride within 0.05 s, while
+            // the foot is in the air), so the foot is never dragged along the ground toward a point ahead
+            float u = made ? 1f : Mathf.Clamp((_plStartTau - tauD) / Math.Max(_plStartTau - land, 0.02f), 0f, 1f);
+            float wp = (made ? 1f : Smooth((_plStartTau - tauD) / 0.05f)) * _sqGate;
+            Vector3 a = _plFrom.Lerp(pt, Smooth(u)) + Vector3.Up * (0.10f * k * Mathf.Sin(Mathf.Pi * u));
             _plAnkle = a; _plW = wp; _plDir = fwd; _plHeld = false;
-            if (wp >= 0.999f && (made || tauD <= land + 0.5f * dt) && !_sqFading) { _plLanded = true; _plAnkle = _plPoint; _plHeld = true; }
+            if (u >= 0.999f && wp >= 0.999f && (made || tauD <= land + 0.5f * dt) && !_sqFading) { _plLanded = true; _plAnkle = _plPoint; _plHeld = true; }
             return;
         }
         // landed: held until the follow-through has carried the body on, or the leg would run out of reach
