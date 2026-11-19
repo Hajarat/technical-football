@@ -1,0 +1,145 @@
+# Elastico at 2 m/s, exit to his left (S = left: the RIGHT foot plays): after a 0.10 s reach the OUTSIDE of the right foot carries
+# the ball about 0.30 m to his right, the foot wraps round the back of the ball (toes a few cm off it) without losing it, and the INSIDE snaps it
+# back across toward the left so it runs on at 45 degrees off the run, ending 0.55 m to the left of where it started. The upper
+# body sells the first direction (hip and shoulder drop to the right), then drives off the left foot toward the exit. Not in the
+# simulation yet (the gesture is recognised and ignored): authored to the numbers it will be built to. elastico_left and its
+# mirror elastico_right (the standing version is elastico.toml, same events). Conventions as in ball_roll.toml.
+
+name = "elastico"
+move = "elastico"
+side = "left"
+foot = "right"
+entry = "run"
+entry_speed = 2.0
+notes = "elastico at 2 m/s: outside push 0.30 m away from the exit, the foot wraps round the ball, inside snaps it back 45 deg toward the exit"
+
+[sim]
+status = "not built: authored to the numbers it will be built to"
+reach_s = 0.10
+move_s = 0.40
+push_m = 0.30                     # the outside carries the ball this far away from S ...
+push_s = 0.16                     # ... over the first 0.16 s (authored 0.11, so the foot has 0.11 s to wrap round)
+contact2_s = 0.20                 # the inside snap, from the move's start (authored 0.22)
+end_offset_m = 0.55               # the ball ends this far to the S side of where it started, moving on at 45 deg off the run
+max_forward_mps = 2.0
+entry_speed = 2.0
+ball_start = [-0.08, 0.11, 0.32]
+ball_radius = 0.11
+
+[events]
+start = 0.0
+contact = 0.2                     # the outside meets the ball
+contact2 = 0.64                   # the inside snaps it back
+release = 0.72                    # the inside leaves it
+end = 1.0
+
+[[variant]]
+suffix = "_run"
+spans = [0.10, 0.22, 0.04, 0.14]
+
+[ball]
+radius = 0.11
+touch = { contact = "right", contact2 = "right", release = "right" }
+
+[[key]]
+t = 0.0
+ease = 0.0
+label = "start: running, the right foot down, the left swinging through"
+pelvis = { pos = [0.0, 0.925, 0.0], pitch = 13 }
+chest = { pitch = 6 }
+head = { pitch = 26 }
+foot_l = { pos = [0.13, 0.05, -0.12], yaw = 6, pitch = -25, toe = 25, knee = [0.15, 0, 1] }
+foot_r = { pos = [-0.13, 0.002, 0.16], yaw = -6, knee = [-0.15, 0, 1], ease = 1 }
+hand_l = { swing = 20, abduct = 14, bend = 70 }
+hand_r = { swing = -15, abduct = 14, bend = 70 }
+ball = { pos = [-0.08, 0.11, 0.32], ease = [1, 1, 0] }
+
+[[key]]
+t = 0.05
+label = "the right foot leaves its stance"
+foot_r = { pos = [-0.13, 0.03, 0.18], yaw = -6, pitch = -15, toe = 15 }
+
+[[key]]
+t = 0.1
+label = "the left foot swinging in to plant"
+foot_l = { pos = [0.14, 0.06, 0.38], yaw = 8, pitch = 5, toe = 0 }
+
+[[key]]
+t = 0.1
+label = "reach: the right foot crosses in front to the ball's left side"
+foot_r = { pos = [0.04, 0.05, 0.2], yaw = 0, pitch = 0, toe = 0, knee = [0.2, 0.2, 1] }
+
+[[key]]
+t = 0.2
+label = "contact: the outside of the right foot on the ball's left side; the sell begins (hip and shoulder drop away from the exit)"
+pelvis = { pos = [-0.01, 0.885, 0.24], yaw = -10, pitch = 11, roll = -5 }
+chest = { yaw = -8, pitch = 9, roll = -14 }
+head = { yaw = -14, pitch = 30, roll = -4 }
+foot_l = { pos = [0.15, 0.002, 0.45], yaw = 8, pitch = 0, toe = 0, knee = [0.2, 0, 1], ease = 1 }
+foot_r = { pos = [0.145, -0.09, 0.0], frame = "ball", yaw = 0, pitch = 0, knee = [0.2, 0.1, 1], ease = 0 }
+hand_l = { swing = 20, abduct = 15, bend = 50 }
+hand_r = { swing = -5, abduct = 45, bend = 35, trail = 100 }
+ball = { pos = [-0.08, 0.11, 0.52], ease = [1, 1, 0] }
+
+[[key]]
+t = 0.42
+label = "the outside has carried the ball 0.30 m away from the exit; the sell at its deepest"
+pelvis = { pos = [-0.08, 0.87, 0.49], yaw = -14, pitch = 12, roll = -7 }
+chest = { yaw = -10, pitch = 9, roll = -18 }
+head = { yaw = -16, pitch = 30, roll = -5 }
+foot_r = { pos = [0.145, -0.09, 0.0], frame = "ball", yaw = -12, pitch = 0, knee = [0.1, 0.1, 1] }
+ball = { pos = [-0.38, 0.11, 0.75], ease = [0, 1, 0] }
+
+[[key]]
+t = 0.51
+label = "the foot wraps round the back of the ball, its toes a few centimetres off it"
+foot_r = { pos = [0.05, -0.08, -0.23], frame = "ball", yaw = -22, pitch = 5, knee = [0, 0.2, 1] }
+
+[[key]]
+t = 0.58
+label = "and up its right side"
+foot_r = { pos = [-0.11, -0.08, -0.19], frame = "ball", yaw = -35, pitch = 3 }
+
+[[key]]
+t = 0.64
+label = "contact2: the inside snaps it back across toward the exit, the weight switching"
+pelvis = { pos = [-0.07, 0.87, 0.73], yaw = -2, pitch = 12, roll = 0 }
+chest = { yaw = -2, pitch = 9, roll = -4 }
+head = { yaw = 0, pitch = 30, roll = 0 }
+foot_r = { pos = [-0.115, -0.09, -0.115], frame = "ball", yaw = -40, pitch = 0, knee = [-0.2, 0.1, 1], ease = 0 }
+ball = { pos = [-0.4, 0.11, 0.98], ease = [1, 1, 0] }
+
+[[key]]
+t = 0.72
+label = "release: the ball away to the left-forward at 45 degrees, the support foot driving off"
+pelvis = { pos = [-0.01, 0.88, 0.85], yaw = 15, pitch = 13, roll = 5 }
+chest = { yaw = 8, pitch = 10, roll = 8 }
+head = { yaw = 12, pitch = 26 }
+foot_l = { pos = [0.15, 0.025, 0.45], yaw = 12, pitch = -15, toe = 20, ease = 1 }
+foot_r = { pos = [-0.115, -0.09, -0.115], frame = "ball", yaw = -35, pitch = 0, ease = 0 }
+hand_l = { swing = -10, abduct = 30, bend = 45 }
+hand_r = { swing = 25, abduct = 15, bend = 55 }
+ball = { pos = [-0.21, 0.11, 1.25], ease = 0 }
+
+[[key]]
+t = 0.78
+label = "the foot follows the ball off"
+foot_r = { pos = [-0.17, -0.06, -0.17], frame = "ball", yaw = -30, pitch = 0 }
+
+[[key]]
+t = 0.86
+label = "the right foot comes down crossed toward the exit"
+foot_r = { pos = [0.02, 0.06, 1.28], yaw = 10, pitch = 0, knee = [0.3, 0.1, 1] }
+
+[[key]]
+t = 1
+ease = 0.0
+label = "end: driving away to the left-forward after the ball"
+pelvis = { pos = [0.2, 0.9, 1.24], yaw = 35, pitch = 14, roll = 8 }
+chest = { yaw = 5, pitch = 9, roll = 4 }
+head = { yaw = 12, pitch = 15 }
+foot_l = { pos = [0.24, 0.09, 0.85], yaw = 25, pitch = 0, toe = 0, knee = [0.4, 0.2, 1] }
+foot_r = { pos = [0.1, 0.002, 1.5], yaw = 30, pitch = 0, knee = [0.4, 0, 1], ease = 1 }
+hand_l = { swing = -25, abduct = 15, bend = 80 }
+hand_r = { swing = 30, abduct = 10, bend = 80 }
+ball = { pos = [0.47, 0.11, 2.24], ease = 0 }

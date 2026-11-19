@@ -1,0 +1,115 @@
+# Fake shot, stop (shoot pressed, cancelled within 0.1 s with the stick at rest): from standing, a full shooting wind-up (the left
+# foot steps in beside the ball, the right leg drawn back, arms out, trunk over the ball), then the right leg comes through short,
+# the sole lands on the ball and stops it under the body, and he ends balanced over it. The simulation has no side for it: the
+# foot is the shooting foot, so the clips are named by the foot: fake_stop_right and its mirror fake_stop_left.
+# fake_stop_run.toml is the same at 3 m/s. Conventions as in ball_roll.toml.
+
+name = "fake_stop"
+move = "fake_stop"
+side = "none"
+foot = "right"
+entry = "stand"
+entry_speed = 0.0
+notes = "fake shot, stop: shooting wind-up, the leg comes through short, the sole stops the ball under him, balanced over it"
+
+[sim]
+fake_shot_window_s = 0.1          # the cancel must come within 0.1 s of the shoot press (the shot's own wind-up is 0.45 s)
+fake_s = 0.1                      # fake_seconds: the move, from the cancel, after a sole reach of up to 0.12 s
+stop_ahead_m = 0.25               # fake_stop_ahead: the ball comes to rest this far ahead of where he stops (his run dies over the move)
+surface = "sole"
+authored_s = [0.30, 0.15, 0.25]   # press->contact (wind-up, short swing), contact->release (sole stops the ball), release->end
+ball_start = [-0.04, 0.11, 0.42]
+
+[events]
+start = 0.0                       # shoot pressed
+contact = 0.5                     # the sole lands on the ball
+release = 0.65                    # the sole lets go, the ball at rest
+end = 1.0
+
+[[variant]]
+suffix = ""
+spans = [0.30, 0.15, 0.25]
+
+[ball]
+radius = 0.11
+on = ["contact", "release"]
+
+[[key]]
+t = 0.0
+ease = 1.0
+label = "start: ready stance, the ball a step ahead"
+pelvis = { pos = [0.0, 0.93, 0.0], pitch = 8 }
+chest = { pitch = 6 }
+head = { pitch = 25 }
+foot_l = { pos = [0.13, 0.002, 0.06], yaw = 6, knee = [0.15, 0, 1] }
+foot_r = { pos = [-0.13, 0.002, 0.06], yaw = -6, knee = [-0.15, 0, 1] }
+hand_l = { swing = 8, abduct = 14, bend = 40 }
+hand_r = { swing = 8, abduct = 14, bend = 40 }
+ball = { pos = [-0.04, 0.11, 0.42] }
+
+[[key]]
+t = 0.2
+label = "stepping in: the left foot striding to the ball, the right pushing"
+pelvis = { pos = [0.03, 0.91, 0.12], yaw = -6, pitch = 12, roll = 2 }
+chest = { yaw = 2, pitch = 12 }
+foot_l = { pos = [0.16, 0.08, 0.24], yaw = 6, pitch = 10, knee = [0.2, 0.1, 1] }
+foot_r = { pos = [-0.13, 0.002, 0.06], yaw = -6, pitch = -12, toe = 15, ease = 1 }
+hand_l = { swing = 20, abduct = 35, bend = 35 }
+hand_r = { swing = -15, abduct = 30, bend = 35 }
+
+[[key]]
+t = 0.36
+label = "top of the backswing: plant foot beside the ball, right leg drawn back, arms out, trunk over the ball"
+pelvis = { pos = [0.07, 0.875, 0.22], yaw = -15, pitch = 16, roll = 5 }
+chest = { yaw = 6, pitch = 16, roll = -2 }
+head = { yaw = -4, pitch = 38 }
+foot_l = { pos = [0.21, 0.002, 0.29], yaw = 6, pitch = 0, knee = [0.2, 0, 1], ease = 1 }
+foot_r = { pos = [-0.10, 0.36, -0.20], yaw = -10, pitch = -50, toe = 0, knee = [0, -0.6, 1] }
+hand_l = { swing = 30, abduct = 55, bend = 30, trail = 90 }
+hand_r = { swing = -30, abduct = 40, bend = 30, trail = 90 }
+
+[[key]]
+t = 0.44
+label = "the swing comes through short, toes up"
+pelvis = { yaw = -4 }
+foot_r = { pos = [-0.08, 0.21, 0.22], yaw = -6, pitch = 10, knee = [-0.1, 0.4, 1] }
+
+[[key]]
+t = 0.5
+label = "contact: the sole lands on top of the ball instead of striking it, the body braking back"
+pelvis = { pos = [0.05, 0.87, 0.24], yaw = -2, pitch = 10, roll = 2 }
+chest = { yaw = 2, pitch = 8, roll = 0 }
+head = { yaw = -2, pitch = 36 }
+foot_r = { pos = [0.0, 0.108, 0.02], frame = "ball", yaw = -6, pitch = 15, knee = [-0.2, 0.3, 1], ease = 0.3 }
+hand_l = { swing = 15, abduct = 40, bend = 35, trail = 90 }
+hand_r = { swing = 0, abduct = 30, bend = 40 }
+ball = { pos = [-0.04, 0.11, 0.42], ease = 1 }
+
+[[key]]
+t = 0.65
+label = "release: the ball held under him, the sole lets go"
+pelvis = { pos = [0.04, 0.875, 0.20], yaw = 0, pitch = 8, roll = 0 }
+foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = -6, pitch = 12, knee = [-0.25, 0.3, 1], ease = 0 }
+ball = { pos = [-0.04, 0.11, 0.36], ease = 1 }
+
+[[key]]
+t = 0.75
+label = "the right foot lifts off the ball"
+foot_r = { pos = [-0.07, 0.17, 0.0], frame = "ball", yaw = -8, pitch = 8 }
+
+[[key]]
+t = 0.86
+label = "and comes down to its right"
+foot_r = { pos = [-0.25, 0.06, 0.28], yaw = -10, pitch = 0, knee = [-0.2, 0, 1] }
+
+[[key]]
+t = 1.0
+label = "end: balanced over the ball, a foot either side"
+pelvis = { pos = [0.0, 0.90, 0.18], yaw = 0, pitch = 10, roll = 0 }
+chest = { yaw = 0, pitch = 8, roll = 0 }
+head = { yaw = 0, pitch = 30 }
+foot_l = { pos = [0.21, 0.002, 0.29], yaw = 8, pitch = 0, ease = 1 }
+foot_r = { pos = [-0.25, 0.002, 0.27], yaw = -10, pitch = 0, knee = [-0.2, 0, 1], ease = 1 }
+hand_l = { swing = 0, abduct = 20, bend = 45 }
+hand_r = { swing = 0, abduct = 20, bend = 45 }
+ball = { pos = [-0.04, 0.11, 0.36] }

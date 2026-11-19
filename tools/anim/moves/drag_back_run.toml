@@ -1,0 +1,137 @@
+# Drag-back braking from a 3 m/s jog: the left foot plants hard ahead, the right sole lands on the rolling ball and stops it,
+# the body's run dies over the first 40 % of the drag while it rocks back, the support foot hops back, the sole pulls the ball
+# to under him and he ends 0.3 m behind where the sole landed (the simulation's drag_back_step_back). Same events at the same
+# normalised times as drag_back.toml. Clips drag_back_right_run, drag_back_left_run.
+
+name = "drag_back"
+move = "drag_back"
+side = "none"
+foot = "right"
+entry = "run"
+entry_speed = 3.0
+notes = "drag-back braking from 3 m/s: hard plant, sole stops the ball and pulls it 0.65 m back under him, rock back, neutral exit"
+
+[sim]
+reach_s = 0.12
+drag_s = 0.25
+drag_distance_m = 1.0
+player_step_back_m = 0.3
+run_stop_share = 0.4              # DragBackStopShare: the run dies linearly over this share of the drag
+entry_speed = 3.0
+ball_start = [-0.09, 0.11, 0.33]  # 0.33 m ahead (contact_zone_ahead at 3 m/s), rolling at the player's pace until the sole lands
+authored_drag_s = 0.40
+authored_drag_distance_m = 0.65
+ball_radius = 0.11
+
+[events]
+start = 0.0
+contact = 0.2
+release = 0.75
+end = 1.0
+
+[[variant]]
+suffix = "_run"
+spans = [0.12, 0.40, 0.20]
+
+[ball]
+radius = 0.11
+on = ["contact", "release"]
+
+# Pelvis z (the simulation's path, the drag at 0.40 s): 0.36 at the contact (3 m/s for 0.12 s), the run dying over 0.16 s
+# against a constant 1.35 m/s step back: about 0.43 at its furthest, 0.33 at mid-drag, 0.06 at the release.
+
+[[key]]
+t = 0.0
+ease = 0.0
+label = "start: jogging, the left foot about to strike, the right toeing off behind"
+pelvis = { pos = [0.0, 0.92, 0.0], pitch = 13 }
+chest = { pitch = 6 }
+head = { yaw = -8, pitch = 22 }
+foot_l = { pos = [0.12, 0.03, 0.20], yaw = 6, pitch = 12, knee = [0.15, 0, 1] }
+foot_r = { pos = [-0.12, 0.04, -0.12], yaw = -6, pitch = -25, toe = 25, knee = [-0.1, 0, 1] }
+hand_l = { swing = -15, abduct = 14, bend = 70 }
+hand_r = { swing = 20, abduct = 14, bend = 70 }
+ball = { pos = [-0.09, 0.11, 0.33], ease = [1, 1, 0] }
+
+[[key]]
+t = 0.08
+label = "the left foot plants hard, ahead of the body"
+foot_l = { pos = [0.13, 0.002, 0.30], yaw = 8, pitch = 0, knee = [0.2, 0, 1], ease = 1 }
+
+[[key]]
+t = 0.11
+label = "reach: the right knee swings through high, the foot rising over the rolling ball"
+pelvis = { pos = [0.03, 0.90, 0.20], pitch = 12, roll = -2 }
+foot_r = { pos = [-0.12, 0.27, 0.45], yaw = -6, pitch = 14, toe = 0, knee = [-0.3, 0.3, 1] }
+
+[[key]]
+t = 0.2
+label = "contact: the sole stops the ball, the body braking over the planted left foot"
+pelvis = { pos = [0.05, 0.885, 0.36], yaw = -2, pitch = 9, roll = -2 }
+chest = { yaw = 0, pitch = 4 }
+head = { yaw = -6, pitch = 34 }
+foot_l = { pos = [0.13, 0.002, 0.30], yaw = 8, knee = [0.2, 0, 1], ease = 1 }
+foot_r = { pos = [0.0, 0.108, 0.02], frame = "ball", yaw = -6, pitch = 15, knee = [-0.25, 0.3, 1], ease = 0.3 }
+hand_l = { swing = 10, abduct = 30, bend = 35, trail = 90 }
+hand_r = { swing = 15, abduct = 25, bend = 40 }
+ball = { pos = [-0.09, 0.11, 0.69], ease = 1 }
+
+[[key]]
+t = 0.3
+label = "the run dies, the body at its furthest"
+pelvis = { pos = [0.05, 0.88, 0.43], yaw = -5, pitch = 4 }
+
+[[key]]
+t = 0.4
+label = "the support foot pushes off backward"
+foot_l = { pos = [0.13, 0.002, 0.30], yaw = 8, pitch = -8, toe = 12, ease = 1 }
+
+[[key]]
+t = 0.47
+label = "mid-drag: rocking back, the support foot hopping back, hips opening"
+pelvis = { pos = [0.05, 0.875, 0.30], yaw = -10, pitch = -1, roll = 0 }
+chest = { yaw = 4, pitch = -6, roll = 2 }
+head = { yaw = -4, pitch = 32 }
+foot_l = { pos = [0.15, 0.045, 0.18], yaw = 10, pitch = 0, toe = 0, knee = [0.2, 0.1, 1] }
+foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = -10, pitch = 12, knee = [-0.35, 0.2, 1] }
+hand_l = { swing = 0, abduct = 38, bend = 35, trail = 100 }
+hand_r = { swing = 5, abduct = 32, bend = 40, trail = 60 }
+
+[[key]]
+t = 0.6
+label = "support foot lands behind"
+foot_l = { pos = [0.16, 0.002, 0.10], yaw = 12, knee = [0.2, 0, 1], ease = 1 }
+
+[[key]]
+t = 0.75
+label = "release: the ball at rest under him, the sole lets go"
+pelvis = { pos = [0.04, 0.87, 0.06], yaw = -20, pitch = 6, roll = 0 }
+chest = { yaw = 8, pitch = 2, roll = 0 }
+head = { yaw = -4, pitch = 30 }
+foot_l = { pos = [0.16, 0.002, 0.10], yaw = 12, ease = 1 }
+foot_r = { pos = [0.0, 0.11, -0.01], frame = "ball", yaw = -18, pitch = 10, knee = [-0.4, 0.2, 1], ease = 0 }
+hand_l = { swing = -5, abduct = 35, bend = 40, trail = 90 }
+hand_r = { swing = 10, abduct = 30, bend = 45 }
+ball = { pos = [-0.09, 0.11, 0.04], ease = 1 }
+
+[[key]]
+t = 0.8
+label = "right foot lifts off the ball"
+foot_r = { pos = [-0.06, 0.17, 0.0], frame = "ball", yaw = -20, pitch = 8 }
+
+[[key]]
+t = 0.88
+label = "and steps out to its right"
+foot_r = { pos = [-0.30, 0.07, 0.02], yaw = -24, pitch = 4, knee = [-0.4, 0, 1] }
+
+[[key]]
+t = 1.0
+label = "end: balanced over the ball, hips half open, ready either way"
+pelvis = { pos = [-0.03, 0.895, 0.05], yaw = -18, pitch = 8, roll = 0 }
+chest = { yaw = 6, pitch = 6, roll = 0 }
+head = { yaw = -2, pitch = 26 }
+foot_l = { pos = [0.16, 0.002, 0.10], yaw = 12, ease = 1 }
+foot_r = { pos = [-0.30, 0.002, 0.04], yaw = -25, pitch = 0, knee = [-0.3, 0, 1], ease = 1 }
+hand_l = { swing = 0, abduct = 20, bend = 45 }
+hand_r = { swing = 5, abduct = 20, bend = 45 }
+ball = { pos = [-0.09, 0.11, 0.04] }

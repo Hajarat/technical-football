@@ -1,0 +1,175 @@
+# Spin (a 360 roulette) toward his left (S = left: the RIGHT sole starts) at 2 m/s: after a 0.12 s reach the right sole lands on the
+# ball and drags it back and round while he turns 180 degrees to his left on the left foot; the feet swap, the left sole takes
+# the ball and drags it on round while he completes the turn on the right foot, facing his original way at the release with the
+# ball ahead of him, displaced toward the left and forward. The ball stays within 0.35 m of the hips: he shields it the whole way.
+# Not in the simulation yet: authored to the numbers it will be built to. The pelvis yaw is keyed through the full 360 (the
+# channel is a plain number, so it never wraps); spin_left and its mirror spin_right (the standing version is spin.toml, same events). Conventions as in ball_roll.toml.
+
+name = "spin"
+move = "spin"
+side = "left"
+foot = "right"
+entry = "run"
+entry_speed = 2.0
+notes = "spin at 2 m/s: right sole drags the ball round through 180 deg, feet swap, left sole completes the 360"
+
+[sim]
+status = "not built: authored to the numbers it will be built to"
+reach_s = 0.12
+move_s = 0.60
+contact2_s = 0.30                 # the feet swap, from the move's start
+turn_deg = 360
+displacement_s_m = 0.5            # toward S, from where the ball was first taken ...
+displacement_forward_m = 1.0      # ... and forward (authored 0.8 at the release, 1.15 by the end: see notes in the report)
+ball_max_from_hips_m = 0.35
+max_forward_mps = 2.0
+entry_speed = 2.0
+ball_start = [-0.09, 0.11, 0.25]
+ball_radius = 0.11
+
+[events]
+start = 0.0
+contact = 0.14                    # the right sole lands on the ball
+lift = 0.44                       # it leaves it, turned 180 degrees
+contact2 = 0.48                   # the left sole takes it
+release = 0.8                     # the left sole leaves it, turned 360 degrees
+end = 1.0
+
+[[variant]]
+suffix = "_run"
+spans = [0.12, 0.27, 0.03, 0.30, 0.20]
+
+[ball]
+radius = 0.11
+on = [["contact", "lift", "right"], ["contact2", "release", "left"]]
+
+[[key]]
+t = 0.0
+ease = 0.0
+label = "start: running at 2 m/s, the left foot swinging in to plant beside the ball"
+pelvis = { pos = [0.0, 0.925, 0.0], pitch = 13 }
+chest = { pitch = 6 }
+head = { pitch = 28 }
+foot_l = { pos = [0.14, 0.06, 0.05], yaw = 6, pitch = 5, knee = [0.15, 0, 1] }
+foot_r = { pos = [-0.13, 0.002, -0.02], yaw = -6, knee = [-0.15, 0, 1], ease = 1 }
+hand_l = { swing = 20, abduct = 14, bend = 70 }
+hand_r = { swing = -15, abduct = 14, bend = 70 }
+ball = { pos = [-0.09, 0.11, 0.32], ease = [1, 1, 0] }
+
+[[key]]
+t = 0.08
+label = "reach: the right knee lifts, the foot rising over the ball"
+pelvis = { pos = [0.03, 0.9, 0.12], pitch = 12, roll = -2 }
+foot_r = { pos = [-0.11, 0.24, 0.16], yaw = -6, pitch = 14, toe = 0, knee = [-0.3, 0.3, 1] }
+
+[[key]]
+t = 0.1
+label = "the left foot plants beside the ball"
+foot_l = { pos = [0.16, 0.002, 0.29], yaw = 6, pitch = 0, knee = [0.2, 0, 1], ease = 1 }
+
+[[key]]
+t = 0.14
+label = "contact: the right sole on top of the ball; the turn to the left begins on the left foot"
+pelvis = { pos = [0.02, 0.88, 0.26], yaw = 0, pitch = 12, roll = 0 }
+chest = { yaw = 8, pitch = 9 }
+head = { yaw = -4, pitch = 36 }
+foot_l = { pos = [0.24, 0.002, 0.29], yaw = 6, pitch = 0, toe = 0, knee = [0.2, 0, 1], ease = 1 }
+foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 0, pitch = 12, knee = [-0.2, 0.3, 1], ease = 0.3 }
+hand_l = { swing = 10, abduct = 45, bend = 30, trail = 90 }
+hand_r = { swing = 10, abduct = 45, bend = 30, trail = 90 }
+ball = { pos = [-0.09, 0.11, 0.49], ease = 1 }
+
+[[key]]
+t = 0.22
+label = "the left foot up on its ball, pivoting"
+foot_l = { pos = [0.24, 0.02, 0.29], yaw = 30, pitch = -12, toe = 15, ease = 0 }
+
+[[key]]
+t = 0.3
+label = "a quarter turn: the sole drags the ball back and round, shoulders and head leading"
+pelvis = { pos = [0.07, 0.87, 0.52], yaw = 85, pitch = 10, roll = 2 }
+chest = { yaw = 18, pitch = 8 }
+head = { yaw = 25, pitch = 30 }
+foot_l = { pos = [0.26, 0.02, 0.54], yaw = 90, pitch = -12, toe = 15 }
+foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 80, pitch = 12, knee = [0, 0.3, 1] }
+hand_l = { swing = -5, abduct = 55, bend = 30, trail = 100 }
+hand_r = { swing = 20, abduct = 50, bend = 30, trail = 100 }
+ball = { pos = [-0.05, 0.11, 0.51] }
+
+[[key]]
+t = 0.39
+label = "the left foot comes up off the ground to take over"
+foot_l = { pos = [0.17, 0.21, 0.57], yaw = 175, pitch = 5, toe = 0 }
+
+[[key]]
+t = 0.44
+label = "lift: turned 180 degrees, facing back, the ball in front of him; the right sole leaves it"
+pelvis = { pos = [0.12, 0.87, 0.79], yaw = 180, pitch = 11, roll = 0 }
+chest = { yaw = 12, pitch = 8 }
+head = { yaw = 10, pitch = 34 }
+foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 170, pitch = 10, knee = [0, 0.3, 1], ease = 0 }
+ball = { pos = [0.0, 0.11, 0.52], ease = 0 }
+
+[[key]]
+t = 0.48
+label = "contact2: the feet swap, the left sole takes the ball"
+pelvis = { pos = [0.15, 0.87, 0.83], yaw = 198 }
+foot_l = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 185, pitch = 12, knee = [0, 0.3, 1], ease = 0.3 }
+ball = { pos = [0.01, 0.11, 0.54] }
+
+[[key]]
+t = 0.5
+label = "the right foot up off the ball"
+foot_r = { pos = [0.13, 0.17, 0.06], frame = "ball", yaw = 195, pitch = 6 }
+
+[[key]]
+t = 0.6
+label = "the right foot comes down as the new pivot"
+foot_r = { pos = [0.44, 0.002, 0.9], yaw = 220, pitch = 0, knee = [0, 0, 1], ease = 1 }
+
+[[key]]
+t = 0.66
+label = "three-quarters: the left sole drags the ball on round, shielded by the body"
+pelvis = { pos = [0.27, 0.87, 0.96], yaw = 275, pitch = 10, roll = 0 }
+chest = { yaw = 12, pitch = 8 }
+head = { yaw = 20, pitch = 28 }
+foot_l = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 270, pitch = 12, knee = [0, 0.3, 1] }
+foot_r = { pos = [0.44, 0.02, 0.9], yaw = 260, pitch = -12, toe = 15, ease = 0 }
+hand_l = { swing = 15, abduct = 50, bend = 30, trail = 100 }
+hand_r = { swing = -5, abduct = 55, bend = 30, trail = 100 }
+ball = { pos = [0.1, 0.11, 0.86] }
+
+[[key]]
+t = 0.8
+label = "release: facing his original way again, the ball ahead of him, the left sole lets go"
+pelvis = { pos = [0.4, 0.875, 1.09], yaw = 360, pitch = 12, roll = 0 }
+chest = { yaw = 0, pitch = 9 }
+head = { yaw = 0, pitch = 18 }
+foot_l = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 355, pitch = 10, knee = [0, 0.3, 1], ease = 0 }
+foot_r = { pos = [0.44, 0.03, 0.9], yaw = 330, pitch = -15, toe = 20, ease = 0 }
+hand_l = { swing = 10, abduct = 30, bend = 45 }
+hand_r = { swing = -10, abduct = 30, bend = 45 }
+ball = { pos = [0.34, 0.11, 1.36], ease = 0 }
+
+[[key]]
+t = 0.84
+label = "the left foot lifts off the ball"
+foot_l = { pos = [0.09, 0.17, -0.02], frame = "ball", yaw = 360, pitch = 6 }
+
+[[key]]
+t = 0.9
+label = "the left foot off the ball and down"
+foot_l = { pos = [0.52, 0.05, 1.32], yaw = 360, pitch = 0, knee = [0.1, 0.1, 1] }
+
+[[key]]
+t = 1
+ease = 0.0
+label = "end: away after the ball"
+pelvis = { pos = [0.46, 0.9, 1.39], yaw = 362, pitch = 14, roll = 0 }
+chest = { yaw = 0, pitch = 8 }
+head = { yaw = 0, pitch = 14 }
+foot_l = { pos = [0.5, 0.002, 1.44], yaw = 362, pitch = 0, knee = [0.1, 0, 1], ease = 1 }
+foot_r = { pos = [0.33, 0.07, 1.19], yaw = 355, pitch = -20, toe = 20 }
+hand_l = { swing = -25, abduct = 15, bend = 80 }
+hand_r = { swing = 30, abduct = 15, bend = 80 }
+ball = { pos = [0.4, 0.11, 1.79], ease = 0 }
