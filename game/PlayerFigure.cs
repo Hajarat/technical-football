@@ -1265,6 +1265,7 @@ public partial class PlayerFigure : Node3D
         float best = 0f;
         float r = f.BallRadius;
         _ovWind[i] = false;
+        float upW = 0f;
         (int Id, float Tau) handover = (int.MinValue, 0f);   // a touch that takes over from the early hint this tick
         int windId = int.MinValue; float windTau = 0f;        // the unmade touch drawn this tick
         for (int n = 0; n < 3; n++)
@@ -1334,6 +1335,8 @@ public partial class PlayerFigure : Node3D
                 target.Y = tf.RelC.Y + 0.10f * k * Smooth(s / 0.10f);
                 fdUse = new Vector3(Mathf.Cos(tf.Psi), 0, Mathf.Sin(tf.Psi));
             }
+            // a predicted immediate touch (re)appearing is eased in, as the hint is: the prediction comes and goes with the stick
+            if (n == 2 && !_teleporting) { wgt = Math.Min(wgt, _upW[i] + f.Dt / HintRise); upW = Math.Max(upW, wgt); }
             if (wgt <= best) continue;
             best = wgt; surf = a.Surface;
             _ovWind[i] = !a.Made;
@@ -1384,7 +1387,7 @@ public partial class PlayerFigure : Node3D
             }
         }
         _ovAnk[i, 1] = _ovAnk[i, 0]; _ovAnk[i, 0] = ank; _ovYaw[i] = Mathf.Atan2(dirv.Z, dirv.X);
-        _hintPrev[i] = hint; _hintW[i] = hint ? best : 0f;
+        _hintPrev[i] = hint; _hintW[i] = hint ? best : 0f; _upW[i] = upW;
         return best;
     }
 
@@ -1410,7 +1413,7 @@ public partial class PlayerFigure : Node3D
     /// <summary>A windup target's change of step (metres per tick) above which it counts as a jump.</summary>
     const float WindupJumpM = 0.03f;
 
-    readonly float[] _hintW = new float[2];
+    readonly float[] _hintW = new float[2], _upW = new float[2];
     const float HintRise = 0.08f;
 
     /// <summary>Per foot: last tick drew the early touch hint (see TouchOverlay).</summary>
