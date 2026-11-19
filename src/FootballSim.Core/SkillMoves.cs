@@ -105,27 +105,30 @@ public static class SkillMoves
     /// low enough and in the execution radius, or arriving at the foot for the planned touch), before the player moves this
     /// tick. Returns the SkillMove event, or null.
     /// <para>
-    /// With a push in flight (a touch planned within meet_wait_seconds of the gesture) the gesture waits for that touch's
-    /// meet: on its contact tick the ball is at the foot, and the move starts instead of the touch. Without one it waits
-    /// buffer_seconds for the ball to come into reach.
+    /// In possession the gesture waits (at most meet_wait_seconds) on the touch controller's forecast: while it waits the
+    /// controller treats it as a demand and goes to the ball without committing a touch, and the move starts once the ball is
+    /// in reach, at the forecast contact at the latest. A touch already committed when the gesture comes is played first (on a
+    /// one-step push), then the move. Without possession it waits buffer_seconds for the ball to come into reach.
     /// </para>
     /// </summary>
     internal static SimEvent? TryStart(PlayerState p, Ball ball, bool inPossession, int tick, float now, Tuning t)
     {
         var k = t.Skill;
         if (p.SkillBufTick < 0) return null;
-        var meet = p.TouchAction is { Pending: true } pa && pa.ContactTick - p.SkillBufTick <= Ticks(k.MeetWaitSeconds, t) ? pa : null;
-        if (tick - p.SkillBufTick > Ticks(meet != null ? k.MeetWaitSeconds : k.BufferSeconds, t)) { p.SkillBufTick = -1; return null; }
+        if (tick - p.SkillBufTick > Ticks(inPossession ? k.MeetWaitSeconds : k.BufferSeconds, t)) { p.SkillBufTick = -1; return null; }
         if (!inPossession || p.SkillAction != null || now < p.SkillCooldownUntil) return null;
+        if (p.TouchAction is { Pending: true }) return null;
         var kind = KindOf(p.SkillBufKind);
         if (ball.Position.Y >= k.MaxBallHeight) return null;
         float dist = TouchModel.HorizontalDistance(p.Position, ball.Position);
-        // At the meet the ball is being steered into the contact zone ahead of the foot: within the zone's slack of the radius.
-        bool atMeet = meet != null && tick >= meet.ContactTick && dist <= Radius(kind, t) + t.Touch.ContactZoneRadius;
+        // At the forecast contact the ball is being steered into the contact zone ahead of the foot: within the zone's slack of
+        // the radius.
+        bool meet = p.ForecastTick >= 0;
+        bool atMeet = meet && tick >= p.ForecastTick && dist <= Radius(kind, t) + t.Touch.ContactZoneRadius;
         if (dist > Radius(kind, t) && !atMeet) return null;
-        // With a meet still to come, a move that would start awkwardly waits for it: a step-over or feint with the ball too far
-        // ahead for the leg to reach over it, a sole move whose foot cannot land on the ball within the reach.
-        if (meet != null && !atMeet)
+        // With a contact still to come, a move that would start awkwardly waits for it: a step-over or feint with the ball too
+        // far ahead for the leg to reach over it, a sole move whose foot cannot land on the ball within the reach.
+        if (meet && !atMeet)
         {
             Vector2 fwd = GestureReader.FrameForward(p, t);
             if (kind is ActionKind.StepOver or ActionKind.BodyFeint

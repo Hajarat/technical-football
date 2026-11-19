@@ -482,7 +482,9 @@ public static class TouchPlanner
         Vector2 steer = SteerFor(p, tg, now, t, out along);
         // While a shot winds up only its one soft touch is played (after it the strike plays the ball).
         bool softDone = shot && p.TouchAction is { Made: true, Kind: ActionKind.Soft };
-        if (committed == null && !softDone && tg.J <= WindupTicks(t)) committed = Commit(p, intent, ball, tg, tick, t);
+        // A skill gesture waiting for the ball: no touch is committed (the move plays the ball when it is reached).
+        bool gesture = p.SkillBufTick >= 0 && !shot;
+        if (committed == null && !softDone && !gesture && tg.J <= WindupTicks(t)) committed = Commit(p, intent, ball, tg, tick, t);
         if (committed != null) committed.ContactPoint = new Vector3(tg.Ball.X, t.Ball.Radius, tg.Ball.Z);
         p.SetForecast(tick + tg.J, tg.Foot, new Vector3(tg.Ball.X, t.Ball.Radius, tg.Ball.Z));
         return steer;
@@ -1248,6 +1250,8 @@ public static class TouchPlanner
                 var wanted = Vector3.Normalize(new Vector3(intent.Move.X, 0f, intent.Move.Y));
                 float turnDeg = TouchModel.TurnAngleDeg(p, ball, wanted);
                 int steps = NextSteps(p, mode, t);
+                // A skill gesture waiting for the ball: a one-step push, so the move can start at the next step.
+                if (p.SkillBufTick >= 0) steps = 1;
                 if (!first)
                 {
                     // A turn cuts the push to the early fraction of the cadence, so the next touch can follow the stick sooner.
