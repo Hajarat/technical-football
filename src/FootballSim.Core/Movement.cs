@@ -106,8 +106,9 @@ public static class Movement
         // easing off no faster than the deceleration budget.
         if (law) speed = MathF.Max(speed + (target - speed) / tau * dt, speed0 - budget);
         else speed = assist.RunSpeed;
-        // The stun after a strike holds the running speed under its cap at once: the strike plants the shooter.
-        speed = MathF.Min(speed, assist.HardCap);
+        // The stun after a strike brings the running speed down to its cap, no faster than the deceleration budget (the strike
+        // plants the shooter without a step in his speed).
+        speed = MathF.Min(speed, MathF.Max(assist.HardCap, speed0 - budget));
 
         float facing = p.Facing;
         if (mag > 0f)
@@ -180,7 +181,7 @@ public static class Movement
 /// <summary>
 /// Per-tick movement modifiers: the speed cap, a turn-rate scale, a steering correction velocity added to the velocity (world
 /// X, Z) and, for a skill move, the running speed to use this tick (NaN: the legs ease toward the stick's target as usual), a
-/// running speed never exceeded this tick (the post-strike stun), whether a stick turned about brakes the run (without the
+/// running speed the run is brought down to within the deceleration budget (the post-strike stun), whether a stick turned about brakes the run (without the
 /// ball), the steering's part along the run, m/s, added to the legs' target speed (it reaches the running speed through the
 /// speed law), and a skill move's step, a velocity (world X, Z) that, unlike <see cref="Steer"/>, does not turn with the body.
 /// </summary>

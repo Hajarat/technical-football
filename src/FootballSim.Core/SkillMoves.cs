@@ -217,7 +217,6 @@ public static class SkillMoves
 
         // The waiting touch is dropped; the move owns the ball until it ends.
         if (p.TouchAction is { Pending: true } waiting) waiting.Phase = ActionPhase.Done;
-        p.SoftWaitAction = null;
         p.Chasing = false;
         p.KnockOnRequested = false;
         // After the move the next touch may be played on the first swing that reaches the ball.

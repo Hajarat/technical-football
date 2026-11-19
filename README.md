@@ -23,6 +23,7 @@ player apart, in `wall`, not as steps); a pooled summary follows the table. `--d
 | Session probe: replays the play-test rounds kept in `src/FootballSim.Core.Tests/TestData/playtest` (or `--replays <dir\|file>`; a folder is searched with its subfolders, so a folder of session folders such as `sessions` gives every round in them) with the current code and counts committed touches not played at their contact, and the speed steps (as the dribble probe counts them) and largest per-tick acceleration in possession, with a total per 1000 possession ticks | `dotnet run -c Release --project src/FootballSim.Batch -- --probe sessions` |
 | Feel probe: speed surges, per-tick acceleration, touch cadence, ball distance and facing wobble of straight dribbles, and the heading response to a 45/90/180 degree stick turn with and without the ball, each row with its speed steps counted as the dribble probe counts them; `--replays sessions` gives the acceleration and speed-step numbers over recorded play-test rounds, `--trace sprint45` (`jog90`, `sprint90off`, ...) prints one turn tick by tick, `--rtrace <replay> [--from T --to T --steps-only 1]` one recorded round tick by tick with each speed step attributed to the touch controller's state | `dotnet run -c Release --project src/FootballSim.Batch -- --probe feel` |
 | Shot diagnostic for the scoring calibration: per scripted round the distance, speed, charge and ball offset at the strike, the shot's accuracy factors, how it ended, why wide shots were wide and why rounds had no shot | `dotnet run -c Release --project src/FootballSim.Batch -- --probe shots --scenario breakaway --n 1000` |
+| Shot probe: scripted shots pressed in possession (standing, a straight jog and sprint, a jog at 45 degrees to the aim, right after a sprint push with the ball about 1 m ahead, 0.1 s into a 90 degree turn) at dribbling 1/50/99: press to strike, ball distance at the press and the strike, dribble touches committed or played after the press, strikes made, strikes at the earliest tick with the ball at the feet, the others on the swinging foot in its window, the strike against the estimate published at the press and against the touch of the same run without the press, and the `shot` speed steps (from a press to 0.5 s after the strike; also in the session probe, which follows every shot pressed in possession, and the feel probe's `--replays` table). `--list 1` prints every run, `--trace <case> --ratings R --index i` one run tick by tick | `dotnet run -c Release --project src/FootballSim.Batch -- --probe shot` |
 | Skill-move probe (scripted gestures per move, side, entry pace and skill_moves 1/50/99; the not-built elastico, heel-to-heel and spin rows should read recognised 100, made 0; `--list-failed 1` prints the ball and the planned touch after the gesture for every run whose move was not made) | `dotnet run -c Release --project src/FootballSim.Batch -- --skill-probe` |
 | Write one replay per skill move (edge_of_box start) for screenshots | `dotnet run -c Release --project src/FootballSim.Batch -- --write-skill-replays out/skill-replays` |
 | Write one replay per visible keeper action (shuffle, rush, planted then reacting, each dive kind, tip over the bar, each reflex save, a block by the ready keeper's hull, smother, closing down, charging, jockeying, spread, a long sprint touch won, a backpedal under a chip, taken round, parry then grounded then getting up) for screenshots; prints each file with the tick range of its action | `dotnet run -c Release --project src/FootballSim.Batch -- --write-keeper-replays out/keeper-replays` |
@@ -84,11 +85,11 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   pace, the leg stretching if need be, and only then at any speed). The steering stops
   correcting within `reach_tolerance` (0.08 m) of the contact point; the foot reaches the rest.
 - A demand (the stick turned past the execution angle off the ball's travel and off the run, the stick released for a stop,
-  a skill gesture waiting, a shot's soft touch) shortens the cooldown to `early_execution` of the cadence (by the angle and
+  a skill gesture waiting, a shot's strike) shortens the cooldown to `early_execution` of the cadence (by the angle and
   dribbling), never sooner than `early_min_interval` (0.22 s); the go-get-it legs then take over when they play the ball a few
   ticks sooner, and the stride may be quickened by up to a quarter to bring a step's window onto the ball.
 - Commit: one `windup` (0.12 s) before its contact the touch is committed, with its foot, kind (a dribble touch, a turn past
-  the execution angle, a cut past `cut_deg`, a stop with the stick released, a knock-on, a shot's soft touch) and surface
+  the execution angle, a cut past `cut_deg`, a stop with the stick released, a knock-on) and surface
   fixed; the stride clock is held so the contact falls in the window. At contact the push follows the stick within 30 degrees
   of the stick at the commit; a bigger change is answered by the next touch. During a committed turn or cut the body opens
   toward the committed direction as far as the contact holds, and for `post_turn_seconds` (0.3 s) after a turn or cut touch
@@ -184,7 +185,7 @@ either side. The right stick counts from half deflection; the timings are in the
 - Heel-to-heel and spin: from rest a forward flick of at most 0.125 s, rest, then back (heel-to-heel) or a side (spin), within
   0.125 s of the release (`combo_step_window`). Elastico: back, then a side as for the step-over.
 - Low shot: hold B for the power wanted, release, and press B again any time after the release and before the strike (the
-  contact comes no sooner than 0.45 s after the first press and 0.12 s after the release). The charge is the first press's,
+  strike comes no sooner than 0.45 s after the first press and 0.12 s after the release; see Shooting). The charge is the first press's,
   so a low shot can have full power; bumpers held on either press count. There is no minimum gap between the release and
   the second press.
 
@@ -202,12 +203,21 @@ before the strike (the gamepad's low shot) counts as driven held.
 | Low finesse | Finesse curl kept low (1-4 degrees) | Inside |
 | Chip | High loft with backspin | Inside |
 
-- Charge fills 0 to 1 in 0.3 s while shoot is held and is frozen at the release (or at 1). Contact comes no sooner than 0.45 s
-  after the press (the wind-up) and 0.12 s after the release; a ball still out of reach then is struck as soon as it is in
-  reach, or the shot is dropped after `round.shoot_buffer`. In possession the ball is kept at the striking foot through the
-  wind-up by a soft touch. From the press to the strike the left stick only aims: the legs run on to the ball (the recovery
-  run toward its intercept, at the ball's own pace away plus the gap over the speed time constant), whichever way the stick
-  is swung, so the striking foot meets it. The soft touch leaves the ball rolling along the shooter's velocity.
+- Charge fills 0 to 1 in 0.3 s while shoot is held and is frozen at the release (or at 1). The strike comes no sooner than
+  0.45 s after the press (the wind-up) and 0.12 s after the release (the earliest strike tick), and it takes the place of the
+  attacker's next touch: from the press no dribble touch is committed (one already committed is played), and the strike is
+  the touch controller's first eligible contact from the earliest strike tick on (the first tick of a swing's contact window
+  that meets the ball), committed like a touch one windup before it, on the foot swinging there, and played in that window.
+  With the ball at the feet at the press (within foot reach, no touch committed) a soft touch keeps it there and the strike
+  falls at the earliest strike tick, on the foot chosen at the press; if the ball is not strikable then, the next contact
+  strikes it. A shot in possession is never dropped: he keeps running on to the ball and strikes on arrival. A shot pressed
+  without the ball, or one whose ball the keeper took, is struck as soon as the ball is in reach from the earliest tick, or
+  dropped after `round.shoot_buffer`. From the press to the strike the left stick only aims: the legs run on to the ball (the
+  go-get-it legs toward its intercept, holding at least the runner's own running speed), whichever way the stick is swung.
+  The soft touch leaves the ball rolling along the shooter's velocity.
+- The attacker publishes `StrikeEta` and `StrikeFoot` from the press on, as the best estimate: the later of the earliest
+  strike tick (while shoot is held, as if it were let go on the next tick) and the controller's forecast contact, then the
+  committed strike; the shot action's `ContactTick` and `Foot` carry the same estimate, and the keeper reads it.
 - Aim is the left stick at the release; a stick at rest then uses its last pushed direction if that was within 0.5 s. It is
   locked from the release to the contact. Aim assist still applies.
 - Each distance to the goal centre has an ideal charge (`shot.ideal_charge`; the HUD marks it from `World.IdealCharge`).
@@ -216,7 +226,8 @@ before the strike (the gamepad's low shot) counts as driven held.
 - Running spoils accuracy: the spread is multiplied by 1 + `shot.speed_multiplier_slope` x (speed / top speed), calibrated so a
   finishing-78 striker at full sprint puts 10-15 m shots on target about 60-75% of the time.
 - Side spin grows with launch speed and the `curve` rating (`shot.spin_reference_speed`, `*_spin_rev`).
-- After the strike the shooter is stunned for 0.15 + 0.35 x charge seconds: speed capped at 40% of top speed, no touches.
+- After the strike the shooter is stunned for 0.15 + 0.35 x charge seconds: no touches, and his running speed is brought down
+  to 40% of top speed no faster than `balance_deceleration` (no speed step); the steering under way eases out.
 - The shot is the attacker's `Action` from the press to the end of its 0.25 s follow-through (kind Power, Finesse, Chip,
   Driven or LowFinesse; Windup, Contact, Recovery; `Released` once shoot is let go). The soft touch made inside the wind-up
   is on `TouchAction`.
