@@ -33,7 +33,7 @@ player apart, in `wall`, not as steps); a pooled summary follows the table. `--d
 | Screenshot run (opens a window briefly) | `godot-mono --path game -- --replay tests/smoke_replay.json --shots out/replay --shot-on setup,charge,flight,outcome --quit-after-round` |
 | Screenshot run without the window taking focus (use this from tools and agents) | `game/tests/run-bg.sh -- --replay tests/smoke_replay.json --shots out/replay --shot-on setup,strike,outcome --quit-after-round` |
 | Keeper gallery: every keeper state and dive kind from a script (both sides, side and front views), no simulation; the keeper is animated from motion clips by default, `--keeper-anim procedural` shows the hand-built poses | `game/tests/run-bg.sh -- --keeper-gallery out/keeper-gallery` |
-| A replay with the attacker's running body from the motion-captured stride cycles (see "Character models"); measurements as below | `godot-mono --headless --path game -- --replay tests/dribble_replay.json --quit-after-round --attacker-anim mocap` |
+| A replay with the attacker's running body from the procedural run cycle instead of the motion-captured stride cycles, the default (see "Character models"); measurements as below | `godot-mono --headless --path game -- --replay tests/dribble_replay.json --quit-after-round --attacker-anim procedural` |
 | Regenerate the attacker's stride cycles (after `retarget.py` has written the attacker clips) and their gallery sheets | `uv run --with numpy python3 tools/anim/cycles.py` then `game/tests/run-bg.sh -- --clip-gallery ../out/cycles --clip-folder res://assets/anim/attacker/cycles --clip-model res://assets/characters/player.glb` |
 
 The smoke run prints the round report on one line prefixed `REPORT ` and exits 0. `smoke.sh` checks it is identical to the batch tool's report.
@@ -127,7 +127,7 @@ The players are rigged MPFB2/MakeHuman bodies (`game/assets/characters/player.gl
 and hands land on them), tints clothing and skin from `FigureKit` and puts the shirt number on the back. Foot-contact and pose measurements come
 from the joints, so they are the same with either `--figure` value.
 
-`--attacker-anim mocap` drives the attacker's running body from motion-captured stride cycles instead (`game/AttackerAnimator.cs`,
+By default (`--attacker-anim mocap`; `--attacker-anim procedural` keeps the procedural run cycle above) the attacker's running body comes from motion-captured stride cycles instead (`game/AttackerAnimator.cs`,
 `src/FootballSim.Anim/CycleMotion.cs`): four seamless one-stride loops in `game/assets/anim/attacker/cycles/` (walk 1.8 m/s, jog 2.9, upright
 run 4.5, athletic run 5.2; see `game/assets/anim/SOURCES.md`). Their playback position is a function of the simulation's stride clock: each foot's
 mid-stance falls on the other foot's swing middle, so the drawn swinging foot is the simulation's (a step in the clock's rate, the touch

@@ -39,8 +39,8 @@ public sealed class ToolArgs
     public string Figure = "skinned";
     /// <summary>--keeper-anim mocap|procedural: the keeper's body from motion clips (the default; needs the skinned figure) or from the hand-built poses (the fallback).</summary>
     public string KeeperAnim = "mocap";
-    /// <summary>--attacker-anim mocap|procedural: the attacker's running body from the motion-captured stride cycles (needs the skinned figure; see AttackerAnimator) or from the procedural run cycle.</summary>
-    public string AttackerAnim = "procedural";
+    /// <summary>--attacker-anim mocap|procedural: the attacker's running body from the motion-captured stride cycles (the default; needs the skinned figure; see AttackerAnimator) or from the procedural run cycle.</summary>
+    public string AttackerAnim = "mocap";
     /// <summary>--keeper-anim-log: print a KEEPER_MM line at every mocap switch (clip, frame, playback rate).</summary>
     public bool KeeperAnimLog;
     /// <summary>--keeper-anim-drop-set a,b: the pose database leaves these clip sets empty (the procedural fallback's check).</summary>
