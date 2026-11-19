@@ -323,7 +323,8 @@ public partial class PlayerFigure
         bool far = lk.Locked && Dist2(hip, held) > Math.Max(hmax, hmaxNow);
         var got = lk.Apply(stance, new NVec3(want.X, want.Y, want.Z), far, dt);
         ank = new Vector3(got.X, got.Y, got.Z);
-        if (lk.Locked && !_mLockWas[i] && cycle) MeasureStep(f, new Vector3(lk.Lock.X, lk.Lock.Y, lk.Lock.Z), speed);
+        // with the cycles in, a step is counted where a foot is held (the procedural plants are not drawn): one count per landing
+        if (lk.Locked && !_mLockWas[i]) MeasureStep(f, new Vector3(lk.Lock.X, lk.Lock.Y, lk.Lock.Z), speed);
         _mLockWas[i] = lk.Locked;
         if (cycle) planted = lk.Settled;
         if (Log && Stats != null) GD.Print($"MOCAP_FOOT tick={Stats.Tick} foot={(i == 0 ? "L" : "R")} w={_mW:F2} s={f.GaitPhase:F3} st={(stance ? 1 : 0)} lock={(lk.Locked ? 1 : 0)} far={(far ? 1 : 0)} want=({want.X:F3},{want.Y:F3},{want.Z:F3}) ank=({ank.X:F3},{ank.Y:F3},{ank.Z:F3}) stride={a.Stride:F2} v={_speedS:F2}");

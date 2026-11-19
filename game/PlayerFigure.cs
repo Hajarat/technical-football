@@ -751,7 +751,7 @@ public partial class PlayerFigure : Node3D
                 Vector3 gait;
                 if (stance)
                 {
-                    if (!ft.InStance) { ft.InStance = true; ft.Released = false; ft.Plant = pelXZ + fm * (w * stepLen) + lat; ft.Plant.Y = AnkleH; if (_mW < 0.5f) MeasureStep(f, ft.Plant, speed); }
+                    if (!ft.InStance) { ft.InStance = true; ft.Released = false; ft.Plant = pelXZ + fm * (w * stepLen) + lat; ft.Plant.Y = AnkleH; if (_mW <= 0f) MeasureStep(f, ft.Plant, speed); }
                     // the body gained speed and the planted foot is about to be out of reach: lift it early, to the rear of the cycle
                     if (!ft.Released && Dist2(pelXZ + right * side * HipW, ft.Plant) > 0.97f * hmaxNow) { ft.Released = true; ft.Blend = 0f; ft.BlendFrom = ft.Ankle; }
                     gait = ft.Released ? pelXZ - fm * (w * stepLen) + lat : ft.Plant;
@@ -1209,10 +1209,12 @@ public partial class PlayerFigure : Node3D
     void MeasureStep(in FigureFrame f, Vector3 plant, float speed)
     {
         if (IsKeeper || Stats == null) return;
-        bool run = speed > 2f && !_seq && _strikeT < 0f && !f.Skill.Valid && !f.Shot.Valid && f.ShotCharge <= 0.001f;
+        // (in mocap mode only steps drawn wholly by one body count: a step across a procedural / cycle hand-over mixes two gaits' timing)
+        bool run = speed > 2f && !_seq && _strikeT < 0f && !f.Skill.Valid && !f.Shot.Valid && f.ShotCharge <= 0.001f && (_mW <= 0f || _mW >= 0.99f);
         if (run && _stepRunning && _stepTick >= 0 && Stats.Tick > _stepTick)
         {
             Stats.StepTime.Add((Stats.Tick - _stepTick) * Stats.JumpDt);
+            if (MocapLogOn) GD.Print($"MOCAP_STEP tick={Stats.Tick} dt={(Stats.Tick - _stepTick)} len={new Vector2(plant.X - _stepAt.X, plant.Z - _stepAt.Z).Length():F3} s={f.GaitPhase:F3} v={speed:F2}");
             Stats.StepLen.Add(new Vector2(plant.X - _stepAt.X, plant.Z - _stepAt.Z).Length());
         }
         _stepTick = Stats.Tick; _stepAt = plant; _stepRunning = run;
