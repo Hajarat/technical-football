@@ -541,6 +541,9 @@ public partial class PlayerFigure : Node3D
 
     const float MaxLeanRad = 12f * Mathf.Pi / 180f;
 
+    float _sinkS;
+    const float SinkRecover = 0.08f;
+
     // ---- the outfield body's layers (the keeper keeps his own pose code and none of these) ----
     // Each is a smooth function of the simulation's stride clock and smoothed speed / acceleration, so no change of speed, direction or plan
     // pops the pose, and nothing reads a clock or a random number.
@@ -916,6 +919,7 @@ public partial class PlayerFigure : Node3D
         // a touch from a standstill (the first touch of a loose ball) can lie beyond a straight leg: only then the pelvis sinks by what is missing
         // (at most 6 cm); a running player never does, the simulation steers the ball into the zone ahead of the swinging foot
         // (the outfield figure runs tall, so its touch poses may sink the pelvis while running too, by what the leg lacks, at most 10 cm)
+        float pelSink0 = pel.Y;
         if (!stepping || body)
             for (int i = 0; i < 2; i++)
             {
@@ -928,6 +932,14 @@ public partial class PlayerFigure : Node3D
                 // (with the cycles the foot leaving the ground can be behind a straight leg as a touch begins: the sink goes with the touch's weight)
                 if (drop > 0f) pel.Y = Math.Max(floorY, pel.Y - Math.Min(drop, body ? 0.10f : 0.06f) * Mathf.Lerp(1f, tw[i], _mW));
             }
+        if (body)
+        {
+            // the outfield pelvis comes back up from a touch's sink over SinkRecover, not in the ticks the touch's weight falls in
+            // (a first touch from a standstill would straighten the standing knee at 2,000 degrees per second)
+            float sink = pelSink0 - pel.Y;
+            _sinkS = _teleporting ? sink : Math.Max(sink, _sinkS * Mathf.Exp(-dt / SinkRecover));
+            pel.Y = Math.Max(floorY, pelSink0 - _sinkS);
+        }
         // a planted foot that would be over-extended lowers the pelvis a little (never below the floor); the stance window above keeps this from happening
         float maxH = 0f;
         for (int i = 0; i < 2; i++)

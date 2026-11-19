@@ -168,6 +168,8 @@ public sealed class CycleMotion
     readonly float[] _w, _target, _share;
     /// <summary>The shortest stance share a cycle with double support (a walk, over half the stride on each foot) is shortened to.</summary>
     public const float MinWalkShare = 0.56f;
+    /// <summary>How fast (seconds) a cycle's shortened stance window follows the step.</summary>
+    public float ShareTau = 0.15f;
     readonly Quaternion[] _tmp;
     bool _init;
 
@@ -224,12 +226,15 @@ public sealed class CycleMotion
     /// </summary>
     public Vector3 Step(float phase, float speed, float dt, Span<Quaternion> local, float stepLength, float scale)
     {
+        // eased: the step can change at once (the core nudging the stride rate), and a stance window that jumps moves the map under the phase
+        float ka = _init ? 1f - MathF.Exp(-dt / ShareTau) : 1f;
         for (int i = 0; i < Cycles.Count; i++)
         {
             float sc = float.IsFinite(stepLength) ? stepLength / Math.Max(Cycles[i].StepLength * scale, 1e-3f) : 1f;
-            _share[i] = Cycles[i].StanceShare / Math.Max(sc, 1f);
+            float share = Cycles[i].StanceShare / Math.Max(sc, 1f);
             // a walk's double support cannot shrink to none (its strikes and toe-offs would meet and the map fold): it keeps a little
-            if (Cycles[i].StanceShare > MinWalkShare) _share[i] = Math.Max(_share[i], MinWalkShare);
+            if (Cycles[i].StanceShare > MinWalkShare) share = Math.Max(share, MinWalkShare);
+            _share[i] = _share[i] > 0f ? _share[i] + (share - _share[i]) * ka : share;
         }
         TargetWeights(Cycles, speed, _target);
         float a = _init ? 1f - MathF.Exp(-dt * 0.69314718f / Math.Max(WeightHalfLife, 1e-4f)) : 1f;
@@ -368,4 +373,38 @@ public sealed class PlantLock
         _shown = p; _have = true; _prevWanted = wanted;
         return p;
     }
+}
+
+/// <summary>
+/// The stride phase the cycles are drawn at: the simulation's, except that a step in its rate (the core nudging the stride to bring a swing
+/// onto the ball) is eased over <see cref="RateTau"/> instead of speeding the whole body up in one tick; the difference this leaves is
+/// pulled back over <see cref="CatchUp"/> and never exceeds <see cref="MaxLag"/> (phase units, a stride is 2). A jump of the phase itself
+/// (a reset, a lock onto a target tick) is followed at once.
+/// </summary>
+public sealed class PhaseFollower
+{
+    public float RateTau = 0.05f, CatchUp = 0.08f, MaxLag = 0.06f, JumpAt = 0.25f;
+    public float Phase { get; private set; }
+    float _rate;
+    bool _have;
+
+    public void Reset() => _have = false;
+
+    /// <summary>One tick: <paramref name="simPhase"/> in [0, 2) and its rate (steps per second, phase units per second).</summary>
+    public float Step(float simPhase, float simRate, float dt)
+    {
+        if (!_have) { Phase = simPhase; _rate = simRate; _have = true; return Phase; }
+        _rate += (simRate - _rate) * (1f - MathF.Exp(-dt / RateTau));
+        float pred = Phase + _rate * dt;
+        float err = Wrap(simPhase - pred);
+        if (MathF.Abs(err) > JumpAt) { Phase = simPhase; _rate = simRate; return Phase; }
+        float p = pred + err * Math.Min(1f, dt / CatchUp);
+        float lag = Wrap(simPhase - p);
+        if (MathF.Abs(lag) > MaxLag) p = simPhase - MathF.Sign(lag) * MaxLag;
+        Phase = Mod2(p);
+        return Phase;
+    }
+
+    static float Mod2(float x) { x %= 2f; return x < 0 ? x + 2f : x; }
+    static float Wrap(float d) { d = Mod2(d + 1f) - 1f; return d; }
 }

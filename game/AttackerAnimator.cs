@@ -136,7 +136,8 @@ public sealed class AttackerAnimator
     public float Stride { get; private set; } = 1f;
     public float NativeSpeed => _motion.NativeSpeed;
 
-    public void Teleport() { _motion.Reset(); _strideInit = false; }
+    public void Teleport() { _motion.Reset(); _phase.Reset(); _strideInit = false; }
+    readonly PhaseFollower _phase = new();
     bool _strideInit;
     /// <summary>How fast (seconds) the stride's fore-aft shortening follows the step.</summary>
     public const float StrideTau = 0.06f;
@@ -148,7 +149,8 @@ public sealed class AttackerAnimator
     public void Compute(in FigureFrame f, Vector3 pos, Vector3 fwd, float speed, float stepLength, float height, float dt)
     {
         float sc = _body.ScaleFor(height);
-        NVec3 hips = _motion.Step(f.GaitPhase, speed, dt, _local, stepLength > 0.05f ? stepLength : float.NaN, sc);
+        float phase = _phase.Step(f.GaitPhase, f.StepFrequency, dt);
+        NVec3 hips = _motion.Step(phase, speed, dt, _local, stepLength > 0.05f ? stepLength : float.NaN, sc);
         byte clipContacts = 0;
         bool full = FullBody != null && FullBody.TryPose(f, _local, out hips, out clipContacts);
         _sk.Forward(_local, hips, _gr, _gp);
@@ -166,7 +168,7 @@ public sealed class AttackerAnimator
             // the foot's fore-aft place relative to the hips is stretched, the hips' own sway is not
             var m = new NVec3(a.X, a.Y, hips.Z + (a.Z - hips.Z) * Stride);
             Ankle[i] = W(m, 1f);
-            Stance[i] = full ? (clipContacts & (i == 0 ? Clip.LeftFoot : Clip.RightFoot)) != 0 : _motion.InStance(i, f.GaitPhase);
+            Stance[i] = full ? (clipContacts & (i == 0 ? Clip.LeftFoot : Clip.RightFoot)) != 0 : _motion.InStance(i, phase);
             // the foot's turn from rest, applied to the rest's forward: its pitch and its yaw from the body's heading
             var d = _gr[_sk.Foot[i]] * NQuat.Inverse(_sk.RestGlobal[_sk.Foot[i]]);
             // (the yaw from the foot's sideways axis, which stays level while the toes point down in the heel recovery)

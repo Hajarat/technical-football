@@ -243,4 +243,27 @@ public class CycleMotionTests
             Assert.Equal(cycles[i].StanceShare, mirrors[i].StanceShare, 5);
         }
     }
+
+    [Fact]
+    public void PhaseFollowerEasesARateStepWithinItsLag()
+    {
+        var pf = new PhaseFollower();
+        float sim = 0f, rate = 3f, dt = 1f / 120f, worst = 0f, prevStep = float.NaN, worstChange = 0f;
+        for (int t = 0; t < 240; t++)
+        {
+            if (t == 100) rate = 4.5f;   // the core speeds the stride up by half at once
+            sim = (sim + rate * dt) % 2f;
+            float before = pf.Phase;
+            float p = pf.Step(sim, rate, dt);
+            float lag = MathF.Abs(((sim - p + 3f) % 2f) - 1f);
+            worst = Math.Max(worst, lag);
+            float step = ((p - before + 3f) % 2f) - 1f;
+            if (t > 1 && !float.IsNaN(prevStep)) worstChange = Math.Max(worstChange, MathF.Abs(step - prevStep));
+            prevStep = step;
+        }
+        Assert.True(worst <= pf.MaxLag + 1e-4f, $"lag {worst}");
+        Assert.True(worstChange < 0.005f, $"per-tick phase step changed by {worstChange} (the raw step changes by 0.0125)");
+        float end = MathF.Abs(((sim - pf.Phase + 3f) % 2f) - 1f);
+        Assert.True(end < 0.002f, $"left behind by {end}");   // caught up
+    }
 }
