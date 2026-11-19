@@ -173,3 +173,36 @@ set = "kick"
 side = "none"
 loop = false
 notes = "soccer: walk up and kick the ball (subject 10)"
+
+# ---- stride cycles (tools/anim/cycles.py -> game/assets/anim/attacker/cycles/) ----
+# One stride of a clip above, from a foot strike to the same foot's next strike (60 Hz frames of the retargeted clip, the end frame
+# being the next stride's first), made seamless and annotated with each foot's strike and toe-off. blend_speed (m/s) is where the
+# game shows that cycle alone; between two it blends them by the speed (src/FootballSim.Anim/CycleMotion.cs).
+
+[[cycle]]
+name = "cycle_walk"
+clip = "walk_brisk_16_21"
+frames = [17, 76]
+blend_speed = 1.8
+notes = "brisk walk, 1.8 m/s on the model"
+
+[[cycle]]
+name = "cycle_jog"
+clip = "jog_16_36"
+frames = [39, 86]
+blend_speed = 2.8
+notes = "relaxed jog, 2.9 m/s; close control (2.6 m/s) is mostly this one"
+
+[[cycle]]
+name = "cycle_run"
+clip = "run_16_46"
+frames = [10, 51]
+blend_speed = 3.7
+notes = "upright run, 4.5 m/s; only between the jog and the athletic run"
+
+[[cycle]]
+name = "cycle_sprint"
+clip = "run_78_12"
+frames = [7, 46]
+blend_speed = 4.5
+notes = "athletic run (lean, knee lift, arm drive), 5.2 m/s; everything from 4.5 m/s up, its stride lengthened above 5.2"
