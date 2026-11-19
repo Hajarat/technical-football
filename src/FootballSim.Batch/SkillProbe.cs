@@ -102,6 +102,8 @@ static class SkillProbe
         public float MidAhead = float.NaN;
         /// <summary>Sole moves: the ball centre's distance from the foot's contact point when the sole lands.</summary>
         public float SoleMiss = float.NaN;
+        /// <summary>With --list-failed: the ball and the planned touch every 4 ticks for 40 ticks from the gesture.</summary>
+        public string Diag = "";
     }
 
     public static int Run(Dictionary<string, string> opts, string dataDir, Tuning tuning)
@@ -133,13 +135,16 @@ static class SkillProbe
                     var sheet = baseSheet.Clone();
                     sheet.SkillMoves = rating;
                     var results = new Result[seeds];
+                    bool listFailed = opts.ContainsKey("list-failed");
                     Parallel.For(0, seeds, i =>
                     {
                         ulong seed = seed0 + (ulong)i;
-                        var r = RunOne(move, entry, tuning, sheet, keeper, seed, -1);
+                        var r = RunOne(move, entry, tuning, sheet, keeper, seed, -1, listFailed);
                         if (r.Made) r.BaseT90 = RunOne(move, entry, tuning, sheet, keeper, seed, r.End).T90;
                         results[i] = r;
                     });
+                    if (listFailed)
+                        for (int i = 0; i < seeds; i++) if (!results[i].Made) Console.WriteLine($"NOT MADE {move.Name} {entry} rating {rating} seed {seed0 + (ulong)i}: {results[i].Diag}");
                     string Pct(Func<Result, bool> f) => (100.0 * results.Count(f) / seeds).ToString("F0", CultureInfo.InvariantCulture);
                     string Mean(Func<Result, float> f)
                     {
@@ -176,7 +181,7 @@ static class SkillProbe
     /// One run. With <paramref name="baselineTurn"/> at -1, the move: its trace from the gesture tick, then the exit with
     /// sprint once it has ended. Otherwise the baseline: no trace, the exit with sprint from that tick.
     /// </summary>
-    static Result RunOne(Move move, string entry, Tuning t, PlayerSheet sheet, PlayerSheet keeper, ulong seed, int baselineTurn)
+    static Result RunOne(Move move, string entry, Tuning t, PlayerSheet sheet, PlayerSheet keeper, ulong seed, int baselineTurn, bool diag = false)
     {
         var sc = new Scenario
         {
@@ -213,6 +218,8 @@ static class SkillProbe
             }
             buf[0] = it;
             w.Step(buf);
+            if (diag && !baseline && i >= 0 && i < 40 && i % 4 == 0)
+                res.Diag += $" [g+{i} dist {TouchModel.HorizontalDistance(p.Position, w.Ball.Position):F2} ahead {(w.Ball.Position.X - p.Position.X):F2} bv {w.Ball.Velocity.X:F2} pv {p.Velocity.X:F2} act {p.Action?.Kind}/{p.Action?.Phase} eta {p.ActionContactEta:F2} skill {p.SkillMove?.Kind} gest {p.LastGesture}@{p.LastGestureTick - g0}]";
             foreach (var e in w.Events)
             {
                 if (e.Team != 0 || e.PlayerIndex != 0) continue;

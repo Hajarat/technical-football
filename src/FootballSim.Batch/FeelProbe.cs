@@ -61,6 +61,7 @@ static class FeelProbe
         public readonly List<float> Speed = new(), Surge = new(), RunSurge = new(), Steer = new(), Acc = new(), Interval = new(),
             Dist = new(), Lateral = new(), FacingRate = new(), SteerLong = new(), SteerLat = new();
         public int Touches;
+        public readonly SpeedSteps Steps = new();
     }
 
     static void RunStraight(Tuning t, PlayerSheet sheet, PlayerSheet keeper, ulong seed, TickIntent stick, float seconds, Straight st)
@@ -75,7 +76,9 @@ static class FeelProbe
         for (int i = 1; i <= ticks && w.State == RoundState.Live; i++)
         {
             buf[0] = stick;
+            st.Steps.Before(p);
             w.Step(buf);
+            st.Steps.After(p, t.Dt, i > t.TickRate);
             bool touched = w.Events.Any(e => e.Team == 0 && e.PlayerIndex == 0 && e.Kind == EventKind.Touch);
             float sp = new Vector2(p.Velocity.X, p.Velocity.Z).Length();
             if (i > from)
@@ -107,6 +110,7 @@ static class FeelProbe
     {
         public readonly List<float> T90 = new(), FacingT90 = new(), Dip = new();
         public int Kept, Runs;
+        public readonly SpeedSteps Steps = new();
     }
 
     static void RunTurn(Tuning t, PlayerSheet sheet, PlayerSheet keeper, ulong seed, bool sprint, float deg, bool withBall, Turn st)
@@ -124,7 +128,9 @@ static class FeelProbe
         for (int i = 1; i <= pre + post && w.State == RoundState.Live; i++)
         {
             buf[0] = i <= pre ? Dir(0f, sp) : Dir(deg, sp);
+            st.Steps.Before(p);
             w.Step(buf);
+            st.Steps.After(p, t.Dt, i > t.TickRate);
             if (withBall && i > t.TickRate && !p.InPossession) lost = true;
             float speed = new Vector2(p.Velocity.X, p.Velocity.Z).Length();
             if (i == pre) before = speed;
@@ -150,12 +156,13 @@ static class FeelProbe
         var sheet = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", attackerId + ".json")).Value;
         var keeper = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", "the_wall.json")).Value;
         if (sheet == null || keeper == null) { Console.Error.WriteLine("players not found"); return 1; }
+        if (opts.TryGetValue("rtrace", out var rtf)) return ReplayTrace.Run(rtf, dataDir, tuning, opts);
         if (opts.TryGetValue("replays", out var rp)) return RunReplays(rp, dataDir, tuning);
         if (opts.TryGetValue("trace", out var tr)) return Trace(tr, tuning, sheet, keeper, opts);
 
         Console.WriteLine($"feel probe: attacker={attackerId} seeds={seeds}");
-        Console.WriteLine("straight dribbles, 3-10 s: speed m/s, surge = max-min speed between touches (all / running speed only), acc = |dv|/dt m/s^2 per tick, interval s, ball distance from the feet m, lateral = sideways spread of the ball sd m, facing = |turn rate| of the facing, deg/s (p99, max)");
-        Console.WriteLine("run           speed  cv     surge  surge_pct  run_surge  steer  st_long  st_lat  acc_p99  acc_max  interval  int_sd  int_cv  dist_p10  dist_p50  dist_p90  lateral_sd  facing_p99  facing_max  touches_s");
+        Console.WriteLine("straight dribbles, 3-10 s: speed m/s, surge = max-min speed between touches (all / running speed only), acc = |dv|/dt m/s^2 per tick, interval s, ball distance from the feet m, lateral = sideways spread of the ball sd m, facing = |turn rate| of the facing, deg/s (p99, max); steps = ticks from 1 s on with the ball whose |d|v||/dt is over 15 m/s^2 (skill-move ticks included; skill = those among them), over all seeds");
+        Console.WriteLine("run           speed  cv     surge  surge_pct  run_surge  steer  st_long  st_lat  acc_p99  acc_max  interval  int_sd  int_cv  dist_p10  dist_p50  dist_p90  lateral_sd  facing_p99  facing_max  touches_s  steps  skill");
         foreach (var (name, stick) in new[] { ("jog", Dir(0f)), ("sprint", Dir(0f, 1f)), ("close", Dir(0f, 0f, true)), ("walk_0.5", Dir(0f, 0f, false, 0.5f)) })
         {
             var st = new Straight();
@@ -169,11 +176,12 @@ static class FeelProbe
                 F(Mean(st.Interval), 3).PadLeft(8), F(Std(st.Interval), 3).PadLeft(6), F(Std(st.Interval) / Mean(st.Interval), 3).PadLeft(6),
                 F(Pct(st.Dist, 0.1)).PadLeft(8), F(Pct(st.Dist, 0.5)).PadLeft(8), F(Pct(st.Dist, 0.9)).PadLeft(8), F(Std(st.Lateral), 3).PadLeft(10),
                 F(Pct(st.FacingRate, 0.99), 1).PadLeft(10), F(st.FacingRate.Max(), 1).PadLeft(10), F(st.Touches / (7.0 * seeds)).PadLeft(9),
+                st.Steps.Steps.ToString().PadLeft(5), st.Steps.SkillSteps.ToString().PadLeft(5),
             }));
         }
         Console.WriteLine();
-        Console.WriteLine("heading response: stick turned at once after 3.0-3.7 s straight (by seed); t90 = s until the velocity's direction is within 10% of the turn (median, p90), facing_t90 the same for the facing, dip = lowest speed / speed before (median)");
-        Console.WriteLine("ball     pace    turn  t90_p50  t90_p90  facing_t90  dip_p50  kept_pct");
+        Console.WriteLine("heading response: stick turned at once after 3.0-3.7 s straight (by seed); t90 = s until the velocity's direction is within 10% of the turn (median, p90), facing_t90 the same for the facing, dip = lowest speed / speed before (median); steps / skill as above, with the ball");
+        Console.WriteLine("ball     pace    turn  t90_p50  t90_p90  facing_t90  dip_p50  kept_pct  steps  skill");
         foreach (bool withBall in new[] { true, false })
         foreach (bool sprint in new[] { false, true })
         foreach (float deg in new[] { 45f, 90f, 180f })
@@ -185,6 +193,7 @@ static class FeelProbe
                 (withBall ? "with" : "without").PadRight(7), (sprint ? "sprint" : "jog").PadRight(6), F(deg, 0).PadLeft(4),
                 F(Pct(st.T90, 0.5)).PadLeft(7), F(Pct(st.T90, 0.9)).PadLeft(7), F(Pct(st.FacingT90, 0.5)).PadLeft(10), F(Pct(st.Dip, 0.5)).PadLeft(7),
                 (withBall ? F(100.0 * st.Kept / st.Runs, 0) : "-").PadLeft(8),
+                (withBall ? st.Steps.Steps.ToString() : "-").PadLeft(5), (withBall ? st.Steps.SkillSteps.ToString() : "-").PadLeft(5),
             }));
         }
         return 0;
@@ -231,13 +240,17 @@ static class FeelProbe
         return 0;
     }
 
-    /// <summary>Per recorded round: per-tick acceleration and the speed surge between touches while in possession.</summary>
+    /// <summary>
+    /// Per recorded round: per-tick acceleration and speed steps while in possession (see <see cref="SpeedSteps"/>: skill-move
+    /// ticks included and counted on their own, shots excluded), and the speed surge between touches. A folder is searched
+    /// with its subfolders, so a folder of session folders gives every round in them.
+    /// </summary>
     static int RunReplays(string path, string dataDir, Tuning tuning)
     {
         var files = Directory.Exists(path) ? Directory.GetFiles(path, "round-*.json", SearchOption.AllDirectories).OrderBy(f => f).ToArray() : new[] { path };
-        Console.WriteLine("replays (attacker in possession, no skill move or shot): acc = |dv|/dt m/s^2 per tick (turning included); dspd = |d speed|/dt m/s^2 per tick; steps = ticks with dspd over 15 m/s^2 (a speed step); surge = max-min speed between touches with the stick unchanged; interval cv over runs of same-stick touches");
-        Console.WriteLine("file                                              ticks  acc_p99  acc_max  dspd_p99  dspd_max  steps  surge_mean  surge_p90  touches  int_cv  worst");
-        var allAcc = new List<float>(); var allSurge = new List<float>(); var allCv = new List<float>(); var allDs = new List<float>(); int allSteps = 0, allTicks = 0;
+        Console.WriteLine("replays (attacker in possession, shots excluded, skill moves included): acc = |dv|/dt m/s^2 per tick (turning included); dspd = |d speed|/dt m/s^2 per tick; steps = ticks with dspd over 15 m/s^2 (a speed step), skill = those during a skill move; surge = max-min speed between touches with the stick unchanged; interval cv over runs of same-stick touches");
+        Console.WriteLine("file                                              ticks  acc_p99  acc_max  dspd_p99  dspd_max  steps  skill  surge_mean  surge_p90  touches  int_cv  worst");
+        var all = new SpeedSteps(); var allSurge = new List<float>(); var allCv = new List<float>();
         foreach (var f in files)
         {
             var replay = Replay.Load(f, out var err);
@@ -251,32 +264,30 @@ static class FeelProbe
             var buf = new TickIntent[w.PlayerCount];
             int per = Math.Max(1, replay.PlayersPerTick);
             var p = w.Attacker;
-            var acc = new List<float>(); var surge = new List<float>(); var intervals = new List<float>(); var cvs = new List<float>(); var ds = new List<float>();
+            var steps = new SpeedSteps(); var surge = new List<float>(); var intervals = new List<float>(); var cvs = new List<float>();
             float worstDs = 0f; string worst = "-";
-            Vector3 v0 = p.Velocity;
-            int lastTouch = -1, steps = 0, touches = 0;
+            int lastTouch = -1, touches = 0;
             float wMin = float.MaxValue, wMax = 0f;
             Vector2 lastStick = Vector2.Zero; bool lastSprint = false; bool clean = false;
-            for (int i = 0; i < replay.TickCount && w.State == RoundState.Live; i++)
+            for (int i = 0; i < replay.TickCount && w.State != RoundState.Report; i++)
             {
                 Array.Clear(buf);
                 for (int k = 0; k < buf.Length && k < per; k++) buf[k] = replay.Intents[i * per + k].ToIntent();
+                if (w.State != RoundState.Live) { w.Step(buf); continue; }
                 var stick = buf[0].Move; bool spr = buf[0].Sprint >= 0.5f;
                 bool same = Vector2.Distance(stick, lastStick) < 0.05f && spr == lastSprint;
                 if (!same) { clean = false; if (intervals.Count >= 3) cvs.Add((float)(Std(intervals) / Mean(intervals))); intervals.Clear(); }
                 lastStick = stick; lastSprint = spr;
-                bool hadBall = p.InPossession;
+                steps.Before(p);
+                float dsMax0 = steps.DspdMax;
                 w.Step(buf);
                 bool touched = w.Events.Any(e => e.Team == 0 && e.PlayerIndex == 0 && e.Kind == EventKind.Touch);
                 float sp = new Vector2(p.Velocity.X, p.Velocity.Z).Length();
-                if (hadBall && p.InPossession && p.SkillMove == null && p.ShotAction() == null)
+                int n0 = steps.Ticks;
+                steps.After(p, tuning.Dt, w.State == RoundState.Live);
+                if (steps.Ticks > n0)
                 {
-                    float a = new Vector2(p.Velocity.X - v0.X, p.Velocity.Z - v0.Z).Length() / tuning.Dt;
-                    acc.Add(a);
-                    float d = MathF.Abs(sp - new Vector2(v0.X, v0.Z).Length()) / tuning.Dt;
-                    ds.Add(d);
-                    if (d > 15f) steps++;
-                    if (d > worstDs) { worstDs = d; worst = $"t={i * tuning.Dt:F2}s:{p.TouchAction?.Kind}@({p.Position.X:F1},{p.Position.Z:F1})"; }
+                    if (steps.DspdMax > dsMax0 && steps.DspdMax > worstDs) { worstDs = steps.DspdMax; worst = $"t={i * tuning.Dt:F2}s:{(p.SkillMove != null ? "skill " + p.SkillMove.Kind : p.TouchAction?.Kind.ToString())}@({p.Position.X:F1},{p.Position.Z:F1})"; }
                     wMin = MathF.Min(wMin, sp); wMax = MathF.Max(wMax, sp);
                 }
                 if (touched)
@@ -285,25 +296,22 @@ static class FeelProbe
                     if (clean && lastTouch >= 0 && wMax > 0f && stick.Length() > 0.1f) { surge.Add(wMax - wMin); intervals.Add((i - lastTouch) * tuning.Dt); }
                     clean = true; lastTouch = i; wMin = float.MaxValue; wMax = 0f;
                 }
-                v0 = p.Velocity;
             }
             if (intervals.Count >= 3) cvs.Add((float)(Std(intervals) / Mean(intervals)));
-            allAcc.AddRange(acc); allSurge.AddRange(surge); allCv.AddRange(cvs); allDs.AddRange(ds); allSteps += steps; allTicks += acc.Count;
+            all.Add(steps); allSurge.AddRange(surge); allCv.AddRange(cvs);
             string name = Path.GetFileName(Path.GetDirectoryName(f)) + "/" + Path.GetFileName(f);
             Console.WriteLine(string.Join("  ", new[]
             {
-                name.PadRight(48), acc.Count.ToString().PadLeft(5), F(Pct(acc, 0.99), 1).PadLeft(7), F(acc.Count == 0 ? 0 : acc.Max(), 1).PadLeft(7),
-                F(Pct(ds, 0.99), 1).PadLeft(8), F(worstDs, 1).PadLeft(8),
-                steps.ToString().PadLeft(5), F(Mean(surge)).PadLeft(10), F(Pct(surge, 0.9)).PadLeft(9), touches.ToString().PadLeft(7), F(Mean(cvs), 3).PadLeft(6), worst,
+                name.PadRight(48), steps.Ticks.ToString().PadLeft(5), F(steps.AccP99, 1).PadLeft(7), F(steps.AccMax, 1).PadLeft(7),
+                F(steps.DspdP99, 1).PadLeft(8), F(steps.DspdMax, 1).PadLeft(8),
+                steps.Steps.ToString().PadLeft(5), steps.SkillSteps.ToString().PadLeft(5), F(Mean(surge)).PadLeft(10), F(Pct(surge, 0.9)).PadLeft(9), touches.ToString().PadLeft(7), F(Mean(cvs), 3).PadLeft(6), worst,
             }));
         }
-        Console.WriteLine($"all: ticks {allTicks}  acc_p99 {F(Pct(allAcc, 0.99), 1)}  acc_max {F(allAcc.Count == 0 ? 0 : allAcc.Max(), 1)}  dspd_p99 {F(Pct(allDs, 0.99), 1)}  dspd_max {F(allDs.Count == 0 ? 0 : allDs.Max(), 1)}  steps {allSteps} ({F(1000.0 * allSteps / Math.Max(1, allTicks), 1)} per 1000 ticks)  surge_mean {F(Mean(allSurge))}  surge_p90 {F(Pct(allSurge, 0.9))}  int_cv {F(Mean(allCv), 3)}");
+        Console.WriteLine($"all: ticks {all.Ticks}  acc_p99 {F(all.AccP99, 1)}  acc_max {F(all.AccMax, 1)}  dspd_p99 {F(all.DspdP99, 1)}  dspd_max {F(all.DspdMax, 1)}  steps {all.Steps} ({F(all.PerThousand, 1)} per 1000 ticks, skill {all.SkillSteps})  surge_mean {F(Mean(allSurge))}  surge_p90 {F(Pct(allSurge, 0.9))}  int_cv {F(Mean(allCv), 3)}");
         return 0;
     }
 
     /// <summary>The planned touch's legs mode (internal to the core), for the trace only.</summary>
     static readonly System.Reflection.FieldInfo LegsField =
         typeof(BallAction).GetField("Legs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-
-    static BallAction? ShotAction(this PlayerState p) => p.Action is { } a && a.Kind >= ActionKind.Power ? a : null;
 }

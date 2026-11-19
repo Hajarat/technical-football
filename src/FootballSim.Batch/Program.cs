@@ -13,10 +13,15 @@ using FootballSim.Core;
 //   ... --probe dribble --only close_reverse_flick --save-replay <file> [--index 0] [--in halfway_run]
 //                                               plays one probe trace in a real scenario and saves its replay (for screenshots)
 //                                               runs the dribble probes (no keeper involved) and prints their metrics
-//   ... --probe sessions [--replays <dir|file>]  re-runs play-test rounds and counts touches dropped at contact and slowdown plans
+//   ... --probe dribble --dtrace <probe> --ratings R [--index i] [--seeds n] [--from T --to T] [--steps-only 1]
+//                                               traces one probe tick by tick (diagnostic)
+//   ... --probe sessions [--replays <dir|file>]  re-runs play-test rounds (a folder with its subfolders) and counts touches dropped
+//                                               at contact, slowdown plans with the stick pushed and speed steps in possession
 //   ... --probe feel [--seeds 20] [--replays <dir|file>]
-//                                               speed surges, acceleration, touch cadence and heading response of dribbling
-//   ... --skill-probe [--seeds 50] [--ratings 1,50,99] [--only step_over,...]
+//                                               speed surges, acceleration, speed steps, touch cadence and heading response of dribbling
+//   ... --probe feel --rtrace <replay> [--from T --to T] [--steps-only 1]
+//                                               traces one recorded round tick by tick and attributes its speed steps (diagnostic)
+//   ... --skill-probe [--seeds 50] [--ratings 1,50,99] [--only step_over,...] [--list-failed 1]
 //                                               runs the skill-move probes (scripted right-stick traces) and prints their metrics
 //   ... --write-skill-replays <dir>             writes one replay per skill move (edge_of_box start) for game screenshots
 //   ... --write-keeper-replays <dir>            searches scripted rounds for each visible keeper action and writes one replay each
