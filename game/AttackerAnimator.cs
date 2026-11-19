@@ -255,8 +255,6 @@ public partial class PlayerFigure
     readonly bool[] _mLockWas = new bool[2];
     /// <summary>How fast the mocap weight follows its target (seconds); the walking pace below which the cycles give way to the procedural steps.</summary>
     const float MocapTau = 0.10f, MocapFromMs = 0.7f, MocapFullMs = 1.5f;
-    /// <summary>Extra forward lean (radians) when running faster than the cycles' own speed, at 2.2 m/s over it.</summary>
-    const float MocapOverLean = 0.10f;
 
     static readonly bool Log = System.Environment.GetEnvironmentVariable("ATTACKER_ANIM_LOG") == "1";
     bool MocapLogOn => Log && !IsKeeper;
@@ -493,7 +491,8 @@ public partial class PlayerFigure
     Basis MocapPelvisBasis(Basis P, Vector3 fwd, Vector3 right)
     {
         if (_atkAnim == null || _mW <= 0f) return P;
-        float lean = (_lean - SpeedLean) + MocapOverLean * Mathf.Clamp((_speedS - _atkAnim.NativeSpeed) / 2.2f, 0f, 1f);
+        // the acceleration lean only (the figure's lean less its speed lean): the cycles carry their own lean with speed
+        float lean = _lean - SpeedLean;
         Basis pm = new Basis(right, -lean) * new Basis(fwd, _bank) * _atkAnim.PelvisBasis;
         return P.Orthonormalized().Slerp(pm.Orthonormalized(), _mW);
     }
@@ -559,6 +558,14 @@ public partial class PlayerFigure
         Stats.MocapTicks++; if (_mW >= 0.999f) Stats.MocapFull++;
     }
 
+    /// <summary>Whether driven bone <paramref name="k"/> is the foot or toes of a foot playing the ball this tick (touch pose, skill or kick weight).</summary>
+    bool PlayingFootBone(in FigureFrame f, int k)
+    {
+        int side = k is 12 or 13 ? 0 : k is 20 or 21 ? 1 : -1;   // driven order: left foot 12, toe 13; right 20, 21
+        if (side < 0) return false;
+        return _twPrev[side] > 0f || _kW > 0f && side == _kFoot || f.Skill.Valid && (f.Skill.Right ? 1 : 0) == side;
+    }
+
     /// <summary>The fastest bone turn of the tick (local rotations, outside shots) into the stats; returns whether a shot is under way.</summary>
     bool BoneSpeeds(in FigureFrame f, SkinnedBody b, float dt)
     {
@@ -568,6 +575,13 @@ public partial class PlayerFigure
             for (int k = 0; k < n; k++)
             {
                 float deg = _bonePrev[k].AngleTo(b.DrivenLocalRotation(k)) * 180f / Mathf.Pi / dt;
+                // the playing foot turning onto its surface (a touch's windup and contact, a skill move, a kick) is reported apart
+                if (PlayingFootBone(f, k))
+                {
+                    if (deg > 1500f) Stats.FootTurnFast++;
+                    if (deg > Stats.FootTurnMaxDegS) { Stats.FootTurnMaxDegS = deg; Stats.FootTurnAt = $"{b.DrivenBoneNames[k]}@{Stats.Tick}"; }
+                    continue;
+                }
                 if (deg > 1500f) { Stats.BoneFast++; if (Log) GD.Print($"MOCAP_FAST tick={Stats.Tick} bone={b.DrivenBoneNames[k]} deg_s={deg:F0} w={_mW:F2} knee_deg={KneeDeg(b, k):F1} reach={Reach(b, k):F3}"); }
                 if (deg > Stats.BoneMaxDegS) { Stats.BoneMaxDegS = deg; Stats.BoneMaxAt = $"{b.DrivenBoneNames[k]}@{Stats.Tick}"; }
             }

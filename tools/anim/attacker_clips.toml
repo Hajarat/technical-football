@@ -190,19 +190,19 @@ notes = "brisk walk, 1.8 m/s on the model"
 name = "cycle_jog"
 clip = "jog_16_36"
 frames = [39, 86]
-blend_speed = 2.8
-notes = "relaxed jog, 2.9 m/s; close control (2.6 m/s) is mostly this one"
+blend_speed = 4.0
+notes = "relaxed jog, 2.9 m/s; with the walk in close control (2.6 m/s), with the upright run at the game's jog (4.85 m/s)"
 
 [[cycle]]
 name = "cycle_run"
 clip = "run_16_46"
 frames = [10, 51]
-blend_speed = 3.7
-notes = "upright run, 4.5 m/s; only between the jog and the athletic run"
+blend_speed = 5.8
+notes = "upright run, 4.5 m/s; half of the game's jog, half of its sprint"
 
 [[cycle]]
 name = "cycle_sprint"
 clip = "run_78_12"
 frames = [7, 46]
-blend_speed = 4.5
-notes = "athletic run (lean, knee lift, arm drive), 5.2 m/s; everything from 4.5 m/s up, its stride lengthened above 5.2"
+blend_speed = 10.0
+notes = "athletic run (lean, knee lift, arm drive), 5.2 m/s; takes over toward the sprint (40 per cent of it at 7.4 m/s), its stance shortened above its own step"

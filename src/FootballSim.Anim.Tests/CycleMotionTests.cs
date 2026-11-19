@@ -100,9 +100,11 @@ public class CycleMotionTests
         var (_, cycles, _) = Load();
         var w = new float[cycles.Count];
         CycleMotion.TargetWeights(cycles, 1.0f, w); Assert.Equal(new[] { 1f, 0f, 0f, 0f }, w);
-        CycleMotion.TargetWeights(cycles, 2.6f, w); Assert.True(w[1] > 0.7f && Math.Abs(w.Sum() - 1f) < 1e-5f && w[0] > 0f);
-        CycleMotion.TargetWeights(cycles, 4.85f, w); Assert.Equal(new[] { 0f, 0f, 0f, 1f }, w);
-        CycleMotion.TargetWeights(cycles, 7.36f, w); Assert.Equal(new[] { 0f, 0f, 0f, 1f }, w);
+        // close control: walk and jog; the game's jog: jog and the upright run; its sprint: the upright and the athletic run
+        CycleMotion.TargetWeights(cycles, 2.6f, w); Assert.True(w[0] > 0.5f && w[1] > 0.3f && Math.Abs(w.Sum() - 1f) < 1e-5f);
+        CycleMotion.TargetWeights(cycles, 4.85f, w); Assert.True(w[1] > 0.4f && w[2] > 0.4f && w[3] == 0f);
+        CycleMotion.TargetWeights(cycles, 7.36f, w); Assert.True(w[2] > 0.4f && w[3] > 0.4f && w[1] == 0f);
+        CycleMotion.TargetWeights(cycles, 10.5f, w); Assert.Equal(new[] { 0f, 0f, 0f, 1f }, w);
     }
 
     [Fact]
@@ -113,11 +115,11 @@ public class CycleMotionTests
         var pose = new Quaternion[sk.Count];
         m.Step(0f, 1.8f, 1f / 120f, pose);
         Assert.Equal(1f, m.Weights[0], 4);
-        m.Step(0.01f, 6f, 1f / 120f, pose);
+        m.Step(0.01f, 10.5f, 1f / 120f, pose);
         Assert.True(m.Weights[0] > 0.9f && m.Weights[3] > 0f && m.Weights[3] < 0.1f);
         float sum = 0f; foreach (var x in m.Weights) sum += x;
         Assert.Equal(1f, sum, 4);
-        for (int i = 0; i < 240; i++) m.Step(0.01f * i, 6f, 1f / 120f, pose);
+        for (int i = 0; i < 240; i++) m.Step(0.01f * i, 10.5f, 1f / 120f, pose);
         Assert.True(m.Weights[3] > 0.99f);
     }
 

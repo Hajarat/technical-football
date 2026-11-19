@@ -355,7 +355,7 @@
    "speed": 2.878,
    "steps_per_s": 2.5532,
    "step_m": 1.1272,
-   "blend_speed": 2.8,
+   "blend_speed": 4.0,
    "stance_share": {
     "left": 0.383,
     "right": 0.404
@@ -363,7 +363,7 @@
    "close_mean_deg": 2.83,
    "close_max_deg": 11.47,
    "close_hips_cm": 1.98,
-   "notes": "relaxed jog, 2.9 m/s; close control (2.6 m/s) is mostly this one"
+   "notes": "relaxed jog, 2.9 m/s; with the walk in close control (2.6 m/s), with the upright run at the game's jog (4.85 m/s)"
   },
   {
    "name": "cycle_run",
@@ -389,7 +389,7 @@
    "speed": 4.4466,
    "steps_per_s": 2.9268,
    "step_m": 1.5193,
-   "blend_speed": 3.7,
+   "blend_speed": 5.8,
    "stance_share": {
     "left": 0.317,
     "right": 0.366
@@ -397,7 +397,7 @@
    "close_mean_deg": 6.32,
    "close_max_deg": 15.03,
    "close_hips_cm": 3.24,
-   "notes": "upright run, 4.5 m/s; only between the jog and the athletic run"
+   "notes": "upright run, 4.5 m/s; half of the game's jog, half of its sprint"
   },
   {
    "name": "cycle_sprint",
@@ -423,7 +423,7 @@
    "speed": 5.1881,
    "steps_per_s": 3.0769,
    "step_m": 1.6861,
-   "blend_speed": 4.5,
+   "blend_speed": 10.0,
    "stance_share": {
     "left": 0.282,
     "right": 0.256
@@ -431,7 +431,7 @@
    "close_mean_deg": 6.31,
    "close_max_deg": 19.82,
    "close_hips_cm": 1.86,
-   "notes": "athletic run (lean, knee lift, arm drive), 5.2 m/s; everything from 4.5 m/s up, its stride lengthened above 5.2"
+   "notes": "athletic run (lean, knee lift, arm drive), 5.2 m/s; takes over toward the sprint (40 per cent of it at 7.4 m/s), its stance shortened above its own step"
   }
  ]
 }

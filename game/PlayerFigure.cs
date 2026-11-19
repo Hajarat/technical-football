@@ -167,17 +167,21 @@ public sealed class FigureStats
     /// The outfield body's shape (BODY_POSE): mean trunk lean while running steadily (no acceleration to speak of) at a jog (4-5.8 m/s) and a
     /// sprint (above 6.8 m/s), the largest bank, the elbow's inside angle range while running, and the mean running pelvis ratio.
     /// </summary>
+    public float LeanCloseSum; public int LeanCloseN;
     public float LeanJogSum, LeanSprintSum, BankMaxDeg, ElbowMinDeg = float.MaxValue, ElbowMaxDeg, RunRatioSum; public int LeanJogN, LeanSprintN, RunRatioN;
     public string BodyLine() =>
         $"BODY_POSE lean_jog_deg={(LeanJogN > 0 ? LeanJogSum / LeanJogN : float.NaN):F1} lean_sprint_deg={(LeanSprintN > 0 ? LeanSprintSum / LeanSprintN : float.NaN):F1} bank_max_deg={BankMaxDeg:F1}" +
-        $" elbow_deg_min={(ElbowMinDeg == float.MaxValue ? float.NaN : ElbowMinDeg):F0} elbow_deg_max={ElbowMaxDeg:F0} run_pelvis_ratio_mean={(RunRatioN > 0 ? RunRatioSum / RunRatioN : float.NaN):F3}";
+        $" lean_close_deg={(LeanCloseN > 0 ? LeanCloseSum / LeanCloseN : float.NaN):F1} elbow_deg_min={(ElbowMinDeg == float.MaxValue ? float.NaN : ElbowMinDeg):F0} elbow_deg_max={ElbowMaxDeg:F0} run_pelvis_ratio_mean={(RunRatioN > 0 ? RunRatioSum / RunRatioN : float.NaN):F3}";
     /// <summary>
     /// The shown pose in --attacker-anim mocap: the lowest toe tip, the fastest bone turn (local, degrees per second; shots left out)
     /// and where, ticks over 1,500 deg/s, and the ticks measured and those drawn wholly from the cycles.
     /// </summary>
     public float MinToeYM = float.MaxValue, BoneMaxDegS; public string BoneMaxAt = "-"; public int BoneFast, MocapTicks, MocapFull;
+    /// <summary>The same for the playing foot's own bones (foot, toes) while it plays the ball (touch, skill move, kick): exempt from the body check, reported apart.</summary>
+    public float FootTurnMaxDegS; public string FootTurnAt = "-"; public int FootTurnFast;
     public string MocapLine() =>
-        $"MOCAP_POSE min_toe_y_m={(MinToeYM == float.MaxValue ? float.NaN : MinToeYM):F3} bone_max_deg_s={BoneMaxDegS:F0} at={BoneMaxAt} bone_over_1500={BoneFast} ticks={MocapTicks} full_mocap_ticks={MocapFull}";
+        $"MOCAP_POSE min_toe_y_m={(MinToeYM == float.MaxValue ? float.NaN : MinToeYM):F3} bone_max_deg_s={BoneMaxDegS:F0} at={BoneMaxAt} bone_over_1500={BoneFast} ticks={MocapTicks} full_mocap_ticks={MocapFull}" +
+        $"\nPLAYING_FOOT_TURN max_deg_s={FootTurnMaxDegS:F0} at={FootTurnAt} over_1500={FootTurnFast}";
     /// <summary>Touches counted, and those where the foot drawn in the swing differs from the simulation's action foot.</summary>
     public int Touches, FootMismatches;
 
@@ -954,7 +958,7 @@ public partial class PlayerFigure : Node3D
         {
             Stats.BankMaxDeg = Math.Max(Stats.BankMaxDeg, Math.Abs(_bank) * 180f / Mathf.Pi);
             bool steady = running0 && Math.Abs(_accFS) < 1f;
-            if (_atkAnim == null) LeanStats(running0, speed, lean);   // mocap: from the shown pose, after it is drawn
+            if (_atkAnim == null) LeanStats(running0, speed, lean, f.CloseControl);   // mocap: from the shown pose, after it is drawn
         }
         // the speed lean tips the whole body forward from the ankles: the pelvis moves ahead of the feet, the trunk leans with it
         if (body) pel += fwd * (Mathf.Sin(SpeedLean) * LeanFromAnkles * (pel.Y - AnkleH) * (1f - _mW));
@@ -1040,7 +1044,7 @@ public partial class PlayerFigure : Node3D
             _headB = new Basis(hr, -_headPitch) * new Basis(hf, Vector3.Up, hr);
             RenderBody(pel, B, shoulderC, knee, ankEff, dir, handT, elbowPole);
             MocapShown(f, ankEff, knee, ref pel, ref lean, fwd, dt);
-            if (_atkAnim != null && Stats != null) LeanStats(running0, speed, lean);
+            if (_atkAnim != null && Stats != null) LeanStats(running0, speed, lean, f.CloseControl);
         }
         var posFlat = new Vector3(pos.X, 0, pos.Z);
         // the playing foot's per-tick move (body-relative and world), during the move and the three ticks after it
@@ -1150,9 +1154,10 @@ public partial class PlayerFigure : Node3D
     }
 
     /// <summary>BODY_POSE's mean running lean at a jog and a sprint (steady speed only).</summary>
-    void LeanStats(bool running0, float speed, float lean)
+    void LeanStats(bool running0, float speed, float lean, bool close)
     {
         bool steady = running0 && Math.Abs(_accFS) < 1f;
+        if (steady && close) { Stats!.LeanCloseSum += lean * 180f / Mathf.Pi; Stats.LeanCloseN++; }
         if (steady && speed >= 4f && speed < 5.8f) { Stats!.LeanJogSum += lean * 180f / Mathf.Pi; Stats.LeanJogN++; }
         if (steady && speed >= 6.8f) { Stats!.LeanSprintSum += lean * 180f / Mathf.Pi; Stats.LeanSprintN++; }
     }
