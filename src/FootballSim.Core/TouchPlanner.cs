@@ -1330,6 +1330,8 @@ public static class TouchPlanner
                 bool reversal = !first && turnDeg >= k.FeetTurnDeg && p.RunSpeed > k.ExecutionMinSpeed;
                 hasMeet = reversal ? FindReversalMeet(p, intent, now, t, pitch, out meet) : FindMeet(p, intent, steps, 0, now, t, pitch, out meet);
                 if (reversal && hasMeet) steps = Math.Max(1, meet.Swings);
+                // A push cut short by MaxMeetSeconds counts the steps it was solved for, so the next touch is played there.
+                else if (hasMeet) steps = Math.Max(1, Math.Min(steps, meet.Swings));
                 Vector3 target = hasMeet ? meet.Cp : p.Position + new Vector3(intent.Move.X, 0f, intent.Move.Y) * 2f;
                 float minPush = reversal ? 0f : TouchModel.MinPush(mode, t);
                 int ticks = hasMeet ? meet.J : Ticks(0.6f, t);

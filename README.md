@@ -66,8 +66,12 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
 - Touches: the stick pushed no further than `walk_max_input` (0.7, GOALS' MaximumInputSizeForWalkTouch) dribbles with
   walking touches, played as close control (a touch every step). A jog pushes the ball two steps on, and every
   `foot_switch_every`-th (4th) push takes one step more so the other foot takes over; a sprint 4 steps at dribbling 1, 3 from
-  about 27 and 2 from about 71 (`steps_per_touch.sprint`, 4 to 1.8 by rating). No push is solved for more than 1.1 s, nor
-  faster than the player can catch within 1.5 s (at his running speed, or 0.8 of his top speed). A sprint push runs out and
+  about 27 and 2 from about 71 (`steps_per_touch.sprint`, 4 to 1.8 by rating). While the stick turns smoothly faster than
+  `turning_stick_rate_deg` a push goes at most `turning_max_steps` steps on (2 at a jog, 3 at a sprint), and so does a sprint
+  push within 0.35 s of the stick changing by more than 10 degrees or of sprint pressed or let go. No push is solved for
+  more than 1.2 s (one cut short there is solved for the last step inside it that keeps the foot its steps would have
+  played, and the next touch is played on that step), nor faster than the player can catch within 1.5 s (at his running
+  speed, or 0.8 of his top speed). A sprint push runs out and
   comes back: its step is kept while the full speed trim can still reach the ball; a jog's or close control's while a
   quarter of it can, else an earlier step plays it.
 - The touch controller (a closed loop, `TouchPlanner`): every tick in possession it predicts the stick's legs and the free
