@@ -158,6 +158,8 @@ public sealed class FigureStats
     /// <summary>The same per-tick foot move (body-relative, either foot) outside skill moves, for scale: ordinary running and touches.</summary>
     public float PlainFootJumpBody;
     public readonly List<float> Contact = new(), ContactTouch = new(), ContactStrike = new(), Slide = new(), Skin = new(), TouchMiss = new(), ContactBall = new();
+    /// <summary>The keeper's planted-foot slides (his rush and charge reuse the run cycle), kept apart from the attacker's <see cref="Slide"/>.</summary>
+    public readonly List<float> SlideKeeper = new();
     public float MinPelvisRatio = float.MaxValue, MinKneeM = float.MaxValue, MinLimbYM = float.MaxValue, LeanMinDeg = float.MaxValue, LeanMaxDeg = float.MinValue;
     /// <summary>Running only (speed above 2 m/s, no shot under way): lowest pelvis ratio (close control apart), lowest in close control, largest |lean|, largest per-step bob.</summary>
     public float RunMinPelvisRatio = float.MaxValue, CloseMinPelvisRatio = float.MaxValue, RunLeanMaxDeg, RunBobMaxM;
@@ -225,7 +227,8 @@ public sealed class FigureStats
     public string ContactLine() => Line("FOOT_CONTACT", Contact);
     public string ContactTouchLine() => Line("FOOT_CONTACT_TOUCH", ContactTouch);
     public string ContactStrikeLine() => Line("FOOT_CONTACT_STRIKE", ContactStrike);
-    public string SlideLine() => Line("FOOT_SLIDE", Slide);
+    /// <summary>The attacker's planted-foot slide, then the keeper's on its own line.</summary>
+    public string SlideLine() => Line("FOOT_SLIDE", Slide) + "\n" + Line("FOOT_SLIDE_KEEPER", SlideKeeper);
     public string ContactBallLine() => Line("FOOT_CONTACT_BALL", ContactBall);
     public string SkinLine() => Line("SKIN_CONTACT", Skin);
     public string SkillLine() => Line("SKILL_CONTACT", SkillContact) + $" skill_min_pelvis_ratio={F(SkillMinPelvisRatio)} skill_lean_max_deg={SkillLeanMaxDeg:F1} foot_jump_body_m={SkillFootJumpBody:F3} foot_jump_world_m={SkillFootJumpWorld:F3} plain_foot_jump_body_m={PlainFootJumpBody:F3} sole_max_err_m={SkillSoleMaxErr:F3}";
@@ -337,6 +340,8 @@ public partial class PlayerFigure : Node3D
         public int Id = int.MinValue; public float Span = 0.12f;
         public Vector3 RelC; public float Psi;
         public int ContactId = int.MinValue, ContactTick;
+        /// <summary>The surface the windup is drawn with: the one the touch had when its windup began (the core may flip it for a tick or two before the contact).</summary>
+        public int SurfId = int.MinValue; public BootSurface Surf;
     }
 
     /// <summary>
@@ -378,6 +383,8 @@ public partial class PlayerFigure : Node3D
     /// launch: a turn touch would otherwise swing the foot's contact surface round the ball (and the ankle with it) in one tick.
     /// </summary>
     const float OutDirTurnRate = 4f * Mathf.Pi;
+    /// <summary>Seconds before a dribble touch's contact the foot starts toward it (the core's windup is shorter: the rest comes from its pre-windup).</summary>
+    const float TouchLead = 0.20f;
     readonly TouchFoot[] _tf = { new(), new() }, _tfUp = { new(), new() };
     /// <summary>Per foot: the touch pose drawn last tick came from an unmade touch (a windup or a predicted touch), its weight, and the ankle drawn
     /// (relative to the pelvis); a fade from that ankle when such a touch vanishes without contact, and how long is left of it.</summary>
@@ -463,8 +470,10 @@ public partial class PlayerFigure : Node3D
         _init = false;
         _strikeT = -1f; _windT = 0; _lastCharge = 0; _lean = 0; _leanExtraS = 0; _stActive = false; _pinWas = false; _skId = int.MinValue; _skJumpValid = false; _jN = 0; _jWasSkill = _jExit = false;
         _accFS = 0; _runPrev = float.NaN; _ratioS = 0.9945f; _bobStep = -1; _kInit = false;
-        foreach (var t in _tf) { t.Id = t.ContactId = int.MinValue; }
-        foreach (var t in _tfUp) { t.Id = t.ContactId = int.MinValue; }
+        _stepW = 0; _closeW = 0; _latS = 0; _bank = 0; _pelYaw = 0; _headYaw = float.NaN; _headPitch = 0;
+        for (int i = 0; i < 2; i++) { _cycPitch[i] = 0f; _cycToe[i] = 0f; }
+        foreach (var t in _tf) { t.Id = t.ContactId = t.SurfId = int.MinValue; }
+        foreach (var t in _tfUp) { t.Id = t.ContactId = t.SurfId = int.MinValue; }
         for (int i = 0; i < 2; i++) { _twPrev[i] = 0f; _kwPrev[i] = 0f; _dropT[i] = 0f; _ovWindPrev[i] = false; }
         _teleporting = true;
         _keeperAnim?.Teleport();
@@ -490,6 +499,58 @@ public partial class PlayerFigure : Node3D
 
     const float MaxLeanRad = 12f * Mathf.Pi / 180f;
 
+    // ---- the outfield body's layers (the keeper keeps his own pose code and none of these) ----
+    // Each is a smooth function of the simulation's stride clock and smoothed speed / acceleration, so no change of speed, direction or plan
+    // pops the pose, and nothing reads a clock or a random number.
+    /// <summary>Forward lean with speed (on top of the acceleration lean): radians at <see cref="SpeedLeanFullMs"/> and above, none below 1 m/s.</summary>
+    const float SpeedLeanMaxRad = 0.30f, SpeedLeanFullMs = 7.5f;
+    /// <summary>The share of the trunk's forward lean the pelvis takes (the spine bends the rest).</summary>
+    const float PelvisLeanShare = 0.5f;
+    /// <summary>Banking into a turn: roll = atan(lateral acceleration / g) * gain, capped; eased with the tau; the pelvis moves into the turn by
+    /// this fraction of its height times sin(roll) so the feet stay outside the body as they do on a real curve.</summary>
+    const float BankGain = 0.8f, BankMaxRad = 0.26f, BankTau = 0.08f, BankShift = 0.45f;
+    /// <summary>Pelvis yaw with the stride: radians per metre of fore-aft spread between the feet (the hip goes forward with its leg), capped; eased.</summary>
+    const float PelYawPerM = 0.16f, PelYawMax = 0.17f, PelYawTau = 0.04f;
+    /// <summary>The chest turns against the pelvis: its yaw is minus the pelvis's times this (walk to sprint).</summary>
+    const float ChestCounterWalk = 0.5f, ChestCounterSprint = 1.2f;
+    /// <summary>Pelvis drop on the swinging leg's side (radians), half of it taken back by the chest; pelvis shift over the stance foot (metres at 1.8 m).</summary>
+    const float PelDropRad = 0.07f, SwayM = 0.018f;
+    /// <summary>Pelvis bob amplitude (metres at 1.8 m), walking and running; lowest at mid-stance.</summary>
+    const float BobWalk = 0.010f, BobRun = 0.022f;
+    /// <summary>How fast the stepping, close-control and stride-shape weights follow their state.</summary>
+    const float StepWTau = 0.12f;
+    /// <summary>Swing ankle apex above its ground height (metres at 1.8 m): walk, extra by a run, extra at a sprint; the apex comes early (heel recovery behind the body).</summary>
+    const float SwingLiftWalk = 0.04f, SwingLiftRun = 0.10f, SwingLiftSprint = 0.10f, SwingApexPow = 0.8f;
+    /// <summary>
+    /// Foot pitch through the stride (radians, positive = toes up), each walk value plus the run extra: the heel strikes toes-up, the foot is
+    /// flat through mid-stance, rolls onto its toes to push off and folds toes-down behind in the heel recovery, then turns up for the next strike.
+    /// </summary>
+    const float HeelStrikeWalk = 0.10f, HeelStrikeRun = 0.14f, ToeOffWalk = 0.18f, ToeOffRun = 0.30f, RecoveryWalk = 0.30f, RecoveryRun = 0.65f, PitchTau = 0.025f;
+    /// <summary>Arms (radians): shoulder swing amplitude walk / run / extra at a sprint, a little forward at a run; elbow bend standing / walking /
+    /// running and its swing (more bent in front); out from the body by default, in close control and in a turn (at full bank).</summary>
+    const float ArmSwingWalk = 0.30f, ArmSwingRun = 0.62f, ArmSwingSprint = 0.25f, ArmForward = -0.05f;
+    const float ElbowStand = 0.25f, ElbowWalk = 0.55f, ElbowRun = 1.35f, ElbowSwing = 0.30f;
+    const float ArmOutBase = 0.15f, ArmOutClose = 0.22f, ArmOutTurn = 0.25f;
+    /// <summary>Head: stays level, looks along the travel and, with the ball, partly toward it (yaw share, pitch share of the angle down to it,
+    /// capped), within a yaw limit from the chest; eased with the tau.</summary>
+    const float HeadBallYaw = 0.45f, HeadBallPitch = 0.40f, HeadPitchMaxRad = 0.45f, HeadPitchBase = 0.06f, HeadYawMaxRad = 0.9f, HeadTau = 0.10f;
+    // their state: stepping / close-control weights, smoothed lateral acceleration, bank, pelvis yaw, head look, per-foot pitch and toe bend from the cycle
+    float _stepW, _closeW, _latS, _bank, _pelYaw, _headYaw = float.NaN, _headPitch;
+    readonly float[] _cycPitch = new float[2], _cycToe = new float[2];
+    /// <summary>How fast a foot may turn about the vertical outside a touch's windup and contact (radians per second); the yaw drawn last tick.</summary>
+    const float FootTurnRate = 3f * Mathf.Pi;
+    readonly float[] _yawOut = new float[2]; readonly bool[] _yawOutOk = new bool[2];
+    // what the render pass draws beyond the torso basis (outfield only)
+    bool _split; Basis _pelB, _headB; readonly float[] _pitch = new float[2], _toeBend = new float[2];
+
+    /// <summary>How far the ankle rises when the foot pitches by <paramref name="pitch"/> so the sole stays on the ground: about the ball of the foot when the heel is up, about the heel when the toes are up.</summary>
+    float PivotLift(float pitch)
+    {
+        float a = AnkleH, c = Mathf.Cos(pitch), s = Mathf.Sin(Math.Abs(pitch));
+        float lever = pitch < 0f ? 0.45f * FootLen : 0.20f * FootLen;
+        return a * c + lever * s - a;
+    }
+
     public void Update(in FigureFrame f)
     {
         float dt = f.Dt > 0 ? f.Dt : 1f / 120f;
@@ -513,6 +574,20 @@ public partial class PlayerFigure : Node3D
 
         bool stepping = f.HasGait && f.IsStepping;
         Vector3 fm = speed > 0.5f ? hv / speed : fwd;
+
+        // ---- the outfield body's smoothed drivers: stepping and close-control weights, lateral (centripetal) acceleration and the bank it gives ----
+        bool body = !IsKeeper;
+        float runW = Mathf.Clamp((_speedS - 1.5f) / 2.5f, 0f, 1f);   // 0 at a walk, 1 from a jog on: the stride's running shape
+        if (body)
+        {
+            float aw = 1f - Mathf.Exp(-dt / StepWTau);
+            _stepW = Mathf.Lerp(_stepW, stepping ? 1f : 0f, aw);
+            _closeW = Mathf.Lerp(_closeW, f.CloseControl ? 1f : 0f, aw);
+            float ab = 1f - Mathf.Exp(-dt / BankTau);
+            _latS = Mathf.Lerp(_latS, Mathf.Clamp(_accS.Dot(right), -12f, 12f), ab);
+            float bankT = Mathf.Clamp(Mathf.Atan(_latS / 9.81f) * BankGain * Mathf.Clamp(_speedS / 3f, 0f, 1f), -BankMaxRad, BankMaxRad);
+            _bank = Mathf.Lerp(_bank, bankT, ab);
+        }
 
         if (IsKeeper)
         {
@@ -586,7 +661,11 @@ public partial class PlayerFigure : Node3D
             w = Mathf.Clamp(0.85f * hmax / Math.Max(stepLen, 0.01f), 0.04f, 0.5f);
         }
         // pelvis bob: one per step, lowest at the swing middle when the body is over the planted foot
-        if (stepping) pel.Y += 0.010f * k * Mathf.Clamp(_speedS / 3f, 0f, 1f) * Mathf.Cos(2f * Mathf.Pi * f.GaitPhase);
+        if (stepping)
+        {
+            float bob = body ? Mathf.Lerp(BobWalk, BobRun, runW) * Mathf.Clamp(_speedS / 2f, 0f, 1f) : 0.010f * Mathf.Clamp(_speedS / 3f, 0f, 1f);
+            pel.Y += bob * k * Mathf.Cos(2f * Mathf.Pi * f.GaitPhase);
+        }
         float hgtNow = pel.Y - AnkleH;
         float hmaxNow = Mathf.Sqrt(Math.Max(0.01f, reach * reach - hgtNow * hgtNow));
         if (stepping && !_moving)
@@ -603,8 +682,10 @@ public partial class PlayerFigure : Node3D
             {
                 StepPin(ft, dt);
                 ft.Blend = 0f; ft.BlendFrom = ft.Ankle; ft.InStance = false;
+                if (body) { float ap = 1f - Mathf.Exp(-dt / PitchTau); _cycPitch[i] = Mathf.Lerp(_cycPitch[i], 0f, ap); _cycToe[i] = Mathf.Lerp(_cycToe[i], 0f, ap); }
                 continue;
             }
+            float pitchT = 0f, toeT = 0f;
             if (stepping)
             {
                 ft.Timed = false;
@@ -620,6 +701,14 @@ public partial class PlayerFigure : Node3D
                     if (!ft.Released && Dist2(pelXZ + right * side * HipW, ft.Plant) > 0.97f * hmaxNow) { ft.Released = true; ft.Blend = 0f; ft.BlendFrom = ft.Ankle; }
                     gait = ft.Released ? pelXZ - fm * (w * stepLen) + lat : ft.Plant;
                     if (ft.Released) gait.Y = AnkleH;
+                    if (body)
+                    {
+                        // heel strike (toes up) easing flat, then the roll onto the toes to push off; a foot lifted early stays on its toes
+                        float st = Mathf.Clamp((phi - sA) / w, 0f, 1f);
+                        float hs = HeelStrikeWalk + HeelStrikeRun * runW, to = ToeOffWalk + ToeOffRun * runW;
+                        pitchT = ft.Released ? -to : hs * (1f - Smooth(st / 0.25f)) - to * Smooth((st - 0.5f) / 0.5f);
+                        toeT = Math.Max(0f, -pitchT);
+                    }
                 }
                 else
                 {
@@ -628,7 +717,17 @@ public partial class PlayerFigure : Node3D
                     float pu = phi >= sB ? phi : phi + 1f;
                     float sa = Mathf.Clamp((pu - sB) / (1f - w), 0f, 1f);
                     gait = pelXZ + fm * (w * stepLen * (2f * Smooth(sa) - 1f)) + lat;
-                    gait.Y = AnkleH + (0.04f + 0.16f * sfs) * k * Mathf.Sin(Mathf.Pi * sa);
+                    if (body)
+                    {
+                        // heel recovery: the ankle comes up early, behind the body, then the knee drives it forward and down to the strike;
+                        // the foot folds toes-down behind (on from the push-off) and turns toes-up for the heel strike
+                        float apex = SwingLiftWalk + SwingLiftRun * runW + SwingLiftSprint * sfs;
+                        gait.Y = AnkleH + apex * k * Mathf.Sin(Mathf.Pi * Mathf.Pow(sa, SwingApexPow));
+                        float hs = HeelStrikeWalk + HeelStrikeRun * runW, to = ToeOffWalk + ToeOffRun * runW, rc = RecoveryWalk + RecoveryRun * runW;
+                        pitchT = sa < 0.35f ? Mathf.Lerp(-to, -rc, Smooth(sa / 0.35f)) : Mathf.Lerp(-rc, hs, Smooth((sa - 0.35f) / 0.65f));
+                        toeT = Math.Max(0f, -pitchT) * (1f - Smooth(sa / 0.3f));
+                    }
+                    else gait.Y = AnkleH + (0.04f + 0.16f * sfs) * k * Mathf.Sin(Mathf.Pi * sa);
                     // wind-up: while the shot is charging, the striking foot trails further back on its natural back-swing
                     if (_backswing > 0f && (i == 1) == _backswingRight)
                     {
@@ -662,6 +761,13 @@ public partial class PlayerFigure : Node3D
             }
             else { IdleFoot(i, ft, pelXZ, right, side, hwf, dt); ft.HasRaw = false; ft.OffW = 0f; }
             ft.Dir = fwd;
+            if (body)
+            {
+                // the cycle's foot pitch and toe bend, eased so a start, stop or blend never snaps the foot round
+                float ap = _teleporting ? 1f : 1f - Mathf.Exp(-dt / PitchTau);
+                _cycPitch[i] = Mathf.Lerp(_cycPitch[i], stepping ? pitchT * _stepW : 0f, ap);
+                _cycToe[i] = Mathf.Lerp(_cycToe[i], stepping ? toeT * _stepW : 0f, ap);
+            }
         }
 
         // ---- assembling the final ankles ----
@@ -686,6 +792,8 @@ public partial class PlayerFigure : Node3D
             // predicted): the foot goes from where it was drawn back to its pose over a short swing instead of in one frame
             // the same when a shot or skill pose is dropped at once (a fake shot aborts the shot, a lost ball ends the move)
             float kw = _kW > 0f && i == _kFoot ? (f.Shot.Valid && !f.Shot.Made ? _kW * (1f - tw[i]) : _kW) : 0f;
+            // the stride's foot pitch gives way to a touch, kick or skill pose by their weights (a contact is drawn flat, exactly as planned)
+            float pw = (1f - tw[i]) * (1f - kw);
             bool dropped = _ovWindPrev[i] && _twPrev[i] > 0.05f && tw[i] < _twPrev[i] - 0.2f || kw < _kwPrev[i] - 0.2f;
             if (dropped && !(tw[i] >= 0.999f && !_ovWind[i]))
             { _dropT[i] = DropFade; _dropFrom[i] = _ankRelPrev[i]; _dropYaw[i] = _yawPrev[i]; }
@@ -699,9 +807,39 @@ public partial class PlayerFigure : Node3D
                 dir[i] = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
                 planted[i] = false;
                 _dropT[i] -= dt;
+                pw *= u;
+            }
+            if (body)
+            {
+                _pitch[i] = _cycPitch[i] * pw; _toeBend[i] = _cycToe[i] * pw;
+                ank[i].Y += PivotLift(_pitch[i]);
+                if (_pitch[i] < -0.03f) planted[i] = false;   // the heel is up: the foot rolls on its toes and is no longer planted flat
+            }
+            if (body)
+            {
+                // outside a windup and its contact tick (which must be drawn exactly) the foot turns at a limited rate, so handing back from a
+                // touch's sideways contact foot to the stride never swings the boot round in a frame or two
+                float yawW = Mathf.Atan2(dir[i].Z, dir[i].X);
+                if (!_teleporting && _yawOutOk[i] && !_ovWind[i] && tw[i] < 0.999f)
+                {
+                    float step = FootTurnRate * dt;
+                    yawW = _yawOut[i] + Math.Clamp(Mathf.Wrap(yawW - _yawOut[i], -Mathf.Pi, Mathf.Pi), -step, step);
+                    dir[i] = new Vector3(Mathf.Cos(yawW), 0, Mathf.Sin(yawW));
+                }
+                _yawOut[i] = yawW; _yawOutOk[i] = true;
             }
             _twPrev[i] = tw[i]; _ovWindPrev[i] = _ovWind[i];
             _ankRelPrev[i] = ank[i] - pelXZ; _yawPrev[i] = Mathf.Atan2(dir[i].Z, dir[i].X);
+        }
+        if (body)
+        {
+            // the pelvis shifts over the stance foot and into a turn (the feet stay where the stride put them), and yaws with the stride:
+            // the hip goes forward with its leg, so it follows the fore-aft spread of the drawn feet (a touch reaching forward turns it too)
+            pel -= right * (SwayM * k * (1f - 0.5f * sfs) * _stepW * Mathf.Sin(Mathf.Pi * f.GaitPhase));
+            pel += right * (Mathf.Sin(_bank) * BankShift * (pel.Y - AnkleH));
+            float spread = (ank[1] - ank[0]).Dot(fwd);
+            float yawT = Mathf.Clamp(PelYawPerM * spread, -PelYawMax, PelYawMax);
+            _pelYaw = _teleporting ? yawT : Mathf.Lerp(_pelYaw, yawT, 1f - Mathf.Exp(-dt / PelYawTau));
         }
         // a touch from a standstill (the first touch of a loose ball) can lie beyond a straight leg: only then the pelvis sinks by what is missing
         // (at most 6 cm); a running player never does, the simulation steers the ball into the zone ahead of the swinging foot
@@ -731,21 +869,32 @@ public partial class PlayerFigure : Node3D
         }
         if (pel.Y < floorY) pel.Y = floorY;
 
-        // ---- lean: outfield players lean only with their acceleration (signed, at most 12 degrees); keepers and shots keep the old lean ----
+        // ---- lean: outfield players lean with their acceleration (signed, at most 12 degrees) and forward with their speed; keepers and shots keep the old lean ----
         float leanT;
         if (IsKeeper) leanT = stepping ? 0.07f + 0.19f * sfs + Mathf.Clamp(0.012f * accF, 0f, 0.08f) : 0f;
-        else leanT = stepping ? Mathf.Clamp(_accFS / 4f, -1f, 1f) * MaxLeanRad : 0f;
+        else leanT = (stepping ? Mathf.Clamp(_accFS / 4f, -1f, 1f) * MaxLeanRad : 0f) + SpeedLeanMaxRad * Mathf.Clamp((_speedS - 1f) / (SpeedLeanFullMs - 1f), 0f, 1f);
         _lean = Mathf.Lerp(_lean, leanT, 1f - Mathf.Exp(-dt / 0.12f));
         _leanExtraS = Mathf.Lerp(_leanExtraS, _leanExtra, 1f - Mathf.Exp(-dt / 0.05f));
         float lean = _lean + _leanExtraS;
         lean = Mathf.Clamp(lean, -0.42f, 0.42f);
         Basis B = new Basis(right, -lean) * new Basis(fwd, Vector3.Up, right);
+        Basis P = B;
+        float counter = Mathf.Lerp(ChestCounterWalk, ChestCounterSprint, sfs);
+        if (body)
+        {
+            // split trunk: the pelvis yaws with the stride, drops on the swinging side, banks and takes part of the lean; the chest counter-turns,
+            // takes back half the drop, banks and takes the whole lean (the spine bends between them)
+            Basis yawB = new Basis(fwd, Vector3.Up, right);
+            float roll = PelDropRad * _stepW * Mathf.Sin(Mathf.Pi * f.GaitPhase);   // + right side down while the right leg swings
+            P = new Basis(Vector3.Up, _pelYaw) * new Basis(fwd, _bank + roll) * new Basis(right, -lean * PelvisLeanShare) * yawB;
+            B = new Basis(Vector3.Up, -_pelYaw * counter) * new Basis(fwd, _bank - 0.5f * roll) * new Basis(right, -lean) * yawB;
+        }
 
         // ---- legs ----
         var knee = new Vector3[2]; var ankEff = new Vector3[2];
         for (int i = 0; i < 2; i++)
         {
-            Vector3 hip = pel + right * (i == 0 ? -HipW : HipW);
+            Vector3 hip = body ? pel + P * new Vector3(0, 0, i == 0 ? -HipW : HipW) : pel + right * (i == 0 ? -HipW : HipW);
             SolveLeg(hip, ank[i], fwd, out knee[i], out ankEff[i]);
         }
 
@@ -753,7 +902,27 @@ public partial class PlayerFigure : Node3D
         Vector3 shoulderC = pel + B * new Vector3(0, 0.035f * H + TorsoLen - 0.03f * H, 0) + _skShoulderOff;
         var handT = new Vector3[2]; var elbowPole = new Vector3[2];
         float amp = 0.15f + 0.45f * sfs;
-        for (int i = 0; i < 2; i++)
+        // outfield arms: bent elbows (near a right angle at a run), swinging against the legs by speed, out from the body for balance in close
+        // control and in a turn; built from shoulder and elbow angles in the chest frame, so the elbow lands where the angles put it
+        float armA = _stepW * (Mathf.Lerp(ArmSwingWalk, ArmSwingRun, runW) + ArmSwingSprint * sfs);
+        float elbow0 = Mathf.Lerp(ElbowStand, Mathf.Lerp(ElbowWalk, ElbowRun, runW), _stepW);
+        float abd = ArmOutBase + ArmOutClose * _closeW + ArmOutTurn * Math.Abs(_bank) / BankMaxRad + 0.35f * _lastCharge;
+        for (int i = 0; body && i < 2; i++)
+        {
+            float side = i == 0 ? -1f : 1f;
+            Vector3 sh = shoulderC + B * new Vector3(0, 0, side * ShoulderW);
+            float oppPhi = i == 0 ? f.RightFootPhase : f.LeftFootPhase;
+            float sw = Mathf.Cos(2f * Mathf.Pi * (oppPhi - 0.70f));
+            float al = armA * sw + ArmForward * runW * _stepW;
+            float be = elbow0 + ElbowSwing * runW * _stepW * sw;
+            Vector3 u = new(Mathf.Sin(al) * Mathf.Cos(abd), -Mathf.Cos(al) * Mathf.Cos(abd), side * Mathf.Sin(abd));
+            Vector3 v = new Vector3(Mathf.Sin(al + be), -Mathf.Cos(al + be), side * 0.3f * Mathf.Sin(abd)).Normalized();
+            Vector3 el = sh + B * u * ArmUp;
+            handT[i] = el + B * v * ArmLow;
+            Vector3 pole = el - (sh + handT[i]) * 0.5f;
+            elbowPole[i] = pole.LengthSquared() > 1e-8f ? pole.Normalized() : (B * new Vector3(-1f, -0.2f, side * 0.5f)).Normalized();
+        }
+        for (int i = 0; !body && i < 2; i++)
         {
             float side = i == 0 ? -1f : 1f;
             Vector3 sh = shoulderC + B * new Vector3(0, 0, side * ShoulderW);
@@ -765,7 +934,29 @@ public partial class PlayerFigure : Node3D
             elbowPole[i] = (B * new Vector3(-1f, -0.2f, side * 0.5f)).Normalized();
         }
         if (IsKeeper) UpdateKeeper(f, pos, fwd, right, hv, speed, dt, new KPose { Pel = pel, Q = B.GetRotationQuaternion(), Knee = knee, Ank = ankEff, Dir = dir, Hand = handT, Pole = elbowPole });
-        else RenderBody(pel, B, shoulderC, knee, ankEff, dir, handT, elbowPole);
+        else
+        {
+            // the head stays level and steady: it looks along the travel and, with the ball, partly at it; within a yaw limit from the chest
+            Vector3 look = speed > 1f ? fm : fwd;
+            float yawT = Mathf.Atan2(look.Z, look.X);
+            float pitchT = HeadPitchBase;
+            Vector3 toBall = new(f.BallPos.X - pos.X, 0, f.BallPos.Z - pos.Z);
+            float bd = toBall.Length();
+            if (f.InPossession && bd > 0.15f)
+            {
+                yawT = Mathf.LerpAngle(yawT, Mathf.Atan2(toBall.Z, toBall.X), HeadBallYaw);
+                pitchT = Mathf.Clamp(Mathf.Atan2(0.93f * H - f.BallPos.Y, bd) * HeadBallPitch, HeadPitchBase, HeadPitchMaxRad);
+            }
+            float chestYaw = f.Facing - _pelYaw * counter;
+            yawT = chestYaw + Mathf.Clamp(Mathf.Wrap(yawT - chestYaw, -Mathf.Pi, Mathf.Pi), -HeadYawMaxRad, HeadYawMaxRad);
+            float ah = 1f - Mathf.Exp(-dt / HeadTau);
+            if (float.IsNaN(_headYaw) || _teleporting) { _headYaw = yawT; _headPitch = pitchT; }
+            else { _headYaw = Mathf.LerpAngle(_headYaw, yawT, ah); _headPitch = Mathf.Lerp(_headPitch, pitchT, ah); }
+            Vector3 hf = new(Mathf.Cos(_headYaw), 0, Mathf.Sin(_headYaw)), hr = new(-hf.Z, 0, hf.X);
+            _split = true; _pelB = P;
+            _headB = new Basis(hr, -_headPitch) * new Basis(hf, Vector3.Up, hr);
+            RenderBody(pel, B, shoulderC, knee, ankEff, dir, handT, elbowPole);
+        }
         var posFlat = new Vector3(pos.X, 0, pos.Z);
         // the playing foot's per-tick move (body-relative and world), during the move and the three ticks after it
         if (!IsKeeper && Stats != null && (f.Skill.Valid || _skTail > 0))
@@ -980,7 +1171,9 @@ public partial class PlayerFigure : Node3D
             // the pending or latest touch, the one before it still following through, and the immediate touch the core is about to make
             FigureAction a = n == 0 ? f.Action : n == 1 ? f.PrevAction : f.Upcoming;
             if (!a.Valid || a.IsSkill || (a.Right ? 1 : 0) != i) continue;
-            if (a.Phase is TouchPhase.Planned or TouchPhase.PreWindup or TouchPhase.Done) continue;
+            // the foot starts toward a pending touch a little before the core's windup (TouchLead), so it need not cover the way from the stride's
+            // swing to the contact zone in the windup alone
+            if (a.Phase is TouchPhase.Planned or TouchPhase.Done || (a.Phase == TouchPhase.PreWindup && !(n == 0 && !a.Made && a.ContactEta <= TouchLead))) continue;
             bool ready = n == 2 && f.UpcomingReady;
             var tf = n == 2 ? _tfUp[i] : _tf[i];
             float tau = a.ContactEta;
@@ -996,10 +1189,13 @@ public partial class PlayerFigure : Node3D
             }
             // the drawn direction follows the wanted one at a limited rate within one touch (a new touch starts from its own)
             d = DrawnOutDir(i, a.Id, d, f.Dt);
-            Vector3 fd = SurfaceDir(a.Surface, i, d);
+            // until the contact the foot is shaped for the surface the windup began with; the contact itself uses the touch's own surface
+            BootSurface sf = a.Surface;
+            if (!a.Made) { if (tf.SurfId != a.Id) { tf.SurfId = a.Id; tf.Surf = a.Surface; } sf = tf.Surf; }
+            Vector3 fd = SurfaceDir(sf, i, d);
             Vector3 rv = new(-fd.Z, 0, fd.X);
-            Vector3 off = Off(i, a.Surface);
-            Vector3 p = a.Surface == BootSurface.Sole ? centre + Vector3.Up * r : centre - d * r;   // the boot's surface point at the contact
+            Vector3 off = Off(i, sf);
+            Vector3 p = sf == BootSurface.Sole ? centre + Vector3.Up * r : centre - d * r;   // the boot's surface point at the contact
             Vector3 c0 = p - (fd * off.X + Vector3.Up * off.Y + rv * off.Z);                        // the ankle that puts it there
 
             float wgt; Vector3 target; Vector3 fdUse = fd;
@@ -1100,14 +1296,14 @@ public partial class PlayerFigure : Node3D
                 if (!ft.Tracking) { ft.Tracking = true; ft.TrackStart = ankle[i]; ft.TrackMax = 0; }
                 else ft.TrackMax = Math.Max(ft.TrackMax, (ankle[i] - ft.TrackStart).Length());
             }
-            else if (ft.Tracking) { Stats?.Slide.Add(ft.TrackMax); ft.Tracking = false; }
+            else if (ft.Tracking) { (IsKeeper ? Stats?.SlideKeeper : Stats?.Slide)?.Add(ft.TrackMax); ft.Tracking = false; }
         }
     }
 
     /// <summary>Closes any stance still being tracked (call before reading the stats).</summary>
     public void FlushStats()
     {
-        foreach (var ft in _feet) if (ft.Tracking) { Stats?.Slide.Add(ft.TrackMax); ft.Tracking = false; }
+        foreach (var ft in _feet) if (ft.Tracking) { (IsKeeper ? Stats?.SlideKeeper : Stats?.Slide)?.Add(ft.TrackMax); ft.Tracking = false; }
     }
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -1525,26 +1721,30 @@ public partial class PlayerFigure : Node3D
     {
         float k = H / 1.8f;
         // torso and pelvis
-        _pelvis.Transform = new Transform3D(B.Scaled(Vector3.One * k), pel);
+        Basis Pb = _split ? _pelB : B, Hb = _split ? _headB : B;
+        _pelvis.Transform = new Transform3D(Pb.Scaled(Vector3.One * k), pel);
         Vector3 torsoC = pel + B * new Vector3(0, 0.035f * H + TorsoLen * 0.5f, 0);
         _torso.Transform = new Transform3D(B.Scaled(Vector3.One * k), torsoC);
         Vector3 neck = pel + B * new Vector3(0, 0.035f * H + TorsoLen + 0.02f * H, 0);
         Vector3 headC = neck + B.Y * (0.078f * H + 0.012f * H);
         SetSeg(_neck, pel + B.Y * (0.30f * H), pel + B.Y * (0.43f * H), FigureMeshes.NeckLen, k);
-        _head.Transform = new Transform3D(B.Scaled(Vector3.One * k), headC);
+        _head.Transform = new Transform3D(Hb.Scaled(Vector3.One * k), headC);
         // number on the upper back: faces -forward (the label's +Z maps to -B.X)
         _number.Transform = new Transform3D(B * new Basis(Vector3.Up, -Mathf.Pi * 0.5f) * Basis.FromScale(Vector3.One * k), torsoC + B * (new Vector3(-0.158f, 0.07f, 0) * k));
 
         for (int i = 0; i < 2; i++)
         {
             float side = i == 0 ? -1f : 1f;
-            Vector3 hip = pel + B * new Vector3(0, -0.01f * H, side * HipW);
+            Vector3 hip = pel + Pb * new Vector3(0, -0.01f * H, side * HipW);
             SetSeg(_thigh[i], hip, knee[i], FigureMeshes.RefLen, k);
             SetSeg(_shin[i], knee[i], ankle[i], FigureMeshes.RefLen, k);
             Vector3 fd = dir[i]; fd.Y = 0; fd = fd.LengthSquared() > 1e-6f ? fd.Normalized() : Vector3.Right;
             Vector3 fr = new(-fd.Z, 0, fd.X);
-            Vector3 fc = ankle[i] + fd * (0.4f * FootLen) + new Vector3(0, -AnkleH + FootH * 0.5f, 0);
-            _foot[i].Transform = new Transform3D(new Basis(fd, Vector3.Up, fr).Scaled(Vector3.One * k), fc);
+            float fp = _split ? _pitch[i] : 0f;
+            Basis fb = new Basis(fd, Vector3.Up, fr);
+            if (fp != 0f) fb = new Basis(fr, fp) * fb;
+            Vector3 fc = fp != 0f ? ankle[i] + fb * new Vector3(0.4f * FootLen, -AnkleH + FootH * 0.5f, 0) : ankle[i] + fd * (0.4f * FootLen) + new Vector3(0, -AnkleH + FootH * 0.5f, 0);
+            _foot[i].Transform = new Transform3D(fb.Scaled(Vector3.One * k), fc);
 
             Vector3 sh = shoulderC + B * new Vector3(0, 0, side * ShoulderW);
             SolveArm(sh, handT[i], elbowPole[i], out var elbow, out var hand);
@@ -1558,9 +1758,11 @@ public partial class PlayerFigure : Node3D
             _hand[i].Transform = new Transform3D(new Basis(hy.Cross(hz), hy, hz).Scaled(Vector3.One * k), hand);
 
             _joints.Hip[i] = hip; _joints.Knee[i] = knee[i]; _joints.Ankle[i] = ankle[i]; _joints.FootDir[i] = fd;
+            _joints.FootPitch[i] = fp; _joints.ToeBend[i] = _split ? _toeBend[i] : 0f;
             _joints.Shoulder[i] = sh; _joints.Elbow[i] = elbow; _joints.Hand[i] = hand;
         }
         _joints.Pelvis = pel; _joints.Torso = B; _joints.Height = H; _joints.AnkleHeight = AnkleH;
+        _joints.SplitTrunk = _split; _joints.PelvisBasis = Pb; _joints.HeadBasis = Hb;
         if (_keeperAnim != null) _keeperAnim.Present(_joints, _animFrame);   // --keeper-anim mocap (PlayerFigure.Keeper.cs)
         else _body?.Pose(_joints);
     }
