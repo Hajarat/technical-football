@@ -426,6 +426,9 @@ public static class SkillMoves
         return new MoveAssist(cap, 1f, steer, run);
     }
 
+    /// <summary>Ball roll: the ball ends this far ahead of the player along the run at the release, metres.</summary>
+    const float BallRollEndAhead = 0.3f;
+
     /// <summary>
     /// How far the player runs on from the sole's landing to the ball roll's end, the run easing down to ball_roll_forward_speed
     /// as <see cref="BeginTick"/> does: the ball's forward travel, so it stays at his foot.
@@ -494,6 +497,7 @@ public static class SkillMoves
             var cp = TouchPlanner.ContactPointFor(p, a.Foot, t);
             miss = new Vector2(ball.Position.X - cp.X, ball.Position.Z - cp.Z).Length();
             LaySolePath(p, a, ball, t);
+            a.RollAhead0 = Vector2.Dot(new Vector2(ball.Position.X - p.Position.X, ball.Position.Z - p.Position.Z), a.HoldDirection);
         }
         Vector3 contactBall = ball.Position;
         if (sole && tick >= a.ContactTick)
@@ -501,6 +505,14 @@ public static class SkillMoves
             int dur = a.EndTick - a.ContactTick;
             float u1 = Math.Clamp((tick + 1 - a.ContactTick) / (float)dur, 0f, 1f);
             Vector3 target = Path(a, u1);
+            if (a.Kind == ActionKind.BallRoll)
+            {
+                // Along the run the ball is kept at the player's foot as he actually travels: from where it was ahead of him when
+                // the sole landed to ball_roll_end_ahead at the release, so the exit touch is a normal one.
+                var f3 = new Vector3(a.HoldDirection.X, 0f, a.HoldDirection.Y);
+                float ahead = a.RollAhead0 + (BallRollEndAhead - a.RollAhead0) * u1;
+                target = target - f3 * Vector3.Dot(target, f3) + f3 * (Vector3.Dot(p.Position, f3) + ahead);
+            }
             var v = new Vector3((target.X - ball.Position.X) / t.Dt, ball.Velocity.Y, (target.Z - ball.Position.Z) / t.Dt);
             ball.Velocity = v;
             ball.Spin = ball.RollingSpin(v);
