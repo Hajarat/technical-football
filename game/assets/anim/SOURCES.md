@@ -162,3 +162,27 @@ Per clip, `clips.toml` also carries:
 `retarget.py`'s flip guard holds the hands, feet, upper arms, neck and head within a range of their rest and a turning speed
 (16 degrees per 60 Hz frame for the neck and head). The neck and head entries remove a one-frame roll swap between the two in
 `getup_back_140_08` at 0.98 s.
+
+## Authored skill clips
+
+`attacker/skills/*.kclip` and `attacker/skills/clips.json` are hand-made: no motion capture and no external source. Each move is
+a file of key poses in `tools/anim/moves/` (pelvis, chest and head angles, feet as sole points on the ground, the pelvis or the
+ball, hands, knee and elbow directions, the ball's path, events and timings), which `tools/anim/author.py` solves onto the 22
+driven bones of `player.glb`, mirrors to the other side and checks (no joint under the ground, no leg past its length, no bone
+over 1,500 deg/s, the sole within 1 cm of the ball while it is on it). Nothing in the game plays them yet.
+
+| Move file | Clips | What it shows |
+| --- | --- | --- |
+| `ball_roll.toml` | `ball_roll_left`, `ball_roll_right` | from standing, the far foot's sole rolls the ball 0.6 m across the body (the simulation's timing: sole lands 0.1 s in, rolls 0.3 s), support-foot hop, exit to a run |
+| `ball_roll.toml` | `ball_roll_left_slow`, `ball_roll_right_slow` | the same poses with a 0.15 s reach and a 0.45 s roll |
+
+Each entry has `set = "skill:<move>"`, `side` (where the ball goes), `foot` (the playing foot), events `start`, `contact`,
+`release`, `end`, and beside the usual keys `ball` (radius, the span the sole is on it, and its centre per frame relative to the
+start, model space), `timing` (each span's seconds), `finger_curl` (per frame, left and right: the clip has no finger bones) and
+`sim` (the simulation's numbers the move was authored to).
+
+```sh
+uv run --with numpy python3 tools/anim/author.py         # every move file, both sides, every timing
+game/tests/run-bg.sh -- --clip-gallery ../out/skills --clip-folder res://assets/anim/attacker/skills --clip-model res://assets/characters/player.glb --video
+uv run --with imageio-ffmpeg python3 tools/anim/encode_video.py out/skills
+```
