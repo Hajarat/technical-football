@@ -194,12 +194,23 @@ public sealed class FigureStats
     public int Tick;
     public float JumpDt = 1f / 120f;
 
-    public void AddJump(JumpContext c, int foot, float m, float m60)
+    /// <summary>
+    /// Per context: the largest excess of a one-tick move over its limit (<paramref name="limit"/> in <see cref="AddJump"/>: 0.10 m for the
+    /// procedural body, 0.10 m + 1.2 x speed x dt in mocap mode, where a swinging foot really travels two steps per step of the body), and
+    /// the change of a foot's velocity from one tick to the next (m/s per tick: what a pop is, whatever the speed), all samples and the worst.
+    /// </summary>
+    public readonly float[] JumpOver = new float[5];
+    public readonly List<float>[] JumpDv = { new(), new(), new(), new(), new() };
+    public readonly (int Tick, int Foot, float M)[] DvWorst = new (int, int, float)[5];
+
+    public void AddJump(JumpContext c, int foot, float m, float m60, float limit = 0.10f, float dv = float.NaN)
     {
         int i = (int)c;
         Jump[i].Add(m);
         if (!float.IsNaN(m60)) Jump60[i].Add(m60);
         if (m > JumpWorst[i].M) JumpWorst[i] = (Tick, foot, m);
+        JumpOver[i] = Math.Max(JumpOver[i], m - limit);
+        if (!float.IsNaN(dv)) { JumpDv[i].Add(dv); if (dv > DvWorst[i].M) DvWorst[i] = (Tick, foot, dv); }
     }
 
     public IEnumerable<string> JumpLines()
@@ -209,7 +220,9 @@ public sealed class FigureStats
         {
             all.AddRange(Jump[i]); all60.AddRange(Jump60[i]);
             var w = JumpWorst[i];
-            yield return $"FOOT_JUMP ctx={JumpNames[i]} dt_s={JumpDt:F5} n={Jump[i].Count} max_m={Max(Jump[i]):F3} p99_m={P99(Jump[i]):F3} max60_m={Max(Jump60[i]):F3} p99_60_m={P99(Jump60[i]):F3} worst_tick={w.Tick} worst_foot={(w.Foot == 1 ? "R" : "L")}";
+            var dw = DvWorst[i];
+            yield return $"FOOT_JUMP ctx={JumpNames[i]} dt_s={JumpDt:F5} n={Jump[i].Count} max_m={Max(Jump[i]):F3} p99_m={P99(Jump[i]):F3} max60_m={Max(Jump60[i]):F3} p99_60_m={P99(Jump60[i]):F3} worst_tick={w.Tick} worst_foot={(w.Foot == 1 ? "R" : "L")}" +
+                $" over_m={Math.Max(0f, JumpOver[i]):F3} dv_max_mps={Max(JumpDv[i]):F2} dv_p99_mps={P99(JumpDv[i]):F2} dv_tick={dw.Tick} dv_foot={(dw.Foot == 1 ? "R" : "L")}";
         }
         yield return $"FOOT_JUMP ctx=all dt_s={JumpDt:F5} n={all.Count} max_m={Max(all):F3} p99_m={P99(all):F3} max60_m={Max(all60):F3} p99_60_m={P99(all60):F3}";
         yield return StrideLine();
@@ -858,7 +871,7 @@ public partial class PlayerFigure : Node3D
                 float mp = MocapPitch(i, _cycPitch[i], ank[i], out float mToe, out float mLift);
                 ank[i].Y += mLift;
                 _pitch[i] = mp * pw; _toeBend[i] = (Mathf.Lerp(_cycToe[i], 0f, _mW) + mToe) * pw;
-                MocapPitchRate(i, tw[i] >= 0.999f && !_ovWind[i], dt);
+                MocapPitchRate(i, tw[i] >= 0.999f && !_ovWind[i], dt, ref ank[i]);
                 ank[i].Y += PivotLift(_pitch[i]) * (1f - _mW);   // the cycle's ankle already rises as its heel lifts
                 if (_pitch[i] < -0.03f) planted[i] = false;   // the heel is up: the foot rolls on its toes and is no longer planted flat
             }
@@ -1042,7 +1055,7 @@ public partial class PlayerFigure : Node3D
         if (!IsKeeper && Stats != null) MeasureJump(f, ankEff, dir, tw);
         _skJumpValid = true;
         _prevAnkWorld[0] = ankEff[0]; _prevAnkWorld[1] = ankEff[1];
-        for (int i = 0; i < 2; i++) { _prevAnkRel[i] = ankEff[i] - posFlat; _prevAnkRel[i].Y = ankEff[i].Y; }
+        for (int i = 0; i < 2; i++) { _prevAnkRel2[i] = _prevAnkRel[i]; _prevAnkRel[i] = ankEff[i] - posFlat; _prevAnkRel[i].Y = ankEff[i].Y; }
 
         // ---- measurements (on the pose just produced; nothing is corrected afterwards) ----
         TrackSlide(planted, ankEff);
@@ -1177,7 +1190,10 @@ public partial class PlayerFigure : Node3D
             {
                 float m = Math.Max((ank[i] - _jAnk[i, 0]).Length(), (toe - _jToe[i, 0]).Length());
                 float m60 = _jN >= 2 ? Math.Max((ank[i] - _jAnk[i, 1]).Length(), (toe - _jToe[i, 1]).Length()) : float.NaN;
-                Stats.AddJump(c, i, m, m60);
+                // the change of velocity over one tick (ankle or boot tip, whichever is larger), m/s per tick
+                float dv = _jN >= 2 ? Math.Max(((ank[i] - _jAnk[i, 0]) - (_jAnk[i, 0] - _jAnk[i, 1])).Length(), ((toe - _jToe[i, 0]) - (_jToe[i, 0] - _jToe[i, 1])).Length()) / dt : float.NaN;
+                float limit = _atkAnim != null ? 0.10f + 1.2f * new Vector2(f.Velocity.X, f.Velocity.Z).Length() * dt : 0.10f;
+                Stats.AddJump(c, i, m, m60, limit, dv);
                 if (MocapLogOn && m > 0.09f) GD.Print($"MOCAP_JUMP tick={Stats.Tick} foot={i} ctx={c} m={m:F3} ank={(ank[i] - _jAnk[i, 0]).Length():F3} toe={(toe - _jToe[i, 0]).Length():F3} tw={tw[i]:F2} w={_mW:F2}");
             }
             _jAnk[i, 1] = _jAnk[i, 0]; _jToe[i, 1] = _jToe[i, 0];
@@ -1248,7 +1264,7 @@ public partial class PlayerFigure : Node3D
             if (!a.Valid || a.IsSkill || (a.Right ? 1 : 0) != i) continue;
             // the foot starts toward a pending touch a little before the core's windup (TouchLead), so it need not cover the way from the stride's
             // swing to the contact zone in the windup alone
-            if (a.Phase is TouchPhase.Planned or TouchPhase.Done || (a.Phase == TouchPhase.PreWindup && (NoPreWindup || !(n == 0 && !a.Made && a.ContactEta <= TouchLead)))) continue;
+            if (a.Phase is TouchPhase.Planned or TouchPhase.Done || (a.Phase == TouchPhase.PreWindup && !(n == 0 && !a.Made && a.ContactEta <= TouchLead))) continue;
             bool ready = n == 2 && f.UpcomingReady;
             var tf = n == 2 ? _tfUp[i] : _tf[i];
             float tau = a.ContactEta;
@@ -1364,8 +1380,6 @@ public partial class PlayerFigure : Node3D
     /// <summary>Per foot: the hint-to-touch handover being taken out (touch id, eta when it began, place and yaw difference) and the last two overlay ankles and yaw.</summary>
     readonly int[] _hoId = { int.MinValue, int.MinValue }; readonly float[] _hoTau0 = new float[2], _hoYaw = new float[2], _ovYaw = new float[2];
     readonly Vector3[] _hoOff = new Vector3[2]; readonly Vector3[,] _ovAnk = new Vector3[2, 2];
-    /// <summary>Test switch (FIGURE_NO_PREWINDUP=1): ignore the core's pre-windup phase, as a core that commits a touch only one windup before its contact would.</summary>
-    static readonly bool NoPreWindup = System.Environment.GetEnvironmentVariable("FIGURE_NO_PREWINDUP") == "1";
 
     /// <summary>Distance from the touching foot's instep point to the ball surface at the latest contact event (for logging).</summary>
     public float LastContactError { get; private set; } = float.NaN;
@@ -1668,6 +1682,7 @@ public partial class PlayerFigure : Node3D
         if (s.Id != _skId)
         {
             _skId = s.Id; _skFromRel = _prevAnkRel[fi]; _skSoleLogged = _skInLogged = false;
+            SkillStartFromProcedural(fi, posXZ);
         }
         Vector3 from = posXZ + new Vector3(_skFromRel.X, 0, _skFromRel.Z); from.Y = _skFromRel.Y;
         float D = Math.Max(s.ExecDuration, 0.06f), t = Mathf.Clamp(s.ExecElapsed, 0f, D);
@@ -1760,7 +1775,8 @@ public partial class PlayerFigure : Node3D
         }
         target.Y = Math.Max(target.Y, AnkleH);
         _kFoot = fi; _kDir = fd; _seq = true; _skActive = true;
-        _kAnkle = from.Lerp(target, inW);
+        if (_skFirst) SkillStartVelocity(fi, from, target, reaching ? s.ReachSpan : 0f, f.Dt);
+        _kAnkle = from.Lerp(target, inW) + SkillStartOffset(f.Dt);
         _kW = outW;
         return true;
     }

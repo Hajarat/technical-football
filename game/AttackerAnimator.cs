@@ -63,12 +63,34 @@ public sealed class AttackerAnimator
         _local = new NQuat[n]; _gr = new NQuat[n]; _gp = new NVec3[n];
         _clipLocal = new Quaternion[n]; _rot = new Quaternion[n]; _gP = new Quaternion[n]; _gF = new Quaternion[n]; _pos = new Vector3[n];
         _spine2 = sk.Find("Spine2"); _neck = sk.Find("Neck"); _head = sk.Find("Head");
+        // the rest foot (the left; the right mirrors it)
+        var rest = new NQuat[n]; for (int k = 0; k < n; k++) rest[k] = sk.RestLocal[k];
+        sk.Forward(rest, sk.Offsets[0], _gr, _gp);
+        NVec3 an = _gp[sk.Foot[0]], tj = _gp[sk.Toe[0]];
+        _df = tj.Z - an.Z; _du = tj.Y - an.Y;
+        var td = NVec3.Transform(NVec3.UnitY, _gr[sk.Toe[0]]);
+        _th0 = MathF.Atan2(td.Y, td.Z);
         string[] s = { "Left", "Right" };
         for (int i = 0; i < 2; i++) { _clav[i] = sk.Find(s[i] + "Shoulder"); _arm[i] = sk.Find(s[i] + "Arm"); _fore[i] = sk.Find(s[i] + "ForeArm"); _hand[i] = sk.Find(s[i] + "Hand"); }
     }
 
     public SkinnedBody Body => _body;
     public CycleMotion Motion => _motion;
+
+    /// <summary>The boot's toe tip lies this far along the toe bone from its joint (model metres; tools/anim/retarget.py TOE_TIP).</summary>
+    public const float ToeTip = 0.08f;
+    readonly float _df, _du, _th0;
+
+    /// <summary>
+    /// The model's foot at rest, in world metres for a figure of <paramref name="height"/>: the toe joint's place from the ankle joint along
+    /// the foot (<paramref name="df"/> forward, <paramref name="du"/> up), the toe tip's distance from the toe joint and its angle up from
+    /// the horizontal (radians). A foot pitched by p (toes up) turns (df, du) by p; toes bent by b turn the tip by p + b.
+    /// </summary>
+    public void ToeGeometry(float height, out float df, out float du, out float lt, out float th0)
+    {
+        float sc = _body.ScaleFor(height);
+        df = _df * sc; du = _du * sc; lt = ToeTip * sc; th0 = _th0;
+    }
 
     /// <summary>The animator for <paramref name="body"/>, or null (and the reason) when the cycles are missing or do not fit the body.</summary>
     public static AttackerAnimator? TryCreate(SkinnedBody body, out string error)
@@ -331,16 +353,6 @@ public partial class PlayerFigure
         // a flat or toes-up foot keeps its heel out of the ground (the cycles' heels sit up to a centimetre low: their retarget
         // grounded the toes and ankle only)
         if (pitch > -0.05f && ank.Y < AnkleH) lift = (AnkleH - ank.Y) * _mW;
-        if (pitch < 0f)
-        {
-            // the toes bend up just enough to keep their tips out of the ground (toe joint and tip from the boot's rough shape)
-            float k = H / 1.8f, lf = 0.14f * k, ht = 0.025f * k, lt = 0.08f * k;
-            float toeY = ank.Y + (ht - AnkleH) * Mathf.Cos(pitch) + lf * Mathf.Sin(pitch);
-            // a toe joint that would be in the ground (a forefoot landing on a shortened stride) lifts the foot
-            if (toeY < 0.012f * k) { lift = Math.Max(lift, (0.012f * k - toeY) * _mW); toeY = 0.012f * k; }
-            float need = Mathf.Asin(Mathf.Clamp((0.022f * k - toeY) / lt, -1f, 1f)) - pitch;
-            toe = Mathf.Clamp(need, 0f, -pitch) * _mW;
-        }
         return pitch;
     }
 
@@ -350,7 +362,7 @@ public partial class PlayerFigure
     const float PitchRate = 14f;
 
     /// <summary>Mocap: limits the change of foot <paramref name="i"/>'s pitch and toe bend per tick, except on a touch's contact (drawn exactly).</summary>
-    void MocapPitchRate(int i, bool exact, float dt)
+    void MocapPitchRate(int i, bool exact, float dt, ref Vector3 ank)
     {
         if (_atkAnim == null) return;
         if (_pitchOk && !_teleporting && !exact)
@@ -361,6 +373,84 @@ public partial class PlayerFigure
         }
         _pitchOut[i] = _pitch[i]; _toeOut[i] = _toeBend[i];
         if (i == 1) _pitchOk = true;
+        if (!exact) KeepToesUp(i, ref ank);
+    }
+
+    /// <summary>
+    /// Mocap: the boot out of the ground for the pitch actually drawn, from the model's own foot (the toe joint's and the toe tip's
+    /// place relative to the ankle at rest, see <see cref="AttackerAnimator.ToeGeometry"/>): a toe joint that would be below
+    /// <see cref="ToeJointClear"/> lifts the foot, then the toes bend up (never past flat) so their tip stays above <see cref="ToeTipClear"/>.
+    /// </summary>
+    void KeepToesUp(int i, ref Vector3 ank)
+    {
+        if (_atkAnim == null) return;
+        _atkAnim.ToeGeometry(H, out float df, out float du, out float lt, out float th0);
+        float p = _pitch[i];
+        // the heel (on the sole, 3 cm behind the ankle) out of the ground too
+        float heelY = ank.Y - 0.03f * H / 1.8f * Mathf.Sin(p) - AnkleH * Mathf.Cos(p);
+        if (heelY < 0f) ank.Y -= heelY;
+        float toeY = ank.Y + df * Mathf.Sin(p) + du * Mathf.Cos(p);
+        if (toeY < ToeJointClear) { ank.Y += ToeJointClear - toeY; toeY = ToeJointClear; }
+        float tipY = toeY + lt * Mathf.Sin(th0 + p + _toeBend[i]);
+        if (tipY < ToeTipClear)
+        {
+            float need = Mathf.Asin(Mathf.Clamp((ToeTipClear - toeY) / lt, -1f, 1f)) - th0 - p;
+            float most = Math.Max(_toeBend[i], -p);
+            // no faster than the pitch may turn (a toe flicking up is a pop too): what the bend cannot take, the foot's lift does
+            if (_pitchOk && !_teleporting) most = Math.Min(most, Math.Max(_toeBend[i], _toePrev[i] + PitchRate / 120f));
+            _toeBend[i] = Mathf.Clamp(need, _toeBend[i], Math.Max(most, _toeBend[i]));
+            tipY = toeY + lt * Mathf.Sin(th0 + p + _toeBend[i]);
+            if (tipY < ToeTipClear) ank.Y += ToeTipClear - tipY;   // toes flat and still low: the whole foot comes up
+        }
+        _toeOut[i] = _toePrev[i] = _toeBend[i];
+    }
+    readonly float[] _toePrev = new float[2];
+
+    /// <summary>Clearance (metres) kept under the toe joint and the boot's toe tip.</summary>
+    const float ToeJointClear = 0.015f, ToeTipClear = 0.004f;
+
+    // a skill move's start in mocap mode: the move is drawn from the procedural foot, the difference to the drawn one dying away
+    Vector3 _skOff, _skOffVel;
+    bool _skFirst;
+    readonly Vector3[] _prevAnkRel2 = new Vector3[2];
+    /// <summary>Half-life (seconds) of the difference between the drawn foot and the procedural one a skill move starts from.</summary>
+    const float SkillStartHalfLife = 0.05f;
+
+    /// <summary>
+    /// Mocap: a skill move starts from where the procedural stride has the playing foot (its reach then covers the procedural distance,
+    /// not the cycle's, which can be far behind or high); the difference from where the foot is drawn is kept as an offset that decays.
+    /// </summary>
+    void SkillStartFromProcedural(int fi, Vector3 posXZ)
+    {
+        _skOff = _skOffVel = Vector3.Zero; _skFirst = false;
+        if (_atkAnim == null || _mW <= 0f || _teleporting) return;
+        _skFirst = true;
+        Vector3 proc = _feet[fi].Ankle - posXZ; proc.Y = _feet[fi].Ankle.Y;
+        _skOff = _skFromRel - proc;
+        _skFromRel = proc;
+    }
+
+    /// <summary>
+    /// On a move's first tick: the offset starts with the drawn foot's velocity (relative to the body) less the move's own at its start
+    /// (the reach's straight line to the ball, or none), so the foot's velocity carries on through the hand-over instead of changing at once.
+    /// </summary>
+    void SkillStartVelocity(int fi, Vector3 from, Vector3 target, float reachSpan, float dt)
+    {
+        _skFirst = false;
+        if (dt <= 0f) dt = 1f / 120f;
+        Vector3 vd = (_prevAnkRel[fi] - _prevAnkRel2[fi]) / dt;
+        Vector3 vr = reachSpan > dt ? (target - from) / reachSpan : Vector3.Zero;
+        _skOffVel = vd - vr;
+    }
+
+    /// <summary>The skill start offset this tick (decayed by a critically damped spring).</summary>
+    Vector3 SkillStartOffset(float dt)
+    {
+        if (_skOff.LengthSquared() < 1e-10f && _skOffVel.LengthSquared() < 1e-8f) return Vector3.Zero;
+        var x = new NVec3(_skOff.X, _skOff.Y, _skOff.Z); var v = new NVec3(_skOffVel.X, _skOffVel.Y, _skOffVel.Z);
+        Spring.Decay(ref x, ref v, SkillStartHalfLife, dt > 0f ? dt : 1f / 120f);
+        _skOff = new Vector3(x.X, x.Y, x.Z); _skOffVel = new Vector3(v.X, v.Y, v.Z);
+        return _skOff;
     }
 
     /// <summary>Mocap: the pelvis between the procedural one and the cycle's (moved into a turn as the procedural one is).</summary>
@@ -418,7 +508,7 @@ public partial class PlayerFigure
             int o = i == 0 ? 6 : 14;   // driven order per side: shoulder, arm, forearm, hand, thigh, shin, foot, toe
             knee[i] = b.DrivenBoneWorld(o + 5);
             ankEff[i] = b.DrivenBoneWorld(o + 6);
-            _shownToe[i] = b.DrivenBoneWorld(o + 7) + b.DrivenBoneAxisWorld(o + 7) * (0.08f * H / 1.8f);
+            _shownToe[i] = b.DrivenBoneWorld(o + 7) + b.DrivenBoneAxisWorld(o + 7) * (AttackerAnimator.ToeTip * b.ScaleFor(H));
         }
         pel = (b.DrivenBoneWorld(10) + b.DrivenBoneWorld(18)) * 0.5f;
         Vector3 up = b.DrivenBoneWorld(4) - b.DrivenBoneWorld(0);   // hips to neck
