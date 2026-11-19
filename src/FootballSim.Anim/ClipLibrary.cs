@@ -7,7 +7,8 @@ namespace FootballSim.Anim;
 public enum ClipVerdict { Keep, Trim, Reject }
 
 /// <summary>One clip with its clips.json labels: chooser set, side, audition verdict and tags (e.g. "idle").</summary>
-public sealed record ClipEntry(Clip Clip, string Set, string Side, ClipVerdict Verdict, IReadOnlyList<string>? Tags = null)
+/// <para><see cref="Bias"/> scales the matcher's cost for the clip's frames (clips.toml "match_bias"; 1 = none).</para>
+public sealed record ClipEntry(Clip Clip, string Set, string Side, ClipVerdict Verdict, IReadOnlyList<string>? Tags = null, float Bias = 1f)
 {
     public bool HasTag(string tag) => Tags != null && Tags.Contains(tag);
 }
@@ -58,7 +59,8 @@ public sealed class ClipLibrary
             var verdict = c.TryGetProperty("verdict", out var v) ? ParseVerdict(v.GetString(), clip.Name) : ClipVerdict.Keep;
             var tags = c.TryGetProperty("tags", out var tg) && tg.ValueKind == JsonValueKind.Array
                 ? tg.EnumerateArray().Select(e => e.GetString() ?? "").ToArray() : Array.Empty<string>();
-            clips.Add(new ClipEntry(clip, set, side, verdict, tags));
+            float bias = c.TryGetProperty("match_bias", out var mb) ? mb.GetSingle() : 1f;
+            clips.Add(new ClipEntry(clip, set, side, verdict, tags, bias));
         }
         return new ClipLibrary(skeleton, clips);
     }

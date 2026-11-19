@@ -103,7 +103,9 @@ public sealed class KeeperAnimator
         {
             Position = new NVec2(pos.X, pos.Z), Velocity = new NVec2(vel.X, vel.Z), Yaw = ModelSpace.YawFromFacing(f.Facing),
             Set = KeeperChooser.SetFor(f.KeeperAction, f.KeeperDive), Scale = scale, Dt = f.Dt > 0 ? f.Dt : 1f / 120f,
+            SquareChest = KeeperChooser.SquaresChest(f.KeeperAction),
         };
+        input.Stance = StanceFrom(j, input, scale, KeeperChooser.StanceWeight(f.KeeperAction));
         _motion.Step(input, _procR, _procP, _outR, _outP);
         _ticks++;
         if (_log && (_motion.SwitchCount != _lastSwitches || _motion.PlayingClip != _lastPlaying))
@@ -115,6 +117,26 @@ public sealed class KeeperAnimator
             _showP[k] = new Vector3(_outP[k].X, _outP[k].Y, _outP[k].Z);
         }
         _body.PoseBones(_showR, _showP[0], _showP);
+    }
+
+    /// <summary>
+    /// The stance layer's targets from this tick's procedural pose (its StandTargets: stance width, hands out low, lean, height), in the
+    /// character space of the simulation's root.
+    /// </summary>
+    StanceTargets StanceFrom(FigureJoints j, in MotionInput input, float scale, float weight)
+    {
+        var t = new StanceTargets { Weight = weight };
+        if (weight <= 0f) return t;
+        var root = new NVec3(input.Position.X, 0, input.Position.Y);
+        var inv = NQuat.Inverse(Spring.Yaw(input.Yaw));
+        NVec3 C(Vector3 w) => NVec3.Transform(ModelSpace.FromWorld(new NVec3(w.X, w.Y, w.Z)) / scale - root, inv);
+        var shoulders = (C(j.Shoulder[0]) + C(j.Shoulder[1])) * 0.5f;
+        var trunk = shoulders - C(j.Pelvis);
+        t.HipsHeight = _procP[0].Y;
+        t.Lean = MathF.Atan2(trunk.Z, trunk.Y);
+        t.LeftAnkleX = C(j.Ankle[0]).X; t.RightAnkleX = C(j.Ankle[1]).X;
+        t.LeftHand = C(j.Hand[0]) - shoulders; t.RightHand = C(j.Hand[1]) - shoulders;
+        return t;
     }
 
     /// <summary>

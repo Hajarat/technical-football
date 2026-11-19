@@ -14,6 +14,10 @@ public struct MotionInput
     /// <summary>World metres per model metre (the snap distance is in world metres).</summary>
     public float Scale;
     public float Dt;
+    /// <summary>Keep the chest within <see cref="KeeperMotion.ChestTolerance"/> of <see cref="Yaw"/> (every clip state but a run).</summary>
+    public bool SquareChest;
+    /// <summary>The stance layer's targets and weight (zero weight: off).</summary>
+    public StanceTargets Stance;
 }
 
 /// <summary>
@@ -28,6 +32,10 @@ public struct MotionInput
 public sealed class KeeperMotion
 {
     public const int SearchInterval = 12;
+    /// <summary>How far (radians) the chest may face away from the simulation's facing while <see cref="MotionInput.SquareChest"/> holds.</summary>
+    public const float ChestTolerance = 5f * MathF.PI / 180f;
+    /// <summary>Half-life (seconds) of the chest correction's and the stance layer's weights as states come and go.</summary>
+    public const float LayerHalfLife = 0.1f;
     public float TrajectoryHalfLife = 0.15f, RootHalfLife = 0.1f, SnapDistance = 0.5f;
     /// <summary>A best frame this close (seconds) to the playing one in the same clip does not cause a jump.</summary>
     public float NearSeconds = 0.25f;
@@ -57,6 +65,8 @@ public sealed class KeeperMotion
     float _yaw, _yawErrVel;
     Vector2 _simVel, _simAcc;
     float _rate = 1f;
+    float _chestW, _stanceW;
+    StanceTargets _stance;
     float _simYaw, _simYawVel;
 
     // poses in character space (hips relative to the root, turned so he faces +Z)
@@ -113,6 +123,8 @@ public sealed class KeeperMotion
             _simVel = input.Velocity; _simAcc = Vector2.Zero; _simYaw = input.Yaw; _simYawVel = 0;
             _inert.Reset(); _lock.Reset();
             _tick = 0; _setName = null; _ps = null; _clip = -1; _t = 0; _rate = 1f;
+            _chestW = input.SquareChest && _db.Set(input.Set) != null ? 1f : 0f;
+            _stanceW = _db.Set(input.Set) != null ? Math.Clamp(input.Stance.Weight, 0f, 1f) : 0f;
             _havePrev = _havePrev2 = false;
         }
 
@@ -203,12 +215,74 @@ public sealed class KeeperMotion
         outRot[0] = Quaternion.Normalize(yawQ * _out[0]);
         outPos[0] = new Vector3(_root.X, 0, _root.Y) + Vector3.Transform(_outP[0], yawQ);
         bool mocapVisible = _clip >= 0 || _inert.Active;
+        ApplyLayers(input, outRot, outPos, dt);
         Vector3 hips = outPos[0];
         _lock.Apply(_sk, outRot, ref hips, outPos, contacts, dt, mocapVisible);
         outPos[0] = hips;
 
         _tick++;
         _first = false;
+    }
+
+    /// <summary>
+    /// The corrections over the placed clip pose: the chest turned to the simulation's facing, then the stance layer (hips height,
+    /// lean, stance width, hands). Their weights follow the state with <see cref="LayerHalfLife"/>, and both are off while the
+    /// procedural pose is shown (it already does both), so nothing pops as states come and go.
+    /// </summary>
+    void ApplyLayers(in MotionInput input, Span<Quaternion> rot, Span<Vector3> pos, float dt)
+    {
+        float a = 1f - MathF.Exp(-dt * 0.69314718f / LayerHalfLife);
+        bool clip = _clip >= 0;
+        _chestW += ((input.SquareChest && clip ? 1f : 0f) - _chestW) * a;
+        float want = clip ? Math.Clamp(input.Stance.Weight, 0f, 1f) : 0f;
+        if (want > 0f) _stance = input.Stance;   // fading out, the last targets stay
+        _stanceW += (want - _stanceW) * a;
+        if (_chestW < 1e-3f && _stanceW < 1e-3f) return;
+
+        _sk.Forward(rot, pos[0], _gr, _gp, pos);
+        if (_chestW >= 1e-3f)
+        {
+            float turn = PoseLayers.ChestCorrection(PoseLayers.ChestYaw(_sk, _gr), input.Yaw, ChestTolerance) * _chestW;
+            PoseLayers.TwistTrunk(_sk, rot, _gr, turn);
+            _sk.Forward(rot, pos[0], _gr, _gp, pos);
+        }
+        if (_stanceW < 1e-3f) return;
+        float w = _stanceW;
+        // the targets are body-relative: measured about the drawn root (which may trail the simulation's a little)
+        var yawQ = Spring.Yaw(_yaw);
+        var root = new Vector3(_root.X, 0, _root.Y);
+        Vector3 ToModel(Vector3 c) => root + Vector3.Transform(c, yawQ);
+        Vector3 ToChar(Vector3 m) => Vector3.Transform(m - root, Quaternion.Inverse(yawQ));
+
+        // lean: the trunk (hips to neck) tipped toward the target's forward lean
+        int neck = _sk.Find("Neck");
+        Vector3 trunk = ToChar(_gp[neck]) - ToChar(_gp[_sk.Hips]);
+        float lean = MathF.Atan2(trunk.Z, trunk.Y);
+        PoseLayers.LeanTrunk(_sk, rot, _gr, _yaw, (_stance.Lean - lean) * w);
+        // height: the hips toward the target's (the legs bend to keep the feet where they are)
+        pos[0] = new Vector3(pos[0].X, pos[0].Y + (_stance.HipsHeight - pos[0].Y) * w, pos[0].Z);
+        _sk.Forward(rot, pos[0], _gr, _gp, pos);
+        // stance width: each ankle slides sideways toward its target place; feet keep the clip's height and forward place
+        for (int i = 0; i < 2; i++)
+        {
+            Vector3 ank = ToChar(_gp[_sk.Foot[i]]);
+            float x = i == 0 ? _stance.LeftAnkleX : _stance.RightAnkleX;
+            Vector3 target = ToModel(new Vector3(ank.X + (x - ank.X) * w, ank.Y, ank.Z));
+            Vector3 thighFwd = Vector3.Transform(Vector3.UnitZ, _gr[_sk.UpLeg[i]] * Quaternion.Inverse(_sk.RestGlobal[_sk.UpLeg[i]]));
+            PoseLayers.Reach(_sk, rot, _gr, _gp, _sk.UpLeg[i], _sk.Leg[i], _sk.Foot[i], target, thighFwd);
+        }
+        _sk.Forward(rot, pos[0], _gr, _gp, pos);
+        // hands: toward the target's place beside the shoulders (arms out low), from where the clip has them
+        int la = _sk.Find("LeftArm"), ra = _sk.Find("RightArm");
+        Vector3 shoulders = (_gp[la] + _gp[ra]) * 0.5f;
+        Vector3 back = Vector3.Transform(-Vector3.UnitZ, yawQ);   // elbows bend back and out
+        for (int i = 0; i < 2; i++)
+        {
+            int arm = i == 0 ? la : ra, fore = _sk.Find(i == 0 ? "LeftForeArm" : "RightForeArm"), hand = _sk.Find(i == 0 ? "LeftHand" : "RightHand");
+            Vector3 want3 = shoulders + Vector3.Transform(i == 0 ? _stance.LeftHand : _stance.RightHand, yawQ);
+            Vector3 target = Vector3.Lerp(_gp[hand], want3, w);
+            PoseLayers.Reach(_sk, rot, _gr, _gp, arm, fore, hand, target, back);
+        }
     }
 
     /// <summary>The playback rate at which the clip's root keeps pace with the simulation's velocity (see <see cref="WarpMin"/>).</summary>

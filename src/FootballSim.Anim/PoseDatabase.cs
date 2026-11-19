@@ -177,7 +177,7 @@ public sealed class RootTrack
 }
 
 /// <summary>One clip inside a <see cref="PoseSet"/>: its frames are the set's frames <see cref="Start"/> .. <see cref="Start"/> + count − 1.</summary>
-public sealed record PoseClip(Clip Clip, RootTrack Root, int Start, string Side)
+public sealed record PoseClip(Clip Clip, RootTrack Root, int Start, string Side, float Bias = 1f)
 {
     public int End => Start + Clip.FrameCount;
 }
@@ -197,20 +197,24 @@ public sealed class PoseSet
     readonly float[] _raw, _norm, _mean, _scale;
     readonly bool[] _searchable;
     readonly byte[] _contacts;
-    readonly float[] _boneSpeed;
+    readonly float[] _boneSpeed, _bias;
 
     public PoseSet(string name, IReadOnlyList<(Clip Clip, string Side)> clips, Skeleton sk, FeatureWeights? weights = null)
+        : this(name, clips.Select(c => (c.Clip, c.Side, 1f)).ToList(), sk, weights) { }
+
+    /// <summary>A set whose clips carry a matcher cost factor each (1 = none; see <see cref="Bias"/>).</summary>
+    public PoseSet(string name, IReadOnlyList<(Clip Clip, string Side, float Bias)> clips, Skeleton sk, FeatureWeights? weights = null)
     {
         Name = name;
         weights ??= FeatureWeights.Default;
         var list = new List<PoseClip>();
         int start = 0;
-        foreach (var (c, side) in clips) { list.Add(new PoseClip(c, new RootTrack(c, sk), start, side)); start += c.FrameCount; }
+        foreach (var (c, side, bias) in clips) { list.Add(new PoseClip(c, new RootTrack(c, sk), start, side, bias)); start += c.FrameCount; }
         Clips = list; FrameCount = start;
         int F = Features.Count;
         _raw = new float[FrameCount * F]; _norm = new float[FrameCount * F];
-        _searchable = new bool[FrameCount]; _contacts = new byte[FrameCount]; _boneSpeed = new float[FrameCount];
-        foreach (var pc in list) Extract(pc, sk);
+        _searchable = new bool[FrameCount]; _contacts = new byte[FrameCount]; _boneSpeed = new float[FrameCount]; _bias = new float[FrameCount];
+        foreach (var pc in list) { Extract(pc, sk); for (int f = pc.Start; f < pc.End; f++) _bias[f] = pc.Bias; }
 
         _mean = new float[F]; _scale = new float[F];
         if (FrameCount > 0)
@@ -304,6 +308,9 @@ public sealed class PoseSet
     public ReadOnlySpan<float> Normalized(int frame) => new(_norm, frame * Features.Count, Features.Count);
     public bool Searchable(int frame) => _searchable[frame];
     public byte Contacts(int frame) => _contacts[frame];
+    /// <summary>The matcher's cost factor for a frame (its clip's match_bias).</summary>
+    public float Bias(int frame) => _bias[frame];
+
     /// <summary>The fastest bone turn near a frame at the clip's own rate (radians per second).</summary>
     public float BoneSpeed(int frame) => _boneSpeed[frame];
 
@@ -351,14 +358,14 @@ public sealed class PoseDatabase
         foreach (var set in all)
         {
             if (_sets.ContainsKey(set)) continue;
-            var clips = new List<(Clip, string)>();
+            var clips = new List<(Clip, string, float)>();
             int colon = set.IndexOf(':');
             string baseSet = colon < 0 ? set : set[..colon], tag = colon < 0 ? "" : set[(colon + 1)..];
             foreach (var e in library.Clips)
             {
                 if (e.Set != baseSet || e.Verdict == ClipVerdict.Reject || (tag.Length > 0 && !e.HasTag(tag))) continue;
-                clips.Add((e.Clip, e.Side));
-                if (mirror) clips.Add((Mirror.Apply(e.Clip, library.Skeleton), Mirror.Side(e.Side)));
+                clips.Add((e.Clip, e.Side, e.Bias));
+                if (mirror) clips.Add((Mirror.Apply(e.Clip, library.Skeleton), Mirror.Side(e.Side), e.Bias));
             }
             _sets[set] = new PoseSet(set, clips, library.Skeleton, weightsFor(set));
         }

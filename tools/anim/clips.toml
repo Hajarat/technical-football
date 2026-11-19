@@ -8,6 +8,7 @@
 #   events  AMC frame numbers; save sets (catch, reflex_*, body_block, dive_*, back_leap, smother) need "contact"
 #   tags    optional labels the chooser can narrow a set by: "idle" marks a stance clip for standing still (the Set, Planted and
 #           Reacting states play only idle-tagged stance clips when there are any)
+#   match_bias  optional cost factor for the matcher (default 1): above 1 the clip is picked only when it fits clearly better
 #   verdict the audition's verdict: keep, trim (frames narrowed, then kept) or reject (still written and shown in the clip gallery,
 #           never in the pose database); a clip without one counts as keep
 #   loop    true only for a clip whose end runs into its start (none yet: the matcher treats every clip as one-shot)
@@ -45,6 +46,7 @@ trial = "83_01"
 frames = [260, 520]
 set = "stance"
 side = "right"
+match_bias = 2.0
 verdict = "keep"
 loop = false
 notes = "one sidestep to his right from standing (subject stands on a raised floor)"

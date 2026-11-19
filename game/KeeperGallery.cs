@@ -14,7 +14,8 @@ namespace FootballSim.Game;
 /// GALLERY_CHECK's lowest_joint_y_m and max_joint_step are the figure's own (procedural) joints; foot_slide_cm, body_lowest_joint_m and
 /// max_bone_deg_per_s measure the rigged body as drawn, in either mode: the largest horizontal drift of an ankle while its foot stays
 /// planted (mocap: a foot the foot lock holds; procedural: the figure's own planted foot; see PlayerFigure.KeeperFootPlanted), the
-/// lowest bone joint, and the fastest bone turn from one tick to the next (POP above 1,500 deg/s).
+/// lowest bone joint, the fastest bone turn from one tick to the next (POP above 1,500 deg/s), and how far the chest (the line
+/// between the shoulder joints) faces away from his facing in the stance and movement states other than the run.
 /// </summary>
 public sealed class KeeperGallery
 {
@@ -59,7 +60,9 @@ public sealed class KeeperGallery
     readonly Vector3[] _plantAt = new Vector3[2], _prevAnkle = new Vector3[2];
     float _slide, _bodyLow, _boneSpeed;
     string _slideWhere = "", _bodyLowWhere = "", _boneWhere = "";
-    int[] _ankleBone = { -1, -1 };
+    int[] _ankleBone = { -1, -1 }, _armBone = { -1, -1 };
+    float _chestOff;
+    string _chestWhere = "";
 
     public KeeperGallery(Match m, string dir, float goalLineX)
     {
@@ -252,7 +255,7 @@ public sealed class KeeperGallery
             if (_s != null) Report();
             if (++_si >= _scripts.Count) { _finished = true; return false; }
             _s = _scripts[_si]; _t = 0; _mi = 0; _minY = 1e9f; _bad = false; _maxStep = 0; _prevJ = null;
-            _prevRot = null; _planted[0] = _planted[1] = false; _slide = 0; _bodyLow = 1e9f; _boneSpeed = 0; _slideWhere = _bodyLowWhere = _boneWhere = "";
+            _prevRot = null; _planted[0] = _planted[1] = false; _slide = 0; _bodyLow = 1e9f; _boneSpeed = 0; _slideWhere = _bodyLowWhere = _boneWhere = ""; _chestOff = 0; _chestWhere = "";
             var f0 = Frame(0, out _);
             _m.Keeper.Teleport(f0);
             _m.Camera.ResetPhysicsInterpolation();
@@ -370,6 +373,24 @@ public sealed class KeeperGallery
             if (!float.IsFinite(w.X) || !float.IsFinite(w.Y) || !float.IsFinite(w.Z)) _bad = true;
             if (w.Y < _bodyLow) { _bodyLow = w.Y; _bodyLowWhere = $"{Short(names[k])}@{_t:F2}s {act}"; }
         }
+        // the chest's heading against his facing (stance and movement states but the run): the line between the shoulder joints
+        if (_armBone[0] < 0)
+            for (int k = 0; k < n; k++)
+            {
+                if (names[k].EndsWith("LeftArm")) _armBone[0] = k;
+                if (names[k].EndsWith("RightArm")) _armBone[1] = k;
+            }
+        if (_armBone[0] >= 0 && act is KeeperAction.Set or KeeperAction.Planted or KeeperAction.Reacting or KeeperAction.Shuffle
+                or KeeperAction.Spread or KeeperAction.Jockey or KeeperAction.Backpedal)
+        {
+            var across = xf * body.DrivenBoneOrigin(_armBone[1]) - xf * body.DrivenBoneOrigin(_armBone[0]);   // toward his right
+            var chest = new Vector3(across.Z, 0, -across.X);   // his right is (-fwd.z, 0, fwd.x), so his front is (right.z, 0, -right.x)
+            if (chest.LengthSquared() > 1e-6f)
+            {
+                float off = Mathf.RadToDeg(Math.Abs(Mathf.Wrap(Mathf.Atan2(chest.Z, chest.X) - _facing, -Mathf.Pi, Mathf.Pi)));
+                if (off > _chestOff) { _chestOff = off; _chestWhere = $"{_t:F2}s {act}"; }
+            }
+        }
         var fig = _m.Keeper.Figure;
         for (int i = 0; i < 2; i++)
         {
@@ -429,5 +450,5 @@ public sealed class KeeperGallery
     void Report() => GD.Print($"GALLERY_CHECK script={_s.Name} anim={_m.Keeper.AnimMode}{(_m.Keeper.Figure.KeeperAnim == null && _m.Keeper.AnimMode == "mocap" ? "(unavailable)" : "")} non_finite={_bad} " +
         $"lowest_joint_y_m={_minY:F3} at={_minWhere} max_joint_step_m_per_tick={_maxStep:F3} at={_maxStepWhere} " +
         $"foot_slide_cm={_slide * 100f:F1} at={_slideWhere} body_lowest_joint_m={_bodyLow:F3} at={_bodyLowWhere} " +
-        $"max_bone_deg_per_s={_boneSpeed:F0} at={_boneWhere}{(_boneSpeed > PopDegPerSec ? " POP" : "")}");
+        $"max_bone_deg_per_s={_boneSpeed:F0} at={_boneWhere}{(_boneSpeed > PopDegPerSec ? " POP" : "")} chest_off_facing_deg={_chestOff:F0} at={_chestWhere}");
 }

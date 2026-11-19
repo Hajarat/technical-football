@@ -23,25 +23,27 @@ public static class Matcher
         {
             if (!set.Searchable(i) || (i >= skipFrom && i < skipTo)) continue;
             var f = set.Normalized(i);
+            float bias = set.Bias(i), limit = cost / bias;
             float d = 0;
             for (int k = 0; k < f.Length; k++)
             {
                 float e = f[k] - query[k];
                 d += e * e;
-                if (d >= cost) break;   // cannot win (equal does not win either: ties keep the lower index)
+                if (d >= limit) break;   // cannot win (equal does not win either: ties keep the lower index)
             }
+            d *= bias;
             if (d < cost) { cost = d; best = i; }
         }
         return best;
     }
 
-    /// <summary>The squared distance of one frame's features from the query.</summary>
+    /// <summary>The squared distance of one frame's features from the query, times its clip's bias.</summary>
     public static float Cost(PoseSet set, int frame, ReadOnlySpan<float> query)
     {
         var f = set.Normalized(frame);
         float d = 0;
         for (int k = 0; k < f.Length; k++) { float e = f[k] - query[k]; d += e * e; }
-        return d;
+        return d * set.Bias(frame);
     }
 
     /// <summary>

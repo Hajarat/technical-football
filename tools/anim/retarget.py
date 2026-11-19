@@ -737,7 +737,7 @@ def main(argv: list[str]) -> int:
         write_kclip(OUT / f"{c['name']}.kclip", r, names)
         cs = {("left", "right")[s]: spans(r.contacts[:, s]) for s in range(2)}
         index.append({"name": c["name"], "file": f"{c['name']}.kclip", "trial": c["trial"], "frames": c.get("frames"),
-                      "set": c["set"], "tags": list(c.get("tags", [])), "verdict": verdict(c), "side": c.get("side", "none"), "kind": c.get("kind", ""), "loop": r.loop,
+                      "set": c["set"], "tags": list(c.get("tags", [])), "match_bias": float(c.get("match_bias", 1.0)), "verdict": verdict(c), "side": c.get("side", "none"), "kind": c.get("kind", ""), "loop": r.loop,
                       "events": r.events, "fps": FPS, "frame_count": r.stats["frames"], "seconds": r.stats["seconds"],
                       "contacts": {k: [list(s) for s in v] for k, v in cs.items()},
                       "notes": c.get("notes", ""), "contact_tolerance_cm": float(c.get("contact_tolerance_cm", MAX_CONTACT_H * 100)), "checks": {k: v for k, v in r.stats.items() if k not in ("frames", "seconds")}})

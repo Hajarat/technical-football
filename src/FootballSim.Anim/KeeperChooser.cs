@@ -37,6 +37,20 @@ public static class KeeperChooser
         _ => null,
     };
 
+    /// <summary>Whether a clip-driven state keeps his chest square to his facing: all but the run (Rush, Charge), whose facing is the run's.</summary>
+    public static bool SquaresChest(KeeperAction action) => action is not (KeeperAction.Rush or KeeperAction.Charge);
+
+    /// <summary>
+    /// How much of the stance layer (the procedural "made big" stance: wide feet, arms out low) a state takes over its clip: all of it
+    /// spread, part of it jockeying (he still steps with the attacker), none otherwise.
+    /// </summary>
+    public static float StanceWeight(KeeperAction action) => action switch
+    {
+        KeeperAction.Spread => 1f,
+        KeeperAction.Jockey => 0.6f,
+        _ => 0f,
+    };
+
     /// <summary>
     /// Which side of the keeper a point is on, by his facing (radians, 0 = +X, positive toward +Z, the simulation's convention):
     /// +1 on his right, −1 on his left, 0 straight ahead or behind. Never by world Z, so it holds whichever way he faces.
