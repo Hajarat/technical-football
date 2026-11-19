@@ -18,7 +18,7 @@ namespace FootballSim.Game;
 /// A clip whose clips.json entry carries a ball track (the authored skill moves, tools/anim/author.py) is shown with its ball and
 /// from a third view, the game camera's angle (zoomed in); its sheet has a moment every 0.05 s plus the events, a second sheet
 /// &lt;clip&gt;_contact.png has one tile per physics tick around the "contact" event, and with --video it also writes a 0.25x slow
-/// version (&lt;dir&gt;/video/&lt;clip&gt;_slow, four frames per clip frame). Its cameras stay still for the whole clip, so the body's
+/// version (&lt;dir&gt;/video/&lt;clip&gt;_slowmo, four frames per clip frame). Its cameras stay still for the whole clip, so the body's
 /// and the ball's travel show.
 /// </summary>
 public sealed class ClipGallery
@@ -334,7 +334,7 @@ public sealed class ClipGallery
     void SaveFrame(Shot shot, int views)
     {
         if (_frame == null) return;
-        string dir = System.IO.Path.Combine(_dir, "video", Cur.Clip.Name + (shot.Out == Out.Slow ? "_slow" : ""));
+        string dir = System.IO.Path.Combine(_dir, "video", Cur.Clip.Name + (shot.Out == Out.Slow ? "_slowmo" : ""));
         if (shot.Col == 0) DirAccess.MakeDirRecursiveAbsolute(dir);
         var img = views == 3 ? _frame : _frame.GetRegion(new Rect2I(0, 0, views * Tile, Tile));
         img.SavePng(System.IO.Path.Combine(dir, $"f_{shot.Col:D4}.png"));
