@@ -299,13 +299,18 @@ public sealed class PlantLock
     /// left (a heel sliding into the ground), which stopping in one tick would show as a jolt of the leg.
     /// </summary>
     public float SettleSeconds = 0.05f;
+    /// <summary>
+    /// A held foot whose pose rises this far (metres) above the lowest it stood at is let go: the heel leaving the ground, after which
+    /// the foot rolls over its toes as the pose has it (holding the ankle there would drag it behind and snap it forward at the end).
+    /// </summary>
+    public float LiftOff = 0.025f;
     public bool Locked { get; private set; }
     /// <summary>Held and no longer settling: the foot stands still.</summary>
     public bool Settled => Locked && _t >= SettleSeconds;
     public Vector3 Lock { get; private set; }
     Vector3 _off, _offVel, _shown, _prevWanted;
     bool _have, _spent;
-    float _t;
+    float _t, _low;
 
     public void Reset() { Locked = false; _off = _offVel = Vector3.Zero; _have = false; _spent = false; _t = 0f; }
 
@@ -317,14 +322,16 @@ public sealed class PlantLock
     public Vector3 Apply(bool stance, Vector3 wanted, bool outOfReach, float dt)
     {
         if (!stance) _spent = false;
-        if (Locked && (!stance || outOfReach))
+        if (Locked) _low = Math.Min(_low, wanted.Y);
+        bool lifted = Locked && wanted.Y > _low + LiftOff;
+        if (Locked && (!stance || outOfReach || lifted))
         {
-            Locked = false; _spent = stance;   // let go for reach: not held again before the next stance
+            Locked = false; _spent = stance;   // let go for reach or a lifting heel: not held again before the next stance
             _off = _shown - wanted; _offVel = Vector3.Zero;
         }
         else if (!Locked && stance && !_spent)
         {
-            Locked = true; _t = 0f;
+            Locked = true; _t = 0f; _low = wanted.Y;
             Lock = _have ? _shown : wanted;   // where it is drawn now (a release still dying away included)
             _off = _offVel = Vector3.Zero;
         }

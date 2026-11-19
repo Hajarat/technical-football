@@ -103,7 +103,7 @@ public sealed class AttackerAnimator
 
     // ---- this tick's cycle pose, in the world ----
     /// <summary>Each foot's ankle as the cycle has it (world, the stride stretched, not yet held), whether it is on the ground, its pitch (radians, toes up) and direction.</summary>
-    public readonly Vector3[] Ankle = new Vector3[2], FootDir = new Vector3[2];
+    public readonly Vector3[] Ankle = new Vector3[2], FootDir = new Vector3[2], Hip = new Vector3[2];
     public readonly bool[] Stance = new bool[2];
     public readonly float[] Pitch = new float[2];
     /// <summary>The point between the hip joints (the figure's pelvis) and the pelvis's turn (world basis, X forward, Y up, Z his right).</summary>
@@ -146,6 +146,7 @@ public sealed class AttackerAnimator
             Pitch[i] = MathF.Atan2(t.Y, t.X * MathF.Sin(yaw) + t.Z * MathF.Cos(yaw));
             FootDir[i] = (fwd * MathF.Cos(yaw) + left * MathF.Sin(yaw)).Normalized();
         }
+        for (int i = 0; i < 2; i++) Hip[i] = W(_gp[_sk.UpLeg[i]], 1f);
         var mid = (_gp[_sk.UpLeg[0]] + _gp[_sk.UpLeg[1]]) * 0.5f;
         Pelvis = W(mid, 1f);
         // the hips bone's turn from rest, from the model's frame (x his left, z forward) into the world (X forward, Z his right) basis
@@ -230,6 +231,7 @@ public partial class PlayerFigure
     const float MocapOverLean = 0.10f;
 
     static readonly bool Log = System.Environment.GetEnvironmentVariable("ATTACKER_ANIM_LOG") == "1";
+    bool MocapLogOn => Log && _atkAnim != null;
     /// <summary>The cycles' weight this tick (0 when not in mocap mode).</summary>
     public float MocapWeight => _mW;
 
@@ -262,7 +264,23 @@ public partial class PlayerFigure
     {
         if (_atkAnim == null || _mW <= 0f) { _mLock[i].Reset(); _mLockWas[i] = false; return; }
         var a = _atkAnim;
-        Vector3 want = ank.Lerp(a.Ankle[i], _mW);
+        // a foot about to play the ball swings low: its heel recovery is taken down toward the ground (a dribbler's lower kick-back),
+        // so the touch's windup starts from near the ball instead of from behind the hip
+        Vector3 cyc = a.Ankle[i];
+        float lift = cyc.Y - AnkleH;
+        // eased: a touch that appears or is dropped (the core replans), or possession won or lost, must not move the foot in a tick
+        float liftT = Mathf.Lerp(f.InPossession ? PossessionLift : 1f, TouchLift, TouchPrep(f, i));
+        _prep[i] = _teleporting ? liftT : Mathf.Lerp(_prep[i], liftT, 1f - Mathf.Exp(-dt / TouchPrepTau));
+        if (lift > 0f)
+        {
+            Vector3 c0 = cyc;
+            cyc.Y = AnkleH + lift * _prep[i];
+            // lowered, a foot behind the body may fall out of the leg's reach: it comes in toward the hip instead (as far as the cycle had it, at most)
+            Vector3 d = cyc - a.Hip[i];
+            float most = Math.Max(0.96f * Leg, (c0 - a.Hip[i]).Length());
+            if (d.Length() > most) cyc = a.Hip[i] + d * (most / d.Length());
+        }
+        Vector3 want = ank.Lerp(cyc, _mW);
         bool cycle = _mW >= 0.5f;
         bool stance = cycle ? a.Stance[i] : planted;
         var lk = _mLock[i];
@@ -284,15 +302,65 @@ public partial class PlayerFigure
         dir = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
     }
 
-    /// <summary>Mocap: the foot's pitch between the stride's and the cycle's; toes bent up to stay on the ground while the heel is up near it.</summary>
-    float MocapPitch(int i, float proc, Vector3 ank, out float toe)
+    /// <summary>The cycle's swing height above the ground kept while in possession, and for a foot about to touch the ball (see <see cref="TouchPrep"/>).</summary>
+    const float PossessionLift = 0.8f, TouchLift = 0.35f;
+    /// <summary>Per foot: the share of the cycle's swing height drawn (eased), 1 = all of it.</summary>
+    readonly float[] _prep = { 1f, 1f };
+    /// <summary>How long before a touch's contact (seconds) its foot starts to swing low, and by when it is all the way low.</summary>
+    const float TouchPrepFrom = 0.42f, TouchPrepFull = 0.14f, TouchPrepTau = 0.06f;
+
+    /// <summary>0..1: how near foot <paramref name="i"/>'s next touch is (the pending touch of that foot, or the core's expected next contact), 0 when none is due.</summary>
+    float TouchPrep(in FigureFrame f, int i)
     {
-        toe = 0f;
+        float eta = float.PositiveInfinity;
+        if (f.Action.Valid && !f.Action.IsSkill && !f.Action.Made && (f.Action.Right ? 1 : 0) == i && f.Action.ContactEta > 0f) eta = f.Action.ContactEta;
+        if (f.InPossession && (f.NextTouchRight ? 1 : 0) == i && f.NextTouchEta > 0f) eta = Math.Min(eta, f.NextTouchEta);
+        if (f.Upcoming.Valid && (f.Upcoming.Right ? 1 : 0) == i) eta = Math.Min(eta, Math.Max(0f, f.Upcoming.ContactEta));
+        if (float.IsInfinity(eta)) return 0f;
+        return Smooth(1f - (eta - TouchPrepFull) / (TouchPrepFrom - TouchPrepFull));
+    }
+
+    /// <summary>Mocap: the foot's pitch between the stride's and the cycle's; toes bent up to stay on the ground while the heel is up near it.</summary>
+    float MocapPitch(int i, float proc, Vector3 ank, out float toe, out float lift)
+    {
+        toe = 0f; lift = 0f;
         if (_atkAnim == null || _mW <= 0f) return proc;
-        float p = _atkAnim.Pitch[i];
-        float low = Mathf.Clamp(1f - (ank.Y - AnkleH) / (0.18f * H / 1.8f), 0f, 1f);
-        toe = Math.Max(0f, -p) * low * _mW;
-        return Mathf.Lerp(proc, p, _mW);
+        // a foot about to play the ball levels out as it swings low (TouchPrep), so the touch's windup does not have to turn it round
+        float p = _atkAnim.Pitch[i] * (1f - 0.75f * Mathf.Clamp((1f - _prep[i]) / (1f - TouchLift), 0f, 1f));
+        float pitch = Mathf.Lerp(proc, p, _mW);
+        // a flat or toes-up foot keeps its heel out of the ground (the cycles' heels sit up to a centimetre low: their retarget
+        // grounded the toes and ankle only)
+        if (pitch > -0.05f && ank.Y < AnkleH) lift = (AnkleH - ank.Y) * _mW;
+        if (pitch < 0f)
+        {
+            // the toes bend up just enough to keep their tips out of the ground (toe joint and tip from the boot's rough shape)
+            float k = H / 1.8f, lf = 0.14f * k, ht = 0.025f * k, lt = 0.08f * k;
+            float toeY = ank.Y + (ht - AnkleH) * Mathf.Cos(pitch) + lf * Mathf.Sin(pitch);
+            // a toe joint that would be in the ground (a forefoot landing on a shortened stride) lifts the foot
+            if (toeY < 0.012f * k) { lift = Math.Max(lift, (0.012f * k - toeY) * _mW); toeY = 0.012f * k; }
+            float need = Mathf.Asin(Mathf.Clamp((0.022f * k - toeY) / lt, -1f, 1f)) - pitch;
+            toe = Mathf.Clamp(need, 0f, -pitch) * _mW;
+        }
+        return pitch;
+    }
+
+    readonly float[] _pitchOut = new float[2], _toeOut = new float[2];
+    bool _pitchOk;
+    /// <summary>How fast the drawn foot pitch and toe bend may change in mocap mode (radians per second): a pose handed over at once (a skill or kick weight jumping to 1) would turn the foot in a tick.</summary>
+    const float PitchRate = 14f;
+
+    /// <summary>Mocap: limits the change of foot <paramref name="i"/>'s pitch and toe bend per tick, except on a touch's contact (drawn exactly).</summary>
+    void MocapPitchRate(int i, bool exact, float dt)
+    {
+        if (_atkAnim == null) return;
+        if (_pitchOk && !_teleporting && !exact)
+        {
+            float st = PitchRate * dt;
+            _pitch[i] = _pitchOut[i] + Math.Clamp(_pitch[i] - _pitchOut[i], -st, st);
+            _toeBend[i] = _toeOut[i] + Math.Clamp(_toeBend[i] - _toeOut[i], -st, st);
+        }
+        _pitchOut[i] = _pitch[i]; _toeOut[i] = _toeBend[i];
+        if (i == 1) _pitchOk = true;
     }
 
     /// <summary>Mocap: the pelvis between the procedural one and the cycle's (moved into a turn as the procedural one is).</summary>
@@ -327,6 +395,13 @@ public partial class PlayerFigure
     readonly Quaternion[] _bonePrev = new Quaternion[22];
     bool _boneHave;
 
+    static float KneeDeg(SkinnedBody b, int k)
+    {
+        int o = k >= 14 ? 14 : 6;
+        Vector3 h = b.DrivenBoneWorld(o + 4), kn = b.DrivenBoneWorld(o + 5), a = b.DrivenBoneWorld(o + 6);
+        return (kn - h).AngleTo(a - kn) * 180f / Mathf.Pi;
+    }
+
     /// <summary>
     /// Mocap: replaces the figure's ankles, knees, pelvis and lean with the shown body's (foot and shin bone heads, the point between
     /// the hip joints, the chest's lean), records the toe tips, and the fastest bone turn of the tick outside shots.
@@ -334,6 +409,7 @@ public partial class PlayerFigure
     void MocapShown(in FigureFrame f, Vector3[] ankEff, Vector3[] knee, ref Vector3 pel, ref float lean, Vector3 fwd, float dt)
     {
         _shown = false;
+        if (_atkAnim == null && _body != null && Stats != null && !IsKeeper) { BoneSpeeds(f, _body, dt); return; }
         if (_atkAnim == null || _body == null) return;
         _shown = true;
         var b = _body;
@@ -348,19 +424,31 @@ public partial class PlayerFigure
         Vector3 up = b.DrivenBoneWorld(4) - b.DrivenBoneWorld(0);   // hips to neck
         lean = Mathf.Atan2(up.Dot(fwd), up.Y);
         if (Stats == null) return;
-        for (int i = 0; i < 2; i++) Stats.MinToeYM = Math.Min(Stats.MinToeYM, _shownToe[i].Y);
+        for (int i = 0; i < 2; i++)
+        {
+            Stats.MinToeYM = Math.Min(Stats.MinToeYM, _shownToe[i].Y);
+            if (Log && _shownToe[i].Y < -0.005f) GD.Print($"MOCAP_TOE tick={Stats.Tick} foot={i} toe_y={_shownToe[i].Y:F3} ank_y={ankEff[i].Y:F3} pitch={_pitch[i]:F2} bend={_toeBend[i]:F2} lock={(_mLock[i].Locked ? 1 : 0)} w={_mW:F2}");
+        }
+        bool shot = BoneSpeeds(f, b, dt);
+        if (f.Skill.Valid || shot) return;
+        Stats.MocapTicks++; if (_mW >= 0.999f) Stats.MocapFull++;
+    }
+
+    /// <summary>The fastest bone turn of the tick (local rotations, outside shots) into the stats; returns whether a shot is under way.</summary>
+    bool BoneSpeeds(in FigureFrame f, SkinnedBody b, float dt)
+    {
         bool shot = f.Shot.Valid || _strikeT >= 0f || !float.IsNaN(f.StrikeEta) || f.ShotCharge > 0.001f;
         int n = Math.Min(b.DrivenCount, _bonePrev.Length);
         if (_boneHave && !_teleporting && !shot)
             for (int k = 0; k < n; k++)
             {
                 float deg = _bonePrev[k].AngleTo(b.DrivenLocalRotation(k)) * 180f / Mathf.Pi / dt;
-                if (deg > 1500f) { Stats.BoneFast++; if (Log) GD.Print($"MOCAP_FAST tick={Stats.Tick} bone={b.DrivenBoneNames[k]} deg_s={deg:F0} w={_mW:F2}"); }
+                if (deg > 1500f) { Stats.BoneFast++; if (Log) GD.Print($"MOCAP_FAST tick={Stats.Tick} bone={b.DrivenBoneNames[k]} deg_s={deg:F0} w={_mW:F2} knee_deg={KneeDeg(b, k):F1}"); }
                 if (deg > Stats.BoneMaxDegS) { Stats.BoneMaxDegS = deg; Stats.BoneMaxAt = $"{b.DrivenBoneNames[k]}@{Stats.Tick}"; }
             }
+        if (Log && _atkAnim != null) GD.Print($"MOCAP_KNEE tick={Stats.Tick} hips={b.DrivenBoneWorld(0).Y:F3} L={KneeDeg(b, 11):F1} R={KneeDeg(b, 19):F1} Ltw={_bonePrev[11].AngleTo(b.DrivenLocalRotation(11)) * 57.3f:F1} Rtw={_bonePrev[19].AngleTo(b.DrivenLocalRotation(19)) * 57.3f:F1}");
         for (int k = 0; k < n; k++) _bonePrev[k] = b.DrivenLocalRotation(k);
         _boneHave = true;
-        if (f.Skill.Valid || shot) return;
-        Stats.MocapTicks++; if (_mW >= 0.999f) Stats.MocapFull++;
+        return shot;
     }
 }

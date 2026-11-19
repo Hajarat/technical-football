@@ -855,8 +855,10 @@ public partial class PlayerFigure : Node3D
             }
             if (body)
             {
-                float mp = MocapPitch(i, _cycPitch[i], ank[i], out float mToe);
+                float mp = MocapPitch(i, _cycPitch[i], ank[i], out float mToe, out float mLift);
+                ank[i].Y += mLift;
                 _pitch[i] = mp * pw; _toeBend[i] = (Mathf.Lerp(_cycToe[i], 0f, _mW) + mToe) * pw;
+                MocapPitchRate(i, tw[i] >= 0.999f && !_ovWind[i], dt);
                 ank[i].Y += PivotLift(_pitch[i]) * (1f - _mW);   // the cycle's ankle already rises as its heel lifts
                 if (_pitch[i] < -0.03f) planted[i] = false;   // the heel is up: the foot rolls on its toes and is no longer planted flat
             }
@@ -899,7 +901,8 @@ public partial class PlayerFigure : Node3D
                 float lim = 0.995f * Leg, dhs = new Vector2(dd.X, dd.Z).Length();
                 if (dhs >= lim) continue;
                 float drop = (pel.Y - ank[i].Y) - Mathf.Sqrt(lim * lim - dhs * dhs);
-                if (drop > 0f) pel.Y = Math.Max(floorY, pel.Y - Math.Min(drop, body ? 0.10f : 0.06f));
+                // (with the cycles the foot leaving the ground can be behind a straight leg as a touch begins: the sink goes with the touch's weight)
+                if (drop > 0f) pel.Y = Math.Max(floorY, pel.Y - Math.Min(drop, body ? 0.10f : 0.06f) * Mathf.Lerp(1f, tw[i], _mW));
             }
         // a planted foot that would be over-extended lowers the pelvis a little (never below the floor); the stance window above keeps this from happening
         float maxH = 0f;
@@ -931,8 +934,7 @@ public partial class PlayerFigure : Node3D
         {
             Stats.BankMaxDeg = Math.Max(Stats.BankMaxDeg, Math.Abs(_bank) * 180f / Mathf.Pi);
             bool steady = running0 && Math.Abs(_accFS) < 1f;
-            if (steady && speed >= 4f && speed < 5.8f) { Stats.LeanJogSum += lean * 180f / Mathf.Pi; Stats.LeanJogN++; }
-            if (steady && speed >= 6.8f) { Stats.LeanSprintSum += lean * 180f / Mathf.Pi; Stats.LeanSprintN++; }
+            if (_atkAnim == null) LeanStats(running0, speed, lean);   // mocap: from the shown pose, after it is drawn
         }
         // the speed lean tips the whole body forward from the ankles: the pelvis moves ahead of the feet, the trunk leans with it
         if (body) pel += fwd * (Mathf.Sin(SpeedLean) * LeanFromAnkles * (pel.Y - AnkleH) * (1f - _mW));
@@ -1017,6 +1019,7 @@ public partial class PlayerFigure : Node3D
             _headB = new Basis(hr, -_headPitch) * new Basis(hf, Vector3.Up, hr);
             RenderBody(pel, B, shoulderC, knee, ankEff, dir, handT, elbowPole);
             MocapShown(f, ankEff, knee, ref pel, ref lean, fwd, dt);
+            if (_atkAnim != null && Stats != null) LeanStats(running0, speed, lean);
         }
         var posFlat = new Vector3(pos.X, 0, pos.Z);
         // the playing foot's per-tick move (body-relative and world), during the move and the three ticks after it
@@ -1125,6 +1128,14 @@ public partial class PlayerFigure : Node3D
         }
     }
 
+    /// <summary>BODY_POSE's mean running lean at a jog and a sprint (steady speed only).</summary>
+    void LeanStats(bool running0, float speed, float lean)
+    {
+        bool steady = running0 && Math.Abs(_accFS) < 1f;
+        if (steady && speed >= 4f && speed < 5.8f) { Stats!.LeanJogSum += lean * 180f / Mathf.Pi; Stats.LeanJogN++; }
+        if (steady && speed >= 6.8f) { Stats!.LeanSprintSum += lean * 180f / Mathf.Pi; Stats.LeanSprintN++; }
+    }
+
     // ---------------------------------------------------------------------------------------------------------------
     // touches
 
@@ -1167,6 +1178,7 @@ public partial class PlayerFigure : Node3D
                 float m = Math.Max((ank[i] - _jAnk[i, 0]).Length(), (toe - _jToe[i, 0]).Length());
                 float m60 = _jN >= 2 ? Math.Max((ank[i] - _jAnk[i, 1]).Length(), (toe - _jToe[i, 1]).Length()) : float.NaN;
                 Stats.AddJump(c, i, m, m60);
+                if (MocapLogOn && m > 0.09f) GD.Print($"MOCAP_JUMP tick={Stats.Tick} foot={i} ctx={c} m={m:F3} ank={(ank[i] - _jAnk[i, 0]).Length():F3} toe={(toe - _jToe[i, 0]).Length():F3} tw={tw[i]:F2} w={_mW:F2}");
             }
             _jAnk[i, 1] = _jAnk[i, 0]; _jToe[i, 1] = _jToe[i, 0];
             _jAnk[i, 0] = ank[i]; _jToe[i, 0] = toe;

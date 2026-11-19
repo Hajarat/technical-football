@@ -164,7 +164,7 @@ public class CycleMotionTests
     public void PlantLockHoldsThenLetsGoSmoothly()
     {
         var lk = new PlantLock();
-        Vector3 W(int t) => new(1 + 0.02f * t, 0.1f + 0.002f * t, 0);
+        Vector3 W(int t) => new(1 + 0.02f * t, 0.1f + 0.0005f * t, 0);
         var first = lk.Apply(true, W(0), false, 0.01f);
         Vector3 p = first;
         for (int t = 1; t < 30; t++)
@@ -177,6 +177,15 @@ public class CycleMotionTests
         }
         Assert.True(lk.Settled);
         Assert.InRange(p.X - first.X, 0.01f, 0.06f);
+        // the heel rising past LiftOff lets it go (the foot rolls over its toes with the pose) and it is not held again this stance
+        var up = lk.Apply(true, new Vector3(1.6f, 0.1f + 0.03f, 0), false, 0.01f);
+        Assert.False(lk.Locked);
+        Assert.True((up - p).Length() < 0.04f);
+        lk.Apply(true, new Vector3(1.6f, 0.1f, 0), false, 0.01f);
+        Assert.False(lk.Locked);
+        lk.Apply(false, new Vector3(1.6f, 0.1f, 0), false, 0.01f);
+        lk.Apply(true, W(0), false, 0.01f);
+        for (int t = 1; t < 30; t++) p = lk.Apply(true, W(t), false, 0.01f);
         var held = p;
         var rel = lk.Apply(false, new Vector3(1.62f, 0.15f, 0), false, 0.01f);
         Assert.True((rel - held).Length() < 0.06f);   // no jump to where the pose has it
