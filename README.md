@@ -178,7 +178,9 @@ before the strike (the gamepad's low shot) counts as driven held.
 - Charge fills 0 to 1 in 0.3 s while shoot is held and is frozen at the release (or at 1). Contact comes no sooner than 0.45 s
   after the press (the wind-up) and 0.12 s after the release; a ball still out of reach then is struck as soon as it is in
   reach, or the shot is dropped after `round.shoot_buffer`. In possession the ball is kept at the striking foot through the
-  wind-up by a soft touch.
+  wind-up by a soft touch. From the press to the strike the left stick only aims: the legs run on to the ball (the recovery
+  run toward its intercept, at the ball's own pace away plus the gap over the speed time constant), whichever way the stick
+  is swung, so the striking foot meets it. The soft touch leaves the ball rolling along the shooter's velocity.
 - Aim is the left stick at the release; a stick at rest then uses its last pushed direction if that was within 0.5 s. It is
   locked from the release to the contact. Aim assist still applies.
 - Each distance to the goal centre has an ideal charge (`shot.ideal_charge`; the HUD marks it from `World.IdealCharge`).
