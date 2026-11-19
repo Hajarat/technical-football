@@ -51,9 +51,10 @@ public sealed class ScriptedAttacker
     public bool Counters { get; set; } = true;
     /// <summary>
     /// Sprint is released (jogging touches) while the keeper is within this distance of the ball, about how far a sprint touch
-    /// runs before it is met again, metres...
+    /// runs before it is met again, metres (the feel probe's sprint touch interval, 0.48 s, at 7.4 m/s; inside the close-control
+    /// range, so the scripted attacker now sprints until it takes close control)...
     /// </summary>
-    public float JogRange { get; set; } = 9f;
+    public float JogRange { get; set; } = 4f;
     /// <summary>...and close control is held within this distance, metres.</summary>
     public float CloseControlRange { get; set; } = 6f;
     /// <summary>A keeper rushing out within this distance of the ball is taken round, metres.</summary>

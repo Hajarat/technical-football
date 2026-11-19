@@ -71,7 +71,8 @@ static class Cli
         {
             if (probe == "feel") return FeelProbe.Run(opts, dataDir, tuning);
             if (probe == "sessions") return SessionProbe.Run(opts, root ?? Directory.GetCurrentDirectory(), dataDir, tuning);
-            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, sessions)"); return 2; }
+            if (probe == "shots") return ShotDiag.Run(opts, dataDir, tuning);
+            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, sessions, shots)"); return 2; }
             return DribbleProbe.Run(opts, dataDir, tuning);
         }
 
