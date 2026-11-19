@@ -107,6 +107,32 @@ uv run --with imageio-ffmpeg python3 tools/anim/encode_video.py out/attacker
 
 `cmu.py` and `retarget.py` default to the keeper's list, model and folder, so the commands above under "Regenerate" are unchanged.
 
+### Stride cycles
+
+`tools/anim/cycles.py` cuts the attacker's stride cycles (`--attacker-anim mocap`) from the retargeted clips above into
+`game/assets/anim/attacker/cycles/` (4 `.kclip` + `clips.json`), from the `[[cycle]]` entries of `tools/anim/attacker_clips.toml`:
+
+| Cycle | From | Frames (60 Hz) | Speed on the model | Steps/s | Shown alone at |
+| --- | --- | --- | --- | --- | --- |
+| `cycle_walk` | `walk_brisk_16_21` | 17-76 | 1.83 m/s | 2.03 | 1.8 m/s |
+| `cycle_jog` | `jog_16_36` | 39-86 | 2.88 m/s | 2.55 | 2.8 m/s |
+| `cycle_run` | `run_16_46` | 10-51 | 4.45 m/s | 2.93 | 3.7 m/s |
+| `cycle_sprint` | `run_78_12` | 7-46 | 5.19 m/s | 3.08 | 4.5 m/s and up |
+
+Each is one stride, from a foot strike to the same foot's next strike (the frame after the range is the next stride's first). It is turned to
+travel along +Z and its travel taken out (the hips relative to a root moving at the stride's mean speed; speed, steps per second and step length
+go to `clips.json`); the end-to-start difference of every bone and of the hips' height is spread over the loop (frame i takes i/N of it), so it
+runs into its start exactly (the mismatch before closing, 1.6 to 6.3 degrees mean, is in `clips.json`); and each foot's strike and toe-off
+(its first and last frame within 2.5 cm of its lowest, by heel, ankle, toe joint or toe tip) are its events `strike_l`, `toeoff_l`,
+`strike_r`, `toeoff_r` and its contact bits. The game mirrors a cycle at load when it wants the other foot's version
+(`StrideCycle.Load(..., mirror: true)`).
+
+```sh
+uv run --with numpy python3 tools/anim/cycles.py
+game/tests/run-bg.sh -- --clip-gallery ../out/cycles --clip-folder res://assets/anim/attacker/cycles --clip-model res://assets/characters/player.glb --video
+uv run --with imageio-ffmpeg python3 tools/anim/encode_video.py out/cycles
+```
+
 ## Baked clips
 
 CMU has no goalkeeper dives, so a dive (low, side, high) and the smother take off on CMU motion (the clips tagged `takeoff`) and fly
