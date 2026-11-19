@@ -1690,8 +1690,9 @@ public partial class PlayerFigure : Node3D
         bool inside = sh.Kind is ShotKind.Finesse or ShotKind.LowFinesse or ShotKind.Chip;
 
         // the sequence's length and the swing's share of it; a later estimate before the contact eases the sequence out (ShotSlip)
-        float len = SequenceSeconds(sh.Kind, cb);
-        float swingT = Math.Min(sh.Kind switch { ShotKind.Driven => 0.12f, ShotKind.Chip => 0.14f, ShotKind.Power => 0.14f, _ => 0.17f }, 0.6f * len);
+        // (the kind can change under way, at the release and at a second press: its numbers are eased, see KindEase)
+        float len = KindEase(0, SequenceSeconds(sh.Kind, cb), dt);
+        float swingT = KindEase(1, Math.Min(sh.Kind switch { ShotKind.Driven => 0.12f, ShotKind.Chip => 0.14f, ShotKind.Power => 0.14f, _ => 0.17f }, 0.6f * len), dt);
         // the plant step (when one is drawn) starts a stride step before it lands, so it is as long as a step of the run
         float plantLen = Math.Max(len, PlantLand(swingT) + 1f / Math.Max(f.StepFrequency, 2.5f));
         // (the estimate is only drawn toward while the ball will be within the body's reach at the contact)
@@ -1709,7 +1710,7 @@ public partial class PlayerFigure : Node3D
         Vector3 rv = new(-fd.Z, 0, fd.X);
         Vector3 off = Off(fi, sh.Surface);
         // the boot's surface point on the ball: behind it along the leave direction, higher or lower on it per kind
-        float th = StrikeAngle(sh.Kind);
+        float th = KindEase(2, StrikeAngle(sh.Kind), dt);
         // (the core's estimate rolls the ball on to the contact tick, but the strike meets it before that tick's roll: one tick less)
         Vector3 centre = sh.ContactPoint;
         if (!sh.Made && tau >= dt) centre -= new Vector3(f.BallVel.X, 0, f.BallVel.Z) * dt;
@@ -1718,9 +1719,9 @@ public partial class PlayerFigure : Node3D
 
         // wind-up pose: the foot drawn back behind the hip and lifted; a finesse foot also goes out to its side, a chip stays low
         float b = 0.35f + 0.65f * cb;
-        float back = sh.Kind switch { ShotKind.Chip => 0.10f + 0.12f * b, ShotKind.Driven => 0.14f + 0.26f * b, ShotKind.Power => 0.16f + 0.30f * b, _ => 0.12f + 0.20f * b };
-        float lift = sh.Kind switch { ShotKind.Chip => 0.10f + 0.12f * b, ShotKind.Driven => 0.14f + 0.30f * b, ShotKind.Power => 0.22f + 0.50f * b, _ => 0.14f + 0.28f * b };
-        float outw = inside && sh.Kind != ShotKind.Chip ? 0.14f + 0.10f * b : 0f;
+        float back = KindEase(3, sh.Kind switch { ShotKind.Chip => 0.10f + 0.12f * b, ShotKind.Driven => 0.14f + 0.26f * b, ShotKind.Power => 0.16f + 0.30f * b, _ => 0.12f + 0.20f * b }, dt);
+        float lift = KindEase(4, sh.Kind switch { ShotKind.Chip => 0.10f + 0.12f * b, ShotKind.Driven => 0.14f + 0.30f * b, ShotKind.Power => 0.22f + 0.50f * b, _ => 0.14f + 0.28f * b }, dt);
+        float outw = KindEase(5, inside && sh.Kind != ShotKind.Chip ? 0.14f + 0.10f * b : 0f, dt);
         Vector3 wind = posXZ + right * (side * (HipW + outw * k)) - fwd * (back * k);
         wind.Y = AnkleH + lift * k;
 

@@ -44,7 +44,11 @@ public partial class PlayerFigure
     int _plMode, _plFoot; float _plW, _plRel, _plDhLand; Vector3 _plAnkle, _plDir = new(1, 0, 0), _plPoint; bool _plHeld, _plLanded;
 
     /// <summary>The hip-to-ankle ground distance (share of a straight-ish leg's ground reach) at which a held plant foot is let go while the body runs on.</summary>
-    const float PlantReleaseReach = 0.92f;
+    const float PlantReleaseReach = 0.80f;
+    /// <summary>The most the pelvis comes down for the plant foot (metres at 1.8 m).</summary>
+    const float PlantDropMaxM = 0.06f;
+    /// <summary>How long the let-go plant foot takes to go back to the stride (seconds).</summary>
+    const float PlantReleaseSeconds = 0.20f;
     /// <summary>How far ahead of the hip (share of the straight-ish leg's ground reach) the plant may land while running: short of straight, so the knee is not whipped as it lands.</summary>
     const float PlantReach = 0.72f;
 
@@ -55,6 +59,23 @@ public partial class PlayerFigure
     {
         _sqGate = 1f; _sqTauPrev = float.MaxValue; _sqFading = false; _shDirPre = fwd;
         _plMode = 0; _plLanded = false; _plRel = 0f; _plHeld = false;
+        _keOk = false; _keSet = 0;
+    }
+
+    // the shot's kind-dependent numbers as drawn (sequence length, swing time, strike angle, backswing back / lift / out), eased
+    readonly float[] _ke = new float[6], _ke1 = new float[6]; bool _keOk; int _keSet;
+    /// <summary>
+    /// Shot number <paramref name="i"/> eased toward <paramref name="target"/> over about 0.07 s, by two first-order lags in a row so it starts
+    /// changing from rest (taken as it is on the shot's first tick):
+    /// the shot's kind changes at the release (finesse, chip) and at a second press (low), possibly with the sequence under way.
+    /// </summary>
+    float KindEase(int i, float target, float dt)
+    {
+        if (!_keOk || _teleporting) { _ke[i] = _ke1[i] = target; if (++_keSet >= _ke.Length) { _keOk = true; _keSet = 0; } return target; }
+        float a = 1f - Mathf.Exp(-dt / 0.035f);
+        _ke1[i] = Mathf.Lerp(_ke1[i], target, a);
+        _ke[i] = Mathf.Lerp(_ke[i], _ke1[i], a);
+        return _ke[i];
     }
 
     /// <summary>
@@ -150,7 +171,7 @@ public partial class PlayerFigure
             var ft = _feet[j];
             ft.Plant = _plPoint; ft.Ankle = _plPoint; ft.Planted = true; ft.Timed = false;
         }
-        _plRel = Math.Min(1f, _plRel + dt / 0.12f);
+        _plRel = Math.Min(1f, _plRel + dt / PlantReleaseSeconds);
         _plW = 1f - Smooth(_plRel);
         _plAnkle = _plPoint + Vector3.Up * (stepping ? 0.10f * k * Smooth(_plRel) : 0f);
         _plHeld = false;
@@ -193,11 +214,12 @@ public partial class PlayerFigure
     {
         if (IsKeeper || _plW <= 0f) return 0f;
         Vector3 hip = pel + right * (_plFoot == 0 ? -HipW : HipW);
-        // (from where the hip will be at the landing, or nearer: the body is still coming up to it)
-        float dh = Math.Min(Dist2(hip, _plPoint), _plDhLand), lim = 0.985f * Leg;
+        // (until the landing from where the hip will be then, or nearer: the body is still coming up to it; held, from where it is, so the
+        // planted-foot cap has nothing left to do and its letting go moves nothing)
+        float dh = _plLanded ? Dist2(hip, _plPoint) : Math.Min(Dist2(hip, _plPoint), _plDhLand), lim = 0.985f * Leg;
         if (dh >= lim) return 0f;
         float need = (pel.Y - _plPoint.Y) - Mathf.Sqrt(lim * lim - dh * dh);
-        return Math.Max(0f, need) * Smooth(_plW);
+        return Math.Clamp(need, 0f, PlantDropMaxM * H / 1.8f) * Smooth(_plW);
     }
 
     // the latest made dribble touch seen in the core's action slot, carried on while the shot's soft touch has taken its place
