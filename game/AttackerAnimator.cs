@@ -8,17 +8,6 @@ using NVec3 = System.Numerics.Vector3;
 namespace FootballSim.Game;
 
 /// <summary>
-/// A full-body clip that plays instead of the stride cycles, timed by the core (a skill move's authored clip, for one): the seam for
-/// later work, nothing implements it yet. When <see cref="AttackerAnimator.FullBody"/> is set and <see cref="TryPose"/> returns true,
-/// its pose (local rotations in the clip bone order and the hips relative to the simulation's root, model space at the model's size)
-/// replaces the cycles' for that tick, blended in and out by the same weight and drawn with the same layers and touch IK.
-/// </summary>
-public interface IFullBodyClip
-{
-    bool TryPose(in FigureFrame f, Span<NQuat> local, out NVec3 hips, out byte contacts);
-}
-
-/// <summary>
 /// --attacker-anim mocap: the attacker's running body from motion-captured stride cycles (game/assets/anim/attacker/cycles, made by
 /// tools/anim/cycles.py), locked to the simulation's stride clock (<see cref="CycleMotion"/>). Each physics tick <see cref="Compute"/>
 /// samples the cycles at the clock's phase, blended by the smoothed speed, and gives <see cref="PlayerFigure"/> the cycle's feet
@@ -52,8 +41,9 @@ public sealed class AttackerAnimator
     readonly int _spine2, _neck, _head;
     readonly int[] _clav = new int[2], _arm = new int[2], _fore = new int[2], _hand = new int[2];
 
-    /// <summary>The seam for a full-body clip timed by the core (see <see cref="IFullBodyClip"/>); null: the cycles always play.</summary>
-    public IFullBodyClip? FullBody;
+    /// <summary>The skill moves' authored clips (--skill-anim clips, see <see cref="SkillClipLayer"/>); null when they cannot load.</summary>
+    public SkillClipLayer? Skills { get; }
+    FigureFrame _frame;
 
     AttackerAnimator(SkinnedBody body, Skeleton sk, List<StrideCycle> cycles)
     {
@@ -72,6 +62,8 @@ public sealed class AttackerAnimator
         _th0 = MathF.Atan2(td.Y, td.Z);
         string[] s = { "Left", "Right" };
         for (int i = 0; i < 2; i++) { _clav[i] = sk.Find(s[i] + "Shoulder"); _arm[i] = sk.Find(s[i] + "Arm"); _fore[i] = sk.Find(s[i] + "ForeArm"); _hand[i] = sk.Find(s[i] + "Hand"); }
+        Skills = SkillClipLayer.TryCreate(body, sk, out string err);
+        if (Skills == null) GD.PushWarning($"--skill-anim clips unavailable, the moves are drawn procedurally: {err}");
     }
 
     public SkinnedBody Body => _body;
@@ -150,9 +142,8 @@ public sealed class AttackerAnimator
     {
         float sc = _body.ScaleFor(height);
         float phase = _phase.Step(f.GaitPhase, f.StepFrequency, dt);
+        _frame = f;
         NVec3 hips = _motion.Step(phase, speed, dt, _local, stepLength > 0.05f ? stepLength : float.NaN, sc);
-        byte clipContacts = 0;
-        bool full = FullBody != null && FullBody.TryPose(f, _local, out hips, out clipContacts);
         _sk.Forward(_local, hips, _gr, _gp);
         if (LogCycles) GD.Print($"MOCAP_CYCLE s={f.GaitPhase:F3} f={f.StepFrequency:F3} {_motion.Describe(f.GaitPhase)}");
         // eased, so a step that changes at once (the clock stopping, a speed step) never moves the feet in a tick
@@ -168,7 +159,7 @@ public sealed class AttackerAnimator
             // the foot's fore-aft place relative to the hips is stretched, the hips' own sway is not
             var m = new NVec3(a.X, a.Y, hips.Z + (a.Z - hips.Z) * Stride);
             Ankle[i] = W(m, 1f);
-            Stance[i] = full ? (clipContacts & (i == 0 ? Clip.LeftFoot : Clip.RightFoot)) != 0 : _motion.InStance(i, phase);
+            Stance[i] = _motion.InStance(i, phase);
             // the foot's turn from rest, applied to the rest's forward: its pitch and its yaw from the body's heading
             var d = _gr[_sk.Foot[i]] * NQuat.Inverse(_sk.RestGlobal[_sk.Foot[i]]);
             // (the yaw from the foot's sideways axis, which stays level while the toes point down in the heel recovery)
@@ -193,9 +184,10 @@ public sealed class AttackerAnimator
     /// <summary>
     /// Shows the body for this tick: the figure's joints are solved (legs to its ankles, the pelvis where it put it), then spine,
     /// neck, head and arms take the cycle's rotations by <paramref name="w"/>, the head turns toward the procedural look
-    /// (<see cref="HeadLook"/>) and the upper arms out by <paramref name="armOut"/> radians.
+    /// (<see cref="HeadLook"/>) and the upper arms out by <paramref name="armOut"/> radians; then the skill layer replaces the pose while a
+    /// clip plays (<paramref name="tw"/> each foot's touch weight, <paramref name="planted"/> the figure's planted feet).
     /// </summary>
-    public void Present(FigureJoints j, float w, float armOut)
+    public void Present(FigureJoints j, float w, float armOut, ReadOnlySpan<float> tw, ReadOnlySpan<bool> planted, bool teleport)
     {
         _body.Solve(j);
         var sr = _body.SolvedRotations; var sp = _body.SolvedPositions;
@@ -227,6 +219,7 @@ public sealed class AttackerAnimator
                 }
             }
         }
+        Skills?.Apply(_frame, j.Height, tw, planted, teleport, _rot, _pos);
         _body.PoseBones(_rot, _pos[0], _pos);
     }
 
@@ -251,6 +244,12 @@ public partial class PlayerFigure
     bool _atkFailed;
     /// <summary>"mocap" (the stride cycles drive his running body; needs the skinned body) or "procedural" (today's run cycle). Outfield only.</summary>
     public string AttackerAnimMode { get; set; } = "procedural";
+    /// <summary>--skill-anim: "clips" (a move with authored clips is drawn from them; needs mocap mode) or "procedural" (<see cref="PlanSkill"/> draws every move).</summary>
+    public string SkillAnimMode { get; set; } = "clips";
+    // this tick's touch weights and planted feet, for the skill layer
+    float[] _layTw = new float[2];
+    bool[] _layPlanted = new bool[2];
+    int _layWas; bool _laySkillWas;
     /// <summary>The mocap animator while --attacker-anim mocap drives the body, else null.</summary>
     public AttackerAnimator? AttackerAnim => _atkAnim;
     /// <summary>The cycles' share of the pose (0 = the procedural pose, 1 = the cycles), eased; per foot the hold of a planted foot.</summary>
@@ -278,6 +277,7 @@ public partial class PlayerFigure
             if (_atkAnim == null) { _atkFailed = true; GD.PushWarning($"--attacker-anim mocap unavailable, using procedural: {err}"); return; }
         }
         if (_atkAnim == null) return;
+        if (_atkAnim.Skills != null) _atkAnim.Skills.Mode = SkillAnimMode;
         if (_teleporting) { _atkAnim.Teleport(); foreach (var l in _mLock) l.Reset(); }
         bool free = stepping && !_skActive && !f.Shot.Valid && _kW <= 0f && _strikeT < 0f && !_seq && f.ShotCharge <= 0.001f && !_pinOn;
         float target = free ? Smooth((_speedS - MocapFromMs) / (MocapFullMs - MocapFromMs)) : 0f;
@@ -505,7 +505,7 @@ public partial class PlayerFigure
     bool MocapPresent()
     {
         if (_atkAnim == null) return false;
-        _atkAnim.Present(_joints, _mW, AttackerAnimator.ArmOutClose * _closeW);
+        _atkAnim.Present(_joints, _mW, AttackerAnimator.ArmOutClose * _closeW, _layTw, _layPlanted, _teleporting);
         return true;
     }
 

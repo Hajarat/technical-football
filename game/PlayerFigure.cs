@@ -155,6 +155,13 @@ public sealed class FigureStats
     /// and the largest sole-to-ball distance from the landing to the start of the move's hand-back.
     /// </summary>
     public float SkillFootJumpBody, SkillFootJumpWorld, SkillSoleMaxErr;
+    /// <summary>
+    /// The largest sole-to-ball distance on any tick from a sole move's landing to its end tick (the whole on-ball span, the hand-back
+    /// included), and for a step-over the closest any surface of the circling boot came to the ball (negative: inside it), as shown.
+    /// </summary>
+    public float SkillOnBallMaxErr, StepOverClearMinM = float.MaxValue;
+    /// <summary>Ticks of a sole move's span on which the playing foot already winds up for the exit touch (the core plays it with the same foot on the end tick), and the largest sole-to-ball distance on them.</summary>
+    public int SkillOnBallTouchTicks; public float SkillOnBallTouchMaxErr;
     /// <summary>The same per-tick foot move (body-relative, either foot) outside skill moves, for scale: ordinary running and touches.</summary>
     public float PlainFootJumpBody;
     public readonly List<float> Contact = new(), ContactTouch = new(), ContactStrike = new(), Slide = new(), Skin = new(), TouchMiss = new(), ContactBall = new();
@@ -263,7 +270,7 @@ public sealed class FigureStats
     public string SlideLine() => Line("FOOT_SLIDE", Slide) + "\n" + Line("FOOT_SLIDE_KEEPER", SlideKeeper);
     public string ContactBallLine() => Line("FOOT_CONTACT_BALL", ContactBall);
     public string SkinLine() => Line("SKIN_CONTACT", Skin);
-    public string SkillLine() => Line("SKILL_CONTACT", SkillContact) + $" skill_min_pelvis_ratio={F(SkillMinPelvisRatio)} skill_lean_max_deg={SkillLeanMaxDeg:F1} foot_jump_body_m={SkillFootJumpBody:F3} foot_jump_world_m={SkillFootJumpWorld:F3} plain_foot_jump_body_m={PlainFootJumpBody:F3} sole_max_err_m={SkillSoleMaxErr:F3}";
+    public string SkillLine() => Line("SKILL_CONTACT", SkillContact) + $" skill_min_pelvis_ratio={F(SkillMinPelvisRatio)} skill_lean_max_deg={SkillLeanMaxDeg:F1} foot_jump_body_m={SkillFootJumpBody:F3} foot_jump_world_m={SkillFootJumpWorld:F3} plain_foot_jump_body_m={PlainFootJumpBody:F3} sole_max_err_m={SkillSoleMaxErr:F3} on_ball_max_err_m={SkillOnBallMaxErr:F3} on_ball_exit_touch_ticks={SkillOnBallTouchTicks} on_ball_exit_touch_max_err_m={SkillOnBallTouchMaxErr:F3} step_over_clear_min_m={F(StepOverClearMinM)}";
     public string TouchMissLine() => Line("TOUCH_MISS", TouchMiss);
     public string TouchFootLine() => $"TOUCH_FOOT n={Touches} mismatches={FootMismatches}";
     public string PoseLine() =>
@@ -1054,8 +1061,15 @@ public partial class PlayerFigure : Node3D
             Vector3 hf = new(Mathf.Cos(_headYaw), 0, Mathf.Sin(_headYaw)), hr = new(-hf.Z, 0, hf.X);
             _split = true; _pelB = P;
             _headB = new Basis(hr, -_headPitch) * new Basis(hf, Vector3.Up, hr);
+            _layTw = tw; _layPlanted = planted;
             RenderBody(pel, B, shoulderC, knee, ankEff, dir, handT, elbowPole);
             MocapShown(f, ankEff, knee, ref pel, ref lean, fwd, dt);
+            // a skill clip holds its own planted feet
+            if (_atkAnim?.Skills is { Playing: true } sl) for (int i = 0; i < 2; i++) planted[i] = sl.Planted(i);
+            int layNow = _atkAnim?.Skills is { } sk2 ? (sk2.Playing ? 2 : sk2.Active ? 1 : 0) : 0;
+            if (MocapLogOn && Stats != null && (layNow != _layWas || f.Skill.Valid != _laySkillWas))
+                GD.Print($"SKILL_LAYER tick={Stats.Tick} state={(layNow == 2 ? "clip" : layNow == 1 ? "hand-back" : "off")} skill={(f.Skill.Valid ? f.Skill.Kind.ToString() : "-")} {_atkAnim?.Skills?.Describe()}");
+            _layWas = layNow; _laySkillWas = f.Skill.Valid;
             if (_atkAnim != null && Stats != null) LeanStats(running0, speed, lean, f.CloseControl);
         }
         var posFlat = new Vector3(pos.X, 0, pos.Z);
@@ -1109,7 +1123,7 @@ public partial class PlayerFigure : Node3D
             }
             else _bobStep = -1;
         }
-        if (!IsKeeper && f.Skill.Valid) LogSkillFoot(f, ankEff, dir);
+        if (!IsKeeper && f.Skill.Valid) LogSkillFoot(f, ankEff, dir, tw);
         if (!IsKeeper && Stats != null && (f.TouchEvent || f.StrikeEvent))
         {
             // the touch just made is the current action, or the previous one when the next touch was planned on the same tick
@@ -1862,33 +1876,45 @@ public partial class PlayerFigure : Node3D
     /// Prints how far the sole's (or the hooking surface's) point is from the ball surface at the move's first contact tick and once
     /// the foot has had time to arrive; the same distances feed the SKIN_CONTACT line when a skinned body is worn.
     /// </summary>
-    void LogSkillFoot(in FigureFrame f, Vector3[] ank, Vector3[] dir)
+    void LogSkillFoot(in FigureFrame f, Vector3[] ank, Vector3[] dir, float[] tw)
     {
         var s = f.Skill;
+        int fi = s.Right ? 1 : 0;
+        if (s.Kind == SkillKind.StepOver && Stats != null && s.ExecElapsed >= 0f)
+        {
+            float clear = float.MaxValue;
+            for (int k = 0; k < 4; k++) clear = Math.Min(clear, (SurfaceAt(fi, (BootSurface)k, ank, dir) - f.BallPos).Length() - f.BallRadius);
+            Stats.StepOverClearMinM = Math.Min(Stats.StepOverClearMinM, clear);
+        }
         if (s.Kind is SkillKind.StepOver or SkillKind.BodyFeint) return;
         if (s.Kind != SkillKind.FakeCut && s.ContactElapsed >= 0f && Stats != null)
         {
-            // sole on the ball from the landing until the hand-back at the end begins
-            int fj = s.Right ? 1 : 0;
-            Vector3 o = Off(fj, BootSurface.Sole);
-            Vector3 d0 = dir[fj]; d0.Y = 0; d0 = d0.Normalized();
-            Vector3 q = ank[fj] + d0 * o.X + Vector3.Up * o.Y + new Vector3(-d0.Z, 0, d0.X) * o.Z;
-            float er = Math.Abs((q - f.BallPos).Length() - f.BallRadius);
+            // sole on the ball from the landing until the hand-back at the end begins; and over the whole span to the end tick
+            float er = Math.Abs((SurfaceAt(fi, BootSurface.Sole, ank, dir) - f.BallPos).Length() - f.BallRadius);
             if (s.Elapsed < s.Duration - Math.Min(0.08f, 0.5f * Math.Max(s.ExecDuration, 0.06f))) Stats.SkillSoleMaxErr = Math.Max(Stats.SkillSoleMaxErr, er);
+            // (a tick on which the same foot already winds up for the core's exit touch is counted apart)
+            if (tw[fi] <= 0f) Stats.SkillOnBallMaxErr = Math.Max(Stats.SkillOnBallMaxErr, er);
+            else { Stats.SkillOnBallTouchTicks++; Stats.SkillOnBallTouchMaxErr = Math.Max(Stats.SkillOnBallTouchMaxErr, er); }
+            if (MocapLogOn) GD.Print($"SKILL_SOLE tick={Stats.Tick} err_m={er:F3} t={s.Elapsed:F3} layer={_atkAnim?.Skills?.Describe() ?? "-"}");
         }
         bool atContact = f.SkillTouch && !_skSoleLogged;
         bool arrived = s.ContactElapsed >= 0.04f && !_skInLogged;
         if (!atContact && !arrived) return;
-        int fi = s.Right ? 1 : 0;
-        Vector3 off = Off(fi, s.Surface);
-        Vector3 fd = dir[fi]; fd.Y = 0; fd = fd.Normalized();
-        Vector3 fr = new(-fd.Z, 0, fd.X);
-        Vector3 pt = ank[fi] + fd * off.X + Vector3.Up * off.Y + fr * off.Z;
-        float err = Math.Abs((pt - f.BallPos).Length() - f.BallRadius);
+        float err = Math.Abs((SurfaceAt(fi, s.Surface, ank, dir) - f.BallPos).Length() - f.BallRadius);
         if (atContact) _skSoleLogged = true;
         if (arrived) _skInLogged = true;
         GD.Print($"SKILL_FOOT kind={s.Kind} {(atContact ? "contact" : "arrived")} t={s.Elapsed:F3} err_m={err:F3}");
         if (atContact && Stats != null) Stats.SkillContact.Add(err);
+    }
+
+    /// <summary>A boot surface's point as shown: the skinned boot's own point when the skinned attacker is drawn from its bones, else from the figure's ankle and foot direction.</summary>
+    Vector3 SurfaceAt(int fi, BootSurface surface, Vector3[] ank, Vector3[] dir)
+    {
+        if (_shown && _body != null && _body.HasSurfaces) return _body.SurfacePoint(fi, surface);
+        Vector3 off = Off(fi, surface);
+        Vector3 fd = dir[fi]; fd.Y = 0; fd = fd.Normalized();
+        Vector3 fr = new(-fd.Z, 0, fd.X);
+        return ank[fi] + fd * off.X + Vector3.Up * off.Y + fr * off.Z;
     }
 
     // ---------------------------------------------------------------------------------------------------------------

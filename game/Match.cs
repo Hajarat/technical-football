@@ -57,6 +57,7 @@ public partial class Match : Node3D
         if (_args.Figure == "skinned") UseSkinnedFigures();
         Attacker.Figure.Stats = FootStats; Attacker.Figure.StatsName = "attacker";
         Attacker.Figure.AttackerAnimMode = _args.AttackerAnim;
+        Attacker.Figure.SkillAnimMode = _args.SkillAnim;
         Keeper.Figure.Stats = FootStats; Keeper.Figure.StatsName = "keeper";
         Overlay.Enabled = true; // default on for now
         if (_args.TopCam) Camera.UseTopDown();

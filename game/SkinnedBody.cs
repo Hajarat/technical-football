@@ -251,6 +251,9 @@ public sealed partial class SkinnedBody : Node3D
         return new Vector3(o.Z * sc, (o.Y + _restAnkleHeight) * sc - ankleH, -o.X * sc);
     }
 
+    /// <summary>The surface point's offset from the foot bone's head in the rest pose (model space, the model's own size): turned by the foot bone's turn from rest, it gives the point in a posed foot.</summary>
+    public Vector3 SurfaceRest(int foot, BootSurface surface) => _surfRest[foot, (int)surface];
+
     /// <summary>The surface point on the boot mesh in world space, from the latest <see cref="Pose"/> (the physics-tick pose, not the interpolated one).</summary>
     public Vector3 SurfacePoint(int foot, BootSurface surface)
     {

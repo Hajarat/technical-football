@@ -41,6 +41,8 @@ public sealed class ToolArgs
     public string KeeperAnim = "mocap";
     /// <summary>--attacker-anim mocap|procedural: the attacker's running body from the motion-captured stride cycles (the default; needs the skinned figure; see AttackerAnimator) or from the procedural run cycle.</summary>
     public string AttackerAnim = "mocap";
+    /// <summary>--skill-anim clips|procedural: the attacker's skill moves from the authored full-body clips (the default; needs --attacker-anim mocap; see SkillClipLayer) or drawn procedurally (the fallback, and for moves without clips).</summary>
+    public string SkillAnim = "clips";
     /// <summary>--keeper-anim-log: print a KEEPER_MM line at every mocap switch (clip, frame, playback rate).</summary>
     public bool KeeperAnimLog;
     /// <summary>--keeper-anim-drop-set a,b: the pose database leaves these clip sets empty (the procedural fallback's check).</summary>
@@ -99,6 +101,10 @@ public sealed class ToolArgs
                 case "--attacker-anim":
                     a.AttackerAnim = (Next() ?? "").ToLowerInvariant();
                     if (a.AttackerAnim != "procedural" && a.AttackerAnim != "mocap") { GD.PushWarning($"--attacker-anim expects mocap or procedural, got '{a.AttackerAnim}'; using procedural"); a.AttackerAnim = "procedural"; }
+                    break;
+                case "--skill-anim":
+                    a.SkillAnim = (Next() ?? "").ToLowerInvariant();
+                    if (a.SkillAnim != "procedural" && a.SkillAnim != "clips") { GD.PushWarning($"--skill-anim expects clips or procedural, got '{a.SkillAnim}'; using clips"); a.SkillAnim = "clips"; }
                     break;
                 case "--keeper-anim-drop-set":
                     a.KeeperAnimDropSets.AddRange((Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
