@@ -29,7 +29,7 @@ The pitch (`src/FootballSim.Core/Pitch.cs`) is a walled arena whose lengths come
 | Smoke comparison (game report vs batch report) | `game/tests/smoke.sh` |
 | Screenshot run (opens a window briefly) | `godot-mono --path game -- --replay tests/smoke_replay.json --shots out/replay --shot-on setup,charge,flight,outcome --quit-after-round` |
 | Screenshot run without the window taking focus (use this from tools and agents) | `game/tests/run-bg.sh -- --replay tests/smoke_replay.json --shots out/replay --shot-on setup,strike,outcome --quit-after-round` |
-| Keeper gallery: every keeper state and dive kind from a script (both sides, side and front views), no simulation | `game/tests/run-bg.sh -- --keeper-gallery out/keeper-gallery` |
+| Keeper gallery: every keeper state and dive kind from a script (both sides, side and front views), no simulation; the keeper is animated from motion clips by default, `--keeper-anim procedural` shows the hand-built poses | `game/tests/run-bg.sh -- --keeper-gallery out/keeper-gallery` |
 
 The smoke run prints the round report on one line prefixed `REPORT ` and exits 0. `smoke.sh` checks it is identical to the batch tool's report.
 Screenshots go to `game/out/` (ignored by git).

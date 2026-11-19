@@ -259,5 +259,14 @@ public partial class Match : Node3D
         if (what == NotificationWMCloseRequest) LogQuit("window-closed");
     }
 
-    public override void _ExitTree() => LogQuit("exit");
+    public override void _ExitTree()
+    {
+        LogQuit("exit");
+        // Godot objects the managed side made and dropped (the figures' mesh builders and meshes) are collected now: a wrapper the GC
+        // has not reached yet when the .NET runtime shuts down keeps its object alive past it, and freeing it then aborts Godot
+        // ("script_bindings" FATAL, exit 134). Whether any are left depends on when the GC last ran, so it is done here every time.
+        System.GC.Collect();
+        System.GC.WaitForPendingFinalizers();
+        System.GC.Collect();
+    }
 }

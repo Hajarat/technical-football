@@ -2,6 +2,8 @@
 
 `keeper/*.kclip` and `keeper/clips.json` are generated from the CMU Graphics Lab Motion Capture Database by the scripts in
 `tools/anim/`. The motion files themselves are downloaded into the git-ignored `tools/anim/.cache/` and are not committed.
+Five clips (`source = "baked"` in `clips.toml`) are not motion capture: they are the game's own procedural keeper, recorded from the
+keeper gallery's scripts (see "Baked clips" below).
 
 ## Credit and licence
 
@@ -49,16 +51,48 @@ The clips `clips.toml` lists; `keeper/clips.json` names the ones the checks let 
 | 111_21 | frames 851–1250 | `lie_side_roll_111_21` | lying, rolling over |
 | 127_23 | frames 1–300 | `smother_diveroll_127_23` | run, dive forward over, roll and get up |
 | 90_34 | frames 241–570 | `smother_roll_90_34` | forward roll from standing, wide legs |
-| 140_01 | frames 121–600 | `getup_front_140_01` | get up from lying face down |
-| 140_03 | frames 91–760 | `getup_side_140_03` | get up from lying on his side |
-| 140_08 | frames 61–660 | `getup_back_140_08` | get up from lying on his back |
-| 139_18 | frames 121–600 | `getup_back_139_18` | get up from his back, rolling over |
+| 140_01 | frames 221–560 | `getup_front_140_01` | get up from lying face down |
+| 140_03 | frames 231–760, 601–645 cut | `getup_side_140_03` | get up from lying on his side |
+| 140_08 | frames 161–660, 495–545 cut | `getup_back_140_08` | get up from lying on his back |
+| 139_18 | frames 141–600, 371–471 cut | `getup_back_139_18` | get up from his back, rolling over |
+
+The get-ups are trimmed to the part where he rises (the core's get-up lasts 1 s): their lead-in lying still is dropped and, where
+a subject sank back or half rose and fell back before getting up, that stretch is cut (clips.toml "cut"; the motion after a cut
+goes on from the frame before it).
+
+## Baked clips
+
+CMU has no goalkeeper dives, so a dive (low, side, high) and the smother take off on CMU motion (the clips tagged `takeoff`) and fly
+on the procedural keeper's pose, baked into a clip (tagged `flight`); the slide tackle is baked whole.
+
+| Clip | Gallery script | What it shows |
+| --- | --- | --- |
+| `dive_low_flight_baked` | `dive_low_right` | the low dive to his right, flat along the ground, and the fall |
+| `dive_side_flight_baked` | `dive_side_right` | the side dive to his right at mid height, and the fall |
+| `dive_high_flight_baked` | `dive_high_right` | the high dive to his right, arms up, and the fall |
+| `smother_flight_baked` | `smother_right` | the smother to his right: down on his side behind the ball, hands around it |
+| `slide_baked` | `slide` | the slide tackle: sitting back, the right leg out along the ground |
+
+`tools/anim/bake_procedural.py` turns each recording to face +Z, keeps 60 Hz, holds the arms' and legs' twist steady where the
+procedural solve flips it, cuts a flight to start just before its take-off (where the trunk has tipped 20 degrees from upright;
+the smother, which no CMU take-off precedes, 45), smooths it over 2.5 frames and labels its take-off, contact and landing;
+`retarget.py` then lists the baked clips in `clips.json` as they are. The dive take-offs hand over to the flight at the last calm
+frame of their wind-up, before the arms swing.
 
 ## Regenerate
 
 ```sh
 python3 tools/anim/cmu.py                                    # fetch the ASF/AMC files clips.toml lists (skips cached ones)
-uv run --with numpy python3 tools/anim/retarget.py           # write keeper/*.kclip and keeper/clips.json
+godot-mono --headless --path game -- --keeper-gallery ../out/bake-gallery --bake-keeper-pose ../out/bake --keeper-anim procedural
+uv run --with numpy python3 tools/anim/bake_procedural.py out/bake   # write the baked keeper/*.kclip
+uv run --with numpy python3 tools/anim/retarget.py           # write the CMU keeper/*.kclip and keeper/clips.json
+```
+
+Then, as below, the tests and the gallery.
+
+## Check
+
+```sh
 uv run --with numpy --with pytest pytest tools/anim          # pipeline tests
 game/tests/run-bg.sh -- --clip-gallery ../out/clips --video  # contact sheets and frame dumps (renders; devbox: Xvfb)
 uv run --with imageio-ffmpeg python3 tools/anim/encode_video.py out/clips

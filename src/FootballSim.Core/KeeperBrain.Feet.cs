@@ -67,6 +67,8 @@ public sealed partial class KeeperBrain
         _k.Facing = MathF.Atan2(_slideDir.Y, _slideDir.X);
         _target = point;
         _footEnd = poke ? MathF.Max(k.SlideFootStart, MathF.Min(d, k.PokeReach)) : k.SlideReach;
+        // the leading foot reaches the point (or the end of its travel) at its speed from where it starts
+        PublishSave(point, MathF.Max(0f, MathF.Min(d, _footEnd) - k.SlideFootStart) / (poke ? k.PokeSpeed : k.SlideSpeed));
         if (poke) SetAction(KeeperAction.Diving, KeeperDive.Feet);
         else SetAction(KeeperAction.Slide);
         StepFeet(0f);

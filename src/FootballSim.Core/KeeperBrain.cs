@@ -121,6 +121,7 @@ public sealed partial class KeeperBrain
         keeper.KeeperAction = KeeperAction.Set;
         keeper.KeeperDive = KeeperDive.None;
         keeper.KeeperActionTime = 0f;
+        keeper.SaveContactTime = float.NaN;
     }
 
     Vector3 HomeFor(Vector3 feet) => new(feet.X, _k.Sheet.HeightM * _t.Keeper.HomeHeightFraction, feet.Z);
@@ -139,7 +140,12 @@ public sealed partial class KeeperBrain
         _k.KeeperDive = a == KeeperAction.Diving ? d : KeeperDive.None;
     }
 
-    void Enter(Phase p) { _phase = p; _phaseTime = 0f; }
+    void Enter(Phase p)
+    {
+        _phase = p;
+        _phaseTime = 0f;
+        if (p is not (Phase.Diving or Phase.Smother or Phase.Slide)) _k.SaveContactTime = float.NaN;   // for views only
+    }
 
     /// <summary>Back on his feet and set: a new arc spot is taken on the next tick, the hands go back to their rest point.</summary>
     void ToStand()
@@ -287,6 +293,7 @@ public sealed partial class KeeperBrain
         _home = HomeFor(_k.Position);
         _carry0 = new Vector2(_k.Velocity.X, _k.Velocity.Z);
         _target = point;
+        PublishSave(point, Vector3.Distance(point, _home) / _t.Keeper.SmotherSpeed);
         SetAction(KeeperAction.Smother);
         StepSmother(0f, null);
     }

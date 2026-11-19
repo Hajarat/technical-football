@@ -43,6 +43,8 @@ def needed_files(clips: list[dict]) -> list[tuple[str, str]]:
     """(cache file name, url) for every distinct ASF and AMC the clips need, in a stable order."""
     out: dict[str, str] = {}
     for c in clips:
+        if "trial" not in c:   # a clip baked from the procedural keeper (tools/anim/bake_procedural.py) has no trial
+            continue
         s, t = trial_parts(c["trial"])
         out.setdefault(f"{s}.asf", f"{BASE}/{s}/{s}.asf")
         out.setdefault(f"{s}_{t}.amc", f"{BASE}/{s}/{s}_{t}.amc")

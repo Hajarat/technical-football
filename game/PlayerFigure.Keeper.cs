@@ -48,8 +48,8 @@ public partial class PlayerFigure
     FigureFrame _animFrame;
     bool _animFailed;
 
-    /// <summary>"procedural" (the poses below, the default) or "mocap" (motion clips where the chooser has a set, see KeeperAnimator). Keeper only; needs the skinned body.</summary>
-    public string KeeperAnimMode { get; set; } = "procedural";
+    /// <summary>"mocap" (motion clips where the chooser has a set, see KeeperAnimator; the default) or "procedural" (the poses below, also the fallback when the clips cannot load). Keeper only; needs the skinned body.</summary>
+    public string KeeperAnimMode { get; set; } = "mocap";
 
     /// <summary>The mocap animator while --keeper-anim mocap drives the body, else null.</summary>
     public KeeperAnimator? KeeperAnim => _keeperAnim;
@@ -194,6 +194,9 @@ public partial class PlayerFigure
         float target, tau;
         switch (act)
         {
+            // a full-length dive (and the smother) goes over into its flight over about a tenth of a second rather than in three
+            // ticks, so the body is seen tipping over (and the baked flight that mocap plays starts from a pose that follows on)
+            case KAct.Diving or KAct.Smother when _dSmother || _dKind is KDive.Low or KDive.Side or KDive.High: target = 1f; tau = 0.10f; break;
             case KAct.Diving: case KAct.Smother: case KAct.Slide: target = 1f; tau = 0.05f; break;
             case KAct.Grounded: target = 1f; tau = 0.08f; break;
             case KAct.Holding: target = _ground ? 1f : 0f; tau = _ground ? 0.10f : 0.15f; break;
@@ -356,7 +359,8 @@ public partial class PlayerFigure
         // own facing (never sideways) while it eases from flat to the stance's lean
         if (getting) tiltT = Keys(g, GetUpG, GetUpTilt) * Deg;
 
-        float tau = diving ? 0.05f : getting ? 0.06f : 0.10f;
+        bool flight = diving && (_dSmother || kind is KDive.Low or KDive.Side or KDive.High);
+        float tau = flight ? 0.09f : diving ? 0.05f : getting ? 0.06f : 0.10f;
         float a = 1f - Mathf.Exp(-dt / tau);
         _dTilt += (tiltT - _dTilt) * a;
         Vector3 nd = _dDir + (dirT - _dDir) * a;
@@ -490,6 +494,12 @@ public partial class PlayerFigure
                 : (B.X * (1f - flatLeg) + Vector3.Up * (1.2f * flatLeg)).Normalized();
             SolveLeg(hip, _dAnk[i], kneePole, out knee[i], out ank[i]);
             Vector3 ht = hand + bodyRight * side * 0.07f * H;
+            if (!lie && !getting && !_dSmother && kind is KDive.Low or KDive.Side or KDive.High && !near)
+            {
+                // the far arm follows the lead arm at the ball, a little short of it and lower (not level with it, never above it)
+                Vector3 shF = pel + B * new Vector3(0, shoulderUp, side * ShoulderW);
+                ht = shF + (ht - shF) * 0.88f + Vector3.Down * (0.06f * H);
+            }
             if (reflex)
             {
                 Vector3 shR = pel + B * new Vector3(0, shoulderUp, side * ShoulderW);

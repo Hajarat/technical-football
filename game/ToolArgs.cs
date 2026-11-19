@@ -20,7 +20,7 @@ public sealed class ToolArgs
     public string? GalleryDir;
     /// <summary>--clip-gallery &lt;dir&gt;: play every keeper clip (res://assets/anim/keeper) and write a contact sheet per clip there.</summary>
     public string? ClipGalleryDir;
-    /// <summary>--video: the clip gallery also writes every frame, for tools/anim/encode_video.py.</summary>
+    /// <summary>--video: the clip gallery (and the keeper gallery) also writes every frame, for tools/anim/encode_video.py.</summary>
     public bool Video;
     /// <summary>--clip-only a,b: the clip gallery shows only these clips.</summary>
     public readonly HashSet<string> ClipOnly = new();
@@ -33,10 +33,14 @@ public sealed class ToolArgs
     public bool ControlsHintOnly;
     /// <summary>"skinned" (rigged human models, the default) or "procedural" (primitive meshes).</summary>
     public string Figure = "skinned";
-    /// <summary>--keeper-anim procedural|mocap: the keeper's body from the hand-built poses (the default) or from motion clips (needs the skinned figure).</summary>
-    public string KeeperAnim = "procedural";
+    /// <summary>--keeper-anim mocap|procedural: the keeper's body from motion clips (the default; needs the skinned figure) or from the hand-built poses (the fallback).</summary>
+    public string KeeperAnim = "mocap";
     /// <summary>--keeper-anim-log: print a KEEPER_MM line at every mocap switch (clip, frame, playback rate).</summary>
     public bool KeeperAnimLog;
+    /// <summary>--keeper-anim-drop-set a,b: the pose database leaves these clip sets empty (the procedural fallback's check).</summary>
+    public readonly List<string> KeeperAnimDropSets = new();
+    /// <summary>--bake-keeper-pose &lt;dir&gt;: play the keeper gallery's dive, smother and slide scripts procedurally and write their bone rotations there (tools/anim/bake_procedural.py).</summary>
+    public string? BakeDir;
 
     /// <summary>The options of this run (the latest <see cref="Parse"/>), for views created after it.</summary>
     public static ToolArgs? Current { get; private set; }
@@ -81,9 +85,13 @@ public sealed class ToolArgs
                     break;
                 case "--keeper-anim":
                     a.KeeperAnim = (Next() ?? "").ToLowerInvariant();
-                    if (a.KeeperAnim != "procedural" && a.KeeperAnim != "mocap") { GD.PushWarning($"--keeper-anim expects procedural or mocap, got '{a.KeeperAnim}'; using procedural"); a.KeeperAnim = "procedural"; }
+                    if (a.KeeperAnim != "procedural" && a.KeeperAnim != "mocap") { GD.PushWarning($"--keeper-anim expects mocap or procedural, got '{a.KeeperAnim}'; using mocap"); a.KeeperAnim = "mocap"; }
                     break;
                 case "--keeper-anim-log": a.KeeperAnimLog = true; break;
+                case "--keeper-anim-drop-set":
+                    a.KeeperAnimDropSets.AddRange((Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                    break;
+                case "--bake-keeper-pose": a.BakeDir = Next(); break;
                 case "--shots": a.ShotDir = Next(); break;
                 case "--shot-ticks":
                     foreach (var s in (Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))
@@ -104,6 +112,11 @@ public sealed class ToolArgs
         {
             if (!System.IO.Path.IsPathRooted(a.GalleryDir)) a.GalleryDir = System.IO.Path.Combine(ProjectSettings.GlobalizePath("res://"), a.GalleryDir);
             DirAccess.MakeDirRecursiveAbsolute(a.GalleryDir);
+        }
+        if (a.BakeDir != null)
+        {
+            if (!System.IO.Path.IsPathRooted(a.BakeDir)) a.BakeDir = System.IO.Path.Combine(ProjectSettings.GlobalizePath("res://"), a.BakeDir);
+            DirAccess.MakeDirRecursiveAbsolute(a.BakeDir);
         }
         if (a.ClipGalleryDir != null)
         {
@@ -132,9 +145,10 @@ public sealed class ShotTool
     readonly Node _host;
     readonly string _dir;
     readonly HashSet<string> _taken = new();
+    readonly string _prefix;
     public int InFlight { get; private set; }
 
-    public ShotTool(Node host, string dir) { _host = host; _dir = dir; }
+    public ShotTool(Node host, string dir, string prefix = "shot_") { _host = host; _dir = dir; _prefix = prefix; }
 
     /// <summary>Takes a shot once per name. Call from _PhysicsProcess; the PNG is written after the next draw.</summary>
     public void Request(string name)
@@ -148,7 +162,7 @@ public sealed class ShotTool
     {
         await _host.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
         var img = _host.GetViewport().GetTexture().GetImage();
-        string path = System.IO.Path.Combine(_dir, $"shot_{name}.png");
+        string path = System.IO.Path.Combine(_dir, $"{_prefix}{name}.png");
         var err = img.SavePng(path);
         GD.Print($"SHOT {name} {path} size={img.GetWidth()}x{img.GetHeight()} err={err}");
         InFlight--;

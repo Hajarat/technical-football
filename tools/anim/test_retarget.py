@@ -126,3 +126,20 @@ def test_guard_spreads_a_neck_head_roll_swap():
     out, hit = R.guard_bone(q, rest, most, step)
     steps = np.degrees(2 * np.arccos(np.clip(np.abs(np.sum(out[1:] * out[:-1], axis=1)), 0, 1)))
     assert steps.max() <= step + 1e-6 and hit[3]
+
+
+def test_a_cut_drops_its_frames_and_the_hips_go_on_from_before_it():
+    n = 40
+    hips = np.stack([np.linspace(0, 3.9, n), np.full(n, 0.9), np.zeros(n)], axis=1)
+    q = np.zeros((n, 22, 4)); q[..., 3] = 1.0
+    c = np.zeros((n, 2), dtype=bool)
+    clip = {"cut": [[21, 40]]}                       # AMC frames 21..40 at 120 Hz from frame 1: 60 Hz frames 10..19
+    problems = []
+    h2, q2, c2, ev = R.apply_cuts(clip, hips, q, c, {"up": 30}, f0=1, step=2, problems=problems)
+    assert not problems
+    assert len(h2) == n - 10
+    assert ev["up"] == 20                            # closed up by the 10 frames cut
+    assert abs(h2[10, 0] - hips[9, 0]) < 1e-9        # the frame after the cut starts where the one before it was
+    bad = []
+    R.apply_cuts({"cut": [[51, 70]]}, hips, q, c, {"up": 30}, f0=1, step=2, problems=bad)
+    assert bad and "inside" in bad[0]

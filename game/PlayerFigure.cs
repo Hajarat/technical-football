@@ -133,12 +133,14 @@ public struct FigureFrame
     public FootballSim.Core.KeeperDive KeeperDive;
     public float KeeperActionTime;
     public Vector3 HandPosition;
+    /// <summary>Where the keeper's current save, smother or slide expects to meet the ball, and when (seconds after the action began; NaN when none is under way).</summary>
+    public Vector3 SaveTarget; public float SaveContactTime;
     public float Dt;
 
     public static FigureFrame At(Vector3 pos, float facing) => new()
     {
         Position = pos, Facing = facing, HeightM = 1.8f, BallRadius = 0.11f, BallPos = pos + new Vector3(2, 0.11f, 0), RunSpeed = float.NaN,
-        NextTouchEta = float.NaN, StrikeEta = float.NaN, Dt = 1f / 120f,
+        NextTouchEta = float.NaN, StrikeEta = float.NaN, SaveContactTime = float.NaN, Dt = 1f / 120f,
     };
 }
 

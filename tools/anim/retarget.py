@@ -656,7 +656,49 @@ def retarget(clip: dict, t: Target, cache: Path = CACHE) -> Result:
              "lowest_joint_m": round(float(gt[:, :, 1].min()), 3),
              "guarded_frames": {b: int(guarded[:, BONES.index(b)].sum()) for b in GUARD if guarded[:, BONES.index(b)].any()}, "flat_foot_frames": flat_n, "hips_roll_deg": round(math.degrees(roll), 2), "leg_splay_deg": round(math.degrees(splay), 2),
              "ground_lift_cm": [round(float(ground_lift.min()) * 100, 1), round(float(ground_lift.max()) * 100, 1)], "lowest_joint_at": int(gt[:, :, 1].min(axis=1).argmin())}
+    if clip.get("cut"):
+        hips, qd, c, events = apply_cuts(clip, hips, qd, c, events, f0, step, problems)
+        stats["frames"] = len(hips); stats["seconds"] = round(len(hips) / FPS, 3)
     return Result(clip["name"], hips, qd, c, events, bool(clip.get("loop", False)), problems, stats)
+
+
+CUT_BLEND = 6   # frames (0.1 s) over which the motion after a cut catches up from the frame before it
+
+
+def apply_cuts(clip: dict, hips: np.ndarray, q: np.ndarray, c: np.ndarray, events: dict, f0: int, step: int, problems: list):
+    """Drops the source frame ranges in clips.toml "cut" (a pause in the middle of a clip, [first, last] inclusive, 120 Hz AMC
+    frames). After each cut the hips go on from where they were (horizontally; their height and every rotation catch up from the
+    frame before the cut over CUT_BLEND frames, slerped), contacts and later events close up. An event inside a cut is refused."""
+    keep = np.ones(len(hips), dtype=bool)
+    seams = []
+    for a, b in clip["cut"]:
+        ia, ib = -((f0 - a) // step), (b - f0) // step + 1   # the first kept 60 Hz frame at or after a, past the last at or before b
+        if not (0 < ia < ib < len(hips)):
+            problems.append(f"cut {a}-{b} outside the clip")
+            continue
+        for name, fr in events.items():
+            if ia <= fr < ib:
+                problems.append(f"event {name} inside cut {a}-{b}")
+        keep[ia:ib] = False
+        seams.append((ia, ib))
+    hips = hips.copy(); q = q.copy()
+    for ia, ib in seams:
+        d = hips[ia - 1] - hips[ib]
+        hips[ib:, 0] += d[0]; hips[ib:, 2] += d[2]
+        for k in range(CUT_BLEND):
+            if ib + k >= len(hips):
+                break
+            u = (k + 1) / (CUT_BLEND + 1)
+            hips[ib + k, 1] = hips[ia - 1, 1] + (hips[ib + k, 1] - hips[ia - 1, 1]) * u
+            for b in range(q.shape[1]):
+                q[ib + k, b] = qslerp(q[ia - 1, b], q[ib + k, b], u)
+    old = np.flatnonzero(keep)
+    remap = {int(o): i for i, o in enumerate(old)}
+    new_events = {}
+    for name, fr in events.items():
+        nxt = old[old >= fr]
+        new_events[name] = remap[int(nxt[0])] if len(nxt) else len(old) - 1
+    return hips[keep], q[keep], c[keep], new_events
 
 
 def write_kclip(path: Path, r: Result, names: list[str]) -> None:
@@ -729,6 +771,23 @@ def main(argv: list[str]) -> int:
     for c in clips:
         if only and c["name"] not in only:
             continue
+        if c.get("source") == "baked":
+            # recorded from the procedural keeper (tools/anim/bake_procedural.py): listed as it is, never retargeted
+            path = OUT / f"{c['name']}.kclip"
+            if not path.exists():
+                failed.append(c["name"])
+                print(f"MISSING {c['name']}: run tools/anim/bake_procedural.py first")
+                continue
+            k = read_kclip(path)
+            nf = len(k["hips"])
+            cs = {("left", "right")[s]: spans(k["contacts"][:, s]) for s in range(2)}
+            index.append({"name": c["name"], "file": path.name, "source": "baked", "script": c.get("script", ""), "set": c["set"],
+                          "tags": list(c.get("tags", [])), "match_bias": float(c.get("match_bias", 1.0)), "verdict": verdict(c),
+                          "side": c.get("side", "none"), "kind": c.get("kind", ""), "loop": k["loop"], "events": k["events"], "fps": k["fps"],
+                          "frame_count": nf, "seconds": round(nf / k["fps"], 3), "contacts": {kk: [list(x) for x in v] for kk, v in cs.items()},
+                          "notes": c.get("notes", "")})
+            print(f"listed {c['name']} (baked): {nf} frames, events {k['events']}")
+            continue
         r = retarget(c, t)
         if r.problems:
             failed.append(c["name"])
@@ -737,7 +796,7 @@ def main(argv: list[str]) -> int:
         write_kclip(OUT / f"{c['name']}.kclip", r, names)
         cs = {("left", "right")[s]: spans(r.contacts[:, s]) for s in range(2)}
         index.append({"name": c["name"], "file": f"{c['name']}.kclip", "trial": c["trial"], "frames": c.get("frames"),
-                      "set": c["set"], "tags": list(c.get("tags", [])), "match_bias": float(c.get("match_bias", 1.0)), "verdict": verdict(c), "side": c.get("side", "none"), "kind": c.get("kind", ""), "loop": r.loop,
+                      "set": c["set"], "cut": c.get("cut", []), "tags": list(c.get("tags", [])), "match_bias": float(c.get("match_bias", 1.0)), "verdict": verdict(c), "side": c.get("side", "none"), "kind": c.get("kind", ""), "loop": r.loop,
                       "events": r.events, "fps": FPS, "frame_count": r.stats["frames"], "seconds": r.stats["seconds"],
                       "contacts": {k: [list(s) for s in v] for k, v in cs.items()},
                       "notes": c.get("notes", ""), "contact_tolerance_cm": float(c.get("contact_tolerance_cm", MAX_CONTACT_H * 100)), "checks": {k: v for k, v in r.stats.items() if k not in ("frames", "seconds")}})
