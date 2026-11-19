@@ -48,13 +48,13 @@ static class SkillProbe
     static Script Knock(int i, int side) => new(i < 8 ? Ahead : Vector2.Zero, null, false, false);
     static Script FakeStop(int i, int side) => new(Vector2.Zero, Vector2.Zero, i < 15, i is >= 6 and < 10);
     static Script FakeCut(int i, int side) => new(Vector2.Zero, i < 1 ? null : Rot(Ahead, side * 60f), i < 15, i is >= 6 and < 10);
-    // Recognised but not built (no move is made): elastico, heel-to-heel, spin.
+    // Elastico, heel-to-heel, spin.
     static Script Elastico(int i, int side) => new(i < 6 ? new Vector2(-1f, 0f) : i < 12 ? new Vector2(0f, side) : Vector2.Zero, null, false, false);
     static Script HeelToHeel(int i, int side) => new(i < 5 ? Ahead : i is >= 9 and < 14 ? new Vector2(-1f, 0f) : Vector2.Zero, null, false, false);
     static Script Spin(int i, int side) => new(i < 5 ? Ahead : i is >= 9 and < 13 ? new Vector2(0f, side) : Vector2.Zero, null, false, false);
 
-    // Exits: away from the sold side at 45 degrees (step-over, feint), a right turn after a drag-back, the cut (fake cut),
-    // straight on otherwise.
+    // Exits: away from the sold side at 45 degrees (step-over, feint, elastico: toward its side), a right turn after a drag-back,
+    // the cut (fake cut), straight on otherwise.
     static readonly Move[] Moves =
     {
         new("step_over", Gesture.StepOver, 1, AllEntries, StepOver, Rot(Ahead, -45f)),
@@ -68,9 +68,8 @@ static class SkillProbe
         new("fake_stop", Gesture.FakeStop, 0, AllEntries, FakeStop, Ahead),
         new("fake_cut", Gesture.FakeCut, 1, AllEntries, FakeCut, Rot(Ahead, 60f)),
         new("fake_cut", Gesture.FakeCut, -1, AllEntries, FakeCut, Rot(Ahead, -60f)),
-        // Not built: recognised_pct should be 100 and made_pct 0.
-        new("elastico", Gesture.Elastico, 1, AllEntries, Elastico, Ahead),
-        new("elastico", Gesture.Elastico, -1, AllEntries, Elastico, Ahead),
+        new("elastico", Gesture.Elastico, 1, AllEntries, Elastico, Rot(Ahead, 45f)),
+        new("elastico", Gesture.Elastico, -1, AllEntries, Elastico, Rot(Ahead, -45f)),
         new("heel_to_heel", Gesture.HeelToHeel, 0, AllEntries, HeelToHeel, Ahead),
         new("spin", Gesture.SpinAndGo, 1, AllEntries, Spin, Ahead),
         new("spin", Gesture.SpinAndGo, -1, AllEntries, Spin, Ahead),
@@ -102,6 +101,25 @@ static class SkillProbe
         public float MidAhead = float.NaN;
         /// <summary>Sole moves: the ball centre's distance from the foot's contact point when the sole lands.</summary>
         public float SoleMiss = float.NaN;
+        /// <summary>The move's length from its start (the reach included), s; its speed steps (|d|v||/dt over 15 m/s^2 between its start and end).</summary>
+        public float Dur = float.NaN;
+        public int Steps;
+        /// <summary>Ball roll: the largest forward (running) speed from 0.15 s after the move's start to its end, m/s.</summary>
+        public float FwdLate = float.NaN;
+        /// <summary>Ball roll: the running speed at the sole's landing, 0.15 s and 0.25 s after it, and at the release, m/s.</summary>
+        public float RLand = float.NaN, R15 = float.NaN, R25 = float.NaN, REnd = float.NaN;
+        /// <summary>From the move's start to its end, along and across the run: the player's travel and the ball's sideways travel, and the ball's distance ahead of the player at the end (negative: behind), metres.</summary>
+        public float PFwd = float.NaN, PSide = float.NaN, BSide = float.NaN, BAhead = float.NaN;
+        /// <summary>The ball's travel along the run from the start to the end, and its place to the side of the player at the end (toward the move's side positive), metres.</summary>
+        public float BFwd = float.NaN, BRelSide = float.NaN;
+        /// <summary>The largest forward speed (ground velocity along the run) from the first contact to the end, and at the end, m/s.</summary>
+        public float FwdMax = float.NaN, FwdEnd = float.NaN;
+        /// <summary>Two-contact moves: the ball's distance from the move's path at the second contact, metres; the largest distance of the ball from the player from the first contact to the end; the facing's turn over the move, degrees (signed toward the side).</summary>
+        public float PathMiss2 = float.NaN, BallMax = float.NaN, Turn = float.NaN;
+        /// <summary>Speed steps from the end of the move over the next 0.3 s (a speed-up no quicker than the speed law under the exit burst excepted).</summary>
+        public int ExitSteps;
+        /// <summary>Heel-to-heel: the ball's speed leaving the flick, m/s.</summary>
+        public float Flick = float.NaN;
         /// <summary>With --list-failed: the ball and the planned touch every 4 ticks for 40 ticks from the gesture.</summary>
         public string Diag = "";
     }
@@ -122,9 +140,15 @@ static class SkillProbe
         Console.WriteLine($"skill probes: attacker={attackerId} (skill_moves set per row) seeds={seeds} from {seed0}; gesture at a random " +
                           "moment from 2.0 to 3.0 s; exit with sprint: away from the sold side at 45 deg (step-over, feint), right turn " +
                           "(drag-back), the cut (fake cut), straight on (others); t90 = seconds from the move's end to 90% of the with-ball " +
-                          "top speed, base_t90 = the same turn without the move (both medians over the seeds)");
+                          "top speed, base_t90 = the same turn without the move (both medians over the seeds); dur = the move from its start " +
+                          "(the sole's reach included) to its end, steps = ticks in it whose |d|v||/dt is over 15 m/s^2 (all seeds), fwd_late_max = " +
+                          "the ball roll's largest running speed from 0.15 s after its start, p_fwd / p_side = the player's travel along and across " +
+                          "the run (side: toward the move's side positive), ball_side = the ball's, ball_end_ahead = the ball ahead of the player at " +
+                          "the end (negative behind), means; run_land/... = the ball roll's running speed at the sole's landing, 0.15 s and 0.25 s " +
+                          "after it and on its last tick, means");
         var header = new[] { "move", "side", "entry", "skill_moves", "recognised_pct", "made_pct", "kept_pct", "t90_s", "base_t90_s", "ball_dist_end_m",
-            "start_ahead_m", "exec_ahead_m", "mid_ahead_m", "sole_miss_m" };
+            "start_ahead_m", "exec_ahead_m", "mid_ahead_m", "sole_miss_m", "dur_s", "steps", "exit_steps", "fwd_late_max", "p_fwd_m", "p_side_m", "ball_fwd_m", "ball_side_m", "ball_end_ahead_m", "ball_end_side_m",
+            "fwd_max/release", "c2_path_miss_max", "ball_dist_max", "turn_deg", "flick_mps", "run_land/+0.15/+0.25/release" };
         var rows = new List<string[]>();
         foreach (var move in Moves)
         {
@@ -136,7 +160,7 @@ static class SkillProbe
                     sheet.SkillMoves = rating;
                     var results = new Result[seeds];
                     bool listFailed = opts.ContainsKey("list-failed");
-                    Parallel.For(0, seeds, i =>
+                    Parallel.For(0, seeds, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
                     {
                         ulong seed = seed0 + (ulong)i;
                         var r = RunOne(move, entry, tuning, sheet, keeper, seed, -1, listFailed);
@@ -144,7 +168,7 @@ static class SkillProbe
                         results[i] = r;
                     });
                     if (listFailed)
-                        for (int i = 0; i < seeds; i++) if (!results[i].Made) Console.WriteLine($"NOT MADE {move.Name} {entry} rating {rating} seed {seed0 + (ulong)i}: {results[i].Diag}");
+                        for (int i = 0; i < seeds; i++) if (!results[i].Made || opts.ContainsKey("trace")) Console.WriteLine($"NOT MADE {move.Name} {entry} rating {rating} seed {seed0 + (ulong)i}: {results[i].Diag}");
                     string Pct(Func<Result, bool> f) => (100.0 * results.Count(f) / seeds).ToString("F0", CultureInfo.InvariantCulture);
                     string Mean(Func<Result, float> f)
                     {
@@ -157,6 +181,11 @@ static class SkillProbe
                         var v = results.Where(r => r.Made).Select(f).Where(x => !float.IsNaN(x)).OrderBy(x => x).ToList();
                         return v.Count == 0 ? "-" : v[v.Count / 2].ToString("F2", CultureInfo.InvariantCulture);
                     }
+                    string Max(Func<Result, float> f)
+                    {
+                        var v = results.Where(r => r.Made).Select(f).Where(x => !float.IsNaN(x)).ToList();
+                        return v.Count == 0 ? "-" : v.Max().ToString("F2", CultureInfo.InvariantCulture);
+                    }
                     string MeanMax(Func<Result, float> f)
                     {
                         var v = results.Where(r => r.Made).Select(f).Where(x => !float.IsNaN(x)).ToList();
@@ -167,6 +196,10 @@ static class SkillProbe
                         move.Name, move.Side > 0 ? "right" : move.Side < 0 ? "left" : "-", entry, rating.ToString(),
                         Pct(r => r.Recognised), Pct(r => r.Made), Pct(r => r.Kept), Median(r => r.T90), Median(r => r.BaseT90), Mean(r => r.BallDistance),
                         MeanMax(r => r.StartAhead), MeanMax(r => r.ExecAhead), MeanMax(r => r.MidAhead), MeanMax(r => r.SoleMiss),
+                        Mean(r => r.Dur), results.Where(r => r.Made).Sum(r => r.Steps).ToString(), results.Where(r => r.Made).Sum(r => r.ExitSteps).ToString(), Max(r => r.FwdLate),
+                        Mean(r => r.PFwd), Mean(r => r.PSide), Mean(r => r.BFwd), Mean(r => r.BSide), Mean(r => r.BAhead), Mean(r => r.BRelSide),
+                        $"{Max(r => r.FwdMax)}/{Mean(r => r.FwdEnd)}", Max(r => r.PathMiss2), Max(r => r.BallMax), Mean(r => r.Turn), Mean(r => r.Flick),
+                        move.Name == "ball_roll" ? $"{Mean(r => r.RLand)}/{Mean(r => r.R15)}/{Mean(r => r.R25)}/{Mean(r => r.REnd)}" : "-",
                     });
                 }
         }
@@ -202,7 +235,9 @@ static class SkillProbe
         int end = baseline ? baselineTurn : -1, lostAt = -1;
         BallAction? act = null;
         bool gained = false;
-        for (int tick = 1; tick <= total && w.State == RoundState.Live; tick++)
+        int startTick = int.MaxValue;
+        Vector2 p0 = default, b0 = default;
+        for (int tick = 1; tick <= total && w.State is RoundState.Live or RoundState.Strike; tick++)
         {
             var it = EntryIntent(entry, tick, t.TickRate);
             int i = tick - 1 - g0;
@@ -217,7 +252,53 @@ static class SkillProbe
                 if (s.Left is Vector2 l) { it.MoveX = l.X; it.MoveZ = l.Y; }
             }
             buf[0] = it;
+            float sp0 = p.Speed, face0 = p.Facing;
             w.Step(buf);
+            if (act != null && w.Tick > act.EndTick && w.Tick <= act.EndTick + 36 && w.Shots.Count == 0)
+            {
+                float law = (t.Movement.SprintSpeed.At99 - sp0) / Movement.TimeConstantAt(p, w.SimTime, t) * t.Dt;
+                float change = p.Speed - sp0;
+                if (change > MathF.Max(15f * t.Dt, law) || -change > 15f * t.Dt) { res.ExitSteps++; if (diag) res.Diag += $" [EXIT STEP e+{w.Tick - act.EndTick} {sp0:F2}->{p.Speed:F2} run {p.RunSpeed:F2} law {law / t.Dt:F1}]"; }
+            }
+            if (act != null && w.Tick > startTick && w.Tick <= act.EndTick)
+            {
+                res.Turn = (float.IsNaN(res.Turn) ? 0f : res.Turn) + Movement.WrapAngle(p.Facing - face0) * 180f / MathF.PI * (move.Side < 0 ? -1f : 1f);
+                if (w.Tick >= act.ContactTick)
+                {
+                    float fv = p.Velocity.X * act.RunDirection.X + p.Velocity.Z * act.RunDirection.Y;
+                    res.FwdMax = float.IsNaN(res.FwdMax) ? fv : MathF.Max(res.FwdMax, fv);
+                    if (w.Tick == act.EndTick - 1) res.FwdEnd = fv;
+                    if (w.Tick == act.Contact2Tick && act.Kind == ActionKind.HeelToHeel) res.Flick = new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z).Length();
+                    float bd = TouchModel.HorizontalDistance(p.Position, w.Ball.Position);
+                    if (w.Tick < act.EndTick) res.BallMax = float.IsNaN(res.BallMax) ? bd : MathF.Max(res.BallMax, bd);
+                }
+            }
+            if (act != null && w.Tick <= act.EndTick && w.Tick > startTick)
+            {
+                if (MathF.Abs(p.Speed - sp0) / t.Dt > 15f) { res.Steps++; if (diag) res.Diag += $" [step t+{w.Tick - startTick} {sp0:F2}->{p.Speed:F2} run {p.RunSpeed:F2}]"; }
+                if (diag) res.Diag += $" [t+{w.Tick - startTick} run {p.RunSpeed:F2} v {p.Speed:F2}]";
+                if (act.Kind == ActionKind.BallRoll)
+                {
+                    int since = w.Tick - act.ContactTick, at15 = (int)MathF.Round(0.15f * t.TickRate), at25 = (int)MathF.Round(0.25f * t.TickRate);
+                    if (since == 0) res.RLand = p.RunSpeed;
+                    if (since == at15) res.R15 = p.RunSpeed;
+                    if (since == at25) res.R25 = p.RunSpeed;
+                    if (w.Tick == act.EndTick - 1) res.REnd = p.RunSpeed;
+                }
+                if (act.Kind == ActionKind.BallRoll && (w.Tick - startTick) * t.Dt > 0.15f && w.Tick < act.EndTick) res.FwdLate = float.IsNaN(res.FwdLate) ? p.RunSpeed : MathF.Max(res.FwdLate, p.RunSpeed);
+                if (w.Tick == act.EndTick)
+                {
+                    var f = act.RunDirection;
+                    var r = new Vector2(-f.Y, f.X) * (move.Side < 0 ? -1f : 1f);
+                    var dp = new Vector2(p.Position.X - p0.X, p.Position.Z - p0.Y);
+                    var db = new Vector2(w.Ball.Position.X - b0.X, w.Ball.Position.Z - b0.Y);
+                    res.Dur = (act.EndTick - startTick) * t.Dt;
+                    res.PFwd = Vector2.Dot(dp, f); res.PSide = Vector2.Dot(dp, r); res.BSide = Vector2.Dot(db, r); res.BFwd = Vector2.Dot(db, f);
+                    res.BAhead = (w.Ball.Position.X - p.Position.X) * f.X + (w.Ball.Position.Z - p.Position.Z) * f.Y;
+                    res.BRelSide = (w.Ball.Position.X - p.Position.X) * r.X + (w.Ball.Position.Z - p.Position.Z) * r.Y;
+                    res.PathMiss2 = act.Contact2PathMiss;
+                }
+            }
             if (diag && !baseline && i >= 0 && i < 40 && i % 4 == 0)
                 res.Diag += $" [g+{i} dist {TouchModel.HorizontalDistance(p.Position, w.Ball.Position):F2} ahead {(w.Ball.Position.X - p.Position.X):F2} bv {w.Ball.Velocity.X:F2} pv {p.Velocity.X:F2} act {p.Action?.Kind}/{p.Action?.Phase} eta {p.ActionContactEta:F2} skill {p.SkillMove?.Kind} gest {p.LastGesture}@{p.LastGestureTick - g0}]";
             foreach (var e in w.Events)
@@ -226,11 +307,14 @@ static class SkillProbe
                 if (e.Kind == EventKind.PossessionGained) gained = true;
                 if (e.Kind == EventKind.PossessionLost && gained && lostAt < 0) lostAt = w.Tick;
                 if (baseline || end >= 0 || w.Tick <= g0) continue;
-                if (e.Kind == EventKind.SkillMove && e.Skill is ActionKind k && move.Expect != Gesture.KnockOn && !GestureReader.NotBuilt(move.Expect)
+                if (e.Kind == EventKind.SkillMove && e.Skill is ActionKind k && move.Expect != Gesture.KnockOn
                     && k == SkillMoves.KindOf(move.Expect))
                 {
                     act = p.SkillMove;
                     end = act?.EndTick ?? w.Tick;
+                    startTick = w.Tick - 1;
+                    p0 = new Vector2(p.Position.X - p.Velocity.X * t.Dt, p.Position.Z - p.Velocity.Z * t.Dt);
+                    b0 = new Vector2(e.Position.X, e.Position.Z);
                     if (k is ActionKind.StepOver or ActionKind.BodyFeint && act != null)
                     {
                         // The ball as the move started (the event's position) against the player then (one tick of his run back).
@@ -286,6 +370,11 @@ static class SkillProbe
             ("skill-fake-stop.json", Moves[8], false),
             ("skill-fake-cut-right.json", Moves[9], false),
             ("skill-fake-cut-left.json", Moves[10], false),
+            ("skill-elastico-right.json", Moves[11], false),
+            ("skill-elastico-left.json", Moves[12], false),
+            ("skill-heel-to-heel.json", Moves[13], false),
+            ("skill-spin-right.json", Moves[14], false),
+            ("skill-spin-left.json", Moves[15], false),
         };
         foreach (var (file, move, sprint) in list)
         {

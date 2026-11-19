@@ -216,7 +216,7 @@ public sealed class ScriptedAttacker
         var ball = w.Ball.Position;
         float toGoal = new Vector2(w.Pitch.GoalLineX - ball.X, ball.Z).Length();
         var k = w.Tuning.Shot;
-        // Ready to press: the ball is strikable now, or (in possession) the next touch, which becomes the soft touch once shoot
+        // Ready to press: the ball is strikable now, or (in possession) the next touch, which the strike takes the place of once shoot
         // is held, comes early enough in the wind-up for the ball to be strikable at the contact.
         bool strikable = ShotModel.CanStrike(a, w.Ball, w.Tuning);
         bool running = w.Scenario.ShootDistance > 0f;

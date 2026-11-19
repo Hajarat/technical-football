@@ -48,9 +48,17 @@ public sealed class PlayerState
     public Foot NextTouchFoot { get; internal set; }
     /// <summary>Where the ball centre is expected to be at that touch (the pending action's <see cref="BallAction.ContactPoint"/>).</summary>
     public Vector3 NextTouchPoint { get; internal set; }
-    /// <summary>Seconds until a pending shot makes contact with the ball, or NaN when no strike is pending.</summary>
+    /// <summary>
+    /// Seconds until the shot under way makes contact with the ball, from the press on: the best estimate, the later of the
+    /// earliest strike (the wind-up after the press, the lead after the release; while shoot is held, as if it were let go on the
+    /// next tick) and the contact the touch controller steers for (the committed strike's once it is committed). NaN when no shot
+    /// is under way.
+    /// </summary>
     public float StrikeEta { get; internal set; } = float.NaN;
-    /// <summary>The foot that will strike, or struck last. Meaningful while charging, during the strike delay and just after.</summary>
+    /// <summary>
+    /// The foot that will strike (the best estimate, like <see cref="StrikeEta"/>), or struck last. Meaningful from the press, through
+    /// the strike delay and just after.
+    /// </summary>
     public Foot StrikeFoot { get; internal set; }
     /// <summary>The foot used for this player's most recent touch or strike.</summary>
     public Foot LastTouchFoot { get; internal set; }
@@ -185,8 +193,17 @@ public sealed class PlayerState
     internal float GaitLockTarget;
     /// <summary>The foot whose swing middle the stride clock crossed on the latest tick, or null.</summary>
     internal Foot? SwingMiddleCrossed;
-    /// <summary>The planned touch that was already winding up when shoot was pressed: the soft touch waits for its contact.</summary>
-    internal BallAction? SoftWaitAction;
+    /// <summary>
+    /// The shot under way, for the touch controller: the earliest tick its strike may fall on (-1: no shot), whether the strike
+    /// may be committed (released, and the ball not held at the feet for a strike at the earliest tick), and the committed
+    /// strike's contact tick and foot (-1: none committed).
+    /// </summary>
+    internal int ShotEarliestTick = -1;
+    internal bool ShotCommitAllowed;
+    /// <summary>The strike is never forecast sooner than this tick (one tick before the latest estimate published), or -1.</summary>
+    internal int ShotNotBeforeTick = -1;
+    internal int StrikeContactTick = -1;
+    internal Foot StrikeContactFoot;
     /// <summary>Kind of the most recent touch made (decides whether the ball may be lost by distance).</summary>
     internal ActionKind LastTouchKind = ActionKind.First;
     /// <summary>Steps the stride clock has begun since the player's last contact with the ball.</summary>
@@ -255,8 +272,12 @@ public sealed class PlayerState
     internal SkillSide SkillBufSide;
     internal Vector2 SkillBufCut;
     internal int SkillBufTick = -1;
+    /// <summary>For a buffered fake shot, the tick shoot was pressed (its move starts at once, its contact on the buffered tick); -1 otherwise.</summary>
+    internal int SkillBufFakeFrom = -1;
     /// <summary>World tick a move ended on, when the touch planner may make the exit touch at once; -1 otherwise.</summary>
     internal int SkillExitTick = -1;
+    /// <summary>World tick a heel-to-heel ended on, when its exit burst starts (its flick was the exit touch); -1 otherwise.</summary>
+    internal int SkillBurstAtTick = -1;
     /// <summary>Simulation seconds before which no move starts (the drag-back's cooldown).</summary>
     internal float SkillCooldownUntil = -100f;
     /// <summary>Simulation seconds until which a new move continues the chain.</summary>
@@ -296,7 +317,7 @@ public sealed class PlayerState
         GSideConsumed = o.GSideConsumed; GKnockUsed = o.GKnockUsed; GKnockWaitTick = o.GKnockWaitTick; GPrevCancel = o.GPrevCancel;
         LastGesture = o.LastGesture; LastGestureTick = o.LastGestureTick; SkillEffective = o.SkillEffective; SkillChainCount = o.SkillChainCount;
         SkillAction = o.SkillAction; SkillBufKind = o.SkillBufKind; SkillBufSide = o.SkillBufSide; SkillBufCut = o.SkillBufCut;
-        SkillBufTick = o.SkillBufTick; SkillExitTick = o.SkillExitTick; SkillCooldownUntil = o.SkillCooldownUntil; SkillChainUntil = o.SkillChainUntil;
+        SkillBufTick = o.SkillBufTick; SkillBufFakeFrom = o.SkillBufFakeFrom; SkillExitTick = o.SkillExitTick; SkillBurstAtTick = o.SkillBurstAtTick; SkillCooldownUntil = o.SkillCooldownUntil; SkillChainUntil = o.SkillChainUntil;
         SkillBoostUntil = o.SkillBoostUntil; SkillBoostFactor = o.SkillBoostFactor; SkillBoostDuration = o.SkillBoostDuration;
         SkillBoostCap = o.SkillBoostCap; SkillBurstUntil = o.SkillBurstUntil; SkillBurstFactor = o.SkillBurstFactor; SkillBurstCap = o.SkillBurstCap;
         return this;

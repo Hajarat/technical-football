@@ -62,6 +62,23 @@ public enum ActionKind
     Driven,
     /// <summary>A low finesse shot: curled along the ground with the inside of the foot.</summary>
     LowFinesse,
+
+    // ---- skill moves added later (after the shots, so the values above keep their numbers) ----
+    /// <summary>
+    /// The outside of the foot pushes the ball away from <see cref="BallAction.Side"/>, the inside snaps it back across the body
+    /// toward it (<see cref="BallAction.Contact2Tick"/>).
+    /// </summary>
+    Elastico,
+    /// <summary>
+    /// A 360 roulette toward <see cref="BallAction.Side"/>: one sole drags the ball back and round while the body turns half way,
+    /// lifts (<see cref="BallAction.LiftTick"/>), and the other sole takes it on round (<see cref="BallAction.Contact2Tick"/>).
+    /// </summary>
+    Spin,
+    /// <summary>
+    /// Straight on: the leading foot's heel knocks the ball back against the trailing foot, which flicks it forward ahead of the
+    /// player (<see cref="BallAction.Contact2Tick"/>).
+    /// </summary>
+    HeelToHeel,
 }
 
 /// <summary>Where an action is in time. Phases advance by ticks, so they are a pure function of the world tick.</summary>
@@ -88,7 +105,7 @@ public enum ActionPhase
 }
 
 /// <summary>The part of the foot that plays the ball.</summary>
-public enum FootSurface { Inside, Laces, Outside, Sole }
+public enum FootSurface { Inside, Laces, Outside, Sole, Heel }
 
 /// <summary>
 /// One action of one player: a touch now, skills and shots later. Created by the touch controller (TouchPlanner), read by the view. Ticks are
@@ -133,8 +150,11 @@ public sealed class BallAction
     public float ContactMiss { get; internal set; } = float.NaN;
 
     // ---- skill moves ----
-    /// <summary>True for a skill move (<see cref="ActionKind.StepOver"/> to <see cref="ActionKind.FakeCut"/>).</summary>
-    public bool IsSkill => Kind is >= ActionKind.StepOver and <= ActionKind.FakeCut;
+    /// <summary>
+    /// True for a skill move (<see cref="ActionKind.StepOver"/> to <see cref="ActionKind.FakeCut"/>, and
+    /// <see cref="ActionKind.Elastico"/> to <see cref="ActionKind.HeelToHeel"/>).
+    /// </summary>
+    public bool IsSkill => Kind is >= ActionKind.StepOver and <= ActionKind.FakeCut or >= ActionKind.Elastico and <= ActionKind.HeelToHeel;
     /// <summary>
     /// For a skill move, the side it goes to relative to the running direction (Left or Right); None for touches and for the
     /// moves without a side (drag-back, fake stop). A fake cut's side is the side of the cut.
@@ -153,6 +173,17 @@ public sealed class BallAction
     /// sole move (ball roll, drag-back, fake stop). -1 for touches.
     /// </summary>
     public int ExecuteTick { get; internal set; } = -1;
+    /// <summary>
+    /// For a skill move with two contacts (elastico, spin, heel-to-heel), the world tick of the second contact, fixed from the
+    /// move's start (a Touch event is raised on it as on <see cref="ContactTick"/>); -1 for every other action.
+    /// </summary>
+    public int Contact2Tick { get; internal set; } = -1;
+    /// <summary>The foot that plays the second contact (the same foot for the elastico, the other foot for the spin and heel-to-heel).</summary>
+    public Foot Foot2 { get; internal set; }
+    /// <summary>The part of <see cref="Foot2"/> that meets the ball at the second contact.</summary>
+    public FootSurface Surface2 { get; internal set; }
+    /// <summary>For the spin, the world tick the first sole lifts off the ball (before <see cref="Contact2Tick"/>); -1 otherwise.</summary>
+    public int LiftTick { get; internal set; } = -1;
     // ---- shots ----
     /// <summary>
     /// True for a shot (<see cref="ActionKind.Power"/> to <see cref="ActionKind.LowFinesse"/>). A shot is
@@ -162,7 +193,7 @@ public sealed class BallAction
     /// Contact, Recovery until <see cref="EndTick"/>, and Done. A shot dropped (faked, or the ball never came into reach) goes
     /// to Done with <see cref="Made"/> false.
     /// </summary>
-    public bool IsShot => Kind >= ActionKind.Power;
+    public bool IsShot => Kind is >= ActionKind.Power and <= ActionKind.LowFinesse;
     /// <summary>
     /// For a shot: true once shoot was released (charge, type and aim fixed, <see cref="ContactTick"/> final unless the ball is
     /// still out of reach then); false while shoot is held. Always false for touches and skill moves.
@@ -190,6 +221,19 @@ public sealed class BallAction
     internal float SkillEntry;
     /// <summary>Where the ball was when the move started and where the sole leaves it.</summary>
     internal Vector3 SkillBallFrom, SkillBallTo;
+    /// <summary>Ball roll, elastico, heel-to-heel: the ball's distance ahead of the player along the run when the sole landed, metres.</summary>
+    internal float RollAhead0;
+    /// <summary>Elastico: the ball's distance toward the move's side from the player when it was first played, metres.</summary>
+    internal float SideOffset0;
+    /// <summary>Spin: the ball against the player in his body frame (ahead, to his right) at the first contact, metres.</summary>
+    internal Vector2 SpinBall0;
+    /// <summary>Spin: the player's facing at the first contact, radians, and his ground velocity planned for the turn (see SkillMoves).</summary>
+    internal float SpinFacing0;
+    internal Vector2 SpinVel0;
+    internal float SpinForward, SpinSideBump;
+    /// <summary>Where the carried ball was sent on the latest tick, and how far from it the ball was at the second contact, metres (NaN before).</summary>
+    internal Vector3 LastTarget;
+    internal float Contact2PathMiss = float.NaN;
     /// <summary>A fake cut's direction (unit X, Z).</summary>
     internal Vector2 SkillCut;
     /// <summary>The effective skill_moves rating the move was made with.</summary>
@@ -205,7 +249,7 @@ public sealed class BallAction
         {
             // A skill move: wind-up from its start to the contact (or the middle), then recovery to its end.
             if (Phase == ActionPhase.Done || tick >= EndTick) return ActionPhase.Done;
-            return tick < ContactTick ? ActionPhase.Windup : tick == ContactTick ? ActionPhase.Contact : ActionPhase.Recovery;
+            return tick < ContactTick ? ActionPhase.Windup : tick == ContactTick || tick == Contact2Tick ? ActionPhase.Contact : ActionPhase.Recovery;
         }
         if (IsShot)
         {

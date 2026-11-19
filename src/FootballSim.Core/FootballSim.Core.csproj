@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="FootballSim.Core.Tests" />
+    <InternalsVisibleTo Include="FootballSim.Batch" />
   </ItemGroup>
 
 </Project>

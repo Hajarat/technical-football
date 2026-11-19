@@ -12,6 +12,12 @@ sealed class SpeedSteps
     public const float Threshold = 15f;
 
     public int Ticks, Steps, SkillSteps, Wall;
+    /// <summary>
+    /// Ticks from a shoot press to 0.5 s after the strike (in possession or not), and the speed steps among them (the boards
+    /// apart): the <c>shot</c> column.
+    /// </summary>
+    public int ShotTicks, ShotSteps;
+    int _shotUntil = int.MinValue;
     public float AccMax, DspdMax;
     readonly List<float> _acc = new();
     readonly List<float> _dspd = new();
@@ -28,8 +34,16 @@ sealed class SpeedSteps
     }
 
     /// <summary>Call after the world steps; <paramref name="measure"/> false skips the tick (a warm-up). Returns true on a step.</summary>
-    public bool After(PlayerState p, float dt, bool measure = true)
+    /// <param name="measureShot">Whether the tick counts for the shot column (default: <paramref name="measure"/>).</param>
+    public bool After(PlayerState p, float dt, bool measure = true, bool? measureShot = null)
     {
+        if (p.Action is { IsShot: true } shot && shot.Made) _shotUntil = shot.ContactTick + (int)MathF.Round(0.5f / dt);
+        if ((measureShot ?? measure) && (p.Action is { IsShot: true } || p.CurrentTick <= _shotUntil))
+        {
+            ShotTicks++;
+            float s1 = new Vector2(p.Velocity.X, p.Velocity.Z).Length(), s0 = new Vector2(_v0.X, _v0.Z).Length();
+            if (MathF.Abs(s1 - s0) / dt > Threshold && !Walled(p)) ShotSteps++;
+        }
         if (!measure || !_had || !p.InPossession || p.Action is { Kind: >= ActionKind.Power }) return false;
         float sp = new Vector2(p.Velocity.X, p.Velocity.Z).Length(), sp0 = new Vector2(_v0.X, _v0.Z).Length();
         float acc = new Vector2(p.Velocity.X - _v0.X, p.Velocity.Z - _v0.Z).Length() / dt;
@@ -40,17 +54,23 @@ sealed class SpeedSteps
         DspdMax = MathF.Max(DspdMax, d);
         if (d <= Threshold) return false;
         // The boards stopped him (his velocity is not his run plus the steering): counted on its own, not as a step.
-        var fwd = new Vector2(MathF.Cos(p.Facing), MathF.Sin(p.Facing));
-        var moved = fwd * p.RunSpeed + new Vector2(p.SteerVelocity.X, p.SteerVelocity.Z);
-        if (Vector2.Distance(moved, new Vector2(p.Velocity.X, p.Velocity.Z)) > 0.05f) { Wall++; return false; }
+        if (Walled(p)) { Wall++; return false; }
         Steps++;
         if (_skill0 || p.SkillMove != null) SkillSteps++;
         return true;
     }
 
+    /// <summary>The boards stopped him this tick: his velocity is not his run plus the steering.</summary>
+    static bool Walled(PlayerState p)
+    {
+        var fwd = new Vector2(MathF.Cos(p.Facing), MathF.Sin(p.Facing));
+        var moved = fwd * p.RunSpeed + new Vector2(p.SteerVelocity.X, p.SteerVelocity.Z);
+        return Vector2.Distance(moved, new Vector2(p.Velocity.X, p.Velocity.Z)) > 0.05f;
+    }
+
     public void Add(SpeedSteps o)
     {
-        Ticks += o.Ticks; Steps += o.Steps; SkillSteps += o.SkillSteps; Wall += o.Wall;
+        Ticks += o.Ticks; Steps += o.Steps; SkillSteps += o.SkillSteps; Wall += o.Wall; ShotTicks += o.ShotTicks; ShotSteps += o.ShotSteps;
         AccMax = MathF.Max(AccMax, o.AccMax); DspdMax = MathF.Max(DspdMax, o.DspdMax);
         _acc.AddRange(o._acc); _dspd.AddRange(o._dspd);
     }

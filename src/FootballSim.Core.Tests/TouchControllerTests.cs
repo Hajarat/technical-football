@@ -455,36 +455,36 @@ public class TouchControllerTests
         }
     }
 
+    /// <summary>
+    /// Shoot pressed while a touch winds up: that touch is made as committed, no other touch is made after it, and the strike
+    /// is the next contact, on the foot swinging in its contact window. (Until 2026-11-19 a soft touch followed the committed
+    /// one; the strike now takes the place of the next touch.)
+    /// </summary>
     [Fact]
-    public void AShotPressedDuringAWindupWaitsForThatContactThenPlansTheSoftTouch()
+    public void AShotPressedDuringAWindupPlaysThatTouchThenStrikesAtTheNextContact()
     {
         for (ulong seed = 1; seed <= 20; seed++)
         {
             var w = Lab(seed);
             var a = RunUntilPhase(w, Jog, ActionPhase.Windup);
             int contactTick = a.ContactTick;
-            var press = new TickIntent { MoveX = 1, ShootHeld = true };
-            BallAction? soft = null;
-            for (int i = 0; i < 180 && soft == null; i++)
+            var p = w.Attacker;
+            for (int i = 0; i < 360 && w.Shots.Count == 0; i++)
             {
-                Step(w, press);
+                Step(w, new TickIntent { MoveX = 1, ShootHeld = i < 24 });
                 foreach (var c in ContactsOf(w))
                 {
-                    if (c == a)
-                    {
-                        Assert.Equal(contactTick, w.Tick);
-                        Assert.NotEqual(ActionKind.Soft, c.Kind);   // the touch already winding up is made as planned
-                    }
-                    else
-                    {
-                        Assert.True(a.Made, $"seed {seed}: a touch before the winding-up one");
-                        Assert.Equal(ActionKind.Soft, c.Kind);
-                        Assert.True(w.Tick > contactTick);
-                        soft = c;
-                    }
+                    Assert.Same(a, c);                              // no touch but the one already winding up
+                    Assert.Equal(contactTick, w.Tick);
+                    Assert.NotEqual(ActionKind.Soft, c.Kind);
+                }
+                if (w.Events.FirstOrDefault(e => e.Kind == EventKind.Strike) is { Kind: EventKind.Strike } strike)
+                {
+                    Assert.True(a.Made, $"seed {seed}: struck before the committed touch");
+                    Assert.True(TouchPlanner.FootInWindow(p, strike.Foot), $"seed {seed}: struck off the swinging foot's window");
                 }
             }
-            Assert.NotNull(soft);
+            Assert.Single(w.Shots);
         }
     }
 
