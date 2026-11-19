@@ -169,15 +169,23 @@ Per clip, `clips.toml` also carries:
 a file of key poses in `tools/anim/moves/` (pelvis, chest and head angles, feet as sole points on the ground, the pelvis or the
 ball, hands, knee and elbow directions, the ball's path, events and timings), which `tools/anim/author.py` solves onto the 22
 driven bones of `player.glb`, mirrors to the other side and checks (no joint under the ground, no leg past its length, no bone
-over 1,500 deg/s, the sole within 1 cm of the ball while it is on it). Nothing in the game plays them yet.
+over 1,500 deg/s, the sole within 1 cm of the ball while it is on it, no boot more than 1 cm inside the ball). Nothing in the game plays them yet.
 
 | Move file | Clips | What it shows |
 | --- | --- | --- |
-| `ball_roll.toml` | `ball_roll_left`, `ball_roll_right` | from standing, the far foot's sole rolls the ball 0.6 m across the body (the simulation's timing: sole lands 0.1 s in, rolls 0.3 s), support-foot hop, exit to a run |
-| `ball_roll.toml` | `ball_roll_left_slow`, `ball_roll_right_slow` | the same poses with a 0.15 s reach and a 0.45 s roll |
+| `ball_roll.toml` | `ball_roll_left`, `ball_roll_right` | from standing, the far foot's sole rolls the ball 0.6 m across the body (sole lands 0.12 s in, rolls 0.40 s), support-foot hop, exit to a run |
+| `ball_roll_run.toml` | `ball_roll_left_run`, `ball_roll_right_run` | the same at 1.5 m/s: 0.75 m across while everything travels 0.6 m forward, a crossover hop of the support foot |
+| `drag_back.toml` | `drag_back_right`, `drag_back_left` | from standing, the sole pulls the ball 0.65 m back to under the body over 0.40 s, rock back, hips open, neutral exit (named by the foot: the move has no side) |
+| `drag_back_run.toml` | `drag_back_right_run`, `drag_back_left_run` | the same braking from 3 m/s: hard plant, the sole stops the ball |
+| `step_over.toml` | `step_over_left`, `step_over_right` | from standing, the foot circles over the front of the ball without touching it, shoulder drop and hip swivel to the side, push off the other way |
+| `step_over_run.toml` | `step_over_left_run`, `step_over_right_run` | the same at 2 m/s with the ball rolling ahead, a skip on the support foot |
+| `body_feint.toml` | `body_feint_left`, `body_feint_right` | from standing, a hard plant and lunge to the side (pelvis shift, shoulder drop, eyes), push off the planted foot the other way |
+| `body_feint_run.toml` | `body_feint_left_run`, `body_feint_right_run` | the same at 2 m/s |
 
-Each entry has `set = "skill:<move>"`, `side` (where the ball goes), `foot` (the playing foot), events `start`, `contact`,
-`release`, `end`, and beside the usual keys `ball` (radius, the span the sole is on it, and its centre per frame relative to the
+A move's standing and running files share their events at the same normalised times, so the two can be blended by entry speed.
+
+Each entry has `set = "skill:<move>"`, `side` (the side the move goes or sells; `none` for the drag-back), `foot` (the playing
+foot), `entry` and `entry_speed`, events `start`, `contact` (a foot meets the ball, or passes over it), `release`, `end`, and beside the usual keys `ball` (radius, the span the sole is on it, and its centre per frame relative to the
 start, model space), `timing` (each span's seconds), `finger_curl` (per frame, left and right: the clip has no finger bones) and
 `sim` (the simulation's numbers the move was authored to).
 
