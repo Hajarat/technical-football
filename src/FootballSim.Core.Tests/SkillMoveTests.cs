@@ -330,6 +330,46 @@ public class SkillMoveTests
         }
     }
 
+    [Theory]
+    [InlineData("step_over")]
+    [InlineData("body_feint")]
+    [InlineData("ball_roll")]
+    [InlineData("drag_back")]
+    [InlineData("fake_cut")]
+    public void TheGroundSpeedIsContinuousThroughASkillExit(string move)
+    {
+        // From the move's end the controller takes the step over and eases it out: no change of the ground speed faster than
+        // 15 m/s^2 (a speed step) over the hand-over, except a speed-up no quicker than the speed law under the exit burst.
+        var (trace, _) = TraceFor(move, 1);
+        foreach (var e in new[] { Entry.Jog, Entry.Sprint })
+        for (ulong seed = 1; seed <= 3; seed++)
+        {
+            var w = Field(seed);
+            var p = w.Attacker;
+            var buf = new TickIntent[w.PlayerCount];
+            int end = -1;
+            float prev = 0f, worst = 0f;
+            for (int tick = 1; tick <= 480; tick++)
+            {
+                var it = Run(e, tick);
+                int i = tick - 241;
+                if (i >= 0 && i < 40) it = trace(i, it);
+                buf[0] = it;
+                w.Step(buf);
+                if (w.Events.Any(x => x.Kind == EventKind.SkillMove)) end = p.SkillMove!.EndTick;
+                // A speed-up from the exit burst may be as quick as the speed law makes it (the move's boosted time constant).
+                float law = (w.Tuning.Movement.SprintSpeed.At99 - prev) / Movement.TimeConstantAt(p, w.SimTime, w.Tuning) * w.Tuning.Dt;
+                float change = p.Speed - prev;
+                if (end > 0 && w.Tick > end && w.Tick <= end + 36 && w.Shots.Count == 0)
+                    worst = MathF.Max(worst, change > 0f ? (change > MathF.Max(15f * w.Tuning.Dt, law) ? change : 0f) : -change);
+                prev = p.Speed;
+            }
+            Assert.True(end > 0, $"{move} {e} seed {seed}: no move");
+            Assert.True(worst <= 15f * w.Tuning.Dt, $"{move} {e} seed {seed}: ground speed changed {worst / w.Tuning.Dt:F1} m/s^2 in a tick after the move");
+            Assert.True(p.InPossession);
+        }
+    }
+
     [Fact]
     public void TheStepOverReachesFurtherThanTheOthers()
     {
