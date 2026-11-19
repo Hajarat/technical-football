@@ -15,13 +15,24 @@ namespace FootballSim.Game;
 /// Each clip is first played through at the physics tick (120 Hz, frames interpolated) and checked; one CLIP_CHECK line per clip
 /// reports non-finite values, the lowest bone joint and the fastest bone turn (deg/s; a pop shows as well over 1,500).
 /// --clip-only a,b limits the run to those clips.
+/// A clip whose clips.json entry carries a ball track (the authored skill moves, tools/anim/author.py) is shown with its ball and
+/// from a third view, the game camera's angle (zoomed in); its sheet has a moment every 0.05 s plus the events, a second sheet
+/// &lt;clip&gt;_contact.png has one tile per physics tick around the "contact" event, and with --video it also writes a 0.25x slow
+/// version (&lt;dir&gt;/video/&lt;clip&gt;_slow, four frames per clip frame). Its cameras stay still for the whole clip, so the body's
+/// and the ball's travel show.
 /// </summary>
 public sealed class ClipGallery
 {
     const float Dt = 1f / 120f;
     const int Tile = 480, Crop = 720;
     const float PopDegPerSec = 1500f;
-    static readonly string[] Views = { "side", "front" };
+    static readonly string[] Views = { "side", "front", "game" };
+    const float SkillMomentSeconds = 0.05f;
+    const int StripTicks = 8;      // ticks either side of the contact in the per-tick strip
+    const int SlowFactor = 4;
+    // The match camera (CameraRig: 6.2 m up, 15.5 m back on +Z, looking at the ball), its field of view narrowed so the body fills
+    // the tile as in the other views.
+    static readonly Vector3 GameEye = new(0, 6.2f, 15.5f);
     // The glTF model faces +Z with its left on +X; placed so it faces world +X (as SkinnedBody.Pose places it).
     static readonly Basis ModelToWorld = new(new Vector3(0, 0, -1), Vector3.Up, new Vector3(1, 0, 0));
 
@@ -31,7 +42,15 @@ public sealed class ClipGallery
         public string Set = "", Side = "";
         public int[] Source = Array.Empty<int>();
         public readonly List<(int Frame, string Tag)> Moments = new();
+        public Vector3[]? Ball;          // model space, one per clip frame
+        public Basis[]? BallSpin;        // the ball's rolling orientation per clip frame
+        public float BallRadius;
+        public Vector3 Aim;              // a skill clip's views hold still on the middle of its hips' path, so the travel shows
+        public int Views => Ball != null ? 3 : 2;
     }
+
+    enum Out { Sheet, Strip, Video, Slow }
+    readonly record struct Shot(Out Out, float T, int View, int Col, string Tag);
 
     readonly Match _m;
     readonly string _dir, _folder;
@@ -43,11 +62,11 @@ public sealed class ClipGallery
     readonly System.Numerics.Quaternion[] _sample;
     readonly Quaternion[] _local, _prevLocal;
 
-    int _ci = -1, _mi, _vf, _view, _settle, _inFlight;
-    enum Stage { Start, Sheet, Video, Next, Done }
-    Stage _stage = Stage.Start;
-    Image? _sheet, _frame;
-    bool _failed;
+    int _ci = -1, _si, _settle, _inFlight;
+    readonly List<Shot> _shots = new();
+    Image? _sheet, _strip, _frame;
+    bool _failed, _done;
+    readonly MeshInstance3D _ball;
 
     public ClipGallery(Match m, string dir, bool video, HashSet<string> only, float goalLineX,
         string folder = "res://assets/anim/keeper", string model = "res://assets/characters/keeper.glb")
@@ -84,6 +103,8 @@ public sealed class ClipGallery
                 }
         }
         if (_clips.Count == 0) { GD.PushError("--clip-gallery: no clips found"); _failed = true; }
+        _ball = new MeshInstance3D { Name = "GalleryBall", Visible = false, Mesh = new SphereMesh { Radius = 0.11f, Height = 0.22f, RadialSegments = 24, Rings = 12 }, MaterialOverride = BallMaterial() };
+        m.AddChild(_ball);
         if (_video) DirAccess.MakeDirRecursiveAbsolute(System.IO.Path.Combine(_dir, "video"));
     }
 
@@ -106,7 +127,24 @@ public sealed class ClipGallery
             if (c.TryGetProperty("frames", out var fr) && fr.ValueKind == JsonValueKind.Array)
                 e.Source = new[] { fr[0].GetInt32(), fr[1].GetInt32() };
             int n = e.Clip.FrameCount;
-            for (int i = 0; i < 6; i++) e.Moments.Add(((int)MathF.Round(i * (n - 1) / 5f), ""));
+            if (c.TryGetProperty("ball", out var ball) && ball.TryGetProperty("track", out var track) && track.GetArrayLength() == n)
+            {
+                e.BallRadius = ball.TryGetProperty("radius", out var rr) ? rr.GetSingle() : 0.11f;
+                e.Ball = new Vector3[n];
+                for (int i = 0; i < n; i++) e.Ball[i] = new Vector3(track[i][0].GetSingle(), track[i][1].GetSingle(), track[i][2].GetSingle());
+                e.BallSpin = RollSpin(e.Ball, e.BallRadius);
+                var tmp = new System.Numerics.Quaternion[e.Clip.BoneCount];
+                var lo = e.Clip.Sample(0f, tmp); var hi = e.Clip.Sample((n - 1) / (float)e.Clip.Fps, tmp);
+                e.Aim = new Vector3((lo.X + hi.X) * 0.5f, (lo.Y + hi.Y) * 0.5f, (lo.Z + hi.Z) * 0.5f);
+            }
+            if (e.Ball != null)
+            {
+                int step = Math.Max(1, (int)MathF.Round(SkillMomentSeconds * e.Clip.Fps));
+                for (int f = 0; f < n; f += step) e.Moments.Add((f, ""));
+                if ((n - 1) % step != 0) e.Moments.Add((n - 1, ""));
+            }
+            else
+                for (int i = 0; i < 6; i++) e.Moments.Add(((int)MathF.Round(i * (n - 1) / 5f), ""));
             foreach (var (tag, f) in e.Clip.Events) e.Moments.Add((Math.Clamp(f, 0, n - 1), tag));
             e.Moments.Sort((a, b) => a.Frame != b.Frame ? a.Frame.CompareTo(b.Frame) : string.CompareOrdinal(b.Tag, a.Tag));
             for (int i = e.Moments.Count - 1; i > 0; i--)   // an event on an evenly spaced moment replaces it
@@ -123,57 +161,115 @@ public sealed class ClipGallery
         if (_failed) return true;
         if (_inFlight > 0) return false;
         if (_settle > 0) { _settle--; if (_settle == 0) Grab(); return false; }
-        switch (_stage)
+        if (_done) return true;
+        if (_ci < 0 || _si >= _shots.Count)
         {
-            case Stage.Start:
-            case Stage.Next:
-                if (_ci >= 0) Finish();
-                if (++_ci >= _clips.Count) { _stage = Stage.Done; return false; }
-                Check();
-                _mi = 0; _view = 0; _vf = 0;
-                _sheet = null;
-                _stage = Stage.Sheet;
-                Show(Cur.Moments[0].Frame, 0);
-                return false;
-            case Stage.Sheet:
-                if (_view == 0) { _view = 1; Show(Cur.Moments[_mi].Frame, 1); return false; }
-                _view = 0;
-                if (++_mi < Cur.Moments.Count) { Show(Cur.Moments[_mi].Frame, 0); return false; }
-                SaveSheet();
-                if (_video) { _stage = Stage.Video; _vf = 0; Show(0, 0); }
-                else _stage = Stage.Next;
-                return false;
-            case Stage.Video:
-                if (_view == 0) { _view = 1; Show(_vf, 1); return false; }
-                _view = 0;
-                SaveFrame();
-                if (++_vf < Cur.Clip.FrameCount) { Show(_vf, 0); return false; }
-                _stage = Stage.Next;
-                return false;
-            default:
-                return true;
+            if (_ci >= 0) Finish();
+            if (++_ci >= _clips.Count) { _done = true; return false; }
+            Check();
+            Plan();
+            _si = 0;
+        }
+        var shot = _shots[_si];
+        Show(shot);
+        return false;
+    }
+
+    /// <summary>Every capture of the current clip, in order: the sheet (each moment in every view), the per-tick contact strip of a
+    /// skill clip, then with --video each frame (all views side by side) and, for a skill clip, the slow version.</summary>
+    void Plan()
+    {
+        _shots.Clear();
+        _sheet = null; _strip = null;
+        var e = Cur;
+        float fps = e.Clip.Fps;
+        for (int mi = 0; mi < e.Moments.Count; mi++)
+            for (int v = 0; v < e.Views; v++) _shots.Add(new Shot(Out.Sheet, e.Moments[mi].Frame / fps, v, mi, e.Moments[mi].Tag));
+        if (e.Ball != null && e.Clip.Events.TryGetValue("contact", out int cf))
+        {
+            for (int k = -StripTicks; k <= StripTicks; k++)
+            {
+                float t = Math.Clamp(cf / fps + k * Dt, 0f, (e.Clip.FrameCount - 1) / fps);
+                for (int v = 0; v < e.Views; v++) _shots.Add(new Shot(Out.Strip, t, v, k + StripTicks, k == 0 ? "contact" : $"{(k > 0 ? "+" : "")}{k} tick"));
+            }
+        }
+        if (_video)
+        {
+            for (int f = 0; f < e.Clip.FrameCount; f++)
+                for (int v = 0; v < e.Views; v++) _shots.Add(new Shot(Out.Video, f / fps, v, f, ""));
+            if (e.Ball != null)
+                for (int f = 0; f <= (e.Clip.FrameCount - 1) * SlowFactor; f++)
+                    for (int v = 0; v < e.Views; v++) _shots.Add(new Shot(Out.Slow, f / (fps * SlowFactor), v, f, ""));
         }
     }
 
-    /// <summary>Poses clip frame <paramref name="frame"/>, aims the camera for <paramref name="view"/> and captures after a settle tick.</summary>
-    void Show(int frame, int view)
+    /// <summary>Poses the clip at the shot's time, aims the camera for its view and captures after a settle tick.</summary>
+    void Show(Shot shot)
     {
         var clip = Cur.Clip;
-        var hips = Pose(clip, frame / (float)clip.Fps);
+        var hips = Pose(clip, shot.T);
         _body.ResetInterpolation();
+        PlaceBall(shot.T);
         // look at the body's middle: halfway between the hips and the lowest point, so a lying keeper stays centred
-        Vector3 hw = _body.Transform * hips;
+        Vector3 hw = _body.Transform * (Cur.Ball != null ? Cur.Aim : hips);
         float look = Math.Clamp(hw.Y * 0.85f, 0.35f, 1.6f);
         var at = new Vector3(hw.X, look, hw.Z);
-        Vector3 eye = view == 0 ? at + new Vector3(0, 0.4f, 4.4f) : at + new Vector3(4.4f, 0.4f, 0);
+        Vector3 eye = shot.View switch { 0 => at + new Vector3(0, 0.4f, 4.4f), 1 => at + new Vector3(4.4f, 0.4f, 0), _ => at + GameEye };
+        // the game view stands as far off as the match camera; its narrower field of view frames the same height of body (3 m)
+        _m.Camera.Fov = shot.View == 2 ? 2f * Mathf.RadToDeg(MathF.Atan(4.4f * MathF.Tan(Mathf.DegToRad(19f)) / GameEye.Length())) : 38f;
         _m.Camera.Transform = new Transform3D(Basis.Identity, eye).LookingAt(at, Vector3.Up);
         _m.Camera.ResetPhysicsInterpolation();
-        string tag = "";
-        if (_stage == Stage.Sheet) tag = Cur.Moments[_mi].Tag;
-        else foreach (var (t, f) in clip.Events) if (f == frame) tag = t;
+        string tag = shot.Tag;
+        int frame = (int)MathF.Round(shot.T * clip.Fps);
+        if (shot.Out is Out.Video or Out.Slow && MathF.Abs(frame - shot.T * clip.Fps) < 1e-3f)
+            foreach (var (t, f) in clip.Events) if (f == frame) tag = t;
         string src = Cur.Source.Length == 2 ? $"  src {Cur.Source[0] + frame * 2}" : "";
-        _label.Text = $"{clip.Name}\n{Views[view].ToUpperInvariant()}  f {frame}/{clip.FrameCount - 1}{src}  {frame / (float)clip.Fps:F2}s{(tag.Length > 0 ? "  [" + tag + "]" : "")}";
+        string at60 = MathF.Abs(frame - shot.T * clip.Fps) < 1e-3f ? $"f {frame}/{clip.FrameCount - 1}" : $"f {shot.T * clip.Fps:F1}/{clip.FrameCount - 1}";
+        string slow = shot.Out == Out.Slow ? "  0.25x" : "";
+        _label.Text = $"{clip.Name}\n{Views[shot.View].ToUpperInvariant()}  {at60}{src}  {shot.T:F3}s{slow}{(tag.Length > 0 ? "  [" + tag + "]" : "")}";
         _settle = 1;
+    }
+
+    void PlaceBall(float t)
+    {
+        var e = Cur;
+        if (e.Ball == null || e.BallSpin == null) { _ball.Visible = false; return; }
+        float x = Math.Clamp(t * e.Clip.Fps, 0f, e.Ball.Length - 1);
+        int a = (int)MathF.Floor(x), b = Math.Min(a + 1, e.Ball.Length - 1);
+        float u = x - a;
+        Vector3 p = e.Ball[a].Lerp(e.Ball[b], u);
+        Basis r = new Basis(e.BallSpin[a].GetRotationQuaternion().Slerp(e.BallSpin[b].GetRotationQuaternion(), u));
+        float s = e.BallRadius / 0.11f;
+        _ball.Transform = new Transform3D(ModelToWorld * r * Basis.FromScale(new Vector3(s, s, s)), _body.Transform * p);
+        _ball.Visible = true;
+        _ball.ResetPhysicsInterpolation();
+    }
+
+    /// <summary>The ball's orientation per frame, rolling without slipping along its track over the ground.</summary>
+    static Basis[] RollSpin(Vector3[] track, float r)
+    {
+        var o = new Basis[track.Length];
+        var cur = Basis.Identity;
+        o[0] = cur;
+        for (int i = 1; i < track.Length; i++)
+        {
+            var d = track[i] - track[i - 1];
+            d.Y = 0;
+            float len = d.Length();
+            if (len > 1e-6f) cur = new Basis(Vector3.Up.Cross(d / len).Normalized(), len / r) * cur;
+            o[i] = cur.Orthonormalized();
+        }
+        return o;
+    }
+
+    static StandardMaterial3D BallMaterial()
+    {
+        // two-tone panels so the roll shows
+        var img = Image.CreateEmpty(64, 32, false, Image.Format.Rgb8);
+        for (int y = 0; y < 32; y++)
+            for (int x = 0; x < 64; x++)
+                img.SetPixel(x, y, ((x / 8) + (y / 8)) % 2 == 0 ? new Color(0.95f, 0.95f, 0.95f) : new Color(0.12f, 0.12f, 0.14f));
+        return new StandardMaterial3D { AlbedoTexture = ImageTexture.CreateFromImage(img), Roughness = 0.6f };
     }
 
     Vector3 Pose(Clip clip, float t)
@@ -188,10 +284,10 @@ public sealed class ClipGallery
     void Grab()
     {
         _inFlight++;
-        Capture(_stage, _view);
+        Capture(_shots[_si]);
     }
 
-    async void Capture(Stage stage, int view)
+    async void Capture(Shot shot)
     {
         await _m.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
         var img = _m.GetViewport().GetTexture().GetImage();
@@ -199,34 +295,49 @@ public sealed class ClipGallery
         int side = Math.Min(Math.Min(w, h), Crop * h / 720);
         var crop = img.GetRegion(new Rect2I((w - side) / 2, (h - side) / 2, side, side));
         crop.Resize(Tile, Tile, Image.Interpolation.Lanczos);
-        if (stage == Stage.Sheet)
+        var e = Cur;
+        var dst = new Vector2I(shot.Col * Tile, shot.View * Tile);
+        switch (shot.Out)
         {
-            int cols = Cur.Moments.Count;
-            _sheet ??= Image.CreateEmpty(cols * Tile, 2 * Tile, false, crop.GetFormat());
-            _sheet.BlitRect(crop, new Rect2I(0, 0, Tile, Tile), new Vector2I(_mi * Tile, view * Tile));
+            case Out.Sheet:
+                _sheet ??= Image.CreateEmpty(e.Moments.Count * Tile, e.Views * Tile, false, crop.GetFormat());
+                _sheet.BlitRect(crop, new Rect2I(0, 0, Tile, Tile), dst);
+                break;
+            case Out.Strip:
+                _strip ??= Image.CreateEmpty((2 * StripTicks + 1) * Tile, e.Views * Tile, false, crop.GetFormat());
+                _strip.BlitRect(crop, new Rect2I(0, 0, Tile, Tile), dst);
+                break;
+            default:
+                _frame ??= Image.CreateEmpty(3 * Tile, Tile, false, crop.GetFormat());
+                if (shot.View == 0) _frame.Fill(Colors.Black);
+                _frame.BlitRect(crop, new Rect2I(0, 0, Tile, Tile), new Vector2I(shot.View * Tile, 0));
+                break;
         }
-        else
-        {
-            _frame ??= Image.CreateEmpty(2 * Tile, Tile, false, crop.GetFormat());
-            _frame.BlitRect(crop, new Rect2I(0, 0, Tile, Tile), new Vector2I(view * Tile, 0));
-        }
+        // the last view of a moment, frame or the last shot of a sheet: write what is complete
+        bool lastView = shot.View == e.Views - 1;
+        bool lastOfKind = _si + 1 >= _shots.Count || _shots[_si + 1].Out != shot.Out;
+        if (lastView && shot.Out is Out.Video or Out.Slow) SaveFrame(shot, e.Views);
+        if (lastOfKind && shot.Out == Out.Sheet) SaveSheet(_sheet, "");
+        if (lastOfKind && shot.Out == Out.Strip) SaveSheet(_strip, "_contact");
+        _si++;
         _inFlight--;
     }
 
-    void SaveSheet()
+    void SaveSheet(Image? sheet, string suffix)
     {
-        if (_sheet == null) return;
-        string path = System.IO.Path.Combine(_dir, Cur.Clip.Name + ".png");
-        var err = _sheet.SavePng(path);
-        GD.Print($"SHEET {Cur.Clip.Name} {path} moments={Cur.Moments.Count} err={err}");
+        if (sheet == null) return;
+        string path = System.IO.Path.Combine(_dir, Cur.Clip.Name + suffix + ".png");
+        var err = sheet.SavePng(path);
+        GD.Print($"SHEET {Cur.Clip.Name}{suffix} {path} moments={sheet.GetWidth() / Tile} err={err}");
     }
 
-    void SaveFrame()
+    void SaveFrame(Shot shot, int views)
     {
         if (_frame == null) return;
-        string dir = System.IO.Path.Combine(_dir, "video", Cur.Clip.Name);
-        if (_vf == 0) DirAccess.MakeDirRecursiveAbsolute(dir);
-        _frame.SavePng(System.IO.Path.Combine(dir, $"f_{_vf:D4}.png"));
+        string dir = System.IO.Path.Combine(_dir, "video", Cur.Clip.Name + (shot.Out == Out.Slow ? "_slow" : ""));
+        if (shot.Col == 0) DirAccess.MakeDirRecursiveAbsolute(dir);
+        var img = views == 3 ? _frame : _frame.GetRegion(new Rect2I(0, 0, views * Tile, Tile));
+        img.SavePng(System.IO.Path.Combine(dir, $"f_{shot.Col:D4}.png"));
     }
 
     void Finish()
