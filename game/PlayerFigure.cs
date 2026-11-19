@@ -714,7 +714,7 @@ public partial class PlayerFigure : Node3D
                 w = Mathf.Clamp(0.85f * hmax / Math.Max(stepLen, 0.01f), 0.04f, 0.5f);
             }
         }
-        MocapBegin(f, pos, fwd, stepping, stepping ? _speedS / Math.Max(f.StepFrequency, 1.5f) : 0f, dt);
+        MocapBegin(f, pos, fwd, stepping, _speedS / Math.Max(f.StepFrequency, 1.5f), dt);
         // pelvis bob: one per step, lowest at the swing middle when the body is over the planted foot
         if (stepping)
         {
@@ -968,6 +968,7 @@ public partial class PlayerFigure : Node3D
         for (int i = 0; i < 2; i++)
         {
             Vector3 hip = body ? pel + P * new Vector3(0, 0, i == 0 ? -HipW : HipW) : pel + right * (i == 0 ? -HipW : HipW);
+            if (!planted[i] && tw[i] <= 0f && !(_kW > 0f && i == _kFoot)) ank[i] = MocapSoftReach(hip, ank[i]);
             SolveLeg(hip, ank[i], fwd, out knee[i], out ankEff[i]);
         }
 

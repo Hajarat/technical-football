@@ -135,7 +135,10 @@ public sealed class AttackerAnimator
     public float Stride { get; private set; } = 1f;
     public float NativeSpeed => _motion.NativeSpeed;
 
-    public void Teleport() => _motion.Reset();
+    public void Teleport() { _motion.Reset(); _strideInit = false; }
+    bool _strideInit;
+    /// <summary>How fast (seconds) the stride's fore-aft shortening follows the step.</summary>
+    public const float StrideTau = 0.06f;
 
     /// <summary>
     /// Samples the cycles for this tick. <paramref name="pos"/> is the simulation's root (feet centre on the ground), <paramref name="fwd"/>
@@ -148,7 +151,10 @@ public sealed class AttackerAnimator
         byte clipContacts = 0;
         bool full = FullBody != null && FullBody.TryPose(f, _local, out hips, out clipContacts);
         _sk.Forward(_local, hips, _gr, _gp);
-        Stride = stepLength > 0.05f ? Math.Clamp(_motion.Stretch(stepLength, sc), StrideMin, 1f) : 1f;
+        // eased, so a step that changes at once (the clock stopping, a speed step) never moves the feet in a tick
+        float strideT = stepLength > 0.05f ? Math.Clamp(_motion.Stretch(stepLength, sc), StrideMin, 1f) : StrideMin;
+        Stride = _strideInit ? Mathf.Lerp(Stride, strideT, 1f - Mathf.Exp(-dt / StrideTau)) : strideT;
+        _strideInit = true;
         Vector3 right = new(-fwd.Z, 0, fwd.X), left = -right;
         Vector3 root = new(pos.X, 0, pos.Z);
         Vector3 W(NVec3 m, float zScale) => root + left * (m.X * sc) + Vector3.Up * (m.Y * sc) + fwd * (m.Z * zScale * sc);
@@ -299,7 +305,9 @@ public partial class PlayerFigure
             cyc.Y = AnkleH + lift * _prep[i];
             // lowered, a foot behind the body may fall out of the leg's reach: it comes in toward the hip instead (as far as the cycle had it, at most)
             Vector3 d = cyc - a.Hip[i];
-            float most = Math.Max(0.96f * Leg, (c0 - a.Hip[i]).Length());
+            // ... and keeps a visible knee bend through the low swing to a touch (the more it is lowered, the more bent)
+            float low = Mathf.Clamp((1f - _prep[i]) / (1f - TouchLift), 0f, 1f);
+            float most = Mathf.Lerp(Math.Max(0.96f * Leg, (c0 - a.Hip[i]).Length()), 0.92f * Leg, low);
             if (d.Length() > most) cyc = a.Hip[i] + d * (most / d.Length());
         }
         Vector3 want = ank.Lerp(cyc, _mW);
@@ -406,6 +414,24 @@ public partial class PlayerFigure
     }
     readonly float[] _toePrev = new float[2];
 
+    /// <summary>
+    /// Mocap: a swinging foot's ankle is brought in toward the hip as the leg nears full length (past <see cref="SoftReachFrom"/> of it,
+    /// approaching straight exponentially, as <see cref="TwoBoneIk.Solve(System.Numerics.Vector3, float, float, System.Numerics.Vector3, System.Numerics.Vector3, float, out System.Numerics.Vector3, out System.Numerics.Vector3)"/>
+    /// does): near straight a knee's angle changes many times faster than the foot moves, so a foot swept through full reach whips it.
+    /// Planted, touching and kicking feet are left where they are.
+    /// </summary>
+    Vector3 MocapSoftReach(Vector3 hip, Vector3 ank)
+    {
+        if (_atkAnim == null || _mW <= 0f) return ank;
+        Vector3 d = ank - hip;
+        float len = d.Length(), full = Leg, soft = SoftReachFrom * full;
+        if (len <= soft || len < 1e-4f) return ank;
+        float band = full - soft;
+        float to = soft + band * (1f - Mathf.Exp(-(len - soft) / band));
+        return hip + d * (Mathf.Lerp(len, to, _mW) / len);
+    }
+    const float SoftReachFrom = 0.93f;
+
     /// <summary>Clearance (metres) kept under the toe joint and the boot's toe tip.</summary>
     const float ToeJointClear = 0.015f, ToeTipClear = 0.004f;
 
@@ -485,6 +511,14 @@ public partial class PlayerFigure
     readonly Quaternion[] _bonePrev = new Quaternion[22];
     bool _boneHave;
 
+    /// <summary>Hip-to-ankle distance over the leg's length (thigh plus shin) of the shown leg on bone k's side.</summary>
+    static float Reach(SkinnedBody b, int k)
+    {
+        int o = k >= 14 ? 14 : 6;
+        Vector3 h = b.DrivenBoneWorld(o + 4), kn = b.DrivenBoneWorld(o + 5), a = b.DrivenBoneWorld(o + 6);
+        return (a - h).Length() / ((kn - h).Length() + (a - kn).Length());
+    }
+
     static float KneeDeg(SkinnedBody b, int k)
     {
         int o = k >= 14 ? 14 : 6;
@@ -533,7 +567,7 @@ public partial class PlayerFigure
             for (int k = 0; k < n; k++)
             {
                 float deg = _bonePrev[k].AngleTo(b.DrivenLocalRotation(k)) * 180f / Mathf.Pi / dt;
-                if (deg > 1500f) { Stats.BoneFast++; if (Log) GD.Print($"MOCAP_FAST tick={Stats.Tick} bone={b.DrivenBoneNames[k]} deg_s={deg:F0} w={_mW:F2} knee_deg={KneeDeg(b, k):F1}"); }
+                if (deg > 1500f) { Stats.BoneFast++; if (Log) GD.Print($"MOCAP_FAST tick={Stats.Tick} bone={b.DrivenBoneNames[k]} deg_s={deg:F0} w={_mW:F2} knee_deg={KneeDeg(b, k):F1} reach={Reach(b, k):F3}"); }
                 if (deg > Stats.BoneMaxDegS) { Stats.BoneMaxDegS = deg; Stats.BoneMaxAt = $"{b.DrivenBoneNames[k]}@{Stats.Tick}"; }
             }
         if (Log && _atkAnim != null) GD.Print($"MOCAP_KNEE tick={Stats.Tick} hips={b.DrivenBoneWorld(0).Y:F3} L={KneeDeg(b, 11):F1} R={KneeDeg(b, 19):F1} Ltw={_bonePrev[11].AngleTo(b.DrivenLocalRotation(11)) * 57.3f:F1} Rtw={_bonePrev[19].AngleTo(b.DrivenLocalRotation(19)) * 57.3f:F1}");
