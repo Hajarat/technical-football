@@ -306,6 +306,7 @@
     600
    ],
    "set": "stance",
+   "cut": [],
    "tags": [
     "idle"
    ],
@@ -365,6 +366,7 @@
     520
    ],
    "set": "stance",
+   "cut": [],
    "tags": [],
    "match_bias": 2.0,
    "verdict": "keep",
@@ -426,6 +428,7 @@
     420
    ],
    "set": "stance",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -479,6 +482,7 @@
     600
    ],
    "set": "stance",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -548,6 +552,7 @@
     420
    ],
    "set": "backpedal",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -617,6 +622,7 @@
     660
    ],
    "set": "backpedal",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -686,6 +692,7 @@
     162
    ],
    "set": "run",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -747,6 +754,7 @@
     332
    ],
    "set": "run",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -812,6 +820,7 @@
     300
    ],
    "set": "run",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -869,6 +878,7 @@
     185
    ],
    "set": "run",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -934,6 +944,7 @@
     240
    ],
    "set": "catch",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -1009,6 +1020,7 @@
     480
    ],
    "set": "catch",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -1076,6 +1088,7 @@
     240
    ],
    "set": "catch",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -1139,6 +1152,7 @@
     330
    ],
    "set": "reflex_hand",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -1194,6 +1208,7 @@
     2580
    ],
    "set": "reflex_hand",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -1249,6 +1264,7 @@
     500
    ],
    "set": "reflex_hand",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -1304,6 +1320,7 @@
     2500
    ],
    "set": "reflex_hand",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -1363,6 +1380,7 @@
     1250
    ],
    "set": "reflex_foot",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -1430,6 +1448,7 @@
     960
    ],
    "set": "reflex_foot",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -1490,6 +1509,7 @@
     1540
    ],
    "set": "body_block",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "reject",
@@ -1553,6 +1573,7 @@
     1620
    ],
    "set": "body_block",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "reject",
@@ -1612,6 +1633,7 @@
     140
    ],
    "set": "dive_side",
+   "cut": [],
    "tags": [
     "takeoff"
    ],
@@ -1621,7 +1643,7 @@
    "kind": "",
    "loop": false,
    "events": {
-    "takeoff": 27,
+    "takeoff": 16,
     "contact": 30,
     "landing": 34
    },
@@ -1672,6 +1694,7 @@
     300
    ],
    "set": "dive_high",
+   "cut": [],
    "tags": [
     "takeoff"
    ],
@@ -1681,7 +1704,7 @@
    "kind": "",
    "loop": false,
    "events": {
-    "takeoff": 32,
+    "takeoff": 22,
     "contact": 46,
     "landing": 58
    },
@@ -1739,6 +1762,7 @@
     520
    ],
    "set": "dive_high",
+   "cut": [],
    "tags": [
     "takeoff"
    ],
@@ -1748,7 +1772,7 @@
    "kind": "",
    "loop": false,
    "events": {
-    "takeoff": 56,
+    "takeoff": 36,
     "contact": 72,
     "landing": 84
    },
@@ -1806,6 +1830,7 @@
     2340
    ],
    "set": "dive_low",
+   "cut": [],
    "tags": [
     "takeoff"
    ],
@@ -1867,6 +1892,7 @@
     340
    ],
    "set": "back_leap",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "reject",
@@ -1932,6 +1958,7 @@
     620
    ],
    "set": "lie_front",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -1981,6 +2008,7 @@
     300
    ],
    "set": "lie_back",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -2043,6 +2071,7 @@
     1250
    ],
    "set": "lie_side",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -2106,6 +2135,7 @@
     300
    ],
    "set": "smother",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -2181,6 +2211,7 @@
     570
    ],
    "set": "smother",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "reject",
@@ -2246,10 +2277,11 @@
    "file": "getup_front_140_01.kclip",
    "trial": "140_01",
    "frames": [
-    121,
-    600
+    221,
+    560
    ],
    "set": "getup",
+   "cut": [],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -2257,59 +2289,55 @@
    "kind": "",
    "loop": false,
    "events": {
-    "up": 176
+    "up": 126
    },
    "fps": 60,
-   "frame_count": 240,
-   "seconds": 4.0,
+   "frame_count": 170,
+   "seconds": 2.833,
    "contacts": {
     "left": [
      [
-      76,
-      134
+      35,
+      82
      ],
      [
-      138,
-      152
+      109,
+      150
      ],
      [
-      159,
-      200
-     ],
-     [
-      211,
-      239
+      161,
+      169
      ]
     ],
     "right": [
      [
-      94,
-      228
+      44,
+      169
      ]
     ]
    },
-   "notes": "get up from lying face down",
+   "notes": "get up from lying face down (trimmed to start as he pushes up: the core's get-up lasts 1 s)",
    "contact_tolerance_cm": 4.0,
    "checks": {
     "scale": 1.1599,
-    "max_dir_err_deg": 0.024,
-    "lowest_joint_m": 0.034,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.036,
     "guarded_frames": {
-     "LeftHand": 59,
-     "RightHand": 22,
-     "LeftFoot": 240
+     "LeftHand": 47,
+     "RightHand": 3,
+     "LeftFoot": 138
     },
     "flat_foot_frames": [
-     66,
-     40
+     19,
+     34
     ],
     "hips_roll_deg": 0.0,
     "leg_splay_deg": 0.0,
     "ground_lift_cm": [
-     -2.5,
-     23.5
+     -3.0,
+     15.1
     ],
-    "lowest_joint_at": 39
+    "lowest_joint_at": 55
    }
   },
   {
@@ -2317,10 +2345,16 @@
    "file": "getup_side_140_03.kclip",
    "trial": "140_03",
    "frames": [
-    91,
+    231,
     760
    ],
    "set": "getup",
+   "cut": [
+    [
+     601,
+     645
+    ]
+   ],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -2328,71 +2362,66 @@
    "kind": "",
    "loop": false,
    "events": {
-    "up": 302
+    "up": 209
    },
    "fps": 60,
-   "frame_count": 335,
-   "seconds": 5.583,
+   "frame_count": 242,
+   "seconds": 4.033,
    "contacts": {
     "left": [
      [
-      52,
-      58
+      0,
+      26
      ],
      [
-      63,
-      89
+      53,
+      104
      ],
      [
-      123,
-      185
+      135,
+      145
      ],
      [
-      205,
-      252
+      149,
+      182
      ],
      [
-      270,
-      334
+      185,
+      241
      ]
     ],
     "right": [
      [
-      0,
-      68
+      63,
+      144
      ],
      [
-      133,
-      214
-     ],
-     [
-      237,
-      275
+      167,
+      185
      ]
     ]
    },
-   "notes": "get up from lying on his side",
+   "notes": "get up from lying on his side (trimmed; the sink back before he rises cut)",
    "contact_tolerance_cm": 4.0,
    "checks": {
     "scale": 1.1599,
-    "max_dir_err_deg": 0.026,
-    "lowest_joint_m": 0.045,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.047,
     "guarded_frames": {
      "RightHand": 13,
-     "LeftFoot": 1,
-     "RightFoot": 89
+     "LeftFoot": 1
     },
     "flat_foot_frames": [
-     204,
-     107
+     134,
+     72
     ],
     "hips_roll_deg": -8.0,
     "leg_splay_deg": 0.0,
     "ground_lift_cm": [
-     -7.2,
-     7.1
+     -6.2,
+     6.8
     ],
-    "lowest_joint_at": 182
+    "lowest_joint_at": 94
    }
   },
   {
@@ -2400,10 +2429,16 @@
    "file": "getup_back_140_08.kclip",
    "trial": "140_08",
    "frames": [
-    61,
+    161,
     660
    ],
    "set": "getup",
+   "cut": [
+    [
+     495,
+     545
+    ]
+   ],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -2411,59 +2446,55 @@
    "kind": "",
    "loop": false,
    "events": {
-    "up": 271
+    "up": 195
    },
    "fps": 60,
-   "frame_count": 300,
-   "seconds": 5.0,
+   "frame_count": 224,
+   "seconds": 3.733,
    "contacts": {
     "left": [
      [
-      104,
-      218
+      54,
+      166
      ],
      [
-      224,
-      227
-     ],
-     [
-      235,
-      299
+      170,
+      223
      ]
     ],
     "right": [
      [
       0,
-      172
+      123
      ],
      [
-      188,
-      242
+      138,
+      170
      ]
     ]
    },
-   "notes": "get up from lying on his back",
+   "notes": "get up from lying on his back (trimmed; the sink back before he rises cut)",
    "contact_tolerance_cm": 4.0,
    "checks": {
     "scale": 1.1599,
     "max_dir_err_deg": 0.025,
-    "lowest_joint_m": 0.047,
+    "lowest_joint_m": 0.046,
     "guarded_frames": {
      "RightHand": 25,
      "Neck": 1,
      "Head": 2
     },
     "flat_foot_frames": [
-     239,
-     153
+     189,
+     103
     ],
     "hips_roll_deg": -8.0,
     "leg_splay_deg": 0.0,
     "ground_lift_cm": [
-     -6.5,
-     9.2
+     -4.4,
+     8.8
     ],
-    "lowest_joint_at": 59
+    "lowest_joint_at": 87
    }
   },
   {
@@ -2471,10 +2502,16 @@
    "file": "getup_back_139_18.kclip",
    "trial": "139_18",
    "frames": [
-    121,
+    141,
     600
    ],
    "set": "getup",
+   "cut": [
+    [
+     371,
+     471
+    ]
+   ],
    "tags": [],
    "match_bias": 1.0,
    "verdict": "keep",
@@ -2482,46 +2519,42 @@
    "kind": "",
    "loop": false,
    "events": {
-    "up": 190
+    "up": 129
    },
    "fps": 60,
-   "frame_count": 240,
-   "seconds": 4.0,
+   "frame_count": 179,
+   "seconds": 2.983,
    "contacts": {
     "left": [
      [
       0,
-      57
+      47
      ],
      [
-      80,
-      115
+      70,
+      105
      ],
      [
-      161,
-      189
+      115,
+      128
      ],
      [
-      207,
-      239
+      146,
+      178
      ]
     ],
     "right": [
      [
-      144,
-      164
+      123,
+      154
      ],
      [
-      184,
-      215
-     ],
-     [
-      223,
-      239
+      162,
+      178
      ]
     ]
    },
-   "notes": "get up from his back, rolling over",
+   "notes": "get up from his back, rolling over (trimmed; the half rise and fall back in the middle cut)",
    "contact_tolerance_cm": 2.0,
    "checks": {
     "scale": 1.1515,
@@ -2531,16 +2564,16 @@
      "LeftHand": 40
     },
     "flat_foot_frames": [
-     117,
-     54
+     107,
+     44
     ],
     "hips_roll_deg": 0.0,
     "leg_splay_deg": 0.0,
     "ground_lift_cm": [
-     -5.2,
+     -5.1,
      9.0
     ],
-    "lowest_joint_at": 104
+    "lowest_joint_at": 94
    }
   },
   {
@@ -2558,19 +2591,19 @@
    "kind": "",
    "loop": false,
    "events": {
-    "takeoff": 9,
-    "contact": 27,
-    "landing": 27
+    "takeoff": 3,
+    "contact": 32,
+    "landing": 32
    },
    "fps": 60,
-   "frame_count": 78,
-   "seconds": 1.3,
+   "frame_count": 83,
+   "seconds": 1.383,
    "contacts": {
     "left": [],
     "right": [
      [
-      37,
-      77
+      46,
+      82
      ]
     ]
    },
@@ -2591,19 +2624,19 @@
    "kind": "",
    "loop": false,
    "events": {
-    "takeoff": 9,
-    "contact": 27,
-    "landing": 39
+    "takeoff": 3,
+    "contact": 32,
+    "landing": 44
    },
    "fps": 60,
-   "frame_count": 78,
-   "seconds": 1.3,
+   "frame_count": 83,
+   "seconds": 1.383,
    "contacts": {
     "left": [],
     "right": [
      [
-      34,
-      77
+      44,
+      82
      ]
     ]
    },
@@ -2624,19 +2657,19 @@
    "kind": "",
    "loop": false,
    "events": {
-    "takeoff": 9,
-    "contact": 27,
-    "landing": 50
+    "takeoff": 3,
+    "contact": 31,
+    "landing": 54
    },
    "fps": 60,
-   "frame_count": 78,
-   "seconds": 1.3,
+   "frame_count": 82,
+   "seconds": 1.367,
    "contacts": {
     "left": [],
     "right": [
      [
-      59,
-      77
+      63,
+      81
      ]
     ]
    },
@@ -2657,18 +2690,18 @@
    "kind": "",
    "loop": false,
    "events": {
-    "takeoff": 9,
-    "contact": 27,
-    "landing": 27
+    "takeoff": 3,
+    "contact": 28,
+    "landing": 28
    },
    "fps": 60,
-   "frame_count": 78,
-   "seconds": 1.3,
+   "frame_count": 79,
+   "seconds": 1.317,
    "contacts": {
     "left": [
      [
-      43,
-      77
+      45,
+      78
      ]
     ],
     "right": []

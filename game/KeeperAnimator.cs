@@ -50,7 +50,9 @@ public sealed class KeeperAnimator
     /// <summary>Each glove sits this far (metres) from the ball's centre when both hands meet it.</summary>
     public const float PairSpread = 0.09f;
     /// <summary>A get-up may play at up to this rate to reach its "up" on the simulation's tick (the CMU get-ups are slow).</summary>
-    public const float GetUpWarpMax = 1.6f;
+    public const float GetUpWarpMax = 2.2f;
+    /// <summary>The get-up clip's "up" lands this far through the core's get-up, so he is upright and facing play before Set takes over.</summary>
+    public const float GetUpUpShare = 0.7f;
 
     KeeperAnimator(SkinnedBody body, PoseDatabase db)
     {
@@ -206,7 +208,7 @@ public sealed class KeeperAnimator
         else if (a == KeeperAction.GettingUp)
         {
             input.HasTarget = true;
-            input.TargetTime = KeeperView.GetUpSeconds - f.KeeperActionTime;
+            input.TargetTime = GetUpUpShare * KeeperView.GetUpSeconds - f.KeeperActionTime;
             input.WarpMax = GetUpWarpMax;
         }
 

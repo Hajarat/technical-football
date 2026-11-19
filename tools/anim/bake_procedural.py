@@ -16,12 +16,12 @@ Here they are:
   arms, forearms, hands, legs, feet, toes) the twist about that axis may change by at most TWIST_STEP_DEG per frame, and a jump of
   over FLIP_DEG in one frame (the solve flipping) is not followed at all; the bone's
   direction, so every joint position, is unchanged;
-* cut, for a flight, to start FLIGHT_LEAD_IN frames before its take-off (the procedural dive's first ticks are the CMU take-off's part,
-  and their swings are too fast to keep), and moved back over the origin;
+* cut, for a flight, to start FLIGHT_LEAD_IN frames before its take-off (the procedural dive's first ticks are the CMU take-off's
+  part), and moved back over the origin;
 * smoothed over time (a Gaussian of SMOOTH_SIGMA frames on every rotation and the hips): the procedural pose swings its limbs in a
   few ticks where its targets jump, faster than the gallery's 1,500 deg/s pop flag;
-* labelled: events "takeoff" (the first frame both ankles are TAKEOFF_LIFT above where they started, but not before TAKEOFF_SHARE of
-  the way to the contact and no later than 0.1 s before it),
+* labelled: events "takeoff" (for a flight the first frame its trunk leans TAKEOFF_TILT_DEG from upright, else the first frame both
+  ankles are TAKEOFF_LIFT above where they started; no later than 0.1 s before the contact),
   "contact" (the script's contact time) and "landing" (the first frame after contact the hips are within 5 cm of their lowest); foot
   contacts as retarget.py labels them (the foot's lowest point under 4 cm, its speed under 0.35 m/s);
 * checked: no joint below the ground (the clip is refused otherwise).
@@ -43,8 +43,8 @@ SMOOTH_SIGMA = 2.5      # frames (42 ms): the procedural pose's quickest swings 
 TWIST_STEP_DEG = 12.0
 FLIP_DEG = 60.0   # 720 deg/s: well under the gallery's 1,500 pop flag
 TAKEOFF_LIFT = 0.05
-TAKEOFF_SHARE = 0.3
-FLIGHT_LEAD_IN = 4     # frames a flight keeps before its take-off (the rest of the procedural dive's start is cut)
+TAKEOFF_TILT_DEG = 20.0
+FLIGHT_LEAD_IN = 3     # frames a flight keeps before its take-off (the rest of the procedural dive's start is cut)
 LANDING_BAND = 0.05
 TWIST_BONES = ["Spine", "Spine1", "Head"] + [s + b for s in ("Left", "Right")
                                                for b in ("Shoulder", "Arm", "ForeArm", "Hand", "UpLeg", "Leg", "Foot", "ToeBase")]
@@ -97,6 +97,17 @@ def unflip_twists(glob: np.ndarray, names: list[str]) -> np.ndarray:
     return out
 
 
+def first_tilted(q: np.ndarray, hips: np.ndarray, t: rt.Target, deg: float) -> int:
+    """The first frame whose trunk (hips to the upper spine) leans <deg> or more from upright (clips.toml takeoff_tilt_deg, default
+    TAKEOFF_TILT_DEG)."""
+    n = len(q)
+    gr, gt = t.fk(rt.quats_to_mats(q.reshape(-1, 4)).reshape(n, 22, 3, 3), hips)
+    sp = gt[:, rt.BONES.index("Spine2")] - gt[:, 0]
+    tilt = np.degrees(np.arccos(np.clip(sp[:, 1] / np.linalg.norm(sp, axis=1), -1, 1)))
+    hit = np.flatnonzero(tilt >= deg)
+    return int(hit[0]) if len(hit) else 0
+
+
 def smooth(local: np.ndarray, hips: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """A Gaussian over time (SMOOTH_SIGMA frames, the ends held) on every local rotation (sign-aligned, averaged, renormalised) and the hips."""
     n = len(local)
@@ -147,8 +158,10 @@ def bake(dump: dict, clip: dict, t: rt.Target) -> rt.Result:
     # a flight starts a little before its take-off: the procedural dive's first ticks (the body thrown from the stance as its weight
     # jumps toward the dive pose) are the CMU take-off's part, and their swings are too fast to keep
     cut = 0
+    tilt_frame = None
     if "flight" in clip.get("tags", []) and dump.get("contact_s") is not None:
-        cut = max(0, int(round(TAKEOFF_SHARE * dump["contact_s"] * rt.FPS)) - FLIGHT_LEAD_IN)
+        tilt_frame = first_tilted(q, hips, t, float(clip.get("takeoff_tilt_deg", TAKEOFF_TILT_DEG)))
+        cut = max(0, tilt_frame - FLIGHT_LEAD_IN)
         local, hips = local[cut:], hips[cut:] - np.array([hips[cut, 0], 0.0, hips[cut, 2]])
         n = len(local)
     local, hips = smooth(local, hips)
@@ -170,9 +183,12 @@ def bake(dump: dict, clip: dict, t: rt.Target) -> rt.Result:
         ank = gt[:, [rt.BONES.index("LeftFoot"), rt.BONES.index("RightFoot")], 1]
         lifted = np.where((ank[:, 0] > ank[0, 0] + TAKEOFF_LIFT) & (ank[:, 1] > ank[0, 1] + TAKEOFF_LIFT))[0]
         tk = int(lifted[0]) if len(lifted) else c // 3
-        # the procedural feet leave the ground in the first ticks of the dive, before the body has turned much: the CMU take-off
-        # covers at least the first TAKEOFF_SHARE of the way to the contact
-        events["takeoff"] = max(1, min(max(tk, int(round(TAKEOFF_SHARE * (c + cut))) - cut), c - int(0.1 * fps)))
+        # a flight's take-off is where the body has tipped TAKEOFF_TILT_DEG from upright: the CMU take-off hands over to it there, so
+        # the switch is from an upright body to one just leaning in (not to one already flying at 45 deg, whose arms, set on the
+        # tilted trunk, would point straight up while the blend brought the trunk over)
+        if tilt_frame is not None:
+            tk = tilt_frame - cut
+        events["takeoff"] = max(1, min(tk, c - int(0.1 * fps)))
         hy = gt[:, 0, 1]
         after = np.arange(c, n)
         low = hy[c:].min()

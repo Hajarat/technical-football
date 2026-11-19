@@ -11,11 +11,14 @@
 #   match_bias  optional cost factor for the matcher (default 1): above 1 the clip is picked only when it fits clearly better
 #   verdict the audition's verdict: keep, trim (frames narrowed, then kept) or reject (still written and shown in the clip gallery,
 #           never in the pose database); a clip without one counts as keep
+#   cut     optional [[first, last], ...] AMC frames dropped from the middle of the clip (a pause); the motion after a cut goes on
+#           from the frame before it (tools/anim/retarget.py apply_cuts)
 #   loop    true only for a clip whose end runs into its start (none yet: the matcher treats every clip as one-shot)
 #   notes   what the trial shows
 #   source  "cmu" (default: retargeted from the CMU trial) or "baked": recorded from the procedural keeper by
 #           tools/anim/bake_procedural.py from the keeper gallery script named by "script" (no trial, no frames: its events are found
 #           in the recording); a baked clip is never retargeted, retarget.py lists it in clips.json as it is
+#   takeoff_tilt_deg  a baked flight's take-off: the first frame its trunk leans this far from upright (default 20)
 #   tags    for the hybrid saves (dive_low, dive_side, dive_high, smother): "takeoff" marks a CMU clip played up to its takeoff event,
 #           "flight" the baked flight that follows it (spec "What CMU covers")
 #   contact_tolerance_cm  optional: how far a contact foot may stay off the ground (default 2); recorded in clips.json so it can be
@@ -29,7 +32,10 @@
 #   contact, reflex_foot  the frame the pelvis is lowest in the lunge
 #   contact, dive_low     the frame both hands are lowest
 #   contact, smother      the frame both hands are lowest in the dive; landing: the pelvis first within 5 cm of its lowest
-#   dive_* and back_leap  takeoff: the last frame before both feet leave the ground (5 cm above where they stood);
+#   dive_* and back_leap  takeoff: the last frame before both feet leave the ground (5 cm above where they stood); for a
+#                         dive's CMU take-off (tag "takeoff") instead the last calm frame of the wind-up, before the arms swing
+#                         (the hand under 1.5 m/s): the baked flight takes over there, and a fast arm swing carried into it
+#                         flung the far arm overhead;
 #                         contact: the top of the jump (pelvis, or head for the leap); landing: the first foot back down
 #   lie_*  landing        the pelvis first within 5 cm of its lowest
 #   getup  up             the pelvis first 80 % of the way from its lowest to its final standing height
@@ -264,7 +270,7 @@ trial = "141_05"
 frames = [30, 140]
 set = "dive_side"
 side = "left"
-events = { takeoff = 84, contact = 91, landing = 99 }
+events = { takeoff = 62, contact = 91, landing = 99 }
 tags = ["takeoff"]
 verdict = "keep"
 loop = false
@@ -276,7 +282,7 @@ trial = "124_11"
 frames = [121, 300]
 set = "dive_high"
 side = "none"
-events = { takeoff = 186, contact = 214, landing = 238 }
+events = { takeoff = 165, contact = 214, landing = 238 }
 tags = ["takeoff"]
 verdict = "keep"
 loop = false
@@ -288,7 +294,7 @@ trial = "118_01"
 frames = [301, 520]
 set = "dive_high"
 side = "none"
-events = { takeoff = 414, contact = 444, landing = 470 }
+events = { takeoff = 373, contact = 444, landing = 470 }
 tags = ["takeoff"]
 verdict = "keep"
 loop = false
@@ -376,49 +382,52 @@ notes = "forward roll from standing, wide legs"
 [[clip]]
 name = "getup_front_140_01"
 trial = "140_01"
-frames = [121, 600]
+frames = [221, 560]
 set = "getup"
 side = "none"
 events = { up = 472 }
 contact_tolerance_cm = 4
 verdict = "keep"
 loop = false
-notes = "get up from lying face down"
+notes = "get up from lying face down (trimmed to start as he pushes up: the core's get-up lasts 1 s)"
 
 [[clip]]
 name = "getup_side_140_03"
 trial = "140_03"
-frames = [91, 760]
+frames = [231, 760]
+cut = [[601, 645]]
 set = "getup"
 side = "none"
 events = { up = 695 }
 contact_tolerance_cm = 4
 verdict = "keep"
 loop = false
-notes = "get up from lying on his side"
+notes = "get up from lying on his side (trimmed; the sink back before he rises cut)"
 
 [[clip]]
 name = "getup_back_140_08"
 trial = "140_08"
-frames = [61, 660]
+frames = [161, 660]
+cut = [[495, 545]]
 set = "getup"
 side = "none"
 events = { up = 603 }
 contact_tolerance_cm = 4
 verdict = "keep"
 loop = false
-notes = "get up from lying on his back"
+notes = "get up from lying on his back (trimmed; the sink back before he rises cut)"
 
 [[clip]]
 name = "getup_back_139_18"
 trial = "139_18"
-frames = [121, 600]
+frames = [141, 600]
+cut = [[371, 471]]
 set = "getup"
 side = "none"
 events = { up = 501 }
 verdict = "keep"
 loop = false
-notes = "get up from his back, rolling over"
+notes = "get up from his back, rolling over (trimmed; the half rise and fall back in the middle cut)"
 
 # ---- baked from the procedural keeper (tools/anim/bake_procedural.py): the flights of the hybrid saves and the slide tackle,
 # until real dive recordings replace them. Each is recorded to his right; mirroring gives the left.
@@ -463,6 +472,7 @@ script = "smother_right"
 set = "smother"
 side = "right"
 tags = ["flight"]
+takeoff_tilt_deg = 45   # no CMU take-off precedes it: it starts once the procedural smother is going over (its first ticks flip the legs)
 verdict = "keep"
 loop = false
 notes = "the procedural smother to his right: down on his side behind the ball, hands around it"

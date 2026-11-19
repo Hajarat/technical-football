@@ -107,7 +107,7 @@ public sealed class KeeperMotion
     /// <summary>The warp never plays a clip so fast that a bone turns quicker than this (degrees per second; the gallery flags 1,500 as a pop).</summary>
     public float WarpBoneLimit = 1000f;
     /// <summary>The same for a timed clip (a save or a get-up landing its event on the tick), whose faster bones the turn guard catches.</summary>
-    public float TimedBoneLimit = 1300f;
+    public float TimedBoneLimit = 1350f;
 
     readonly PoseDatabase _db;
     readonly Skeleton _sk;
@@ -553,7 +553,18 @@ public sealed class KeeperMotion
         {
             // any other timed set: never so early that even the fastest rate would land its target event late
             if (pc.TargetFrame < 0) return f;
-            int latest = pc.TargetFrame - (int)MathF.Round(Math.Max(0f, input.TargetTime) * MaxRate(input) * pc.Clip.Fps);
+            // walking back from the event, each frame takes 1/fps over the fastest rate it allows (the warp and the bone limit)
+            float left = Math.Max(0f, input.TargetTime), maxRate = MaxRate(input);
+            int latest = pc.TargetFrame;
+            while (latest > 0)
+            {
+                float turn = ps.BoneSpeed(pc.Start + latest - 1) * (180f / MathF.PI);
+                float rate = turn > 1f ? Math.Clamp(TimedBoneLimit / turn, 1f, maxRate) : maxRate;
+                float cost = 1f / (pc.Clip.Fps * rate);
+                if (cost > left) break;
+                left -= cost;
+                latest--;
+            }
             return Math.Clamp(Math.Max(f, latest), 0, Math.Max(0, pc.TargetFrame - 1));
         }
         if (_chainStage == 0)
