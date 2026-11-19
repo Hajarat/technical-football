@@ -210,11 +210,11 @@ public static class SkillMoves
 
         // The waiting touch is dropped; the move owns the ball until it ends.
         if (p.TouchAction is { Pending: true } waiting) waiting.Phase = ActionPhase.Done;
-        p.Replanning = false;
-        p.EarlyTurnTick = -1;
         p.SoftWaitAction = null;
-        p.Recovering = false;
+        p.Chasing = false;
         p.KnockOnRequested = false;
+        // After the move the next touch may be played on the first swing that reaches the ball.
+        p.PushSteps = 1;
 
         bool contactless = kind is ActionKind.StepOver or ActionKind.BodyFeint;
         Vector2 fwd = GestureReader.FrameForward(p, t);
@@ -253,14 +253,13 @@ public static class SkillMoves
             ContactTick = contactless ? tick + reach + dur / 2 : tick + reach,
             EndTick = tick + reach + dur,
             ContactPoint = new Vector3(ball.Position.X, t.Ball.Radius, ball.Position.Z),
-            Legs = LegsMode.Hold,
             HoldDirection = fwd,
             SkillEntry = entry,
             SkillCut = cut,
             SkillEffective = p.SkillEffective,
             FeetTurn = feetTurn,
         };
-        if (p.TouchAction is { Made: true } prev && prev.PhaseAt(tick, TouchPlanner.PreWindupTicks(t), TouchPlanner.WindupTicks(t)) != ActionPhase.Done)
+        if (p.TouchAction is { Made: true } prev && prev.PhaseAt(tick, TouchPlanner.WindupTicks(t), TouchPlanner.WindupTicks(t)) != ActionPhase.Done)
             p.PrevTouchAction = prev;
         else p.PrevTouchAction = null;
         p.TouchAction = a;
@@ -540,9 +539,7 @@ public static class SkillMoves
         if (a.Kind == ActionKind.DragBack) p.SkillCooldownUntil = now + k.DragBackCooldown;
         if (a.FeetTurn)
         {
-            // The planner's own turn: straight into the exit touch, with no chain window or exit burst.
-            p.Replanning = true;
-            p.Recovering = false;
+            // The controller's own turn: straight into the exit touch, with no chain window or exit burst.
             p.SkillExitTick = tick;
             return;
         }
@@ -558,8 +555,6 @@ public static class SkillMoves
             p.SkillBoostCap = k.BurstSpeedCap.ForRating(a.SkillEffective) * scale;
             p.SkillBoostUntil = now + ExitTouchWithin;
         }
-        p.Replanning = true;
-        p.Recovering = false;
         p.SkillExitTick = tick;
     }
 

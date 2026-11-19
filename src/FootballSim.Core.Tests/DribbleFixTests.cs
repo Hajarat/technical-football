@@ -53,11 +53,11 @@ public class DribbleFixTests
             BallAction? a = null;
             for (int i = 0; i < 600 && a == null; i++)
             {
-                if (w.Attacker.Action is { Pending: true, Phase: ActionPhase.PreWindup } pa) a = pa;
+                if (w.Attacker.Action is { Pending: true, Phase: ActionPhase.Windup } pa && pa.ContactTick - w.Tick >= 4) a = pa;
                 else Step(w, Dir(0f));
             }
             Assert.NotNull(a);
-            // Two ticks at neutral (one 60 Hz poll), then the stick is back: the touch is still the planned one, not a stop.
+            // Two ticks at neutral (one 60 Hz poll), then the stick is back: the touch is still the committed one, not a stop.
             Step(w, default);
             Step(w, default);
             Assert.NotEqual(ActionKind.Stop, a!.Kind);
@@ -98,16 +98,18 @@ public class DribbleFixTests
     }
 
     /// <summary>
-    /// The three penalty rounds of the play-test, replayed with the current code (they play out differently from the recording):
-    /// no touch is dropped at its contact while the stick is pushed, and no slowdown is planned with the stick pushed (the
-    /// steering slows the run only as far as the ball needs). Skipped when the rounds are not in the tree.
+    /// The play-test penalty rounds kept under TestData/playtest (the first session, and every round of the three recorded
+    /// 2026-11-19 sessions), replayed with the current code (they play out differently from the recording): every committed
+    /// touch is played while the stick is pushed, and possession is only ever lost to the keeper or the shot. Skipped when the
+    /// rounds are not in the tree.
     /// </summary>
     [Fact]
-    public void ThePlayTestRoundsDropNoTouchWithTheStickPushed()
+    public void ThePlayTestRoundsPlayEveryCommittedTouchAndKeepPossession()
     {
         string dir = Path.Combine(TestData.DataDir, "..", "src", "FootballSim.Core.Tests", "TestData", "playtest");
         var files = Directory.Exists(dir) ? Directory.GetFiles(dir, "round-*.json") : Array.Empty<string>();
         if (files.Length == 0) { _out.WriteLine($"no play-test rounds under {dir}; skipped"); return; }
+        Assert.True(files.Length >= 18, $"{files.Length} rounds");
         foreach (var f in files.OrderBy(x => x))
         {
             var rp = Replay.Load(f, out var err);
@@ -117,9 +119,9 @@ public class DribbleFixTests
             w.Begin();
             var buf = new TickIntent[w.PlayerCount];
             int per = Math.Max(1, rp.PlayersPerTick);
-            int drops = 0, slowdowns = 0;
-            BallAction? seen = null;
+            int unplayed = 0, lost = 0;
             var p = w.Attacker;
+            bool keeperOrShot = false;
             for (int tick = 0; tick < rp.TickCount && w.State != RoundState.Report; tick++)
             {
                 Array.Clear(buf);
@@ -127,16 +129,13 @@ public class DribbleFixTests
                 var waiting = p.TouchAction is { Pending: true } pw ? pw : null;
                 w.Step(buf);
                 bool pushed = buf[0].Move.Length() >= t.Touch.StickThreshold;
-                if (pushed && waiting != null && !waiting.Made && waiting.Phase == ActionPhase.Done && w.Tick >= waiting.ContactTick) drops++;
-                if (p.TouchAction is { Pending: true } a && a != seen)
-                {
-                    seen = a;
-                    if (pushed && a.Kind == ActionKind.Slowdown) slowdowns++;
-                }
+                if (pushed && waiting != null && !waiting.Made && waiting.Phase == ActionPhase.Done && w.Tick >= waiting.ContactTick) unplayed++;
+                keeperOrShot |= w.Shots.Count > 0 || w.Events.Any(e => e.Kind == EventKind.Save);
+                if (!keeperOrShot && w.Events.Any(e => e.Kind == EventKind.PossessionLost && e.Team == 0)) lost++;
             }
-            _out.WriteLine($"{Path.GetFileName(f)}: {drops} dropped at contact with the stick pushed, {slowdowns} slowdowns with the stick pushed");
-            Assert.Equal(0, drops);
-            Assert.Equal(0, slowdowns);
+            _out.WriteLine($"{Path.GetFileName(f)}: {unplayed} committed touches not played with the stick pushed, {lost} possessions lost by himself");
+            Assert.Equal(0, unplayed);
+            Assert.Equal(0, lost);
         }
     }
 }

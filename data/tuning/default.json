@@ -134,8 +134,8 @@
       "close": 1,
       "jog": 2,
       "sprint": {
-        "at1": 6,
-        "at99": 4
+        "at1": 4,
+        "at99": 2
       }
     },
     "lift_deg": {

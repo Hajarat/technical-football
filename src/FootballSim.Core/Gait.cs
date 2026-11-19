@@ -67,6 +67,8 @@ public static class Gait
         p.StepFrequency = ds / dt;
         float s1 = locked && p.GaitLockTicks == 0 ? p.GaitLockTarget : s0 + ds;
         Foot? crossed = null;
+        // A new step begins when the phase passes a whole step (1, or 2 before the wrap).
+        p.StepBegun = s0 < 1f && s1 >= 1f || s0 < 2f && s1 >= 2f;
         if (s0 < 0.5f && s1 >= 0.5f) crossed = Foot.Right;
         else if (s0 < 1.5f && s1 >= 1.5f) crossed = Foot.Left;
         else if (s0 < 2.5f && s1 >= 2.5f) crossed = Foot.Right;

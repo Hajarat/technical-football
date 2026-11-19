@@ -6,15 +6,12 @@ using FootballSim.Core;
 /// <summary>
 /// Diagnostic: re-simulates one play-test replay and prints the attacker tick by tick (<c>--probe feel --rtrace &lt;file&gt;
 /// [--from T] [--to T] [--steps-only 1]</c>, world ticks), then attributes every speed step (see <see cref="SpeedSteps"/>) to the
-/// planner state on that tick, and lists the touches dropped at contact and the slowdown plans. The dribble probe's
+/// touch controller's state on that tick, and lists the committed touches not played at their contact. The dribble probe's
 /// <c>--dtrace</c> uses it for a scripted trace.
 /// </summary>
 static class ReplayTrace
 {
     const BindingFlags NP = BindingFlags.NonPublic | BindingFlags.Instance;
-    static readonly FieldInfo Legs = typeof(BallAction).GetField("Legs", NP)!;
-    static readonly FieldInfo HoldDir = typeof(BallAction).GetField("HoldDirection", NP)!;
-    static readonly FieldInfo TurnStep = typeof(BallAction).GetField("TurnStep", NP)!;
     static readonly FieldInfo Debt = typeof(PlayerState).GetField("SpeedDebt", NP)!;
     static readonly FieldInfo PostTurn = typeof(PlayerState).GetField("PostTurnUntil", NP)!;
     static readonly FieldInfo Skill = typeof(PlayerState).GetField("SkillAction", NP)!;
@@ -55,15 +52,15 @@ static class ReplayTrace
         var cause = new Dictionary<string, int>();
         var stepTicks = new List<int>();
         var drops = new List<string>();
-        float vmin = float.MaxValue; int vminTick = -1; BallAction? lastPlan = null;
+        float vmin = float.MaxValue; int vminTick = -1;
         if (!quiet)
-            Console.WriteLine("tick  stick_deg mag spr | facing veldir  |v|   run  dRun/dt dSt/dt dV/dt | steer | ahead  lat   bv  | kind      phase     legs     eta  turnStep rec debt  post tau  | touch");
+            Console.WriteLine("tick  stick_deg mag spr | facing veldir  |v|   run  dRun/dt dSt/dt dV/dt | steer | ahead  lat   bv  | kind      phase     legs     eta  debt  post tau  | touch");
         for (int i = 0; i < tickCount && w.State != RoundState.Report; i++)
         {
             Array.Clear(buf);
             fill(i, buf);
             var waiting = p.TouchAction is { Pending: true } pw ? pw : null;
-            string wInfo = waiting == null ? "" : $"{waiting.Kind}/{Legs.GetValue(waiting)}/tick{waiting.ContactTick}/planned{waiting.PlanTick}";
+            string wInfo = waiting == null ? "" : $"{waiting.Kind}/{(p.Chasing ? "Chase" : "Stick")}/tick{waiting.ContactTick}/committed{waiting.PlanTick}";
             var stick = buf[0].Move;
             bool hadBall = p.InPossession;
             bool skillBefore = Skill.GetValue(p) != null;
@@ -71,9 +68,6 @@ static class ReplayTrace
             int tick = w.Tick;
             bool touched = w.Events.Any(e => e.Team == 0 && e.PlayerIndex == 0 && e.Kind == EventKind.Touch);
             bool dropped = waiting != null && !waiting.Made && waiting.Phase == ActionPhase.Done && w.Tick >= waiting.ContactTick;
-            if (p.TouchAction is { Pending: true } np && np != lastPlan && np.Kind == ActionKind.Slowdown)
-                drops.Add($"SLOWDOWN planned tick {w.Tick} for contact {np.ContactTick} legs {Legs.GetValue(np)} |v| {F(p.Speed)} ahead {F(TouchModel.HorizontalDistance(p.Position, w.Ball.Position))} replanned-after {wInfo}");
-            if (p.TouchAction is { Pending: true } np2) lastPlan = np2;
             if (countDrops && i * tuning.Dt >= 1f && p.Speed < vmin && p.InPossession && p.Speed > 0f && w.Tick > 240) { vmin = p.Speed; vminTick = w.Tick; }
             if (dropped)
             {
@@ -88,9 +82,7 @@ static class ReplayTrace
             var a = p.TouchAction;
             string kind = a == null ? "-" : a.Kind.ToString();
             string phase = a == null ? "-" : a.Phase.ToString();
-            string legs = a == null ? "-" : Legs.GetValue(a)?.ToString() ?? "-";
-            if (a != null && legs == "Stick" && HoldDir.GetValue(a) is Vector2 hd && hd != Vector2.Zero) legs = "Bend" + F(Deg(MathF.Atan2(hd.Y, hd.X)), 0);
-            bool turnStep = a != null && (bool)TurnStep.GetValue(a)!;
+            string legs = p.Chasing ? "Chase" : "Stick";
             float debt = (float)Debt.GetValue(p)!;
             bool post = w.SimTime < (float)PostTurn.GetValue(p)!;
             bool skill = Skill.GetValue(p) != null;
@@ -105,8 +97,8 @@ static class ReplayTrace
                 // The source of the speed step: the running speed (legs target / debt), the steering, or the facing swinging the
                 // steering against the run (|v| = |run*fwd + steer|).
                 string src = MathF.Abs(dRun) > SpeedSteps.Threshold ? (dRun < 0 ? "run-" : "run+") : dSt > SpeedSteps.Threshold ? "steer" : "mix";
-                string pend = a is { Pending: true } ? $"{kind}/{legs}/{phase}{(turnStep ? "/turnStep" : "")}" : $"none(last {LastTouchKind.GetValue(p)})";
-                string key = $"{src} {(skill || skillBefore ? "skill " : "")}{pend}{(p.Recovering ? " recovering" : "")}{(debt > 0 ? " debt" : "")}{(skillBefore ? " skill-ended" : "")}{(touched ? " touch" : "")}";
+                string pend = a is { Pending: true } ? $"{kind}/{legs}/{phase}" : $"none(last {LastTouchKind.GetValue(p)})";
+                string key = $"{src} {(skill || skillBefore ? "skill " : "")}{pend}{(p.Chasing ? " chasing" : "")}{(debt > 0 ? " debt" : "")}{(skillBefore ? " skill-ended" : "")}{(touched ? " touch" : "")}";
                 cause[key] = cause.GetValueOrDefault(key) + 1;
             }
             if (!quiet && tick >= from && (to < 0 || tick <= to))
@@ -119,9 +111,9 @@ static class ReplayTrace
                     F(dRun, 1).PadLeft(7), F(dSt, 1).PadLeft(6), F(dspd, 1).PadLeft(6), "|", F(new Vector2(p.SteerVelocity.X, p.SteerVelocity.Z).Length()).PadLeft(5), "|",
                     F(Vector2.Dot(rel, fwd)).PadLeft(5), F(TouchModel.Lateral(p.Position, p.Facing, w.Ball.Position)).PadLeft(5),
                     F(new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z).Length()).PadLeft(5), "|",
-                    (skill ? "SKILL:" + p.SkillMove?.Kind : kind).PadRight(9), phase.PadRight(9), legs.PadRight(8), F(p.ActionContactEta).PadLeft(5),
-                    (turnStep ? "T" : ".").PadLeft(4), (p.Recovering ? "R" : ".").PadLeft(3), F(debt).PadLeft(5), (post ? "P" : ".").PadLeft(3), F(tau).PadLeft(5), "|",
-                    dropped ? "DROP" : "", touched ? "TOUCH " + w.Events.First(e => e.Kind == EventKind.Touch).ToString() : "", isStep ? "<STEP" : "", !measured ? "(unmeasured)" : "",
+                    (skill ? "SKILL:" + p.SkillMove?.Kind : kind).PadRight(9), phase.PadRight(9), legs.PadRight(8), F(p.NextTouchEta).PadLeft(5),
+                    F(debt).PadLeft(5), (post ? "P" : ".").PadLeft(3), F(tau).PadLeft(5), "|",
+                    dropped ? "UNPLAYED" : "", touched ? "TOUCH " + w.Events.First(e => e.Kind == EventKind.Touch).ToString() : "", isStep ? "<STEP" : "", !measured ? "(unmeasured)" : "",
                 }));
             }
             v0 = p.Velocity; run0 = p.RunSpeed; st0 = p.SteerVelocity;

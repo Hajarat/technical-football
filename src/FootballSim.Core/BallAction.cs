@@ -15,8 +15,8 @@ public enum ActionKind
     /// <summary>A sprinting touch, the ball pushed further ahead.</summary>
     Sprint,
     /// <summary>
-    /// A touch made while the legs slow down to let the ball come back to the foot. No longer planned: with the stick pushed
-    /// the run slows only as far as the steering needs (see TouchPlanner); kept for older replays and views.
+    /// A touch made while the legs slow down to let the ball come back to the foot. No longer made: with the stick pushed the
+    /// run slows only as far as the steering needs (see TouchPlanner); kept for older replays and views.
     /// </summary>
     Slowdown,
     /// <summary>The stick was released: the ball is brought to rest just ahead of where the player stops.</summary>
@@ -27,7 +27,10 @@ public enum ActionKind
     Cut,
     /// <summary>A knock-on: pushed far ahead to run onto, planned to be met at the catch time.</summary>
     KnockOn,
-    /// <summary>A planned push that needed more than the largest push speed; the ball may be lost by distance after it.</summary>
+    /// <summary>
+    /// No longer made: a push is never longer than the player can catch (see TouchPlanner); kept for older replays and views, and
+    /// the ball may be lost by distance after it.
+    /// </summary>
     Heavy,
     /// <summary>Shoot was pressed in possession: the ball is set to the player's speed so it stays strikable.</summary>
     Soft,
@@ -64,11 +67,17 @@ public enum ActionKind
 /// <summary>Where an action is in time. Phases advance by ticks, so they are a pure function of the world tick.</summary>
 public enum ActionPhase
 {
-    /// <summary>Chosen, more than the pre-windup before contact. The legs follow the stick.</summary>
+    /// <summary>
+    /// Not used by touches: the touch controller commits a touch only one windup before its contact (kept for older views and
+    /// replays).
+    /// </summary>
     Planned,
-    /// <summary>From the pre-windup until the windup: the player is steered so the ball arrives in the contact zone.</summary>
+    /// <summary>Not used by touches (see <see cref="Planned"/>).</summary>
     PreWindup,
-    /// <summary>The foot is drawn back; steering continues.</summary>
+    /// <summary>
+    /// The foot is drawn back: a touch from its commit (one windup before the contact) to the contact; the player is steered so
+    /// the ball arrives in the contact zone.
+    /// </summary>
     Windup,
     /// <summary>The contact tick: the ball gets its new velocity and spin.</summary>
     Contact,
@@ -80,22 +89,6 @@ public enum ActionPhase
 
 /// <summary>The part of the foot that plays the ball.</summary>
 public enum FootSurface { Inside, Laces, Outside, Sole }
-
-/// <summary>What the legs do while a planned touch waits for its contact.</summary>
-internal enum LegsMode
-{
-    /// <summary>Follow the stick.</summary>
-    Stick,
-    /// <summary>Hold the current running speed along a fixed direction (run on to the ball).</summary>
-    Hold,
-    /// <summary>
-    /// Ease off (let the ball come back to the foot): with the stick pushed the legs slow down while turning toward the stick;
-    /// with it released they just slow down.
-    /// </summary>
-    Neutral,
-    /// <summary>Run to where the ball will be and arrive at its pace (the recovery run).</summary>
-    Approach,
-}
 
 /// <summary>
 /// One action of one player: a touch now, skills and shots later. Created by the touch planner, read by the view. Ticks are
@@ -112,7 +105,7 @@ public sealed class BallAction
     public Foot Foot { get; internal set; }
     /// <summary>The part of the foot used.</summary>
     public FootSurface Surface { get; internal set; }
-    /// <summary>World tick the action was planned on.</summary>
+    /// <summary>World tick the action was started on (a touch: committed, one windup before its contact).</summary>
     public int PlanTick { get; internal set; }
     /// <summary>World tick of the contact (the middle of the foot's swing for a dribble touch).</summary>
     public int ContactTick { get; internal set; }
@@ -134,7 +127,7 @@ public sealed class BallAction
     public Vector3 NextMeetPoint { get; internal set; }
     /// <summary>The foot planned for the next meet.</summary>
     public Foot NextMeetFoot { get; internal set; }
-    /// <summary>True once the contact was made; false while waiting and for an action dropped before contact.</summary>
+    /// <summary>True once the contact was made; false while waiting and for a touch not played (the ball out of reach at its contact).</summary>
     public bool Made { get; internal set; }
     /// <summary>Horizontal distance from the ball centre to <see cref="ContactPoint"/> at contact, metres (NaN before).</summary>
     public float ContactMiss { get; internal set; } = float.NaN;
@@ -179,27 +172,21 @@ public sealed class BallAction
     /// <summary>For a skill move, the unit ground direction (X, Z) the player was running in when it started; zero for touches.</summary>
     public Vector2 RunDirection => IsSkill ? HoldDirection : Vector2.Zero;
 
-    // ---- planner state ----
-    internal LegsMode Legs;
-    /// <summary>Unit ground direction (X, Z) the legs hold for <see cref="LegsMode.Hold"/>.</summary>
+    // ---- touch controller state ----
+    /// <summary>For a skill move, the unit ground direction (X, Z) the player was running in when it started.</summary>
     internal Vector2 HoldDirection;
-    /// <summary>Stick direction (radians) when the action was planned, for the replan test; NaN with the stick released.</summary>
-    internal float PlanStickAngle = float.NaN;
-    /// <summary>The stick angle the waiting touch was last checked against for drift, radians (NaN: the plan's own).</summary>
-    internal float CheckStickAngle = float.NaN;
-    /// <summary>The world tick the waiting touch was last checked against the stick (see drift_recheck_deg, recheck_interval).</summary>
-    internal int CheckTick = -1;
-    /// <summary>A drag-back started by the planner as a turn at the feet (no chain, cooldown or exit burst of a skill move).</summary>
+    /// <summary>A drag-back started by the touch controller as a turn at the feet (no chain, cooldown or exit burst of a skill move).</summary>
     internal bool FeetTurn;
-    /// <summary>Touch mode of the intent when planned, for the replan-on-slowdown test.</summary>
-    internal TouchMode PlanMode;
+    /// <summary>The stick when the touch was committed (zero: released); at contact the ball is played within 30 degrees of it.</summary>
+    internal Vector2 CommitMove;
+    /// <summary>The stick at contact was more than 30 degrees from <see cref="CommitMove"/> and the touch was played at that limit.</summary>
+    internal bool Clamped;
+    /// <summary>Played with the leg stretched beyond its reach (heavier errors): see TouchPlanner.Execute.</summary>
+    internal bool Stretched;
+    /// <summary>A touch committed on the go-get-it legs (they carry it to the contact), not the stick's.</summary>
+    internal bool ChaseLegs;
     /// <summary>The steering correction applied on the latest tick, m/s.</summary>
     internal Vector2 Steer;
-    /// <summary>
-    /// An early turn touch played from further off (turn_reach): the player is stepped toward the ball with the turn's larger,
-    /// quicker steering (turn_steer_max, turn_steer_accel), a plant step rather than a stretched leg.
-    /// </summary>
-    internal bool TurnStep;
     // Skill move state (HoldDirection is the running direction the move started on).
     /// <summary>Running speed along that direction when the move started, m/s.</summary>
     internal float SkillEntry;

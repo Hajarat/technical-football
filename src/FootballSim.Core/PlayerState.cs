@@ -123,8 +123,11 @@ public sealed class PlayerState
     public Vector3 SteerVelocity { get; internal set; }
     /// <summary>Forward running speed along the facing on the latest tick, without the steering correction, m/s.</summary>
     public float RunSpeed { get; internal set; }
-    /// <summary>True while the player runs to a ball that no touch can be planned for yet (the recovery run).</summary>
-    public bool Recovering { get; internal set; }
+    /// <summary>
+    /// True while the legs run to the ball (the touch controller's go-get-it legs: the stick's own legs cannot bring the ball
+    /// within reach at an eligible swing), false while they follow the stick.
+    /// </summary>
+    public bool Chasing { get; internal set; }
 
     // ---- Skill moves (phase B). ----
 
@@ -163,7 +166,7 @@ public sealed class PlayerState
     /// <summary>Until this simulation time the turn rate is at least post_turn_rotation_rate (after a turn or cut touch).</summary>
     internal float PostTurnUntil = -100f;
     /// <summary>
-    /// The touch planner's sideways steering correction last tick (world X, Z), m/s: it eases from there, and turns with the
+    /// The touch controller's sideways steering correction last tick (world X, Z), m/s: it eases from there, and turns with the
     /// body (see <see cref="SteerFacing"/>); zero during a skill move.
     /// </summary>
     internal Vector2 PlannerSteer;
@@ -174,8 +177,6 @@ public sealed class PlayerState
     /// correction.
     /// </summary>
     internal Vector2 SteerCarry;
-    /// <summary>True while the planner searches for an early turn touch (the turn's reach and steering apply).</summary>
-    internal bool PlanningTurn;
     internal float TurnRefHeading;
     internal float TurnRefTime;
     /// <summary>Ticks left of a stride-clock lock (0 = free running).</summary>
@@ -188,13 +189,19 @@ public sealed class PlayerState
     internal BallAction? SoftWaitAction;
     /// <summary>Kind of the most recent touch made (decides whether the ball may be lost by distance).</summary>
     internal ActionKind LastTouchKind = ActionKind.First;
-    /// <summary>A waiting touch was just dropped: the replan may pick a swing as close as the windup.</summary>
-    internal bool Replanning;
-    /// <summary>
-    /// The waiting touch was dropped for a stick turn: the replan is an early turn touch, made no earlier than this world tick
-    /// (see TouchPlanner); -1 otherwise.
-    /// </summary>
-    internal int EarlyTurnTick = -1;
+    /// <summary>Steps the stride clock has begun since the player's last contact with the ball.</summary>
+    internal int StepsSinceTouch;
+    /// <summary>True when the stride clock began a new step on the latest tick.</summary>
+    internal bool StepBegun;
+    /// <summary>The steps the last push was solved for (1 after a touch that is not a push): the touch controller's cooldown.</summary>
+    internal int PushSteps = 1;
+    /// <summary>World tick of the next contact the touch controller expects (the committed touch's, else the swing it steers for), or -1.</summary>
+    internal int ForecastTick = -1;
+    /// <summary>The foot and the ball centre expected at <see cref="ForecastTick"/>.</summary>
+    internal Foot ForecastFoot;
+    internal Vector3 ForecastPoint;
+    internal void SetForecast(int tick, Foot foot, Vector3 point) { ForecastTick = tick; ForecastFoot = foot; ForecastPoint = point; }
+    internal void ClearForecast() => ForecastTick = -1;
     /// <summary>Stick direction on the previous tick, radians (NaN with the stick released).</summary>
     internal float StickAnglePrev = float.NaN;
     /// <summary>How fast the stick is being turned smoothly, radians per second (0 after a jump or a release).</summary>
@@ -277,7 +284,7 @@ public sealed class PlayerState
         TouchBoostFrom = o.TouchBoostFrom; KnockOnFrom = o.KnockOnFrom; KnockOnDirection = o.KnockOnDirection;
         KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PostTurnUntil = o.PostTurnUntil; PlannerSteer = o.PlannerSteer; SteerFacing = o.SteerFacing; SteerCarry = o.SteerCarry; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
-        SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed;
+        SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed; StepBegun = o.StepBegun;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction;
         GZone = o.GZone; GPrevZone = o.GPrevZone; GZoneStart = o.GZoneStart; GFwdLastTick = o.GFwdLastTick;
         GFwdStart = o.GFwdStart; GFwdFromNeutral = o.GFwdFromNeutral; GBackLastTick = o.GBackLastTick;

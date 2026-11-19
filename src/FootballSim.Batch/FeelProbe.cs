@@ -233,8 +233,8 @@ static class FeelProbe
                 F(Vector2.Dot(rel, fwd)).PadLeft(10), F(TouchModel.Lateral(p.Position, p.Facing, w.Ball.Position)).PadLeft(8),
                 F(new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z).Length()).PadLeft(6),
                 (a == null ? "-" : a.Kind.ToString()).PadRight(12), (a == null ? "-" : a.Phase.ToString()).PadRight(9),
-                (a == null ? "-" : LegsField.GetValue(a)?.ToString() ?? "-").PadRight(8),
-                F(p.ActionContactEta).PadLeft(5), touched ? "TOUCH" : "",
+                (p.Chasing ? "Chase" : "Stick").PadRight(8),
+                F(p.NextTouchEta).PadLeft(5), touched ? "TOUCH" : "",
             }));
         }
         return 0;
@@ -310,8 +310,4 @@ static class FeelProbe
         Console.WriteLine($"all: ticks {all.Ticks}  acc_p99 {F(all.AccP99, 1)}  acc_max {F(all.AccMax, 1)}  dspd_p99 {F(all.DspdP99, 1)}  dspd_max {F(all.DspdMax, 1)}  steps {all.Steps} ({F(all.PerThousand, 1)} per 1000 ticks, skill {all.SkillSteps})  surge_mean {F(Mean(allSurge))}  surge_p90 {F(Pct(allSurge, 0.9))}  int_cv {F(Mean(allCv), 3)}");
         return 0;
     }
-
-    /// <summary>The planned touch's legs mode (internal to the core), for the trace only.</summary>
-    static readonly System.Reflection.FieldInfo LegsField =
-        typeof(BallAction).GetField("Legs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
 }

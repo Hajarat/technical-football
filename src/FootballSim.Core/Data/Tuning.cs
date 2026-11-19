@@ -219,7 +219,7 @@ public sealed class StepsPerTouchTuning
     public float Close { get; set; } = 1f;
     public float Jog { get; set; } = 2f;
     /// <summary>At a sprint, by dribbling rating (rounded to whole steps).</summary>
-    public RatingRange Sprint { get; set; } = new(6f, 4f);
+    public RatingRange Sprint { get; set; } = new(4f, 2f);
 }
 
 /// <summary>The most steps to the next meet while turning (see <see cref="TouchTuning.TurningStickRateDeg"/>).</summary>

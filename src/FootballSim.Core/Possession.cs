@@ -56,13 +56,15 @@ public static class Possession
     }
 
     /// <summary>
-    /// The next touch of a player in possession, read from the planned action: seconds to its contact tick, its foot and its
-    /// contact point. <see cref="TouchForecast.None"/> when no touch is planned.
+    /// The next touch of a player in possession: the committed touch (seconds to its contact tick, its foot and its contact
+    /// point), else the swing the touch controller steers for (its forecast, updated every tick). <see cref="TouchForecast.None"/>
+    /// when none is expected.
     /// </summary>
     public static TouchForecast PredictNextTouch(PlayerState p, int tick, bool inPossession, Tuning t)
     {
-        var a = p.TouchAction;
-        if (!inPossession || a == null || !a.Pending) return TouchForecast.None;
-        return new TouchForecast(a.ContactEta(tick, t.Dt), a.Foot, a.ContactPoint);
+        if (!inPossession) return TouchForecast.None;
+        if (p.TouchAction is { Pending: true } a) return new TouchForecast(a.ContactEta(tick, t.Dt), a.Foot, a.ContactPoint);
+        if (p.ForecastTick < tick) return TouchForecast.None;
+        return new TouchForecast((p.ForecastTick - tick) * t.Dt, p.ForecastFoot, p.ForecastPoint);
     }
 }

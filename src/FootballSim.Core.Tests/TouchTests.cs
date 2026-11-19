@@ -31,9 +31,9 @@ public class TouchTests
         Assert.Equal(TouchMode.Jog, TouchModel.ModeFor(new TickIntent { Sprint = 0.1f }, T));
         Assert.Equal(1, TouchModel.StepsPerTouch(s, TouchMode.CloseControl, T));
         Assert.Equal(2, TouchModel.StepsPerTouch(s, TouchMode.Jog, T));
-        s.Dribbling = 1; Assert.Equal(6, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
-        s.Dribbling = 50; Assert.Equal(5, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
-        s.Dribbling = 99; Assert.Equal(4, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
+        s.Dribbling = 1; Assert.Equal(4, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
+        s.Dribbling = 50; Assert.Equal(3, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
+        s.Dribbling = 99; Assert.Equal(2, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
         Assert.Equal(3f, TouchModel.LiftDeg(s, ActionKind.Jog, TouchMode.Jog, T), 4);
         s.Dribbling = 1; Assert.Equal(8f, TouchModel.LiftDeg(s, ActionKind.Sprint, TouchMode.Sprint, T), 4);
         Assert.Equal(12f, TouchModel.LiftDeg(s, ActionKind.Heavy, TouchMode.Sprint, T), 4);

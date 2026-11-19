@@ -4,12 +4,12 @@ using Xunit.Abstractions;
 
 namespace FootballSim.Core.Tests;
 
-/// <summary>The touch planner's review focus: replans, stop touches, and a shot pressed during a windup.</summary>
-public class TouchPlannerTests
+/// <summary>The touch controller: committed touches, stop touches, turns, smoothness, and a shot pressed during a windup.</summary>
+public class TouchControllerTests
 {
     readonly ITestOutputHelper _out;
 
-    public TouchPlannerTests(ITestOutputHelper output) { _out = output; }
+    public TouchControllerTests(ITestOutputHelper output) { _out = output; }
 
     static Tuning Exact()
     {
@@ -65,55 +65,6 @@ public class TouchPlannerTests
         yield return p.PrevTouchAction is { Made: true } pa && pa.ContactTick == w.Tick ? pa : p.TouchAction!;
     }
 
-    [Fact]
-    public void ReleasingSprintDuringThePreWindupReplans()
-    {
-        for (ulong seed = 1; seed <= 20; seed++)
-        {
-            var w = Lab(seed);
-            var a = RunUntilPhase(w, Sprint, ActionPhase.PreWindup);
-            Assert.Equal(ActionKind.Sprint, a.Kind);
-            Step(w, Jog);
-            Assert.Equal(ActionPhase.Done, a.Phase);
-            Assert.False(a.Made);
-            // A new touch is planned at once, or after a short run to the ball.
-            for (int i = 0; i < 60 && w.Attacker.Action == a; i++) Step(w, Jog);
-            Assert.NotSame(a, w.Attacker.Action);
-            Assert.False(a.Made);
-            // The leg is never stretched: every later contact is in the zone, on the foot in swing.
-            for (int i = 0; i < 360; i++)
-            {
-                Step(w, Jog);
-                foreach (var c in ContactsOf(w))
-                {
-                    Assert.InRange(c.ContactMiss, 0f, w.Tuning.Touch.ContactZoneRadius);
-                    Assert.Equal(w.Attacker.SwingFoot, c.Foot);
-                }
-            }
-            Assert.True(w.Attacker.InPossession);
-        }
-    }
-
-    [Fact]
-    public void AStickChangeBeyondTheReplanAngleReplansAndASmallerOneIsAnEarlyTurn()
-    {
-        var w = Lab(3);
-        var a = RunUntilPhase(w, Jog, ActionPhase.Planned);
-        Step(w, new TickIntent { MoveX = MathF.Cos(0.8f), MoveZ = MathF.Sin(0.8f) });   // 46 degrees: planned again as a turn
-        Assert.Equal(ActionPhase.Done, a.Phase);
-        Assert.False(a.Made);
-        var e = w.Attacker.Action!;
-        Assert.True(e.Pending);
-        Assert.NotEqual(LegsMode.Hold, e.Legs);
-
-        var v = Lab(4);
-        var b = RunUntilPhase(v, Jog, ActionPhase.Planned);
-        Step(v, new TickIntent { MoveX = MathF.Cos(2.1f), MoveZ = MathF.Sin(2.1f) });   // 120 degrees: dropped
-        Assert.Equal(ActionPhase.Done, b.Phase);
-        Assert.False(b.Made);
-        Assert.NotSame(b, v.Attacker.Action);
-    }
-
     [Theory]
     [InlineData("[]", "at least one")]
     [InlineData("[[30, 0.6], [10, 1]]", "strictly increasing")]
@@ -136,69 +87,6 @@ public class TouchPlannerTests
     static float Deg(float rad) => rad * 180f / MathF.PI;
     static float WrapDeg(float d) => Deg(Movement.WrapAngle(d * MathF.PI / 180f));
 
-    /// <summary>
-    /// Jogs straight until a touch is made whose next contact is at most <paramref name="maxEta"/> seconds away (a two-step jog
-    /// push); returns that contact's distance in time.
-    /// </summary>
-    static float RunToPush(World w, float maxEta)
-    {
-        for (int i = 0; i < 240; i++) Step(w, Jog);
-        for (int i = 0; i < 600; i++)
-        {
-            Step(w, Jog);
-            if (ContactsOf(w).Any() && w.Attacker.Action is { Pending: true } n && n.ContactEta(w.Tick, w.Tuning.Dt) is var eta && eta <= maxEta) return eta;
-        }
-        throw new Exception("no push");
-    }
-
-    [Fact]
-    public void ATurnOfThirtyFiveDegreesNeverHoldsTheLegsBeforeTheWindup()
-    {
-        foreach (bool shortPush in new[] { true, false })
-        for (ulong seed = 1; seed <= 10; seed++)
-        {
-            var w = Lab(seed, Exact());
-            if (shortPush) RunToPush(w, 0.7f);
-            else RunUntilPhase(w, Jog, ActionPhase.Planned);
-            for (int i = 0; i < 120; i++)
-            {
-                Step(w, Toward(35f));
-                if (w.Attacker.Action is { Pending: true } a && a.Phase != ActionPhase.Windup)
-                    Assert.True(a.Legs != LegsMode.Hold, $"seed {seed}: legs held in {a.Phase}");
-            }
-            // The legs end up on the stick.
-            Assert.InRange(WrapDeg(Deg(w.Attacker.Facing) - 35f), -5f, 5f);
-            Assert.True(w.Attacker.InPossession);
-        }
-    }
-
-    [Fact]
-    public void AnEarlyTurnTouchFiresWithinTheBound()
-    {
-        for (ulong seed = 1; seed <= 10; seed++)
-        {
-            var w = Lab(seed, Exact());
-            float planned = RunToPush(w, 0.7f);
-            float pushAt = w.Attacker.LastTouchTime;
-            var before = w.Ball.Velocity;
-            BallAction? turn = null;
-            float at = float.NaN;
-            for (int i = 0; i < 120 && turn == null; i++)
-            {
-                Step(w, Toward(35f));
-                foreach (var c in ContactsOf(w)) { turn = c; at = w.Attacker.LastTouchTime; }
-            }
-            Assert.NotNull(turn);
-            // No later than the push's planned meet (sooner when the ball is in reach at an earlier swing; after a two-step jog push
-            // it rarely is), and never sooner than early_min_interval after it.
-            Assert.InRange(at - pushAt, w.Tuning.Touch.EarlyMinInterval - 1e-4f, planned + 1e-4f);
-            Assert.True(turn!.Kind is ActionKind.Turn or ActionKind.Cut, $"seed {seed}: {turn.Kind}");
-            // The ball now heads toward the stick side.
-            float change = WrapDeg(Deg(MathF.Atan2(turn.BallOutVelocity.Z, turn.BallOutVelocity.X)) - Deg(MathF.Atan2(before.Z, before.X)));
-            Assert.True(change > 15f, $"seed {seed}: ball turned {change:F1} degrees");
-        }
-    }
-
     [Fact]
     public void EarlyTurnTouchesKeepTheMinimumIntervalUnderAFastWiggle()
     {
@@ -216,8 +104,8 @@ public class TouchPlannerTests
                     float now = w.Attacker.LastTouchTime;
                     if (!float.IsNaN(last))
                         Assert.True(now - last >= w.Tuning.Touch.EarlyMinInterval - 1e-4f, $"seed {seed}: touches {now - last:F3} s apart");
-                    // Played, if stretched (the steering along the run reaches the ball through the speed law).
-                    Assert.InRange(c.ContactMiss, 0f, MathF.Max(w.Tuning.Touch.ContactZoneRadius, w.Tuning.Touch.StretchReach));
+                    // Played within the reach of the body (a turn touch may play the ball anywhere within the turn reach of it).
+                    Assert.InRange(c.ContactMiss, 0f, w.Tuning.Touch.FeetTurnReach);
                     last = now;
                     touches++;
                 }
@@ -225,38 +113,6 @@ public class TouchPlannerTests
             Assert.True(touches > 6, $"seed {seed}: {touches} touches");
             Assert.True(w.Attacker.InPossession);
         }
-    }
-
-    [Fact]
-    public void RunningToTheBallNeverTurnsTheLegsMoreThanTheApproachLimitOffTheStick()
-    {
-        var t0 = new Tuning();
-        float max = t0.Touch.ApproachMaxStickDeg;
-        int bent = 0;
-        foreach (float sprint in new[] { 0f, 1f })
-        foreach (float turnBy in new[] { 20f, 35f })
-        for (ulong seed = 1; seed <= 10; seed++)
-        {
-            var w = Lab(seed);
-            var p = w.Attacker;
-            var go = new TickIntent { MoveX = 1, Sprint = sprint };
-            RunUntilPhase(w, go, ActionPhase.Planned);
-            for (int i = 0; i < 3 * 120; i++)
-            {
-                float stick = i < 120 ? turnBy : (i < 240 ? 0f : -turnBy);   // never more than turnBy from the ball's line
-                Step(w, Toward(stick, sprint));
-                if (p.Action is not { Pending: true } a) continue;
-                float legs = stick;
-                if (a.Legs == LegsMode.Stick && a.HoldDirection != Vector2.Zero) { legs = stick + Deg(MathF.Atan2(a.HoldDirection.Y, a.HoldDirection.X)); bent++; }
-                else if (a.Legs == LegsMode.Approach)
-                    legs = Deg(MathF.Atan2(w.Ball.Position.Z - p.Position.Z, w.Ball.Position.X - p.Position.X));
-                else continue;
-                Assert.True(MathF.Abs(WrapDeg(legs - stick)) <= max + 1f,
-                    $"seed {seed} sprint {sprint} turn {turnBy}: legs {legs:F0} vs stick {stick:F0} ({a.Legs})");
-            }
-            Assert.True(p.InPossession);
-        }
-        _out.WriteLine($"{bent} ticks with the legs bent toward the ball");
     }
 
     // ---- smoothness (GOALS-parity pass) ----
@@ -369,28 +225,124 @@ public class TouchPlannerTests
     }
 
     [Fact]
-    public void NeutralStickDuringTheWindupBecomesAStopTouch()
+    public void AReleasedStickBeforeTheCommitIsPlayedAsAStopTouch()
     {
         for (ulong seed = 1; seed <= 20; seed++)
         {
             var w = Lab(seed, dribbling: 60);
-            var a = RunUntilPhase(w, Sprint, ActionPhase.Windup);
-            // A release no longer than release_debounce still reads as the stick held (a flick through neutral).
-            int debounce = (int)MathF.Round(w.Tuning.Touch.ReleaseDebounce * w.Tuning.TickRate);
-            for (int i = 0; i <= debounce; i++) Step(w, default);
-            Assert.Equal(ActionKind.Stop, a.Kind);
-            for (int i = 0; i < 40 && !a.Made; i++) Step(w, default);
-            Assert.True(a.Made, $"seed {seed}: the stop touch was not made");
-            Assert.Equal(ActionKind.Stop, a.Kind);
-            Assert.Equal(FootSurface.Sole, a.Surface);
+            for (int i = 0; i < 240; i++) Step(w, Sprint);
+            // Released while no touch is committed (between touches): the next touch is a stop.
+            for (int i = 0; i < 600 && w.Attacker.Action is { Pending: true }; i++) Step(w, Sprint);
+            BallAction? stop = null;
+            for (int i = 0; i < 240 && stop == null; i++)
+            {
+                Step(w, default);
+                foreach (var c in ContactsOf(w)) stop = c;
+            }
+            Assert.NotNull(stop);
+            Assert.Equal(ActionKind.Stop, stop!.Kind);
+            Assert.Equal(FootSurface.Sole, stop.Surface);
             // A stop, not a forward push: the ball leaves slower than the player and comes to rest just ahead of him.
-            Assert.True(new Vector2(a.BallOutVelocity.X, a.BallOutVelocity.Z).Length() < w.Attacker.Speed + 0.5f);
+            Assert.True(new Vector2(stop.BallOutVelocity.X, stop.BallOutVelocity.Z).Length() < w.Attacker.Speed + 0.5f);
             for (int i = 0; i < 6 * 120; i++) Step(w, default);
             Assert.True(w.Ball.Velocity.Length() < 0.06f && w.Attacker.Speed < 0.1f);
-            // Near where he stops: the stop aims 0.35 m ahead; the rated speed error may leave it a little short of his feet.
             float ahead = w.Ball.Position.X - w.Attacker.Position.X;
             Assert.InRange(ahead, -0.7f, 1.2f);
             Assert.True(w.Attacker.InPossession);
+        }
+    }
+
+    [Fact]
+    public void ACommittedTouchKeepsItsFootSurfaceAndKindToItsContact()
+    {
+        // The view swings the committed surface of the boot onto the ball over the windup: nothing of it may change on the way.
+        int touches = 0;
+        foreach (var stick in new Func<int, TickIntent>[]
+        {
+            i => Jog, i => Sprint, i => Toward((i / 50) % 2 == 0 ? 45f : -45f), i => Toward((i / 37) % 3 * 70f, (i / 200) % 2),
+            i => (i / 90) % 2 == 0 ? Sprint : default, i => Toward((i / 13) % 2 == 0 ? 30f : -60f) with { KnockOn = i % 300 == 150 },
+        })
+        for (ulong seed = 1; seed <= 5; seed++)
+        {
+            var w = Lab(seed);
+            BallAction? watched = null;
+            (Foot, FootSurface, ActionKind) at = default;
+            for (int i = 0; i < 8 * 120; i++)
+            {
+                Step(w, stick(i));
+                var a = w.Attacker.TouchAction;
+                if (a is { Pending: true } && a != watched) { watched = a; at = (a.Foot, a.Surface, a.Kind); }
+                if (watched is { Made: true } m && m.ContactTick == w.Tick)
+                {
+                    Assert.Equal(at, (m.Foot, m.Surface, m.Kind));
+                    touches++;
+                    watched = null;
+                }
+                else if (watched is { Pending: true } pw) Assert.Equal(at, (pw.Foot, pw.Surface, pw.Kind));
+            }
+            Assert.True(w.Attacker.InPossession, $"seed {seed}: possession lost");
+        }
+        Assert.True(touches > 300, $"{touches} committed touches");
+    }
+
+    [Fact]
+    public void APlayerInPossessionIsAlwaysBackOnTheBallWithinOneAndAHalfSeconds()
+    {
+        // The possession invariant: no push is faster or longer than he can catch, and a ball out of reach at a swing is gone
+        // after by the legs, so contacts never stop for longer than 1.5 s while the stick is pushed, at any dribbling.
+        foreach (int dribbling in new[] { 1, 50, 99 })
+        foreach (var (stick, si) in new Func<int, TickIntent>[]
+        {
+            i => Sprint, i => i < 360 ? Sprint : Toward(90f, 1f), i => i < 360 ? Sprint : Toward(180f, 1f),
+            i => Toward((i / 96) % 2 == 0 ? 45f : -45f), i => Toward((i / 60) * 50f, (i / 150) % 2),
+        }.Select((f, n) => (f, n)))
+        for (ulong seed = 1; seed <= 6; seed++)
+        {
+            var w = Lab(seed, dribbling: dribbling);
+            int last = -1, unplayedAt = -1, stepsSince = 0;
+            for (int i = 0; i < 8 * 120; i++)
+            {
+                var waiting = w.Attacker.TouchAction is { Pending: true } pw ? pw : null;
+                Step(w, stick(i));
+                if (waiting is { Made: false, Phase: ActionPhase.Done } && w.Tick >= waiting.ContactTick) { unplayedAt = w.Tick; stepsSince = 0; }
+                if (unplayedAt > 0 && w.Attacker.StepBegun) stepsSince++;
+                if (ContactsOf(w).Any() || w.Attacker.SkillMove != null) { last = w.Tick; unplayedAt = -1; }
+                // A committed touch not played is followed by a played contact within two steps.
+                Assert.True(unplayedAt < 0 || stepsSince <= 3, $"dribbling {dribbling} seed {seed}: no contact two steps after a touch not played at {unplayedAt}");
+                if (last > 0 && i > 120) Assert.True((w.Tick - last) * w.Tuning.Dt <= 1.5f, $"dribbling {dribbling} stick {si} seed {seed}: no contact for {(w.Tick - last) * w.Tuning.Dt:F2} s at tick {w.Tick}, ball {TouchModel.HorizontalDistance(w.Attacker.Position, w.Ball.Position):F2} m at {w.Ball.Velocity.Length():F2} m/s, player {w.Attacker.Speed:F2} m/s, chasing {w.Attacker.Chasing}, eta {w.Attacker.NextTouchEta:F2}");
+            }
+            Assert.True(w.Attacker.InPossession);
+        }
+    }
+
+    [Fact]
+    public void AStickTurnAtAnyMomentOfASprintPushIsPlayedWithinTheLatencyBound()
+    {
+        foreach (int dribbling in new[] { 1, 50, 99 })
+        {
+            var lat = new List<float>();
+            for (ulong seed = 1; seed <= 4; seed++)
+            for (int at = 0; at < 120; at += 12)
+            {
+                var w = Lab(seed, dribbling: dribbling);
+                for (int i = 0; i < 360 + at; i++) Step(w, Sprint);
+                var before = w.Ball.Velocity;
+                float t = float.NaN;
+                for (int i = 1; i <= 240 && float.IsNaN(t); i++)
+                {
+                    Step(w, Toward(90f, 1f));
+                    foreach (var c in ContactsOf(w))
+                        if (c.Kind is ActionKind.Turn or ActionKind.Cut) t = i * w.Tuning.Dt;
+                }
+                Assert.True(w.Attacker.InPossession);
+                lat.Add(float.IsNaN(t) ? 9f : t);
+            }
+            lat.Sort();
+            float p90 = lat[(int)(0.9 * lat.Count)];
+            _out.WriteLine($"dribbling {dribbling}: turn touch p50 {lat[lat.Count / 2]:F2} p90 {p90:F2} s");
+            // The dispatch's sprint-row bounds (1.0 / 0.8 / 0.6 s at dribbling 1 / 50 / 99) with one more swing of slack.
+            float bound = dribbling == 1 ? 1.25f : dribbling == 50 ? 1.05f : 0.85f;
+            Assert.True(p90 <= bound, $"dribbling {dribbling}: p90 {p90:F2} s");
         }
     }
 
@@ -402,28 +354,96 @@ public class TouchPlannerTests
         {
             var w = Lab(seed);
             for (int i = 0; i < 3 * 120; i++) Step(w, Sprint);
+            // A touch already committed when the stick is let go is played as committed; every touch after it is a stop.
+            var committed = w.Attacker.Action is { Pending: true } pc ? pc : null;
+            int release = w.Tick, debounce = (int)MathF.Round(w.Tuning.Touch.ReleaseDebounce * w.Tuning.TickRate);
             var kinds = new List<ActionKind>();
             for (int i = 0; i < 5 * 120; i++)
             {
                 Step(w, default);
                 foreach (var c in ContactsOf(w))
                 {
+                    // ... and so is one committed while a release no longer than release_debounce still reads as the stick.
+                    if (c == committed || c.PlanTick <= release + debounce) continue;
                     kinds.Add(c.Kind);
-                    // The ball is met ahead of the feet, never behind them (the run now slows no faster than
-                    // balance_deceleration, so a stop can be met a little closer to the feet than before).
+                    // The ball is met ahead of the feet, never behind them.
                     var fwd = new Vector2(MathF.Cos(w.Attacker.Facing), MathF.Sin(w.Attacker.Facing));
                     var rel = new Vector2(c.ContactPoint.X - w.Attacker.Position.X, c.ContactPoint.Z - w.Attacker.Position.Z);
-                    Assert.True(Vector2.Dot(rel, fwd) > 0.05f, $"seed {seed}: contact {Vector2.Dot(rel, fwd):F2} m ahead");
+                    Assert.True(Vector2.Dot(rel, fwd) > 0.1f, $"seed {seed}: contact {Vector2.Dot(rel, fwd):F2} m ahead");
                 }
             }
-            Assert.All(kinds, k => Assert.True(k is ActionKind.Stop or ActionKind.Slowdown, $"seed {seed}: {k} after the stick was released"));
+            Assert.All(kinds, k => Assert.True(k == ActionKind.Stop, $"seed {seed}: {k} after the stick was released"));
             if (kinds.Contains(ActionKind.Stop)) stops++;
             Assert.True(w.Attacker.InPossession, $"seed {seed}: possession lost");
             Assert.True(w.Ball.Velocity.Length() < 0.06f, $"seed {seed}: ball still rolling");
+            Assert.True(w.Attacker.Speed < 0.1f, $"seed {seed}: still moving");
             Assert.InRange(TouchModel.HorizontalDistance(w.Attacker.Position, w.Ball.Position), 0f, 1.3f);
         }
         _out.WriteLine($"{stops} of 30 sharp stops made a stop touch");
         Assert.Equal(30, stops);
+    }
+
+    [Fact]
+    public void StickAndSprintReleasedTogetherEndInAPlayedStopTouch()
+    {
+        for (ulong seed = 1; seed <= 20; seed++)
+        foreach (int dribbling in new[] { 1, 99 })
+        {
+            var w = Lab(seed, dribbling: dribbling);
+            for (int i = 0; i < 300 + 5 * (int)seed; i++) Step(w, Sprint);
+            BallAction? stop = null;
+            for (int i = 0; i < 6 * 120; i++)
+            {
+                Step(w, default);
+                foreach (var c in ContactsOf(w)) if (c.Kind == ActionKind.Stop) stop ??= c;
+            }
+            Assert.True(stop != null, $"seed {seed} dribbling {dribbling}: no stop touch (ball {TouchModel.HorizontalDistance(w.Attacker.Position, w.Ball.Position):F2} m, speed {w.Attacker.Speed:F2})");
+            Assert.True(stop!.Made);
+            Assert.True(w.Attacker.InPossession && w.Attacker.Speed < 0.1f, $"seed {seed} dribbling {dribbling}: speed {w.Attacker.Speed:F2}");
+            Assert.InRange(TouchModel.HorizontalDistance(w.Attacker.Position, w.Ball.Position), 0f, 1.3f);
+        }
+    }
+
+    [Fact]
+    public void AStraightJogAtDribblingOneNeverDipsUnderEightyFivePercent()
+    {
+        for (ulong seed = 1; seed <= 30; seed++)
+        {
+            var w = Lab(seed, dribbling: 1);
+            var p = w.Attacker;
+            float pace = w.Tuning.Movement.JogSpeed * w.Tuning.Touch.TopSpeedWithBall.ForRating(1);
+            bool atSpeed = false;
+            for (int i = 0; i < 10 * 120; i++)
+            {
+                Step(w, Jog);
+                if (i < 120 || !(atSpeed |= p.Speed >= 0.95f * pace)) continue;
+                Assert.True(p.Speed >= 0.85f * pace - 1e-3f, $"seed {seed} tick {w.Tick}: {p.Speed:F2} m/s of {pace:F2}");
+            }
+            Assert.True(p.InPossession);
+        }
+    }
+
+    [Fact]
+    public void TheGroundSpeedStaysContinuousThroughACut()
+    {
+        for (ulong seed = 1; seed <= 10; seed++)
+        foreach (var it in new[] { Jog, Sprint })
+        {
+            var w = Lab(seed);
+            var p = w.Attacker;
+            for (int i = 0; i < 360; i++) Step(w, it);
+            float prev = p.Speed, worst = 0f;
+            bool cut = false;
+            for (int i = 0; i < 240; i++)
+            {
+                Step(w, Toward(100f, it.Sprint));
+                cut |= ContactsOf(w).Any(c => c.Kind == ActionKind.Cut);
+                if (p.SkillMove == null) worst = MathF.Max(worst, MathF.Abs(p.Speed - prev));
+                prev = p.Speed;
+            }
+            Assert.True(cut || p.SkillMove != null, $"seed {seed}: no cut");
+            Assert.True(worst <= 15f * w.Tuning.Dt, $"seed {seed}: ground speed changed {worst / w.Tuning.Dt:F1} m/s^2 in a tick");
+        }
     }
 
     [Fact]
@@ -470,15 +490,20 @@ public class TouchPlannerTests
             Step(w, Jog);
             if (!p.InPossession) continue;
             ticks++;
+            Assert.False(float.IsNaN(p.NextTouchEta) && p.Action is { Pending: true });
+            if (!float.IsNaN(p.NextTouchEta)) pending++;
             if (p.Action is not { Pending: true } a) continue;
-            pending++;
             Assert.Equal((a.ContactTick - w.Tick) * w.Tuning.Dt, p.ActionContactEta, 4);
             Assert.Equal(p.ActionContactEta, p.NextTouchEta, 4);
             Assert.Equal(a.Foot, p.NextTouchFoot);
             Assert.Equal(a.ContactPoint, p.NextTouchPoint);
-            Assert.Equal(a.PhaseAt(w.Tick, TouchPlanner.PreWindupTicks(w.Tuning), TouchPlanner.WindupTicks(w.Tuning)), a.Phase);
+            Assert.Equal(a.PhaseAt(w.Tick, TouchPlanner.WindupTicks(w.Tuning), TouchPlanner.WindupTicks(w.Tuning)), a.Phase);
+            // A touch exists only from its commit, one windup before the contact.
+            Assert.Equal(ActionPhase.Windup, a.Phase);
+            Assert.InRange(a.ContactTick - a.PlanTick, 0, TouchPlanner.WindupTicks(w.Tuning));
             if (p.PreviousAction is { } prev) Assert.True(prev.Made && prev.Phase is ActionPhase.Contact or ActionPhase.Recovery);
         }
-        Assert.True(pending > 0.95 * ticks, $"{pending} of {ticks} ticks had a planned touch");
+        // The next contact is forecast (committed, or the swing the controller steers for) nearly all the time.
+        Assert.True(pending > 0.95 * ticks, $"{pending} of {ticks} ticks had a forecast touch");
     }
 }

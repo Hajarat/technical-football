@@ -80,8 +80,16 @@ static class DribbleProbe
         new("close_reverse_flick", 5f, (s, seed) => Flick(s, seed, true), CurveStart),
     };
 
+    /// <summary>A committed touch whose stick at contact was turned back to 30 degrees from its commit (internal to the core).</summary>
+    static readonly System.Reflection.FieldInfo ClampedField =
+        typeof(BallAction).GetField("Clamped", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+
+    static readonly System.Reflection.FieldInfo StretchedField =
+        typeof(BallAction).GetField("Stretched", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+
     sealed class Stats
     {
+        public readonly List<float> TurnMiss = new();
         public int Runs, Kept;
         public double TouchesPerSecond;
         public readonly List<float> Ahead = new();
@@ -89,7 +97,7 @@ static class DribbleProbe
         public int Left, Right, NotInSwing;
         public float MaxSteer;
         public readonly Dictionary<ActionKind, int> Kinds = new();
-        public int Drops, Stretched;
+        public int Drops, Stretched, Clamped;
         public readonly List<float> Latency = new();
         public readonly List<float> Align = new();
         public int AlignMissed;
@@ -140,7 +148,7 @@ static class DribbleProbe
 
         Console.WriteLine($"dribble probes: attacker={attackerId} (dribbling set per row) seeds={seeds} from {seed0}{(exact ? " errors=0" : "")}");
         var header = new[] { "probe", "dribbling", "kept_pct", "touches_s", "ahead_p10", "ahead_p50", "ahead_p90", "left", "right",
-            "max_steer", "miss_p50", "miss_max", "not_in_swing", "drops", "stretched", "turn_latency_s(p50/p90)", "align_s(p50/p90/miss)", "vmin_pct", "steps", "skill_steps", "kinds" };
+            "max_steer", "miss_p50", "miss_max", "not_in_swing", "drops", "stretched", "clamped", "turn_miss(p50/p90/max)", "turn_latency_s(p50/p90)", "align_s(p50/p90/miss)", "vmin_pct", "steps", "skill_steps", "kinds" };
         var rows = new List<string[]>();
         var pooled = new List<string>();
         bool allKept = true;
@@ -157,7 +165,7 @@ static class DribbleProbe
                 var st = new Stats();
                 for (int i = 0; i < seeds; i++) RunOne(probe, tuning, sheet, keeper, seed0 + (ulong)i, i, st);
                 allKept &= st.Kept == st.Runs;
-                st.Ahead.Sort(); st.Miss.Sort(); st.Latency.Sort(); st.Align.Sort();
+                st.Ahead.Sort(); st.Miss.Sort(); st.TurnMiss.Sort(); st.Latency.Sort(); st.Align.Sort();
                 lat.AddRange(st.Latency); align.AddRange(st.Align); drops += st.Drops;
                 string F(float v) => v.ToString("F2", CultureInfo.InvariantCulture);
                 string P(List<float> l, double q) => l.Count == 0 ? "-" : F(l[Math.Min(l.Count - 1, (int)(q * l.Count))]);
@@ -167,7 +175,8 @@ static class DribbleProbe
                     (st.TouchesPerSecond / st.Runs).ToString("F2", CultureInfo.InvariantCulture),
                     P(st.Ahead, 0.1), P(st.Ahead, 0.5), P(st.Ahead, 0.9), st.Left.ToString(), st.Right.ToString(), F(st.MaxSteer),
                     P(st.Miss, 0.5), st.Miss.Count == 0 ? "-" : F(st.Miss[^1]), st.NotInSwing.ToString(),
-                    st.Drops.ToString(), st.Stretched.ToString(),
+                    st.Drops.ToString(), st.Stretched.ToString(), st.Clamped.ToString(),
+                    st.TurnMiss.Count == 0 ? "-" : $"{P(st.TurnMiss, 0.5)}/{P(st.TurnMiss, 0.9)}/{F(st.TurnMiss[^1])}",
                     st.Latency.Count == 0 ? "-" : $"{P(st.Latency, 0.5)}/{P(st.Latency, 0.9)}",
                     probe.Flick == null ? "-" : $"{P(st.Align, 0.5)}/{P(st.Align, 0.9)}/{st.AlignMissed}",
                     float.IsFinite(st.MinSpeedPct) ? st.MinSpeedPct.ToString("F0", CultureInfo.InvariantCulture) : "-",
@@ -301,7 +310,9 @@ static class DribbleProbe
                 if (act.Kind is not (ActionKind.First or ActionKind.Soft) && !act.IsSkill)
                 {
                     st.Miss.Add(act.ContactMiss);
-                    if (act.ContactMiss > t.Touch.ContactZoneRadius + 1e-4f) st.Stretched++;
+                    if ((bool)StretchedField.GetValue(act)!) st.Stretched++;
+                    if (act.Kind is ActionKind.Turn or ActionKind.Cut) st.TurnMiss.Add(act.ContactMiss);
+                    if ((bool)ClampedField.GetValue(act)!) st.Clamped++;
                     if (p.IsStepping && p.SwingFoot != act.Foot) st.NotInSwing++;
                 }
                 // The turn touch: a turn, a cut or a touch at the feet, or any touch that sends the ball along the stick.
