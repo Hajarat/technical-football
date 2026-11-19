@@ -208,6 +208,12 @@ public sealed class PlayerState
     internal float StickRate;
     /// <summary>Ticks the smooth stick turn rate has been non-zero without a break (caps how far it is carried on).</summary>
     internal int StickTurnTicks;
+    /// <summary>The stick direction its last change was measured from, radians (NaN with the stick released).</summary>
+    internal float StickSettledAngle = float.NaN;
+    /// <summary>The tick the stick last turned (smoothly or by a jump) or sprint was last pressed or let go.</summary>
+    internal int StickChangeTick = -100000;
+    /// <summary>Whether sprint was held on the previous tick.</summary>
+    internal bool SprintPrev;
     /// <summary>Ticks the stick has been released without a break (0 while pushed).</summary>
     internal int StickReleasedTicks;
     /// <summary>The stick when last pushed (zero before any push this round): a short release reads as this.</summary>

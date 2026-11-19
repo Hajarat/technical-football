@@ -149,6 +149,10 @@ public static class TouchPlanner
     const float StickLeadMaxDeg = 90f;
     /// <summary>A stick moving more than this in one tick jumped (a flick), degrees: it is not a smooth turn.</summary>
     const float StickJumpDeg = 3f;
+    /// <summary>A stick turned further than this from where it settled has changed, degrees.</summary>
+    const float StickSettleDeg = 10f;
+    /// <summary>A stick changed (or sprint pressed or let go) within this is still turning: a sprint push stays short, seconds.</summary>
+    const float StickSettleSeconds = 0.35f;
     /// <summary>Smoothing time of the stick turn rate, seconds.</summary>
     const float StickRateSmoothing = 0.1f;
 
@@ -160,8 +164,24 @@ public static class TouchPlanner
             p.StickAnglePrev = float.NaN; p.StickRate = 0f; p.StickTurnTicks = 0; p.SpeedDebt = 0f; p.TouchCadenceCount = 0;
             p.PlannerSteer = Vector2.Zero; p.SteerCarry = Vector2.Zero; p.ReverseTime = -100f; p.PostTurnUntil = -100f;
             p.StepsSinceTouch = 0; p.PushSteps = 1; p.Chasing = false; p.ClearForecast();
+            p.StickSettledAngle = float.NaN; p.StickChangeTick = -100000; p.SprintPrev = intent.Sprint > 0.5f;
         }
+        bool sprint = intent.Sprint > 0.5f;
+        if (sprint != p.SprintPrev) p.StickChangeTick = tick;
+        p.SprintPrev = sprint;
         Vector2 m = intent.Move;
+        if (m.Length() < t.Touch.StickThreshold) p.StickSettledAngle = float.NaN;
+        else
+        {
+            // The stick's last change: a turn of more than StickSettleDeg from where it last settled, smooth or a jump.
+            float sa = MathF.Atan2(m.Y, m.X);
+            if (float.IsNaN(p.StickSettledAngle)) p.StickSettledAngle = sa;
+            else if (MathF.Abs(Movement.WrapAngle(sa - p.StickSettledAngle)) * 180f / MathF.PI > StickSettleDeg)
+            {
+                p.StickSettledAngle = sa;
+                p.StickChangeTick = tick;
+            }
+        }
         if (m.Length() < t.Touch.StickThreshold) { p.StickAnglePrev = float.NaN; p.StickRate = 0f; p.StickTurnTicks = 0; return; }
         float a = MathF.Atan2(m.Y, m.X);
         if (!float.IsNaN(p.StickAnglePrev))
@@ -1043,7 +1063,7 @@ public static class TouchPlanner
     }
 
     /// <summary>The longest a push is solved for, seconds (inside the 1.5 s the player is always back on the ball).</summary>
-    const float MaxMeetSeconds = 1.1f;
+    const float MaxMeetSeconds = 1.2f;
 
     /// <summary>
     /// The meet of a reversal: predicts the player on the stick's legs (braking, turning about and running back) and returns
@@ -1280,7 +1300,10 @@ public static class TouchPlanner
                     if (turning) steps = Math.Max(1, (int)MathF.Round(EarlyFraction(p, turnDeg, t) * steps));
                     // While the stick is moving or a turn is under way the ball is kept within a few steps, so a turn that
                     // follows can be played at the next swing; straight-line touches keep their cadence.
-                    if (turning || MathF.Abs(p.StickRate) * 180f / MathF.PI > k.TurningStickRateDeg)
+                    // (At a sprint, also a stick that changed or a sprint pressed or let go within StickSettleSeconds: a
+                    // long sprint push is only for a steady stick.)
+                    bool unsettled = mode == TouchMode.Sprint && (tick - p.StickChangeTick) * t.Dt < StickSettleSeconds;
+                    if (turning || unsettled || MathF.Abs(p.StickRate) * 180f / MathF.PI > k.TurningStickRateDeg)
                         steps = Math.Min(steps, mode == TouchMode.Sprint ? k.TurningMaxSteps.Sprint : mode == TouchMode.Jog ? k.TurningMaxSteps.Jog : steps);
                     if (immediate)
                     {
