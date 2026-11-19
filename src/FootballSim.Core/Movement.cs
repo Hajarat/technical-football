@@ -76,9 +76,13 @@ public static class Movement
         Step(p, intent, dt, now, new MoveAssist(hasBall ? TopSpeedWithBall(p.Sheet, t) : TopSpeed(p.Sheet, t), 1f, Vector2.Zero), t, pitch);
 
     /// <summary>
-    /// Moves a player one tick with an explicit speed cap, turn-rate scale and a steering correction velocity (the touch
-    /// planner bringing the ball into the contact zone). The running speed follows the facing; the correction is added on top
-    /// and does not feed back into it, nor into the stride clock, which advances at the running speed.
+    /// Moves a player one tick with an explicit speed cap, turn-rate scale and a steering correction (the touch planner
+    /// bringing the ball into the contact zone). The running speed follows the facing and eases toward the legs' target plus
+    /// the correction's part along the run (<see cref="MoveAssist.SteerAlong"/>), so the correction never changes the speed
+    /// outside the speed law; the sideways part (<see cref="MoveAssist.Steer"/>) is added to the velocity and does not feed
+    /// back into the running speed, nor into the stride clock, which advances at the running speed. The running speed never
+    /// falls faster than balance_deceleration: the legs easing off and a sharp turn's or cut's balance loss share that one
+    /// budget.
     /// </summary>
     internal static void Step(PlayerState p, in TickIntent intent, float dt, float now, in MoveAssist assist, Tuning t, Pitch? pitch)
     {
@@ -90,11 +94,17 @@ public static class Movement
         if (mag < m.StickDeadZone) mag = 0f;
 
         float target = top * mag * ModeFraction(intent, p.Sheet, t);
+        // The steering's part along the run moves the target (never above the off-ball top speed, never below a standstill).
+        if (assist.SteerAlong != 0f) target = Math.Clamp(target + assist.SteerAlong, 0f, MathF.Max(top, TopSpeed(p.Sheet, t)));
         var fwd0 = new Vector3(MathF.Cos(p.Facing), 0f, MathF.Sin(p.Facing));
         float speed = MathF.Max(0f, Vector3.Dot(p.Velocity - p.SteerVelocity, fwd0));
+        float speed0 = speed;
         float tau = MathF.Max(TimeConstantAt(p, now, t), dt);
-        // A skill move sets the running speed itself (it paces the player against the ball); otherwise it eases to the target.
-        if (float.IsNaN(assist.RunSpeed)) speed += (target - speed) / tau * dt;
+        bool law = float.IsNaN(assist.RunSpeed);
+        float budget = m.BalanceDeceleration * dt;
+        // A skill move sets the running speed itself (it paces the player against the ball); otherwise it eases to the target,
+        // easing off no faster than the deceleration budget.
+        if (law) speed = MathF.Max(speed + (target - speed) / tau * dt, speed0 - budget);
         else speed = assist.RunSpeed;
         // The stun after a strike holds the running speed under its cap at once: the strike plants the shooter.
         speed = MathF.Min(speed, assist.HardCap);
@@ -136,18 +146,24 @@ public static class Movement
         }
         if (p.SpeedDebt > 0f)
         {
-            float shed = MathF.Min(p.SpeedDebt, m.BalanceDeceleration * dt);
+            // Under the speed law the balance loss takes what the legs' own easing off leaves of the budget.
+            float room = law ? budget + speed - speed0 : budget;
+            float shed = MathF.Min(p.SpeedDebt, MathF.Max(0f, room));
             speed -= shed;
             p.SpeedDebt -= shed;
             if (speed <= 0f) p.SpeedDebt = 0f;
         }
 
         speed = MathF.Max(speed, 0f);
+        // The sideways correction turns with the body: as the facing turns this tick it keeps its angle to the run instead of
+        // swinging into or against it. A skill move's step (the carry) keeps its direction on the ground.
+        float turned = WrapAngle(facing - p.Facing), tc = MathF.Cos(turned), ts = MathF.Sin(turned);
+        var steer = new Vector2(assist.Steer.X * tc - assist.Steer.Y * ts, assist.Steer.X * ts + assist.Steer.Y * tc) + assist.Carry;
         p.MoveTime = now;
         p.Facing = facing;
         p.RunSpeed = speed;
-        p.SteerVelocity = new Vector3(assist.Steer.X, 0f, assist.Steer.Y);
-        p.Velocity = new Vector3(MathF.Cos(facing) * speed + assist.Steer.X, 0f, MathF.Sin(facing) * speed + assist.Steer.Y);
+        p.SteerVelocity = new Vector3(steer.X, 0f, steer.Y);
+        p.Velocity = new Vector3(MathF.Cos(facing) * speed + steer.X, 0f, MathF.Sin(facing) * speed + steer.Y);
         Vector3 pos = p.Position + p.Velocity * dt;
         if (pitch != null)
         {
@@ -162,9 +178,11 @@ public static class Movement
 }
 
 /// <summary>
-/// Per-tick movement modifiers: the speed cap, a turn-rate scale, a steering correction velocity (world X, Z) and, for a skill
-/// move, the running speed to use this tick (NaN: the legs ease toward the stick's target as usual), and a running speed never
-/// exceeded this tick (the post-strike stun), and whether a stick turned about brakes the run (without the ball).
+/// Per-tick movement modifiers: the speed cap, a turn-rate scale, a steering correction velocity added to the velocity (world
+/// X, Z) and, for a skill move, the running speed to use this tick (NaN: the legs ease toward the stick's target as usual), a
+/// running speed never exceeded this tick (the post-strike stun), whether a stick turned about brakes the run (without the
+/// ball), the steering's part along the run, m/s, added to the legs' target speed (it reaches the running speed through the
+/// speed law), and a skill move's step, a velocity (world X, Z) that, unlike <see cref="Steer"/>, does not turn with the body.
 /// </summary>
 internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Steer, float RunSpeed = float.NaN,
-    float HardCap = float.PositiveInfinity, bool TurnAbout = false);
+    float HardCap = float.PositiveInfinity, bool TurnAbout = false, float SteerAlong = 0f, Vector2 Carry = default);

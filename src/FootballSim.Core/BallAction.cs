@@ -14,7 +14,10 @@ public enum ActionKind
     Jog,
     /// <summary>A sprinting touch, the ball pushed further ahead.</summary>
     Sprint,
-    /// <summary>A touch made while the legs slow down to let the ball come back to the foot.</summary>
+    /// <summary>
+    /// A touch made while the legs slow down to let the ball come back to the foot. No longer planned: with the stick pushed
+    /// the run slows only as far as the steering needs (see TouchPlanner); kept for older replays and views.
+    /// </summary>
     Slowdown,
     /// <summary>The stick was released: the ball is brought to rest just ahead of where the player stops.</summary>
     Stop,

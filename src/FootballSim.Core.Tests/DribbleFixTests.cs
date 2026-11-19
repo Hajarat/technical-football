@@ -99,8 +99,8 @@ public class DribbleFixTests
 
     /// <summary>
     /// The three penalty rounds of the play-test, replayed with the current code (they play out differently from the recording):
-    /// no touch is dropped at its contact while the stick is pushed, and no slowdown is planned with the stick pushed further off
-    /// than slowdown_max_ahead. Skipped when the rounds are not in the tree.
+    /// no touch is dropped at its contact while the stick is pushed, and no slowdown is planned with the stick pushed (the
+    /// steering slows the run only as far as the ball needs). Skipped when the rounds are not in the tree.
     /// </summary>
     [Fact]
     public void ThePlayTestRoundsDropNoTouchWithTheStickPushed()
@@ -117,7 +117,7 @@ public class DribbleFixTests
             w.Begin();
             var buf = new TickIntent[w.PlayerCount];
             int per = Math.Max(1, rp.PlayersPerTick);
-            int drops = 0, farSlowdowns = 0;
+            int drops = 0, slowdowns = 0;
             BallAction? seen = null;
             var p = w.Attacker;
             for (int tick = 0; tick < rp.TickCount && w.State != RoundState.Report; tick++)
@@ -131,12 +131,12 @@ public class DribbleFixTests
                 if (p.TouchAction is { Pending: true } a && a != seen)
                 {
                     seen = a;
-                    if (pushed && a.Kind == ActionKind.Slowdown && (a.ContactTick - w.Tick) * t.Dt > t.Touch.SlowdownMaxAhead + 1e-4f) farSlowdowns++;
+                    if (pushed && a.Kind == ActionKind.Slowdown) slowdowns++;
                 }
             }
-            _out.WriteLine($"{Path.GetFileName(f)}: {drops} dropped at contact with the stick pushed, {farSlowdowns} far slowdowns");
+            _out.WriteLine($"{Path.GetFileName(f)}: {drops} dropped at contact with the stick pushed, {slowdowns} slowdowns with the stick pushed");
             Assert.Equal(0, drops);
-            Assert.Equal(0, farSlowdowns);
+            Assert.Equal(0, slowdowns);
         }
     }
 }

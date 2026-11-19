@@ -349,11 +349,6 @@ public sealed class TouchTuning
     /// </summary>
     public float StretchReach { get; set; } = 0.25f;
     /// <summary>
-    /// With the stick pushed a slowdown (easing off to let the ball come back) is planned only on a swing at most this far
-    /// ahead, seconds (about one jog cadence); a recovering player never eases off, he runs on to the ball.
-    /// </summary>
-    public float SlowdownMaxAhead { get; set; } = 0.6f;
-    /// <summary>
     /// A stick released for no longer than this is read as still held where it was, seconds (a flick through neutral is
     /// polled at 60 Hz, so it can read neutral for a tick or two); a longer release is a stop.
     /// </summary>

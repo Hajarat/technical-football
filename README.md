@@ -56,12 +56,14 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
 - Turning: with the ball up to 450 degrees per second by agility (GOALS' dribbling RotationRate), less with weight and halved
   at top speed; a heading change smaller than the rate covers in `turn_ease` (0.05 s) eases in instead of snapping, so the
   small corrections between touches do not jerk the body round.
-- A sharp turn or a cut costs the balance percentage of speed, shed at `balance_deceleration` (12 m/s^2) rather than at once.
+- A sharp turn or a cut costs the balance percentage of speed, shed rather than at once: the running speed never falls faster
+  than `balance_deceleration` (12 m/s^2), the legs easing off and the balance loss sharing that one budget.
 - Turning with the ball: a stick turned past the execution angle plans the turn touch at once on the next swing that can play
   the ball up to `turn_reach` (0.45 m at rest to 0.6 m at a sprint, after GOALS' 0.6 m execution radius) from the foot, with
   the body stepped toward it (`turn_steer_max` 1.5 m/s at `turn_steer_accel` 15 m/s^2), not a stretched leg; for
   `post_turn_seconds` (0.3 s) after a turn or cut touch the body turns at least `post_turn_rotation_rate` (540 deg/s, after
-  GOALS' post-execution rotation rate) onto the ball's new line.
+  GOALS' post-execution rotation rate) onto the ball's new line. The turn's sideways step turns with the body, so it never
+  swings into or against the run.
 - Without the ball the turn rate tops out at GOALS' 360 deg/s (`possession.off_ball_turn_bonus` -0.2), and a stick more than
   `reverse_turn_deg` (135) from the facing above `reverse_min_speed` plants the runner: `reverse_speed_loss` (0.65) of his
   speed is shed while he turns about.
@@ -69,9 +71,12 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   walking touches, played as close control (a touch every step). A jog touches every two steps, and every
   `foot_switch_every`-th (4th) touch takes one step more so the other foot takes over: an even cadence on both feet.
 - Steering into the contact zone: a touch is planned at least `min_plan_ahead` (0.3 s) before its contact and the player is
-  steered during the last `pre_windup` (0.4 s, GOALS' PreWindupTime). The steering correction eases in and out at
-  `steer_accel` (6 m/s^2, at most `steer_max` 0.6 m/s) and only brings the ball to within `reach_tolerance` (0.08 m) of the
-  swinging foot's contact point; the foot reaches the rest, and the contact point is where the ball is.
+  steered during the last `pre_windup` (0.4 s, GOALS' PreWindupTime). The miss across the run is covered by a sideways step
+  that eases in and out at `steer_accel` (6 m/s^2, at most `steer_max` 0.6 m/s); the miss along the run changes the legs'
+  target speed (by at most `steer_max` plus 1.5 m/s, the turn's maximum plus 1.5 m/s for a turn step, never above the
+  off-ball top speed), which reaches the running speed only through the speed law, so the steering never steps the speed.
+  It brings the ball to within `reach_tolerance` (0.08 m) of the swinging foot's contact point; the foot reaches the rest,
+  and the contact point is where the ball is.
 - A waiting touch is checked again whenever the stick has drifted `drift_recheck_deg` (3) since the last check, and every
   `recheck_interval` (0.05 s) in the pre-windup: if the legs no longer bring the ball within the steering's reach it is planned
   again at once (inside the windup the run holds instead, and a change of touch mode waits for the next touch). Predictions
@@ -81,14 +86,18 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
 - At contact a ball up to `stretch_reach` (0.25 m) from the contact point is still played, stretched, with the rated errors
   (with the contact point 0.25-0.45 m ahead of the body that keeps it within about GOALS' 0.6 m execution radius); only a
   ball further off is dropped.
-- With the stick pushed a slowdown (easing off) is planned only on a swing at most `slowdown_max_ahead` (0.6 s, about a jog
-  cadence) ahead and a step sooner than running on would play the ball; a recovering player never eases off.
+- With the stick pushed the legs never ease off for a touch: a ball short of its meet slows the run only as far as the
+  steering along the run needs.
 - A stick released for no longer than `release_debounce` (0.04 s; a pad polled at 60 Hz can read neutral for a tick or two
-  in a flick) reads as still held; a longer release is a stop. Not while shoot is held.
+  in a flick) reads as still held, and sprint let go with it is not a change of touch mode; a longer release is a stop. Not
+  while shoot is held. The waiting touch then becomes a stop on the legs it will use (the run held along the facing, or
+  easing off to a stop), checked against them: if neither still meets the ball it is planned again as a stop at once.
 - Turning at the feet: a stick at least `feet_turn_deg` (120) from the ball's travel (the facing for a still ball) while
   running, with the ball low and within `feet_turn_reach` (0.6 m, GOALS' execution radius) of the body and no touch already
   winding up, turns the ball at once with the drag-back's sole motion, pulled onto the stick's line instead of straight back
-  (the drag-back's timings and distance; no chain, exit burst or gesture), and the exit touch sends it along the stick.
+  (the drag-back's timings and distance; no chain, exit burst or gesture), and the exit touch sends it along the stick. Its
+  run slows no faster than `balance_deceleration` and its step toward the stick eases in so the ground speed changes no
+  faster than that either; afterwards the step eases out at `steer_accel`.
 
 ## Character models
 
