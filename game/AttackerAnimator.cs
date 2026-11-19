@@ -279,7 +279,8 @@ public partial class PlayerFigure
         }
         if (_atkAnim == null) return;
         if (_teleporting) { _atkAnim.Teleport(); foreach (var l in _mLock) l.Reset(); }
-        bool free = stepping && !_skActive && !f.Shot.Valid && _kW <= 0f && _strikeT < 0f && !_seq && f.ShotCharge <= 0.001f && !_pinOn;
+        // (a shot action runs on the cycles: its striking leg and plant are drawn over them, see PlanShot)
+        bool free = stepping && !_skActive && (f.Shot.Valid || _kW <= 0f && _strikeT < 0f && !_seq && f.ShotCharge <= 0.001f && !_pinOn);
         float target = free ? Smooth((_speedS - MocapFromMs) / (MocapFullMs - MocapFromMs)) : 0f;
         _mW = _teleporting ? target : Mathf.Lerp(_mW, target, 1f - Mathf.Exp(-dt / MocapTau));
         if (_mW < 1e-3f && target == 0f) _mW = 0f;
@@ -505,7 +506,7 @@ public partial class PlayerFigure
     bool MocapPresent()
     {
         if (_atkAnim == null) return false;
-        _atkAnim.Present(_joints, _mW, AttackerAnimator.ArmOutClose * _closeW);
+        _atkAnim.Present(_joints, _mW * (1f - ShotUpperShare * _shUpper), AttackerAnimator.ArmOutClose * _closeW);
         return true;
     }
 
@@ -589,6 +590,7 @@ public partial class PlayerFigure
                 if (deg > 1500f) { Stats.BoneFast++; if (Log) GD.Print($"MOCAP_FAST tick={Stats.Tick} bone={b.DrivenBoneNames[k]} deg_s={deg:F0} w={_mW:F2} knee_deg={KneeDeg(b, k):F1} reach={Reach(b, k):F3}"); }
                 if (deg > Stats.BoneMaxDegS) { Stats.BoneMaxDegS = deg; Stats.BoneMaxAt = $"{b.DrivenBoneNames[k]}@{Stats.Tick}"; }
             }
+        if (_boneHave && !_teleporting && shot) ShotBoneSpeeds(b, n, dt);
         if (Log && _atkAnim != null) GD.Print($"MOCAP_KNEE tick={Stats.Tick} hips={b.DrivenBoneWorld(0).Y:F3} L={KneeDeg(b, 11):F1} R={KneeDeg(b, 19):F1} Ltw={_bonePrev[11].AngleTo(b.DrivenLocalRotation(11)) * 57.3f:F1} Rtw={_bonePrev[19].AngleTo(b.DrivenLocalRotation(19)) * 57.3f:F1}");
         for (int k = 0; k < n; k++) _bonePrev[k] = b.DrivenLocalRotation(k);
         _boneHave = true;

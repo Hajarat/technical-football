@@ -56,6 +56,7 @@ public partial class Match
                 Elapsed = (p.CurrentTick - sa.PlanTick) * f.Dt, ContactEta = sa.ContactEta(p.CurrentTick, f.Dt), RecoverySeconds = (sa.EndTick - sa.ContactTick) * f.Dt,
                 ContactPoint = G(sa.ContactPoint), BallOutVelocity = G(sa.BallOutVelocity), Made = sa.Made,
                 Held = !sa.Released,
+                Aim = new Vector3(w.Pitch.GoalLineX - G(sa.ContactPoint).X, 0, -G(sa.ContactPoint).Z),
             };
         f.Upcoming = UpcomingTouch(p, out f.UpcomingReady);
         f.NextTouchEta = p.NextTouchEta; f.NextTouchRight = p.NextTouchFoot == Foot.Right; f.NextTouchPoint = G(p.NextTouchPoint);
