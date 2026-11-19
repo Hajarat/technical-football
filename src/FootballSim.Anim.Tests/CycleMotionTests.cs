@@ -49,6 +49,32 @@ public class CycleMotionTests
         }
     }
 
+    [Theory]
+    [InlineData(1.0f)]
+    [InlineData(0.85f)]
+    [InlineData(0.75f)]
+    [InlineData(0.6f)]
+    public void ShortenedStanceMapStaysMonotoneAndContinuous(float shareScale)
+    {
+        var (_, cycles, _) = Load();
+        foreach (var c0 in cycles)
+        {
+            // a fresh copy each time: the map is rebuilt for the share asked for, not left from an earlier one
+            var c = new StrideCycle(c0.Clip, c0.Speed, c0.StepsPerSecond, c0.BlendSpeed);
+            int n = c.Clip.FrameCount;
+            float share = c.StanceShare * shareScale;
+            if (c.StanceShare > CycleMotion.MinWalkShare) share = Math.Max(share, CycleMotion.MinWalkShare);
+            float prev = c.ClipFrame(0f, share);
+            for (int i = 1; i <= 2000; i++)
+            {
+                float f = c.ClipFrame(i * 0.001f, share);
+                float d = f - prev; if (d < -n / 2f) d += n;
+                Assert.True(d > 0f && d < 0.2f, $"{c.Clip.Name} share {share:F3} at {i * 0.001f}: step {d}");
+                prev = f;
+            }
+        }
+    }
+
     [Fact]
     public void TheDrawnSwingingFootIsTheClocksSwingingFoot()
     {

@@ -166,6 +166,8 @@ public sealed class CycleMotion
     public float WeightHalfLife = 0.12f;
 
     readonly float[] _w, _target, _share;
+    /// <summary>The shortest stance share a cycle with double support (a walk, over half the stride on each foot) is shortened to.</summary>
+    public const float MinWalkShare = 0.56f;
     readonly Quaternion[] _tmp;
     bool _init;
 
@@ -226,6 +228,8 @@ public sealed class CycleMotion
         {
             float sc = float.IsFinite(stepLength) ? stepLength / Math.Max(Cycles[i].StepLength * scale, 1e-3f) : 1f;
             _share[i] = Cycles[i].StanceShare / Math.Max(sc, 1f);
+            // a walk's double support cannot shrink to none (its strikes and toe-offs would meet and the map fold): it keeps a little
+            if (Cycles[i].StanceShare > MinWalkShare) _share[i] = Math.Max(_share[i], MinWalkShare);
         }
         TargetWeights(Cycles, speed, _target);
         float a = _init ? 1f - MathF.Exp(-dt * 0.69314718f / Math.Max(WeightHalfLife, 1e-4f)) : 1f;
@@ -263,6 +267,15 @@ public sealed class CycleMotion
         for (int k = 0; k < b; k++) local[k] = Quaternion.Normalize(local[k]);
         StanceShare = share; NativeStep = step; NativeSpeed = spd;
         return hips;
+    }
+
+    /// <summary>For logs: each cycle's weight, stance share and the clip frame it shows at <paramref name="phase"/>.</summary>
+    public string Describe(float phase)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < Cycles.Count; i++)
+            if (_w[i] > 0f) sb.Append($"{Cycles[i].Clip.Name}:{_w[i]:F2}/{_share[i]:F3}/f{Cycles[i].ClipFrame(phase, _share[i] > 0f ? _share[i] : Cycles[i].StanceShare):F2} ");
+        return sb.ToString();
     }
 
     /// <summary>Whether foot <paramref name="foot"/> (0 = left) is on the ground at stride phase <paramref name="phase"/> in the blended cycles.</summary>

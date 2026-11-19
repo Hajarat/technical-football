@@ -76,6 +76,7 @@ public sealed class AttackerAnimator
 
     public SkinnedBody Body => _body;
     public CycleMotion Motion => _motion;
+    static readonly bool LogCycles = System.Environment.GetEnvironmentVariable("ATTACKER_ANIM_LOG") == "1";
 
     /// <summary>The boot's toe tip lies this far along the toe bone from its joint (model metres; tools/anim/retarget.py TOE_TIP).</summary>
     public const float ToeTip = 0.08f;
@@ -151,6 +152,7 @@ public sealed class AttackerAnimator
         byte clipContacts = 0;
         bool full = FullBody != null && FullBody.TryPose(f, _local, out hips, out clipContacts);
         _sk.Forward(_local, hips, _gr, _gp);
+        if (LogCycles) GD.Print($"MOCAP_CYCLE s={f.GaitPhase:F3} f={f.StepFrequency:F3} {_motion.Describe(f.GaitPhase)}");
         // eased, so a step that changes at once (the clock stopping, a speed step) never moves the feet in a tick
         float strideT = stepLength > 0.05f ? Math.Clamp(_motion.Stretch(stepLength, sc), StrideMin, 1f) : StrideMin;
         Stride = _strideInit ? Mathf.Lerp(Stride, strideT, 1f - Mathf.Exp(-dt / StrideTau)) : strideT;
