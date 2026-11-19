@@ -189,6 +189,12 @@ public sealed class PlayerState
     internal float StickAnglePrev = float.NaN;
     /// <summary>How fast the stick is being turned smoothly, radians per second (0 after a jump or a release).</summary>
     internal float StickRate;
+    /// <summary>Ticks the smooth stick turn rate has been non-zero without a break (caps how far it is carried on).</summary>
+    internal int StickTurnTicks;
+    /// <summary>Ticks the stick has been released without a break (0 while pushed).</summary>
+    internal int StickReleasedTicks;
+    /// <summary>The stick when last pushed (zero before any push this round): a short release reads as this.</summary>
+    internal Vector2 LastStickMove;
     /// <summary>A knock-on was asked for; the next touch made is one.</summary>
     internal bool KnockOnRequested;
     /// <summary>No longer read (the foot switch counts <see cref="TouchCadenceCount"/>); the world still clears it each round.</summary>

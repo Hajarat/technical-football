@@ -328,6 +328,44 @@ public sealed class TouchTuning
     public float TurnSteerMax { get; set; } = 1.5f;
     /// <summary>...changing by at most this, m/s^2 (a plant step).</summary>
     public float TurnSteerAccel { get; set; } = 15f;
+    /// <summary>
+    /// A waiting touch is checked again each time the stick has drifted this far since the last check, degrees (below the
+    /// execution angle): if the stick-following legs no longer bring the ball within the steering's reach at the contact, the
+    /// touch is planned again (inside the windup the run holds instead).
+    /// </summary>
+    public float DriftRecheckDeg { get; set; } = 3f;
+    /// <summary>...and at least this often, seconds, whatever the stick does (a push aimed along a predicted stick turn that never
+    /// came, a meet predicted wrongly after a cut).</summary>
+    public float RecheckInterval { get; set; } = 0.05f;
+    /// <summary>
+    /// How far ahead the stick's turn rate is carried on in predictions, seconds: the predicted turn eases out over this time
+    /// constant (never longer than the stick has been turning), so a thumb that stops turning is not predicted to go on.
+    /// </summary>
+    public float StickLeadTime { get; set; } = 0.15f;
+    /// <summary>
+    /// At contact a ball up to this far from the contact point (beyond the contact zone) is still played, stretched, metres;
+    /// further off the touch is dropped. With the contact point 0.25-0.45 m ahead of the body this keeps the ball within about
+    /// GOALS' 0.6 m execution radius.
+    /// </summary>
+    public float StretchReach { get; set; } = 0.25f;
+    /// <summary>
+    /// With the stick pushed a slowdown (easing off to let the ball come back) is planned only on a swing at most this far
+    /// ahead, seconds (about one jog cadence); a recovering player never eases off, he runs on to the ball.
+    /// </summary>
+    public float SlowdownMaxAhead { get; set; } = 0.6f;
+    /// <summary>
+    /// A stick released for no longer than this is read as still held where it was, seconds (a flick through neutral is
+    /// polled at 60 Hz, so it can read neutral for a tick or two); a longer release is a stop.
+    /// </summary>
+    public float ReleaseDebounce { get; set; } = 0.04f;
+    /// <summary>
+    /// A stick turned at least this far from the ball's travel (the facing for a still ball), degrees, with the ball within
+    /// <see cref="FeetTurnReach"/> of the body, turns the ball at the feet at once: the sole pulls it back onto the stick's
+    /// line (the drag-back's motion) instead of waiting for a swing in front of the foot.
+    /// </summary>
+    public float FeetTurnDeg { get; set; } = 120f;
+    /// <summary>The ball's largest distance from the body for that turn at the feet, metres (GOALS' execution radius 0.6 m).</summary>
+    public float FeetTurnReach { get; set; } = 0.6f;
     /// <summary>The steering correction changes by at most this, m/s^2 (0: at once), so it never steps the velocity.</summary>
     public float SteerAccel { get; set; } = 6f;
     /// <summary>With an even steps_per_touch, every this-many-th touch takes one step more so the other foot plays on.</summary>

@@ -187,13 +187,26 @@ public static class SkillMoves
         return (best, bestMiss);
     }
 
-    static BallAction Start(PlayerState p, ActionKind kind, SkillSide side, Vector2 cut, Ball ball, int tick, float now, Tuning t)
+    /// <summary>
+    /// The touch planner's turn at the feet (see TouchPlanner): a drag-back whose sole pulls the ball onto the stick's line
+    /// <paramref name="dir"/> (unit, world X, Z) instead of straight back, the player stepping that way as he stops. It is not a
+    /// skill move of the player's: no gesture, no chain, no exit burst; the drag-back's cooldown keeps it from starting again
+    /// before the exit touch has sent the ball along the stick.
+    /// </summary>
+    internal static BallAction StartFeetTurn(PlayerState p, Vector2 dir, Ball ball, int tick, float now, Tuning t) =>
+        Start(p, ActionKind.DragBack, SkillSide.None, dir, ball, tick, now, t, feetTurn: true);
+
+    static BallAction Start(PlayerState p, ActionKind kind, SkillSide side, Vector2 cut, Ball ball, int tick, float now, Tuning t,
+        bool feetTurn = false)
     {
         var k = t.Skill;
-        p.SkillChainCount = now < p.SkillChainUntil ? p.SkillChainCount + 1 : 0;
-        p.SkillEffective = p.Sheet.SkillMoves * MathF.Pow(k.ChainMultiplier, p.SkillChainCount);
-        p.SkillBoostUntil = -100f; // an earlier move's burst, waiting for its touch or under way, is gone
-        p.SkillBurstUntil = -100f;
+        if (!feetTurn)
+        {
+            p.SkillChainCount = now < p.SkillChainUntil ? p.SkillChainCount + 1 : 0;
+            p.SkillEffective = p.Sheet.SkillMoves * MathF.Pow(k.ChainMultiplier, p.SkillChainCount);
+            p.SkillBoostUntil = -100f; // an earlier move's burst, waiting for its touch or under way, is gone
+            p.SkillBurstUntil = -100f;
+        }
 
         // The waiting touch is dropped; the move owns the ball until it ends.
         if (p.TouchAction is { Pending: true } waiting) waiting.Phase = ActionPhase.Done;
@@ -245,6 +258,7 @@ public static class SkillMoves
             SkillEntry = entry,
             SkillCut = cut,
             SkillEffective = p.SkillEffective,
+            FeetTurn = feetTurn,
         };
         if (p.TouchAction is { Made: true } prev && prev.PhaseAt(tick, TouchPlanner.PreWindupTicks(t), TouchPlanner.WindupTicks(t)) != ActionPhase.Done)
             p.PrevTouchAction = prev;
@@ -319,7 +333,8 @@ public static class SkillMoves
                 // drag_back_step_back behind where he started.
                 run = entry * MathF.Max(0f, 1f - u1 / DragBackStopShare);
                 float drift = entry * DragBackStopShare * 0.5f * durSec;
-                steer = -fwd * ((k.DragBackStepBack + drift) / durSec);
+                // A turn at the feet steps toward the stick's line, where the sole pulls the ball.
+                steer = (a.FeetTurn ? a.SkillCut : -fwd) * ((k.DragBackStepBack + drift) / durSec);
                 break;
             }
             case ActionKind.FakeStop:
@@ -406,7 +421,8 @@ public static class SkillMoves
                 to = b0 + r3 * ((a.Side == SkillSide.Left ? -1f : 1f) * k.BallRollDistance.Evaluate(entry)) + f3 * (entry * durSec);
                 break;
             case ActionKind.DragBack:
-                to = b0 - f3 * k.DragBackDistance;
+                // A turn at the feet pulls the ball onto the stick's line rather than straight back.
+                to = a.FeetTurn ? b0 + new Vector3(a.SkillCut.X, 0f, a.SkillCut.Y) * k.DragBackDistance : b0 - f3 * k.DragBackDistance;
                 break;
             case ActionKind.FakeStop:
             {
@@ -521,8 +537,16 @@ public static class SkillMoves
                 ball.Spin = Vector3.Zero;
                 break;
         }
-        p.SkillChainUntil = now + k.ChainWindow;
         if (a.Kind == ActionKind.DragBack) p.SkillCooldownUntil = now + k.DragBackCooldown;
+        if (a.FeetTurn)
+        {
+            // The planner's own turn: straight into the exit touch, with no chain window or exit burst.
+            p.Replanning = true;
+            p.Recovering = false;
+            p.SkillExitTick = tick;
+            return;
+        }
+        p.SkillChainUntil = now + k.ChainWindow;
 
         // The exit burst rides on the exit touch (the planner's next touch), like a touch boost: started here it would make
         // the legs outrun a ball at the feet before that touch could be planned.

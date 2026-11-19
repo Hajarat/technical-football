@@ -373,7 +373,9 @@ public class TouchPlannerTests
         {
             var w = Lab(seed, dribbling: 60);
             var a = RunUntilPhase(w, Sprint, ActionPhase.Windup);
-            Step(w, default);
+            // A release no longer than release_debounce still reads as the stick held (a flick through neutral).
+            int debounce = (int)MathF.Round(w.Tuning.Touch.ReleaseDebounce * w.Tuning.TickRate);
+            for (int i = 0; i <= debounce; i++) Step(w, default);
             Assert.Equal(ActionKind.Stop, a.Kind);
             for (int i = 0; i < 40 && !a.Made; i++) Step(w, default);
             Assert.True(a.Made, $"seed {seed}: the stop touch was not made");
