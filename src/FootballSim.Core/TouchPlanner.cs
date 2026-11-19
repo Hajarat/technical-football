@@ -463,6 +463,8 @@ public static class TouchPlanner
             (int)MathF.Ceiling((k.EarlyMinInterval - (now - p.LastTouchTime)) / t.Dt - 1e-3f));
         // A shot's strike is its next contact: never before the earliest strike tick.
         if (shot && p.ShotEarliestTick >= 0) minJ = Math.Max(minJ, p.ShotEarliestTick - tick);
+        // ... nor sooner than a tick before the strike estimate already published (it may move later, never earlier).
+        if (shot && p.ShotNotBeforeTick >= 0) minJ = Math.Max(minJ, p.ShotNotBeforeTick - tick);
         bool strikeCommitted = shot && p.StrikeContactTick >= 0;
         if (committed != null)
         {
@@ -490,8 +492,7 @@ public static class TouchPlanner
             // Never sooner than early_min_interval after the last touch (minJ), and at least the windup ahead less the slack.
             int h = HorizonTicks(t);
             int need = Cooldown(p, demand, turn ? turnDeg : 90f, t);
-            // The strike: the first tick that meets the ball (the first eligible contact), not the best of its window.
-            if (shot) tg = Search(p, ShotPace(p, t), ball, chase: true, need, minJ, Math.Max(h, minJ + h), now, t, pitch, firstTick: true);
+            if (shot) tg = StrikeSearch(p, ball, need, minJ, Math.Max(h, minJ + h), now, t, pitch);
             else if (demand)
             {
                 // The stick's legs where they cost no time (the body already turns to the stick), else go and get it sooner.
@@ -558,6 +559,24 @@ public static class TouchPlanner
         if (Residual(p, q, now, t, 1f, turnish) <= t.Touch.ContactZoneRadius) { tg = q; return; }
         p.GaitLockTicks = 0;
     }
+
+    /// <summary>
+    /// The strike's contact: the first tick that meets the ball (the first eligible contact, not the best of its window) on a
+    /// swing of the foot chosen at the press; the other foot's when the chosen foot cannot meet it or would wait more than one
+    /// step longer than the other foot.
+    /// </summary>
+    static Target StrikeSearch(PlayerState p, Ball ball, int need, int minJ, int maxJ, float now, Tuning t, Pitch? pitch)
+    {
+        var pace = ShotPace(p, t);
+        var any = Search(p, pace, ball, chase: true, need, minJ, maxJ, now, t, pitch, firstTick: true);
+        if (!any.Found || any.Foot == p.ShotFoot) return any;
+        var own = Search(p, pace, ball, chase: true, need, minJ, maxJ, now, t, pitch, firstTick: true, foot: p.ShotFoot);
+        int step = p.StepFrequency > 0f ? (int)MathF.Ceiling(t.TickRate / p.StepFrequency) : 0;
+        return own.Found && own.J <= any.J + step + StrikeFootSlack ? own : any;
+    }
+
+    /// <summary>The chosen foot's swing is still taken this many ticks past one step after the other foot's (the stride clock moves with the speed).</summary>
+    const int StrikeFootSlack = 2;
 
     /// <summary>
     /// Commits the shot's strike on the target's swing, one windup before its contact: its contact tick and foot (the foot in
@@ -681,7 +700,8 @@ public static class TouchPlanner
     /// touch, which may also play the ball anywhere within the turn reach of the body.
     /// </summary>
     static Target Search(PlayerState p, in TickIntent user, Ball ball, bool chase, int need, int minJ, int maxJ, float now, Tuning t,
-        Pitch? pitch, float tol = 0f, bool held = false, float trim = 1f, bool turnish = false, bool firstOnly = false, bool firstTick = false)
+        Pitch? pitch, float tol = 0f, bool held = false, float trim = 1f, bool turnish = false, bool firstOnly = false, bool firstTick = false,
+        Foot? foot = null)
     {
         var c = p.Scratch();
         var b = ball.ScratchA();
@@ -702,7 +722,7 @@ public static class TouchPlanner
                 steps++;
                 if (best.Found) return best;   // the window of the step before held a contact
             }
-            bool inWindow = c.IsStepping && InWindow(c.SwingProgress);
+            bool inWindow = c.IsStepping && InWindow(c.SwingProgress) && (foot == null || c.SwingFoot == foot);
             if (inWindow && steps >= need && i >= minJ && b.Position.Y <= t.Touch.MaxBallHeight)
             {
                 looked = true;
@@ -935,6 +955,7 @@ public static class TouchPlanner
     {
         p.StrikeContactTick = -1;
         p.ShotEarliestTick = -1;
+        p.ShotNotBeforeTick = -1;
         p.ShotCommitAllowed = false;
     }
 

@@ -207,9 +207,12 @@ before the strike (the gamepad's low shot) counts as driven held.
   0.45 s after the press (the wind-up) and 0.12 s after the release (the earliest strike tick), and it takes the place of the
   attacker's next touch: from the press no dribble touch is committed (one already committed is played), and the strike is
   the touch controller's first eligible contact from the earliest strike tick on (the first tick of a swing's contact window
-  that meets the ball), committed like a touch one windup before it, on the foot swinging there, and played in that window.
-  With the ball at the feet at the press (within foot reach, no touch committed) a soft touch keeps it there and the strike
-  falls at the earliest strike tick, on the foot chosen at the press; if the ball is not strikable then, the next contact
+  that meets the ball) on a swing of the striking foot chosen at the press (the preferred foot unless the ball is well over on
+  the other side), or of the other foot when the chosen one cannot meet the ball or would wait more than one step longer. It
+  is committed like a touch one windup before it, on the foot swinging there, and played in that window; from the commit its
+  contact tick is fixed. With the ball at the feet at the press (within foot reach, no touch committed) a soft touch keeps it
+  there and the strike falls at the earliest strike tick, on the foot chosen at the press, whatever the stride clock's
+  swinging foot (the view poses the whole body for the shot itself); if the ball is not strikable then, the next contact
   strikes it. A shot in possession is never dropped: he keeps running on to the ball and strikes on arrival. A shot pressed
   without the ball, or one whose ball the keeper took, is struck as soon as the ball is in reach from the earliest tick, or
   dropped after `round.shoot_buffer`. From the press to the strike the left stick only aims: the legs run on to the ball (the
@@ -217,7 +220,8 @@ before the strike (the gamepad's low shot) counts as driven held.
   The soft touch leaves the ball rolling along the shooter's velocity.
 - The attacker publishes `StrikeEta` and `StrikeFoot` from the press on, as the best estimate: the later of the earliest
   strike tick (while shoot is held, as if it were let go on the next tick) and the controller's forecast contact, then the
-  committed strike; the shot action's `ContactTick` and `Foot` carry the same estimate, and the keeper reads it.
+  committed strike; once published it may move later (by whole steps, while the run cannot reach the ball) but never more
+  than a tick earlier. The shot action's `ContactTick` and `Foot` carry the same estimate, and the keeper reads it.
 - Aim is the left stick at the release; a stick at rest then uses its last pushed direction if that was within 0.5 s. It is
   locked from the release to the contact. Aim assist still applies.
 - Each distance to the goal centre has an ideal charge (`shot.ideal_charge`; the HUD marks it from `World.IdealCharge`).

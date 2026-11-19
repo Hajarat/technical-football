@@ -40,6 +40,7 @@ static class ShotProbe
 
     sealed class Row
     {
+        public int ChosenFoot, EarlierJumps, CommitMoved;
         public int Runs, Struck, CommittedAfter, PlayedAfter, FootOk, ShotSteps, ShotTicks, NoPress, AtFoot, Forecast;
         public readonly List<float> Time = new(), DPress = new(), DStrike = new(), VsEta = new(), VsTouch = new();
     }
@@ -52,7 +53,7 @@ static class ShotProbe
         int seeds = opts.TryGetValue("seeds", out var ns) ? int.Parse(ns, CultureInfo.InvariantCulture) : 20;
         int[] ratings = opts.TryGetValue("ratings", out var rs) ? rs.Split(',').Select(int.Parse).ToArray() : new[] { 1, 50, 99 };
         var keeper = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", "the_wall.json")).Value!;
-        Console.WriteLine($"shot probe: striker_a by dribbling, seeds={seeds}, shoot held 0.2 s; time = press to strike s (mean/max), d_press / d_strike = ball from the feet m (mean/max), committed / played = runs with a dribble touch committed / played after the press, at_foot = strikes pressed with the ball at the feet (struck at the earliest strike tick on the foot chosen at the press), foot_ok = the other strikes on the swinging foot in its window (or standing) / those strikes, vs_eta = strike tick - (press + StrikeEta at the press) (mean, max |x|, runs within one tick), vs_touch = strike tick - the later of the earliest strike tick and the first dribble touch of the same run without the press (mean, max |x|, runs within one tick), shot = speed steps (|d speed|/dt > 15 m/s^2) from the press to 0.5 s after the strike / ticks");
+        Console.WriteLine($"shot probe: striker_a by dribbling, seeds={seeds}, shoot held 0.2 s; time = press to strike s (mean/max), d_press / d_strike = ball from the feet m (mean/max), committed / played = runs with a dribble touch committed / played after the press, at_foot = strikes pressed with the ball at the feet (struck at the earliest strike tick on the foot chosen at the press), foot_ok = the other strikes on the swinging foot in its window (or standing) / those strikes, vs_eta = strike tick - (press + StrikeEta at the press) (mean, max |x|, runs within one tick), vs_touch = strike tick - the later of the earliest strike tick and the first dribble touch of the same run without the press (mean, max |x|, runs within one tick), shot = speed steps (|d speed|/dt > 15 m/s^2) from the press to 0.5 s after the strike / ticks; chosen_foot = the other strikes on the foot chosen at the press (else the other foot's swing), est_earlier = ticks the published estimate moved more than a tick earlier, commit_moved = ticks it moved after the strike's commit");
         Console.WriteLine($"{"case",-22} {"rating",6} {"runs",5} {"struck",7} {"time",11} {"d_press",11} {"d_strike",11} {"committed",9} {"played",6} {"at_foot",7} {"foot_ok",7} {"vs_eta",13} {"vs_touch",13} {"shot",9}");
         if (opts.TryGetValue("trace", out var tr))
         {
@@ -78,7 +79,7 @@ static class ShotProbe
     static void Merge(Row a, Row b)
     {
         a.Runs += b.Runs; a.Struck += b.Struck; a.CommittedAfter += b.CommittedAfter; a.PlayedAfter += b.PlayedAfter; a.FootOk += b.FootOk;
-        a.ShotSteps += b.ShotSteps; a.ShotTicks += b.ShotTicks; a.NoPress += b.NoPress; a.AtFoot += b.AtFoot; a.Forecast += b.Forecast;
+        a.ShotSteps += b.ShotSteps; a.ShotTicks += b.ShotTicks; a.NoPress += b.NoPress; a.AtFoot += b.AtFoot; a.Forecast += b.Forecast; a.ChosenFoot += b.ChosenFoot; a.EarlierJumps += b.EarlierJumps; a.CommitMoved += b.CommitMoved;
         a.Time.AddRange(b.Time); a.DPress.AddRange(b.DPress); a.DStrike.AddRange(b.DStrike); a.VsEta.AddRange(b.VsEta); a.VsTouch.AddRange(b.VsTouch);
     }
 
@@ -89,6 +90,7 @@ static class ShotProbe
         string vt = r.VsTouch.Count == 0 ? "-" : $"{F(r.VsTouch.Average(), 1)}/{F(r.VsTouch.Max(MathF.Abs), 0)}/{r.VsTouch.Count(x => MathF.Abs(x) <= 1f)}";
         string vs = r.VsEta.Count == 0 ? "-" : $"{F(r.VsEta.Average(), 1)}/{F(r.VsEta.Max(MathF.Abs), 0)}/{r.VsEta.Count(x => MathF.Abs(x) <= 1f)}";
         Console.WriteLine($"{name,-22} {rating,6} {r.Runs,5} {F(100.0 * r.Struck / Math.Max(1, r.Runs), 1),7} {MM(r.Time),11} {MM(r.DPress),11} {MM(r.DStrike),11} {r.CommittedAfter,9} {r.PlayedAfter,6} {r.AtFoot,7} {r.FootOk + "/" + r.Forecast,7} {vs,13} {vt,13} {r.ShotSteps + "/" + r.ShotTicks,9}"
+            + $" chosen_foot {r.ChosenFoot}/{r.Forecast} est_earlier {r.EarlierJumps} commit_moved {r.CommitMoved}"
             + (r.NoPress > 0 ? $"  (no press in {r.NoPress})" : ""));
     }
 
@@ -172,10 +174,13 @@ static class ShotProbe
         float dPress = Flat(w.Ball.Position, p.Position);
         // Pressed with the ball at the feet (within foot reach, no touch committed): struck at the earliest strike tick.
         bool atFoot = TouchModel.InReach(p, w.Ball, t) && p.TouchAction is not { Pending: true };
+        Foot chosen = ShotModel.StrikingFoot(p, w.Ball.Position, t);
+        int prevEst = int.MinValue, commitAt = -1;
         var before = p.TouchAction;
         int hold = (int)MathF.Round(0.2f * t.TickRate);
         int press = -1, strike = -1, earliest = 0;
         float eta = float.NaN, dStrike = float.NaN;
+        Foot strikeFoot = Foot.Right;
         bool committed = false, played = false, footOk = false;
         var changes = new List<string>();
         int lastEst = int.MinValue;
@@ -187,6 +192,15 @@ static class ShotProbe
             Step(it);
             if (i == 0) { press = w.Tick; eta = p.StrikeEta; }
             if (i == hold) earliest = Math.Max((int)MathF.Round(t.Shot.WindupSeconds * t.TickRate), hold + (int)MathF.Round(t.Shot.ReleaseLeadSeconds * t.TickRate));
+            if (!float.IsNaN(p.StrikeEta))
+            {
+                int e = w.Tick + (int)MathF.Round(p.StrikeEta * t.TickRate);
+                if (prevEst != int.MinValue && e < prevEst - 1) row.EarlierJumps++;
+                // From the commit (one windup before the contact) the contact tick is fixed.
+                if (commitAt >= 0 && e != commitAt) row.CommitMoved++;
+                if (commitAt < 0 && e - w.Tick <= (int)MathF.Round(t.Touch.Windup * t.TickRate) && w.State == RoundState.Strike && !atFoot) commitAt = e;
+                prevEst = e;
+            }
             if (List && !float.IsNaN(p.StrikeEta))
             {
                 int est = w.Tick - press + (int)MathF.Round(p.StrikeEta * t.TickRate);
@@ -207,6 +221,7 @@ static class ShotProbe
             {
                 strike = w.Tick;
                 dStrike = Flat(ev.Position, p.Position);
+                strikeFoot = ev.Foot;
                 footOk = !p.IsStepping || p.SwingFoot == ev.Foot && p.SwingProgress >= 0.22f && p.SwingProgress <= 0.88f;
             }
             if (strike >= 0 && w.Tick > strike + 60) break;
@@ -220,7 +235,7 @@ static class ShotProbe
         if (strike < 0) return;
         row.Struck++;
         if (atFoot) row.AtFoot++;
-        else { row.Forecast++; if (footOk) row.FootOk++; }
+        else { row.Forecast++; if (footOk) row.FootOk++; if (strikeFoot == chosen) row.ChosenFoot++; }
         row.Time.Add((strike - press) * t.Dt);
         row.DStrike.Add(dStrike);
         if (!float.IsNaN(eta)) row.VsEta.Add(strike - (press + MathF.Round(eta * t.TickRate)));

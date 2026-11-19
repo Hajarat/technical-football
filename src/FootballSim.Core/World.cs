@@ -39,7 +39,8 @@ public sealed class World
     float _awayFor;            // seconds the ball has been beyond the controller's lose distance
     bool _softPending;         // shoot pressed with the ball at the feet: the soft touch is still to be made
     bool _shotAtFoot;          // shoot pressed with the ball at the feet: struck at the earliest strike tick if strikable then
-    Foot _strikeFoot;          // foot decided at the press for a shot struck at the earliest tick (else the swinging foot)
+    Foot _strikeFoot;          // foot decided at the press (the swinging foot it strikes with when that differs, once struck)
+    int _strikeEstMax = -1;    // the latest strike tick published for the shot under way (the estimate never moves earlier)
     int _shotStartTick = -1;   // tick shoot was pressed for the shot under way (for the fake shot), or -1
     bool _shotCancelled;       // the shot was turned into a fake: the rest of this press of shoot is ignored
 
@@ -185,7 +186,7 @@ public sealed class World
         _pending = default; _outcomeLeft = 0f;
         _liveSeconds = 0f; _endTick = 0; _endClock = 0f; _lastShot = null;
         _controller = null; _awayFor = 0f; _softPending = false; _shotAtFoot = false; _strikeFoot = Foot.Right;
-        _shotStartTick = -1; _shotCancelled = false;
+        _shotStartTick = -1; _shotCancelled = false; _strikeEstMax = -1;
 
         float r = Tuning.Ball.Radius;
         Ball.Position = new Vector3(Scenario.Ball.X, r, Scenario.Ball.Z);
@@ -541,6 +542,8 @@ public sealed class World
     {
         bool shot = p.ShotAction is { Made: false } && _shotStartTick >= 0;
         p.ShotEarliestTick = shot ? EarliestStrikeTick(Tick) : -1;
+        p.ShotFoot = _strikeFoot;
+        p.ShotNotBeforeTick = shot && _strikeEstMax >= 0 ? _strikeEstMax - 1 : -1;
         p.ShotCommitAllowed = shot && _pending.Active && !_shotAtFoot && _controller == p;
     }
 
@@ -560,6 +563,9 @@ public sealed class World
             if (a.StrikeContactTick >= 0) { est = a.StrikeContactTick; foot = a.StrikeContactFoot; }
             else if (a.TouchAction is not { Pending: true } && a.ForecastTick >= Tick) { est = Math.Max(est, a.ForecastTick); foot = a.ForecastFoot; }
         }
+        // Published, the estimate may move later (while the run cannot reach the ball) but never more than a tick earlier.
+        if (a.StrikeContactTick < 0) est = Math.Max(est, _strikeEstMax - 1);
+        _strikeEstMax = Math.Max(_strikeEstMax, est);
         shot.ContactTick = est;
         shot.Foot = foot;
         a.StrikeFoot = foot;
@@ -625,6 +631,7 @@ public sealed class World
         _shotAtFoot = inPossession && p.TouchAction is not { Pending: true } && TouchModel.InReach(p, Ball, tuning);
         _softPending = _shotAtFoot;
         p.StrikeContactTick = -1;
+        _strikeEstMax = -1;
         _strikeFoot = ShotModel.StrikingFoot(p, Ball.Position, tuning);
         p.StrikeFoot = _strikeFoot;
         p.ShotAction = new BallAction
