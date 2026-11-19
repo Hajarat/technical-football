@@ -40,8 +40,8 @@ public sealed class PlayerState
     /// <summary>True while this player controls the ball (dribbling it). False when the ball is loose or someone else's.</summary>
     public bool InPossession { get; internal set; }
     /// <summary>
-    /// Seconds until this player's next planned touch of the ball (the pending <see cref="Action"/>'s contact), or NaN when
-    /// none is planned.
+    /// Seconds until this player's next expected touch of the ball: the committed touch's contact (the pending
+    /// <see cref="Action"/>), else the contact the touch controller steers for (updated every tick), or NaN when none is expected.
     /// </summary>
     public float NextTouchEta { get; internal set; } = float.NaN;
     /// <summary>The foot expected to make that touch. Meaningful only when <see cref="NextTouchEta"/> is a number.</summary>
@@ -214,8 +214,6 @@ public sealed class PlayerState
     internal Vector2 LastStickMove;
     /// <summary>A knock-on was asked for; the next touch made is one.</summary>
     internal bool KnockOnRequested;
-    /// <summary>No longer read (the foot switch counts <see cref="TouchCadenceCount"/>); the world still clears it each round.</summary>
-    internal bool TouchRhythm;
     /// <summary>Touches pushed with an even steps_per_touch this round, for the foot switch (see foot_switch_every).</summary>
     internal int TouchCadenceCount;
 

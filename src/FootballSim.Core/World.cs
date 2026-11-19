@@ -272,7 +272,6 @@ public sealed class World
         p.StepsSinceTouch = 0;
         p.PushSteps = 1;
         p.ClearForecast();
-        p.TouchRhythm = false;
         p.SoftWaitAction = null;
         p.TouchBoostFrom = float.NaN;
         p.TouchBoostUntil = -100f;

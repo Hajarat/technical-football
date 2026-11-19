@@ -16,7 +16,7 @@ using FootballSim.Core;
 //   ... --probe dribble --dtrace <probe> --ratings R [--index i] [--seeds n] [--from T --to T] [--steps-only 1]
 //                                               traces one probe tick by tick (diagnostic)
 //   ... --probe sessions [--replays <dir|file>]  re-runs play-test rounds (a folder with its subfolders) and counts touches dropped
-//                                               at contact, slowdown plans with the stick pushed and speed steps in possession
+//                                               at contact, and speed steps in possession
 //   ... --probe feel [--seeds 20] [--replays <dir|file>]
 //                                               speed surges, acceleration, speed steps, touch cadence and heading response of dribbling
 //   ... --probe feel --rtrace <replay> [--from T --to T] [--steps-only 1]

@@ -91,7 +91,7 @@ public enum ActionPhase
 public enum FootSurface { Inside, Laces, Outside, Sole }
 
 /// <summary>
-/// One action of one player: a touch now, skills and shots later. Created by the touch planner, read by the view. Ticks are
+/// One action of one player: a touch now, skills and shots later. Created by the touch controller (TouchPlanner), read by the view. Ticks are
 /// world ticks at 120 per second; positions are world metres (see Types.cs). The view never decides timing: it reads
 /// <see cref="Phase"/>, <see cref="Foot"/>, <see cref="ContactTick"/> and <see cref="ContactPoint"/>.
 /// </summary>
@@ -185,8 +185,6 @@ public sealed class BallAction
     internal bool Stretched;
     /// <summary>A touch committed on the go-get-it legs (they carry it to the contact), not the stick's.</summary>
     internal bool ChaseLegs;
-    /// <summary>The steering correction applied on the latest tick, m/s.</summary>
-    internal Vector2 Steer;
     // Skill move state (HoldDirection is the running direction the move started on).
     /// <summary>Running speed along that direction when the move started, m/s.</summary>
     internal float SkillEntry;

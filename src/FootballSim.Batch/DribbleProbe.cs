@@ -341,8 +341,8 @@ static class DribbleProbe
 
 /// <summary>
 /// Re-runs recorded play-test rounds (round-*.json, a folder searched with its subfolders, so a folder of session folders gives
-/// every round in them) with the current code and counts, per round, the touches dropped at their contact (all, and with the
-/// stick pushed), the slowdown plans made with the stick pushed, and the speed steps in possession (see <see cref="SpeedSteps"/>). The rounds play out differently
+/// every round in them) with the current code and counts, per round, the committed touches not played at their contact (all,
+/// and with the stick pushed), and the speed steps in possession (see <see cref="SpeedSteps"/>). The rounds play out differently
 /// from the recording as the simulation changes; the counts are what matters.
 /// </summary>
 static class SessionProbe
@@ -358,8 +358,8 @@ static class SessionProbe
         if (files.Length == 0) { Console.WriteLine($"session probe: no round-*.json under {src}; skipped"); return 0; }
         Console.WriteLine($"session probe: {files.Length} rounds from {src}");
         Console.WriteLine("steps = possession ticks whose |d|v||/dt is over 15 m/s^2 (shots excluded, skill moves included; skill = those during a move), acc_max = largest |dv|/dt over the same ticks, m/s^2");
-        Console.WriteLine($"{"round",-50} {"ticks",6} {"drops",6} {"drops_pushed",13} {"slowdowns_pushed",17} {"slowdown_far_pushed",20} {"poss_ticks",10} {"steps",6} {"skill",6} {"acc_max",8}  outcome");
-        int totalDrops = 0, totalPushedDrops = 0, totalSlow = 0;
+        Console.WriteLine($"{"round",-50} {"ticks",6} {"unplayed",8} {"unplayed_pushed",15} {"poss_ticks",10} {"steps",6} {"skill",6} {"acc_max",8}  outcome");
+        int totalDrops = 0, totalPushedDrops = 0;
         var all = new SpeedSteps();
         foreach (var f in files)
         {
@@ -370,31 +370,27 @@ static class SessionProbe
             var kee = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", rp.KeeperId + ".json")).Value;
             if (sc == null || att == null || kee == null) { Console.Error.WriteLine($"{f}: scenario or players not found"); return 1; }
             var c = Audit(rp, tuning, sc, att, kee);
-            totalDrops += c.Drops; totalPushedDrops += c.DropsPushed; totalSlow += c.SlowdownsPushed;
+            totalDrops += c.Drops; totalPushedDrops += c.DropsPushed;
             all.Add(c.Steps);
             string name = Path.GetFileName(Path.GetDirectoryName(f)) + "/" + Path.GetFileName(f);
-            Console.WriteLine($"{name,-50} {rp.TickCount,6} {c.Drops,6} {c.DropsPushed,13} {c.SlowdownsPushed,17} {c.SlowdownsFarPushed,20} {c.Steps.Ticks,10} {c.Steps.Steps,6} {c.Steps.SkillSteps,6} {c.Steps.AccMax,8:F1}  {c.Outcome}");
+            Console.WriteLine($"{name,-50} {rp.TickCount,6} {c.Drops,8} {c.DropsPushed,15} {c.Steps.Ticks,10} {c.Steps.Steps,6} {c.Steps.SkillSteps,6} {c.Steps.AccMax,8:F1}  {c.Outcome}");
         }
-        Console.WriteLine($"total: {totalDrops} touches dropped at contact ({totalPushedDrops} with the stick pushed), {totalSlow} slowdown plans with the stick pushed, " +
+        Console.WriteLine($"total: {totalDrops} committed touches not played ({totalPushedDrops} with the stick pushed), " +
                           $"{all.Steps} speed steps in {all.Ticks} possession ticks ({all.PerThousand:F1} per 1000, skill {all.SkillSteps}), acc_max {all.AccMax:F1} m/s^2");
         return 0;
     }
 
-    public readonly record struct Counts(int Drops, int DropsPushed, int SlowdownsPushed, int SlowdownsFarPushed, SpeedSteps Steps, string Outcome);
+    public readonly record struct Counts(int Drops, int DropsPushed, SpeedSteps Steps, string Outcome);
 
-    /// <summary>
-    /// Plays a replay's recorded ticks and counts the drops at contact and the slowdown plans made with the stick pushed (far: the
-    /// contact more than 0.6 s off).
-    /// </summary>
+    /// <summary>Plays a replay's recorded ticks and counts the committed touches not played at their contact.</summary>
     public static Counts Audit(Replay rp, Tuning t, Scenario sc, PlayerSheet att, PlayerSheet kee)
     {
         var w = new World(t, sc, att, kee, rp.Seed);
         w.Begin();
         var buf = new TickIntent[w.PlayerCount];
         int per = Math.Max(1, rp.PlayersPerTick);
-        int drops = 0, dropsPushed = 0, slow = 0, slowFar = 0;
+        int drops = 0, dropsPushed = 0;
         var p = w.Attacker;
-        BallAction? seen = null;
         var steps = new SpeedSteps();
         for (int tick = 0; tick < rp.TickCount && w.State != RoundState.Report; tick++)
         {
@@ -410,16 +406,7 @@ static class SessionProbe
                 drops++;
                 if (pushed) dropsPushed++;
             }
-            if (p.TouchAction is { Pending: true } a && a != seen)
-            {
-                seen = a;
-                if (a.Kind == ActionKind.Slowdown && pushed)
-                {
-                    slow++;
-                    if ((a.ContactTick - w.Tick) * t.Dt > 0.6f) slowFar++;
-                }
-            }
         }
-        return new Counts(drops, dropsPushed, slow, slowFar, steps, w.Report?.Outcome.Label() ?? w.State.ToString());
+        return new Counts(drops, dropsPushed, steps, w.Report?.Outcome.Label() ?? w.State.ToString());
     }
 }

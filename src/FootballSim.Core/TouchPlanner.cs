@@ -251,7 +251,6 @@ public static class TouchPlanner
             steer = Toward(p.PlannerSteer, Vector2.Zero, SteerStep(t));
         }
         p.PlannerSteer = steer;
-        if (p.TouchAction is { Pending: true } a) a.Steer = steer + FacingDir(p) * along;
         // A skill move's step eases out (at steer_accel) on top of it.
         p.SteerCarry = Toward(p.SteerCarry, Vector2.Zero, SteerStep(t));
         float cap = Possession.SpeedCap(p, true, p.Chasing, t);
