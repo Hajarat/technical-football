@@ -248,8 +248,8 @@ static class FeelProbe
     static int RunReplays(string path, string dataDir, Tuning tuning)
     {
         var files = Directory.Exists(path) ? Directory.GetFiles(path, "round-*.json", SearchOption.AllDirectories).OrderBy(f => f).ToArray() : new[] { path };
-        Console.WriteLine("replays (attacker in possession, shots excluded, skill moves included): acc = |dv|/dt m/s^2 per tick (turning included); dspd = |d speed|/dt m/s^2 per tick; steps = ticks with dspd over 15 m/s^2 (a speed step), skill = those during a skill move; surge = max-min speed between touches with the stick unchanged; interval cv over runs of same-stick touches");
-        Console.WriteLine("file                                              ticks  acc_p99  acc_max  dspd_p99  dspd_max  steps  skill  surge_mean  surge_p90  touches  int_cv  worst");
+        Console.WriteLine("replays (attacker in possession, shots excluded, skill moves included): acc = |dv|/dt m/s^2 per tick (turning included); dspd = |d speed|/dt m/s^2 per tick; steps = ticks with dspd over 15 m/s^2 (a speed step), skill = those during a skill move; surge = max-min speed between touches with the stick unchanged; interval cv over runs of same-stick touches; shot = speed steps from a shoot press to 0.5 s after the strike (in possession or not)");
+        Console.WriteLine("file                                              ticks  acc_p99  acc_max  dspd_p99  dspd_max  steps  skill  shot  surge_mean  surge_p90  touches  int_cv  worst");
         var all = new SpeedSteps(); var allSurge = new List<float>(); var allCv = new List<float>();
         foreach (var f in files)
         {
@@ -273,7 +273,7 @@ static class FeelProbe
             {
                 Array.Clear(buf);
                 for (int k = 0; k < buf.Length && k < per; k++) buf[k] = replay.Intents[i * per + k].ToIntent();
-                if (w.State != RoundState.Live) { w.Step(buf); continue; }
+                if (w.State != RoundState.Live) { steps.Before(p); w.Step(buf); steps.After(p, tuning.Dt, false, w.IsSimulating); continue; }
                 var stick = buf[0].Move; bool spr = buf[0].Sprint >= 0.5f;
                 bool same = Vector2.Distance(stick, lastStick) < 0.05f && spr == lastSprint;
                 if (!same) { clean = false; if (intervals.Count >= 3) cvs.Add((float)(Std(intervals) / Mean(intervals))); intervals.Clear(); }
@@ -284,7 +284,7 @@ static class FeelProbe
                 bool touched = w.Events.Any(e => e.Team == 0 && e.PlayerIndex == 0 && e.Kind == EventKind.Touch);
                 float sp = new Vector2(p.Velocity.X, p.Velocity.Z).Length();
                 int n0 = steps.Ticks;
-                steps.After(p, tuning.Dt, w.State == RoundState.Live);
+                steps.After(p, tuning.Dt, w.State == RoundState.Live, w.IsSimulating);
                 if (steps.Ticks > n0)
                 {
                     if (steps.DspdMax > dsMax0 && steps.DspdMax > worstDs) { worstDs = steps.DspdMax; worst = $"t={i * tuning.Dt:F2}s:{(p.SkillMove != null ? "skill " + p.SkillMove.Kind : p.TouchAction?.Kind.ToString())}@({p.Position.X:F1},{p.Position.Z:F1})"; }
@@ -304,10 +304,10 @@ static class FeelProbe
             {
                 name.PadRight(48), steps.Ticks.ToString().PadLeft(5), F(steps.AccP99, 1).PadLeft(7), F(steps.AccMax, 1).PadLeft(7),
                 F(steps.DspdP99, 1).PadLeft(8), F(steps.DspdMax, 1).PadLeft(8),
-                steps.Steps.ToString().PadLeft(5), steps.SkillSteps.ToString().PadLeft(5), F(Mean(surge)).PadLeft(10), F(Pct(surge, 0.9)).PadLeft(9), touches.ToString().PadLeft(7), F(Mean(cvs), 3).PadLeft(6), worst,
+                steps.Steps.ToString().PadLeft(5), steps.SkillSteps.ToString().PadLeft(5), steps.ShotSteps.ToString().PadLeft(4), F(Mean(surge)).PadLeft(10), F(Pct(surge, 0.9)).PadLeft(9), touches.ToString().PadLeft(7), F(Mean(cvs), 3).PadLeft(6), worst,
             }));
         }
-        Console.WriteLine($"all: ticks {all.Ticks}  acc_p99 {F(all.AccP99, 1)}  acc_max {F(all.AccMax, 1)}  dspd_p99 {F(all.DspdP99, 1)}  dspd_max {F(all.DspdMax, 1)}  steps {all.Steps} ({F(all.PerThousand, 1)} per 1000 ticks, skill {all.SkillSteps})  surge_mean {F(Mean(allSurge))}  surge_p90 {F(Pct(allSurge, 0.9))}  int_cv {F(Mean(allCv), 3)}");
+        Console.WriteLine($"all: ticks {all.Ticks}  acc_p99 {F(all.AccP99, 1)}  acc_max {F(all.AccMax, 1)}  dspd_p99 {F(all.DspdP99, 1)}  dspd_max {F(all.DspdMax, 1)}  steps {all.Steps} ({F(all.PerThousand, 1)} per 1000 ticks, skill {all.SkillSteps})  shot {all.ShotSteps} in {all.ShotTicks} ticks  surge_mean {F(Mean(allSurge))}  surge_p90 {F(Pct(allSurge, 0.9))}  int_cv {F(Mean(allCv), 3)}");
         return 0;
     }
 }

@@ -230,14 +230,17 @@ public class CalibrationTests
     /// angle's its target. With the closed-loop touch controller (the ball kept closer, sprint pushes the keeper no longer
     /// collects) and the scripted attacker striking at the distances these bands were first measured at (strike_distance:
     /// breakaway 11.3, halfway run 12.4, angled run 11.1 m), the run-ins measured (2,000 rounds) breakaway 12.1, halfway run
-    /// 34.6, angled run 31.9 and keeper rush 39.6%; those bands are five points either side of the measured value.
+    /// 34.6, angled run 31.9 and keeper rush 39.6%; those bands are five points either side of the measured value. With a shot's
+    /// strike taking the place of the next touch (2026-11-19: on whichever foot is swinging, about half of the run-in strikes
+    /// on the weak foot, and the keeper reading the strike estimate from the press) halfway run measured 24.2%; its band is five
+    /// points either side.
     /// </summary>
     [Theory]
     [InlineData("penalty", 72.0, 80.0)]
     [InlineData("edge_of_box", 6.0, 14.0)]
     [InlineData("tight_angle", 2.0, 8.0)]
     [InlineData("breakaway", 7.0, 17.0)]
-    [InlineData("halfway_run", 30.0, 40.0)]
+    [InlineData("halfway_run", 19.0, 29.0)]
     [InlineData("angled_run", 27.0, 37.0)]
     [InlineData("keeper_rush", 35.0, 45.0)]
     public void ScoringRateStaysInItsBand(string scenario, double lo, double hi)

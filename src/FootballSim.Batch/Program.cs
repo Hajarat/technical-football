@@ -17,6 +17,8 @@ using FootballSim.Core;
 //                                               traces one probe tick by tick (diagnostic)
 //   ... --probe sessions [--replays <dir|file>]  re-runs play-test rounds (a folder with its subfolders) and counts touches dropped
 //                                               at contact, and speed steps in possession
+//   ... --probe shot [--seeds 20] [--ratings 1,50,99]  scripted shots pressed in possession: press to strike, ball distance,
+//                                               touches after the press, strike foot and speed steps
 //   ... --probe feel [--seeds 20] [--replays <dir|file>]
 //                                               speed surges, acceleration, speed steps, touch cadence and heading response of dribbling
 //   ... --probe feel --rtrace <replay> [--from T --to T] [--steps-only 1]
@@ -72,7 +74,8 @@ static class Cli
             if (probe == "feel") return FeelProbe.Run(opts, dataDir, tuning);
             if (probe == "sessions") return SessionProbe.Run(opts, root ?? Directory.GetCurrentDirectory(), dataDir, tuning);
             if (probe == "shots") return ShotDiag.Run(opts, dataDir, tuning);
-            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, sessions, shots)"); return 2; }
+            if (probe == "shot") return ShotProbe.Run(opts, dataDir, tuning);
+            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, sessions, shots, shot)"); return 2; }
             return DribbleProbe.Run(opts, dataDir, tuning);
         }
 

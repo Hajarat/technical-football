@@ -190,6 +190,8 @@ public sealed class BallAction
     internal float SkillEntry;
     /// <summary>Where the ball was when the move started and where the sole leaves it.</summary>
     internal Vector3 SkillBallFrom, SkillBallTo;
+    /// <summary>Ball roll: the ball's distance ahead of the player along the run when the sole landed, metres.</summary>
+    internal float RollAhead0;
     /// <summary>A fake cut's direction (unit X, Z).</summary>
     internal Vector2 SkillCut;
     /// <summary>The effective skill_moves rating the move was made with.</summary>

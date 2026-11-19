@@ -358,9 +358,11 @@ static class SessionProbe
         if (files.Length == 0) { Console.WriteLine($"session probe: no round-*.json under {src}; skipped"); return 0; }
         Console.WriteLine($"session probe: {files.Length} rounds from {src}");
         Console.WriteLine("steps = possession ticks whose |d|v||/dt is over 15 m/s^2 (shots excluded, skill moves included; skill = those during a move), acc_max = largest |dv|/dt over the same ticks, m/s^2");
-        Console.WriteLine($"{"round",-50} {"ticks",6} {"unplayed",8} {"unplayed_pushed",15} {"poss_ticks",10} {"steps",6} {"skill",6} {"wall",5} {"acc_max",8}  outcome");
+        Console.WriteLine("shot = speed steps from a shoot press to 0.5 s after the strike (in possession or not); shots = presses in possession: struck / keeper touched first / neither (dropped or faked), committed = dribble touches committed after a press, foot_ok = strikes on the swinging foot in its window (or standing)");
+        Console.WriteLine($"{"round",-50} {"ticks",6} {"unplayed",8} {"unplayed_pushed",15} {"poss_ticks",10} {"steps",6} {"skill",6} {"wall",5} {"shot",5} {"acc_max",8}  {"shots",8} {"committed",9} {"foot_ok",7}  outcome");
         int totalDrops = 0, totalPushedDrops = 0;
         var all = new SpeedSteps();
+        var shots = new ShotAudit();
         foreach (var f in files)
         {
             var rp = Replay.Load(f, out var err);
@@ -373,14 +375,17 @@ static class SessionProbe
             totalDrops += c.Drops; totalPushedDrops += c.DropsPushed;
             all.Add(c.Steps);
             string name = Path.GetFileName(Path.GetDirectoryName(f)) + "/" + Path.GetFileName(f);
-            Console.WriteLine($"{name,-50} {rp.TickCount,6} {c.Drops,8} {c.DropsPushed,15} {c.Steps.Ticks,10} {c.Steps.Steps,6} {c.Steps.SkillSteps,6} {c.Steps.Wall,5} {c.Steps.AccMax,8:F1}  {c.Outcome}");
+            var a = c.Shots;
+            shots.Add(a);
+            Console.WriteLine($"{name,-50} {rp.TickCount,6} {c.Drops,8} {c.DropsPushed,15} {c.Steps.Ticks,10} {c.Steps.Steps,6} {c.Steps.SkillSteps,6} {c.Steps.Wall,5} {c.Steps.ShotSteps,5} {c.Steps.AccMax,8:F1}  {$"{a.Struck}/{a.KeeperFirst}/{a.Neither}",8} {a.CommittedAfter,9} {$"{a.FootOk}/{a.Struck}",7}  {c.Outcome}");
         }
+        Console.WriteLine($"shots pressed in possession: {shots.Presses}, struck {shots.Struck}, keeper touched first {shots.KeeperFirst}, neither {shots.Neither}; dribble touches committed after a press {shots.CommittedAfter}; strikes on the swinging foot {shots.FootOk}/{shots.Struck}; shot speed steps {all.ShotSteps} in {all.ShotTicks} ticks");
         Console.WriteLine($"total: {totalDrops} committed touches not played ({totalPushedDrops} with the stick pushed), " +
                           $"{all.Steps} speed steps in {all.Ticks} possession ticks ({all.PerThousand:F1} per 1000, skill {all.SkillSteps}; {all.Wall} more against the boards), acc_max {all.AccMax:F1} m/s^2");
         return 0;
     }
 
-    public readonly record struct Counts(int Drops, int DropsPushed, SpeedSteps Steps, string Outcome);
+    public readonly record struct Counts(int Drops, int DropsPushed, SpeedSteps Steps, string Outcome, ShotAudit Shots);
 
     /// <summary>Plays a replay's recorded ticks and counts the committed touches not played at their contact.</summary>
     public static Counts Audit(Replay rp, Tuning t, Scenario sc, PlayerSheet att, PlayerSheet kee)
@@ -392,14 +397,17 @@ static class SessionProbe
         int drops = 0, dropsPushed = 0;
         var p = w.Attacker;
         var steps = new SpeedSteps();
+        var shots = new ShotAudit();
         for (int tick = 0; tick < rp.TickCount && w.State != RoundState.Report; tick++)
         {
             Array.Clear(buf);
             for (int i = 0; i < w.PlayerCount && i < per; i++) buf[i] = rp.Intents[tick * per + i].ToIntent();
             var waiting = p.TouchAction is { Pending: true } pw ? pw : null;
             steps.Before(p);
+            shots.Before(p);
             w.Step(buf);
-            if (w.State == RoundState.Live) steps.After(p, t.Dt);
+            shots.After(w);
+            steps.After(p, t.Dt, w.State == RoundState.Live, w.IsSimulating);
             bool pushed = buf[0].Move.Length() >= t.Touch.StickThreshold;
             if (waiting != null && !waiting.Made && waiting.Phase == ActionPhase.Done && w.Tick >= waiting.ContactTick)
             {
@@ -407,6 +415,6 @@ static class SessionProbe
                 if (pushed) dropsPushed++;
             }
         }
-        return new Counts(drops, dropsPushed, steps, w.Report?.Outcome.Label() ?? w.State.ToString());
+        return new Counts(drops, dropsPushed, steps, w.Report?.Outcome.Label() ?? w.State.ToString(), shots);
     }
 }
