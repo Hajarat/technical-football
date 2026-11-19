@@ -186,7 +186,9 @@ def test_every_move_file_passes_and_pairs_its_entries(rig):
     moves = [A.load_move(p) for p in sorted(A.MOVES.glob("*.toml"))]
     for c in A.build(moves, rig):
         assert not c.problems, (c.name, c.problems)
-        assert list(c.events) == ["start", "contact", "release", "end"], c.name
+        ev = list(c.events)
+        # start, the first contact, any further contacts (contact2, ...), the last contact's end, end
+        assert ev[:2] == ["start", "contact"] and ev[-2:] == ["release", "end"], c.name
     # a move's standing and running files share their event layout, so the runtime can blend them by entry speed
     by = {}
     for m in moves:
