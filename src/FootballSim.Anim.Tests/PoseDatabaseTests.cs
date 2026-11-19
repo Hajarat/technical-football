@@ -13,9 +13,9 @@ public class PoseDatabaseTests
     public void TheLibraryCarriesTheAuditionVerdicts()
     {
         var lib = TestKit.Keeper;
-        Assert.Equal(35, lib.Clips.Count);
+        Assert.Equal(40, lib.Clips.Count);   // 35 retargeted from CMU, 5 baked from the procedural keeper
         Assert.Equal(Rejected.OrderBy(s => s), lib.Clips.Where(c => c.Verdict == ClipVerdict.Reject).Select(c => c.Clip.Name).OrderBy(s => s));
-        Assert.Equal(31, lib.Clips.Count(c => c.Verdict == ClipVerdict.Keep));
+        Assert.Equal(36, lib.Clips.Count(c => c.Verdict == ClipVerdict.Keep));
         Assert.Equal(22, lib.Skeleton.Count);
     }
 
@@ -57,7 +57,7 @@ public class PoseDatabaseTests
     {
         var db = new PoseDatabase(TestKit.Keeper, KeeperChooser.Sets);
         var w = FeatureWeights.Default;
-        foreach (var set in db.Sets)
+        foreach (var set in db.Sets.Where(s => s.FrameCount > 0))   // a set with no kept clip (yet) has nothing to normalise
         {
             for (int g = 0; g < Features.Groups.Length; g++)
             {
@@ -72,6 +72,17 @@ public class PoseDatabaseTests
                     sumStd += Math.Sqrt(v / set.FrameCount);
                     Assert.InRange(m, -1e-3, 1e-3);
                 }
+                // (a group that hardly varies over the set, such as one baked clip's steady facing, is left at its floor scale)
+                double rawStd = 0;
+                for (int d = s0; d < s0 + len; d++)
+                {
+                    double m = 0, v = 0;
+                    for (int i = 0; i < set.FrameCount; i++) m += set.Raw(i)[d];
+                    m /= set.FrameCount;
+                    for (int i = 0; i < set.FrameCount; i++) { double e = set.Raw(i)[d] - m; v += e * e; }
+                    rawStd += Math.Sqrt(v / set.FrameCount);
+                }
+                if (rawStd / len < 1e-3) continue;
                 Assert.InRange(sumStd / len, Features.Weight(w, g) * 0.999, Features.Weight(w, g) * 1.001);
             }
         }

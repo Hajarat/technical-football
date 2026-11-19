@@ -48,8 +48,8 @@ public partial class PlayerFigure
     FigureFrame _animFrame;
     bool _animFailed;
 
-    /// <summary>"procedural" (the poses below, the default) or "mocap" (motion clips where the chooser has a set, see KeeperAnimator). Keeper only; needs the skinned body.</summary>
-    public string KeeperAnimMode { get; set; } = "procedural";
+    /// <summary>"mocap" (motion clips where the chooser has a set, see KeeperAnimator; the default) or "procedural" (the poses below, also the fallback when the clips cannot load). Keeper only; needs the skinned body.</summary>
+    public string KeeperAnimMode { get; set; } = "mocap";
 
     /// <summary>The mocap animator while --keeper-anim mocap drives the body, else null.</summary>
     public KeeperAnimator? KeeperAnim => _keeperAnim;

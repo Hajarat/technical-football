@@ -75,6 +75,7 @@ public partial class Match
         f.KeeperAction = k.KeeperAction; f.KeeperDive = k.KeeperDive; f.KeeperActionTime = k.KeeperActionTime;
         f.Holding = k.KeeperAction == KeeperAction.Holding;
         f.HandPosition = G(k.HandPosition);
+        f.SaveTarget = G(k.SaveTarget); f.SaveContactTime = k.SaveContactTime;
         f.BallPos = G(World.Ball.Position);
         FillGait(ref f, k);
         return f;

@@ -12,7 +12,7 @@ public partial class KeeperView : Node3D
 
     public PlayerFigure Figure => _figure;
 
-    /// <summary>"procedural" (default) or "mocap": how his rigged body is animated (--keeper-anim; see KeeperAnimator).</summary>
+    /// <summary>"mocap" (default) or "procedural": how his rigged body is animated (--keeper-anim; see KeeperAnimator).</summary>
     public string AnimMode { get => _figure.KeeperAnimMode; set => _figure.KeeperAnimMode = value; }
 
     public override void _Ready()

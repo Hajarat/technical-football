@@ -13,6 +13,11 @@
 #           never in the pose database); a clip without one counts as keep
 #   loop    true only for a clip whose end runs into its start (none yet: the matcher treats every clip as one-shot)
 #   notes   what the trial shows
+#   source  "cmu" (default: retargeted from the CMU trial) or "baked": recorded from the procedural keeper by
+#           tools/anim/bake_procedural.py from the keeper gallery script named by "script" (no trial, no frames: its events are found
+#           in the recording); a baked clip is never retargeted, retarget.py lists it in clips.json as it is
+#   tags    for the hybrid saves (dive_low, dive_side, dive_high, smother): "takeoff" marks a CMU clip played up to its takeoff event,
+#           "flight" the baked flight that follows it (spec "What CMU covers")
 #   contact_tolerance_cm  optional: how far a contact foot may stay off the ground (default 2); recorded in clips.json so it can be
 #           tightened once milestone 2's foot locking pins the feet
 #
@@ -260,6 +265,7 @@ frames = [30, 140]
 set = "dive_side"
 side = "left"
 events = { takeoff = 84, contact = 91, landing = 99 }
+tags = ["takeoff"]
 verdict = "keep"
 loop = false
 notes = "jump sideways to his left (a small hop: take-off and landing only)"
@@ -271,6 +277,7 @@ frames = [121, 300]
 set = "dive_high"
 side = "none"
 events = { takeoff = 186, contact = 214, landing = 238 }
+tags = ["takeoff"]
 verdict = "keep"
 loop = false
 notes = "two-foot jump forward"
@@ -282,6 +289,7 @@ frames = [301, 520]
 set = "dive_high"
 side = "none"
 events = { takeoff = 414, contact = 444, landing = 470 }
+tags = ["takeoff"]
 verdict = "keep"
 loop = false
 notes = "crouch and jump"
@@ -292,7 +300,8 @@ trial = "144_17"
 frames = [2160, 2340]
 set = "dive_low"
 side = "none"
-events = { contact = 2262 }
+events = { takeoff = 2215, contact = 2262 }
+tags = ["takeoff"]
 verdict = "keep"
 loop = false
 notes = "low lunge forward, hands down to the ground"
@@ -346,11 +355,11 @@ trial = "127_23"
 frames = [1, 300]
 set = "smother"
 side = "none"
-events = { contact = 88, landing = 122 }
+events = { takeoff = 70, contact = 88, landing = 122 }
 contact_tolerance_cm = 4
 verdict = "keep"
 loop = false
-notes = "run, dive forward over, roll and get up"
+notes = "run, dive forward over, roll and get up (not a take-off for the smother: its forward roll ends on his back, hands up; the baked smother flight plays alone)"
 
 [[clip]]
 name = "smother_roll_90_34"
@@ -410,3 +419,60 @@ events = { up = 501 }
 verdict = "keep"
 loop = false
 notes = "get up from his back, rolling over"
+
+# ---- baked from the procedural keeper (tools/anim/bake_procedural.py): the flights of the hybrid saves and the slide tackle,
+# until real dive recordings replace them. Each is recorded to his right; mirroring gives the left.
+
+[[clip]]
+name = "dive_low_flight_baked"
+source = "baked"
+script = "dive_low_right"
+set = "dive_low"
+side = "right"
+tags = ["flight"]
+verdict = "keep"
+loop = false
+notes = "the procedural low dive to his right, flat along the ground, and the fall onto the ground"
+
+[[clip]]
+name = "dive_side_flight_baked"
+source = "baked"
+script = "dive_side_right"
+set = "dive_side"
+side = "right"
+tags = ["flight"]
+verdict = "keep"
+loop = false
+notes = "the procedural side dive to his right at mid height, and the fall onto the ground"
+
+[[clip]]
+name = "dive_high_flight_baked"
+source = "baked"
+script = "dive_high_right"
+set = "dive_high"
+side = "right"
+tags = ["flight"]
+verdict = "keep"
+loop = false
+notes = "the procedural high dive to his right, arms up, and the fall onto the ground"
+
+[[clip]]
+name = "smother_flight_baked"
+source = "baked"
+script = "smother_right"
+set = "smother"
+side = "right"
+tags = ["flight"]
+verdict = "keep"
+loop = false
+notes = "the procedural smother to his right: down on his side behind the ball, hands around it"
+
+[[clip]]
+name = "slide_baked"
+source = "baked"
+script = "slide"
+set = "slide"
+side = "none"
+verdict = "keep"
+loop = false
+notes = "the procedural slide tackle: sitting back, the right leg out along the ground at the ball"

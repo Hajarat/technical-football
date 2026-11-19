@@ -2,33 +2,89 @@ using System.Numerics;
 
 namespace FootballSim.Anim;
 
-/// <summary>Weights of the feature groups (spec appendix E's starting values).</summary>
+/// <summary>
+/// Weights of the feature groups (spec appendix E's starting values). The save point and the time to contact count only in save sets
+/// (<see cref="Save"/>); the body group (hips height and tilt) only where lying and getting up are matched by pose.
+/// </summary>
 public sealed record FeatureWeights(float FootPosition = 0.75f, float FootVelocity = 1f, float HipVelocity = 1f,
-    float TrajectoryPosition = 1f, float TrajectoryFacing = 1.5f)
+    float TrajectoryPosition = 1f, float TrajectoryFacing = 1.5f, float SavePoint = 0f, float SaveTime = 0f, float Body = 0f)
 {
     public static readonly FeatureWeights Default = new();
+    /// <summary>A save set's: the defaults plus the save point (2.0) and the time to contact (1.5).</summary>
+    public static readonly FeatureWeights Save = new(SavePoint: 2f, SaveTime: 1.5f);
+}
+
+/// <summary>Which part of the body a save set's clips meet the ball with (where <see cref="PoseClip.LimbAtTarget"/> is taken).</summary>
+public enum ContactLimb { Hands, ReachingHand, ReachingFoot }
+
+/// <summary>
+/// How a set's frames are labelled beyond the pose: the event its time feature counts down to (a save's "contact", a get-up's "up";
+/// null for none), the limb that meets the ball there, and the events bounding the searchable frames (from <see cref="SearchFrom"/>
+/// inclusive to <see cref="SearchUntil"/> exclusive; a clip without the event is not bounded by it).
+/// </summary>
+public sealed record PoseSetOptions(string? TargetEvent = null, ContactLimb Limb = ContactLimb.Hands, string? SearchFrom = null, string? SearchUntil = null)
+{
+    public static readonly PoseSetOptions None = new();
 }
 
 /// <summary>
-/// The matching features of one pose (27 floats), in character space: about the root on the ground under the hips, turned so the
+/// The matching features of one pose (38 floats), in character space: about the root on the ground under the hips, turned so the
 /// body faces +Z (the model's own axes: left +X, up +Y). Groups, in order: left and right foot (ankle) position; left and right foot
-/// velocity; hip velocity; the root's position 10, 20 and 30 frames (60 Hz) ahead (x, z); its facing then (x, z of a unit vector).
+/// velocity; hip velocity; the root's position 10, 20 and 30 frames (60 Hz) ahead (x, z); its facing then (x, z of a unit vector);
+/// the save point relative to the hips; the time to the set's target event (seconds); the body: hips height, and the hips' forward
+/// and up axes (turned from rest).
 /// </summary>
 public static class Features
 {
-    public const int Count = 27;
-    public const int FootPos = 0, FootVel = 6, HipVel = 12, TrajPos = 15, TrajDir = 21;
+    public const int Count = 38;
+    public const int FootPos = 0, FootVel = 6, HipVel = 12, TrajPos = 15, TrajDir = 21, SavePt = 27, SaveT = 30, Body = 31;
     /// <summary>Trajectory sample times, in 60 Hz frames ahead.</summary>
     public static readonly int[] TrajFrames = { 10, 20, 30 };
     /// <summary>The same in seconds.</summary>
     public static readonly float[] TrajSeconds = { 10 / 60f, 20 / 60f, 30 / 60f };
     /// <summary>First index and length of each group.</summary>
-    public static readonly (int Start, int Length)[] Groups = { (FootPos, 6), (FootVel, 6), (HipVel, 3), (TrajPos, 6), (TrajDir, 6) };
+    public static readonly (int Start, int Length)[] Groups =
+        { (FootPos, 6), (FootVel, 6), (HipVel, 3), (TrajPos, 6), (TrajDir, 6), (SavePt, 3), (SaveT, 1), (Body, 7) };
 
     public static float Weight(FeatureWeights w, int group) => group switch
     {
-        0 => w.FootPosition, 1 => w.FootVelocity, 2 => w.HipVelocity, 3 => w.TrajectoryPosition, _ => w.TrajectoryFacing,
+        0 => w.FootPosition, 1 => w.FootVelocity, 2 => w.HipVelocity, 3 => w.TrajectoryPosition, 4 => w.TrajectoryFacing,
+        5 => w.SavePoint, 6 => w.SaveTime, _ => w.Body,
     };
+
+    /// <summary>The save point (character space, relative to the hips) and the seconds to the target event.</summary>
+    public static void WriteSave(Span<float> dst, Vector3 point, float time)
+    {
+        Put(dst, SavePt, point);
+        dst[SaveT] = time;
+    }
+
+    /// <summary>The body group: hips height and the hips' forward and up axes in character space.</summary>
+    public static void WriteBody(Span<float> dst, float hipsHeight, Vector3 forward, Vector3 up)
+    {
+        dst[Body] = hipsHeight;
+        Put(dst, Body + 1, forward);
+        Put(dst, Body + 4, up);
+    }
+
+    /// <summary>The body group of a pose whose hips global rotation is <paramref name="hipsRot"/>, about a root facing <paramref name="yaw"/>.</summary>
+    public static void WriteBody(Span<float> dst, Skeleton sk, Quaternion hipsRot, float hipsHeight, float yaw)
+    {
+        var turn = hipsRot * Quaternion.Inverse(sk.RestGlobal[sk.Hips]);
+        WriteBody(dst, hipsHeight, ToCharacter(Vector3.Transform(Vector3.UnitZ, turn), yaw), ToCharacter(Vector3.Transform(Vector3.UnitY, turn), yaw));
+    }
+
+    /// <summary>
+    /// The way a body faces (yaw about +Y, 0 = +Z) from its hips' turn from rest: the forward axis pitched back upright about the body's
+    /// own sideways axis (forward.xz − forward.y · up.xz), so lying face down it is the way his head points and on his back the way his
+    /// feet do (the way he faces once he sits or pushes up), and it never spins when the forward axis points up or down.
+    /// </summary>
+    public static Vector2 Heading(Quaternion turnFromRest)
+    {
+        var f = Vector3.Transform(Vector3.UnitZ, turnFromRest);
+        var u = Vector3.Transform(Vector3.UnitY, turnFromRest);
+        return new Vector2(f.X - f.Y * u.X, f.Z - f.Y * u.Z);
+    }
 
     public static void WritePose(Span<float> dst, Vector3 leftFoot, Vector3 rightFoot, Vector3 leftVel, Vector3 rightVel, Vector3 hipVel)
     {
@@ -88,8 +144,8 @@ public static class Trajectory
 }
 
 /// <summary>
-/// A clip's root: per frame the point on the ground under the hips and the way the body faces (the hips' forward turned from rest,
-/// flattened), both averaged over ±6 frames (0.1 s) so the hips' sway does not shake them. Root motion is the change of this root.
+/// A clip's root: per frame the point on the ground under the hips and the way the body faces (<see cref="Features.Heading"/> of the
+/// hips' turn from rest), both averaged over ±6 frames (0.1 s) so the hips' sway does not shake them. Root motion is the change of this root.
 /// </summary>
 public sealed class RootTrack
 {
@@ -110,9 +166,8 @@ public sealed class RootTrack
         {
             var h = clip.Hips(f);
             rawPos[f] = new Vector2(h.X, h.Z);
-            var fwd = Vector3.Transform(Vector3.UnitZ, clip.Rotations(f)[sk.Hips] * restInv);
-            var flat = new Vector2(fwd.X, fwd.Z);
-            rawFwd[f] = flat.LengthSquared() > 1e-8f ? Vector2.Normalize(flat) : Vector2.UnitY;
+            var flat = Features.Heading(clip.Rotations(f)[sk.Hips] * restInv);
+            rawFwd[f] = flat.LengthSquared() > 1e-8f ? Vector2.Normalize(flat) : f > 0 ? rawFwd[f - 1] : Vector2.UnitY;
         }
         _pos = new Vector2[n]; _yaw = new float[n];
         for (int f = 0; f < n; f++)
@@ -180,6 +235,42 @@ public sealed class RootTrack
 public sealed record PoseClip(Clip Clip, RootTrack Root, int Start, string Side, float Bias = 1f)
 {
     public int End => Start + Clip.FrameCount;
+    /// <summary>The frame of the set's target event in this clip (a save's contact, a get-up's "up"), or -1.</summary>
+    public int TargetFrame { get; init; } = -1;
+    /// <summary>Where the set's contact limb is at <see cref="TargetFrame"/> (model space); zero without one.</summary>
+    public Vector3 LimbAtTarget { get; init; }
+    /// <summary>A named event's frame in the clip, or -1.</summary>
+    public int Event(string name) => Clip.Events.TryGetValue(name, out int f) ? f : -1;
+    /// <summary>-1 for a clip moving to its left, +1 to its right, 0 for neither.</summary>
+    public int SideSign => Side == "left" ? -1 : Side == "right" ? 1 : 0;
+}
+
+/// <summary>Where the gloves and the reaching foot are (shared by the pose database, the hand IK and the gallery's check).</summary>
+public static class Limbs
+{
+    /// <summary>The glove's middle: this far (metres) past the wrist along the forearm.</summary>
+    public const float GloveReach = 0.08f;
+
+    public static Vector3 Glove(Vector3 elbow, Vector3 wrist)
+    {
+        var d = wrist - elbow;
+        return d.LengthSquared() > 1e-10f ? wrist + Vector3.Normalize(d) * GloveReach : wrist;
+    }
+
+    /// <summary>The contact limb's point in a forward-kinematics pose (<paramref name="gp"/> model positions).</summary>
+    public static Vector3 Point(Skeleton sk, ReadOnlySpan<Vector3> gp, ContactLimb limb)
+    {
+        Vector3 hips = gp[sk.Hips];
+        if (limb == ContactLimb.ReachingFoot)
+        {
+            Vector3 l = gp[sk.Foot[0]], r = gp[sk.Foot[1]];
+            return (l - hips).LengthSquared() >= (r - hips).LengthSquared() ? l : r;
+        }
+        Vector3 gl = Glove(gp[sk.Find("LeftForeArm")], gp[sk.Find("LeftHand")]);
+        Vector3 gr = Glove(gp[sk.Find("RightForeArm")], gp[sk.Find("RightHand")]);
+        if (limb == ContactLimb.Hands) return (gl + gr) * 0.5f;
+        return (gl - hips).LengthSquared() >= (gr - hips).LengthSquared() ? gl : gr;
+    }
 }
 
 /// <summary>
@@ -197,24 +288,43 @@ public sealed class PoseSet
     readonly float[] _raw, _norm, _mean, _scale;
     readonly bool[] _searchable;
     readonly byte[] _contacts;
+    readonly sbyte[] _side;
     readonly float[] _boneSpeed, _bias;
+
+    /// <summary>The labels the set was built with (target event, contact limb, search bounds).</summary>
+    public PoseSetOptions Options { get; }
 
     public PoseSet(string name, IReadOnlyList<(Clip Clip, string Side)> clips, Skeleton sk, FeatureWeights? weights = null)
         : this(name, clips.Select(c => (c.Clip, c.Side, 1f)).ToList(), sk, weights) { }
 
     /// <summary>A set whose clips carry a matcher cost factor each (1 = none; see <see cref="Bias"/>).</summary>
-    public PoseSet(string name, IReadOnlyList<(Clip Clip, string Side, float Bias)> clips, Skeleton sk, FeatureWeights? weights = null)
+    public PoseSet(string name, IReadOnlyList<(Clip Clip, string Side, float Bias)> clips, Skeleton sk, FeatureWeights? weights = null,
+        PoseSetOptions? options = null)
     {
         Name = name;
         weights ??= FeatureWeights.Default;
+        Options = options ?? PoseSetOptions.None;
         var list = new List<PoseClip>();
         int start = 0;
-        foreach (var (c, side, bias) in clips) { list.Add(new PoseClip(c, new RootTrack(c, sk), start, side, bias)); start += c.FrameCount; }
+        foreach (var (c, side, bias) in clips)
+        {
+            var pc = new PoseClip(c, new RootTrack(c, sk), start, side, bias);
+            int tf = Options.TargetEvent != null && c.Events.TryGetValue(Options.TargetEvent, out int ev) ? Math.Clamp(ev, 0, c.FrameCount - 1) : -1;
+            if (tf >= 0)
+            {
+                var gr = new Quaternion[sk.Count]; var gp = new Vector3[sk.Count];
+                sk.Forward(c.Rotations(tf), c.Hips(tf), gr, gp);
+                pc = pc with { TargetFrame = tf, LimbAtTarget = Limbs.Point(sk, gp, Options.Limb) };
+            }
+            list.Add(pc);
+            start += c.FrameCount;
+        }
         Clips = list; FrameCount = start;
         int F = Features.Count;
         _raw = new float[FrameCount * F]; _norm = new float[FrameCount * F];
         _searchable = new bool[FrameCount]; _contacts = new byte[FrameCount]; _boneSpeed = new float[FrameCount]; _bias = new float[FrameCount];
-        foreach (var pc in list) { Extract(pc, sk); for (int f = pc.Start; f < pc.End; f++) _bias[f] = pc.Bias; }
+        _side = new sbyte[FrameCount];
+        foreach (var pc in list) { Extract(pc, sk); for (int f = pc.Start; f < pc.End; f++) { _bias[f] = pc.Bias; _side[f] = (sbyte)pc.SideSign; } }
 
         _mean = new float[F]; _scale = new float[F];
         if (FrameCount > 0)
@@ -277,7 +387,13 @@ public sealed class PoseSet
                 td[i] = new Vector2(MathF.Sin(d), MathF.Cos(d));
             }
             Features.WriteTrajectory(row, tp, td);
-            _searchable[pc.Start + f] = f < n - tail;
+            // the save point (the limb at the target frame, relative to the hips now) and the time to it, in this frame's character space
+            if (pc.TargetFrame >= 0)
+                Features.WriteSave(row, Features.ToCharacter(pc.LimbAtTarget - pos[f, 2], yaw), (pc.TargetFrame - f) / (float)clip.Fps);
+            Features.WriteBody(row, sk, clip.Rotations(f)[sk.Hips], pos[f, 2].Y, yaw);
+            int from = Options.SearchFrom != null && pc.Event(Options.SearchFrom) is int a0 && a0 >= 0 ? a0 : 0;
+            int until = Options.SearchUntil != null && pc.Event(Options.SearchUntil) is int b0 && b0 >= 0 ? b0 : n;
+            _searchable[pc.Start + f] = f < n - tail && f >= from && f < until;
             _contacts[pc.Start + f] = clip.Contacts(f);
         }
         // the fastest bone turn around each frame (radians per second at the clip's own rate, the most over ±3 frames)
@@ -310,6 +426,8 @@ public sealed class PoseSet
     public byte Contacts(int frame) => _contacts[frame];
     /// <summary>The matcher's cost factor for a frame (its clip's match_bias).</summary>
     public float Bias(int frame) => _bias[frame];
+    /// <summary>The side the frame's clip moves to: -1 left, +1 right, 0 neither.</summary>
+    public int Side(int frame) => _side[frame];
 
     /// <summary>The fastest bone turn near a frame at the clip's own rate (radians per second).</summary>
     public float BoneSpeed(int frame) => _boneSpeed[frame];
@@ -346,6 +464,11 @@ public sealed class PoseDatabase
 
     /// <summary>A database whose sets may weigh the features differently (<paramref name="weightsFor"/> gives a set's, or null for the default).</summary>
     public PoseDatabase(ClipLibrary library, IEnumerable<string> sets, Func<string, FeatureWeights?> weightsFor, bool mirror = true)
+        : this(library, sets, weightsFor, _ => null, mirror) { }
+
+    /// <summary>A database whose sets carry labels too (<paramref name="optionsFor"/>: target event, contact limb, search bounds).</summary>
+    public PoseDatabase(ClipLibrary library, IEnumerable<string> sets, Func<string, FeatureWeights?> weightsFor,
+        Func<string, PoseSetOptions?> optionsFor, bool mirror = true, IReadOnlyCollection<string>? drop = null)
     {
         Skeleton = library.Skeleton;
         var all = new List<string>();
@@ -364,10 +487,11 @@ public sealed class PoseDatabase
             foreach (var e in library.Clips)
             {
                 if (e.Set != baseSet || e.Verdict == ClipVerdict.Reject || (tag.Length > 0 && !e.HasTag(tag))) continue;
+                if (drop != null && drop.Contains(baseSet)) continue;   // a set emptied on purpose (the fallback's test)
                 clips.Add((e.Clip, e.Side, e.Bias));
                 if (mirror) clips.Add((Mirror.Apply(e.Clip, library.Skeleton), Mirror.Side(e.Side), e.Bias));
             }
-            _sets[set] = new PoseSet(set, clips, library.Skeleton, weightsFor(set));
+            _sets[set] = new PoseSet(set, clips, library.Skeleton, weightsFor(set), optionsFor(set));
         }
     }
 
@@ -382,6 +506,9 @@ public sealed class PoseDatabase
         int colon = name.IndexOf(':');
         return colon > 0 ? Set(name[..colon]) : null;
     }
+
+    /// <summary>The set exactly as named, or null when it is unknown or holds no frame (no fallback from "set:tag" to the set).</summary>
+    public PoseSet? Exact(string? name) => name != null && _sets.TryGetValue(name, out var s) && s.FrameCount > 0 ? s : null;
 
     public IEnumerable<PoseSet> Sets => _sets.Values;
 }

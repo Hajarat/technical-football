@@ -4,7 +4,7 @@ using FootballSim.Core;
 
 namespace FootballSim.Anim.Tests;
 
-/// <summary>The chooser's rows for this milestone, and the side check by facing (not world Z), including at a facing of π.</summary>
+/// <summary>The chooser's rows (spec appendix F), and the side check by facing (not world Z), including at a facing of π.</summary>
 public class KeeperChooserTests
 {
     [Theory]
@@ -20,15 +20,46 @@ public class KeeperChooserTests
     public void StanceAndMovementStatesHaveASet(KeeperAction action, string set) => Assert.Equal(set, KeeperChooser.SetFor(action, KeeperDive.None));
 
     [Theory]
-    [InlineData(KeeperAction.Diving, KeeperDive.Side)]
-    [InlineData(KeeperAction.Diving, KeeperDive.Catch)]
-    [InlineData(KeeperAction.Diving, KeeperDive.ReflexHand)]
-    [InlineData(KeeperAction.Smother, KeeperDive.None)]
-    [InlineData(KeeperAction.Slide, KeeperDive.None)]
-    [InlineData(KeeperAction.Holding, KeeperDive.None)]
-    [InlineData(KeeperAction.Grounded, KeeperDive.None)]
-    [InlineData(KeeperAction.GettingUp, KeeperDive.None)]
-    public void OtherStatesStayProcedural(KeeperAction action, KeeperDive dive) => Assert.Null(KeeperChooser.SetFor(action, dive));
+    [InlineData(KeeperAction.Diving, KeeperDive.Low, KeeperChooser.DiveLow)]
+    [InlineData(KeeperAction.Diving, KeeperDive.Side, KeeperChooser.DiveSide)]
+    [InlineData(KeeperAction.Diving, KeeperDive.High, KeeperChooser.DiveHigh)]
+    [InlineData(KeeperAction.Diving, KeeperDive.Feet, KeeperChooser.Feet)]
+    [InlineData(KeeperAction.Diving, KeeperDive.Catch, KeeperChooser.Catch)]
+    [InlineData(KeeperAction.Diving, KeeperDive.Back, KeeperChooser.BackLeap)]
+    [InlineData(KeeperAction.Diving, KeeperDive.ReflexHand, KeeperChooser.ReflexHand)]
+    [InlineData(KeeperAction.Diving, KeeperDive.ReflexFoot, KeeperChooser.ReflexFoot)]
+    [InlineData(KeeperAction.Diving, KeeperDive.BodyBlock, KeeperChooser.BodyBlock)]
+    [InlineData(KeeperAction.Smother, KeeperDive.None, KeeperChooser.Smother)]
+    [InlineData(KeeperAction.Slide, KeeperDive.None, KeeperChooser.Slide)]
+    [InlineData(KeeperAction.Holding, KeeperDive.None, KeeperChooser.Hold)]
+    [InlineData(KeeperAction.GettingUp, KeeperDive.None, KeeperChooser.GetUp)]
+    public void SaveAndGroundStatesHaveASet(KeeperAction action, KeeperDive dive, string set) => Assert.Equal(set, KeeperChooser.SetFor(action, dive));
+
+    [Theory]
+    [InlineData(Lying.Front, KeeperChooser.LieFront)]
+    [InlineData(Lying.Side, KeeperChooser.LieSide)]
+    [InlineData(Lying.Back, KeeperChooser.LieBack)]
+    public void LyingIsChosenByHowTheLastClipLeftHim(Lying lying, string set)
+    {
+        Assert.Equal(set, KeeperChooser.SetFor(KeeperAction.Grounded, KeeperDive.None, lying));
+        // holding the ball where he lies keeps him lying; standing he has the hold set
+        Assert.Equal(set, KeeperChooser.SetFor(KeeperAction.Holding, KeeperDive.None, lying, onGround: true));
+    }
+
+    [Fact]
+    public void TheHybridSavesAreTheThreeDivesAndTheSmother()
+    {
+        foreach (var s in new[] { KeeperChooser.DiveLow, KeeperChooser.DiveSide, KeeperChooser.DiveHigh, KeeperChooser.Smother })
+        {
+            Assert.True(KeeperChooser.IsChain(s));
+            Assert.Contains(KeeperChooser.Takeoff(s), KeeperChooser.Sets);
+            Assert.Contains(KeeperChooser.Flight(s), KeeperChooser.Sets);
+        }
+        Assert.False(KeeperChooser.IsChain(KeeperChooser.Catch));
+        Assert.Equal("contact", KeeperChooser.OptionsFor(KeeperChooser.ReflexHand)!.TargetEvent);
+        Assert.Equal(ContactLimb.ReachingFoot, KeeperChooser.OptionsFor(KeeperChooser.Slide)!.Limb);
+        Assert.Equal("up", KeeperChooser.OptionsFor(KeeperChooser.GetUp)!.TargetEvent);
+    }
 
     [Fact]
     public void SideIsBySidesOfHisFacingNotWorldZ()

@@ -158,4 +158,41 @@ public class MatcherTests
         var pc = set.Locate(best, out _);
         Assert.True(pc.Side == "right", $"picked {pc.Clip.Name} ({pc.Side}); query {string.Join(",", raw.Select(v => v.ToString("F2")))}; frame {string.Join(",", set.Raw(best).ToArray().Select(v => v.ToString("F2")))}");
     }
+
+    [Fact]
+    public void ASideFilterKeepsToClipsMovingThatWayOrNeither()
+    {
+        var left = TestKit.Walk(Sk, "left", 120, 1.2f, 1.5f);   // the hips travel along model +X: his left
+        var set = new PoseSet("save", new[] { (left, "left"), (Mirror.Apply(left, Sk), "right"), (TestKit.Stand(Sk, "stand", 90), "none") }, Sk);
+        for (int i = 0; i < set.FrameCount; i += 5)
+        {
+            if (!set.Searchable(i)) continue;
+            int r = Matcher.Best(set, set.Normalized(i), out _, 0, 0, side: 1);
+            Assert.True(set.Side(r) >= 0, $"frame {i}: a right save picked {set.Locate(r, out _).Clip.Name}");
+            int l = Matcher.Best(set, set.Normalized(i), out _, 0, 0, side: -1);
+            Assert.True(set.Side(l) <= 0);
+        }
+        // the left clip's own frame, asked for on the right, gives its mirror or the standing clip, never itself
+        int q = 30;
+        int best = Matcher.Search(set, set.Normalized(q), -1, 0f, side: 1);
+        Assert.NotEqual("left", set.Locate(best, out _).Clip.Name);
+    }
+
+    [Fact]
+    public void ASideWithNoClipsFallsBackToAnyFrame()
+    {
+        var left = TestKit.Walk(Sk, "left", 120, 1.2f, 1.5f);
+        var set = new PoseSet("save", new[] { (left, "left") }, Sk);
+        Assert.Equal(-1, Matcher.Best(set, set.Normalized(20), out _, 0, 0, side: 1));
+        Assert.Equal(20, Matcher.Search(set, set.Normalized(20), -1, 0f, side: 1));
+    }
+
+    [Fact]
+    public void ASetEmptiedOnPurposeGivesNothingSoTheFallbackDraws()
+    {
+        var lib = new ClipLibrary(Sk, new[] { new ClipEntry(TestKit.Stand(Sk, "stand", 120), "catch", "none", ClipVerdict.Keep) });
+        var db = new PoseDatabase(lib, new[] { "catch" }, _ => null, _ => null, true, new[] { "catch" });
+        Assert.Null(db.Set("catch"));
+        Assert.NotNull(new PoseDatabase(lib, new[] { "catch" }).Set("catch"));
+    }
 }

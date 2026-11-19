@@ -24,6 +24,16 @@ public sealed class PlayerState
     public float KeeperActionTime { get; internal set; }
     /// <summary>For keepers: where the hands are this tick, so a view can lean the body. For outfield players, the feet position.</summary>
     public Vector3 HandPosition { get; internal set; }
+    /// <summary>
+    /// For keepers: where the brain expects the ball to meet his hands, body or feet in the current save, smother or slide (the
+    /// point he aims at). Written for views only; nothing in the core reads it. Meaningful while <see cref="SaveContactTime"/> is a number.
+    /// </summary>
+    public Vector3 SaveTarget { get; internal set; }
+    /// <summary>
+    /// For keepers: seconds after the current action began (see <see cref="KeeperActionTime"/>) at which that meeting is predicted,
+    /// or NaN when no save, smother or slide is under way. Written for views only; nothing in the core reads it.
+    /// </summary>
+    public float SaveContactTime { get; internal set; } = float.NaN;
 
     // ---- Contract for the on-the-ball rework (possession, feet). The game layer animates from these. ----
 

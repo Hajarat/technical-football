@@ -187,6 +187,8 @@ public sealed class FootLock
 
     float _lift, _liftVel;
     public float LiftHalfLife = 0.1f;
+    /// <summary>How far the body is lifted off the ground this tick (metres).</summary>
+    public float Lifted => _lift;
 
     // per foot: the leg's last drawn local rotations (thigh, shin, foot) and, once released, their offsets from the clip's
     readonly Quaternion[,] _drawnLocal = new Quaternion[2, 3];

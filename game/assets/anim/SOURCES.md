@@ -2,6 +2,8 @@
 
 `keeper/*.kclip` and `keeper/clips.json` are generated from the CMU Graphics Lab Motion Capture Database by the scripts in
 `tools/anim/`. The motion files themselves are downloaded into the git-ignored `tools/anim/.cache/` and are not committed.
+Five clips (`source = "baked"` in `clips.toml`) are not motion capture: they are the game's own procedural keeper, recorded from the
+keeper gallery's scripts (see "Baked clips" below).
 
 ## Credit and licence
 
@@ -54,11 +56,37 @@ The clips `clips.toml` lists; `keeper/clips.json` names the ones the checks let 
 | 140_08 | frames 61–660 | `getup_back_140_08` | get up from lying on his back |
 | 139_18 | frames 121–600 | `getup_back_139_18` | get up from his back, rolling over |
 
+## Baked clips
+
+CMU has no goalkeeper dives, so a dive (low, side, high) and the smother take off on CMU motion (the clips tagged `takeoff`) and fly
+on the procedural keeper's pose, baked into a clip (tagged `flight`); the slide tackle is baked whole.
+
+| Clip | Gallery script | What it shows |
+| --- | --- | --- |
+| `dive_low_flight_baked` | `dive_low_right` | the low dive to his right, flat along the ground, and the fall |
+| `dive_side_flight_baked` | `dive_side_right` | the side dive to his right at mid height, and the fall |
+| `dive_high_flight_baked` | `dive_high_right` | the high dive to his right, arms up, and the fall |
+| `smother_flight_baked` | `smother_right` | the smother to his right: down on his side behind the ball, hands around it |
+| `slide_baked` | `slide` | the slide tackle: sitting back, the right leg out along the ground |
+
+`tools/anim/bake_procedural.py` turns each recording to face +Z, keeps 60 Hz, holds the arms' and legs' twist steady where the
+procedural solve flips it, cuts a flight to start just before its take-off, smooths it over 2.5 frames and labels its take-off,
+contact and landing; `retarget.py` then lists the baked clips in `clips.json` as they are.
+
 ## Regenerate
 
 ```sh
 python3 tools/anim/cmu.py                                    # fetch the ASF/AMC files clips.toml lists (skips cached ones)
-uv run --with numpy python3 tools/anim/retarget.py           # write keeper/*.kclip and keeper/clips.json
+godot-mono --headless --path game -- --keeper-gallery ../out/bake-gallery --bake-keeper-pose ../out/bake --keeper-anim procedural
+uv run --with numpy python3 tools/anim/bake_procedural.py out/bake   # write the baked keeper/*.kclip
+uv run --with numpy python3 tools/anim/retarget.py           # write the CMU keeper/*.kclip and keeper/clips.json
+```
+
+Then, as below, the tests and the gallery.
+
+## Check
+
+```sh
 uv run --with numpy --with pytest pytest tools/anim          # pipeline tests
 game/tests/run-bg.sh -- --clip-gallery ../out/clips --video  # contact sheets and frame dumps (renders; devbox: Xvfb)
 uv run --with imageio-ffmpeg python3 tools/anim/encode_video.py out/clips

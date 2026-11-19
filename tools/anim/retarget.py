@@ -729,6 +729,23 @@ def main(argv: list[str]) -> int:
     for c in clips:
         if only and c["name"] not in only:
             continue
+        if c.get("source") == "baked":
+            # recorded from the procedural keeper (tools/anim/bake_procedural.py): listed as it is, never retargeted
+            path = OUT / f"{c['name']}.kclip"
+            if not path.exists():
+                failed.append(c["name"])
+                print(f"MISSING {c['name']}: run tools/anim/bake_procedural.py first")
+                continue
+            k = read_kclip(path)
+            nf = len(k["hips"])
+            cs = {("left", "right")[s]: spans(k["contacts"][:, s]) for s in range(2)}
+            index.append({"name": c["name"], "file": path.name, "source": "baked", "script": c.get("script", ""), "set": c["set"],
+                          "tags": list(c.get("tags", [])), "match_bias": float(c.get("match_bias", 1.0)), "verdict": verdict(c),
+                          "side": c.get("side", "none"), "kind": c.get("kind", ""), "loop": k["loop"], "events": k["events"], "fps": k["fps"],
+                          "frame_count": nf, "seconds": round(nf / k["fps"], 3), "contacts": {kk: [list(x) for x in v] for kk, v in cs.items()},
+                          "notes": c.get("notes", "")})
+            print(f"listed {c['name']} (baked): {nf} frames, events {k['events']}")
+            continue
         r = retarget(c, t)
         if r.problems:
             failed.append(c["name"])

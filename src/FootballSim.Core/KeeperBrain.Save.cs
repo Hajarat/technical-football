@@ -114,6 +114,7 @@ public sealed partial class KeeperBrain
         _span = 0f;
         _target = target;
         _targetT = sinceReaction;
+        PublishSave(_target, _targetT);
         _difficulty = Keeper.Difficulty(_k.Sheet, _t, _feet0, Vector3.Zero, target);
         _exec = Keeper.SaveExecution(_k.Sheet, _t, _difficulty);
         _planePoint = new Vector2(_home.X, _home.Z);
@@ -337,6 +338,16 @@ public sealed partial class KeeperBrain
         return true;
     }
 
+    /// <summary>
+    /// Shows the views where the current save, smother or slide expects to meet the ball and when (seconds after the action began):
+    /// <see cref="PlayerState.SaveTarget"/>, <see cref="PlayerState.SaveContactTime"/>. Written only; nothing in the core reads them.
+    /// </summary>
+    void PublishSave(Vector3 target, float contactTime)
+    {
+        _k.SaveTarget = target;
+        _k.SaveContactTime = contactTime;
+    }
+
     void StartDive(Ball ball, SimRng rng) => StartSave(PlanSave(ball, 0f, reflex: false), rng, reflex: false);
 
     /// <summary>
@@ -367,6 +378,7 @@ public sealed partial class KeeperBrain
         var target = plan.Target;
         target = new Vector3(target.X + lateral.X * nz, MathF.Max(_t.Ball.Radius * 0.5f, target.Y + ny), target.Z + lateral.Y * nz);
         _target = target;
+        PublishSave(_target, _targetT);
         // He is beaten once the ball passes his save plane: through his hands' rest point, or through the target if that is
         // further along the ball's travel (a ball taken just behind him).
         float beyond = Vector2.Dot(new Vector2(target.X - _home.X, target.Z - _home.Z), _planeN);
