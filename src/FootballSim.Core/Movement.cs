@@ -159,7 +159,29 @@ public static class Movement
         // The sideways correction turns with the body: as the facing turns this tick it keeps its angle to the run instead of
         // swinging into or against it. A skill move's step (the carry) keeps its direction on the ground.
         float turned = WrapAngle(facing - p.Facing), tc = MathF.Cos(turned), ts = MathF.Sin(turned);
-        var steer = new Vector2(assist.Steer.X * tc - assist.Steer.Y * ts, assist.Steer.X * ts + assist.Steer.Y * tc) + assist.Carry;
+        var steered = new Vector2(assist.Steer.X * tc - assist.Steer.Y * ts, assist.Steer.X * ts + assist.Steer.Y * tc);
+        var steer = steered + assist.Carry;
+        if (assist.ShareCarry && assist.Carry != assist.CarryFrom)
+        {
+            // A move's step easing out after it shares the deceleration budget with the run: it is held back as far as needed
+            // for the ground speed to fall no faster than balance_deceleration (it never holds a speed-up back).
+            var run = new Vector2(MathF.Cos(facing), MathF.Sin(facing)) * speed + steered;
+            float v0 = new Vector2(p.Velocity.X, p.Velocity.Z).Length();
+            Vector2 cFrom = assist.CarryFrom, cTo = assist.Carry;
+            float Ground(float s) => (run + cFrom + (cTo - cFrom) * s).Length();
+            if (Ground(1f) < v0 - budget && Ground(0f) > Ground(1f))
+            {
+                float lo = 0f, hi = 1f;
+                for (int i = 0; i < 12; i++)
+                {
+                    float mid = 0.5f * (lo + hi);
+                    if (Ground(mid) < v0 - budget) hi = mid; else lo = mid;
+                }
+                var c = cFrom + (cTo - cFrom) * lo;
+                p.SteerCarry = c;
+                steer = steered + c;
+            }
+        }
         p.MoveTime = now;
         p.Facing = facing;
         p.RunSpeed = speed;
@@ -183,7 +205,8 @@ public static class Movement
 /// X, Z) and, for a skill move, the running speed to use this tick (NaN: the legs ease toward the stick's target as usual), a
 /// running speed the run is brought down to within the deceleration budget (the post-strike stun), whether a stick turned about brakes the run (without the
 /// ball), the steering's part along the run, m/s, added to the legs' target speed (it reaches the running speed through the
-/// speed law), and a skill move's step, a velocity (world X, Z) that, unlike <see cref="Steer"/>, does not turn with the body.
+/// speed law), and a skill move's step, a velocity (world X, Z) that, unlike <see cref="Steer"/>, does not turn with the body; with ShareCarry its ease-out from CarryFrom is held within the deceleration budget.
 /// </summary>
 internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Steer, float RunSpeed = float.NaN,
-    float HardCap = float.PositiveInfinity, bool TurnAbout = false, float SteerAlong = 0f, Vector2 Carry = default);
+    float HardCap = float.PositiveInfinity, bool TurnAbout = false, float SteerAlong = 0f, Vector2 Carry = default,
+    Vector2 CarryFrom = default, bool ShareCarry = false);

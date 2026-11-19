@@ -283,6 +283,7 @@ public static class TouchPlanner
         }
         p.PlannerSteer = steer;
         // A skill move's step eases out (at steer_accel) on top of it.
+        Vector2 carryFrom = p.SteerCarry;
         p.SteerCarry = Toward(p.SteerCarry, Vector2.Zero, SteerStep(t));
         float cap = Possession.SpeedCap(p, true, p.Chasing, t);
         if (Stunned(p, now))
@@ -290,7 +291,8 @@ public static class TouchPlanner
             float stun = Movement.TopSpeed(p.Sheet, t) * t.Shot.StunSpeedFraction;
             return new MoveAssist(MathF.Min(cap, stun), 1f, steer, HardCap: stun, Carry: p.SteerCarry);
         }
-        return new MoveAssist(cap, 1f, steer, SteerAlong: along, Carry: p.SteerCarry);
+        // The move's step easing out shares the run's deceleration budget (see Movement.Step).
+        return new MoveAssist(cap, 1f, steer, SteerAlong: along, Carry: p.SteerCarry, CarryFrom: carryFrom, ShareCarry: true);
     }
 
     /// <summary>A skill move's step eases in at this, m/s^2 (a quick plant, not a jolt).</summary>
