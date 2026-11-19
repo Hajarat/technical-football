@@ -272,8 +272,12 @@ public sealed class PlayerState
     internal SkillSide SkillBufSide;
     internal Vector2 SkillBufCut;
     internal int SkillBufTick = -1;
+    /// <summary>For a buffered fake shot, the tick shoot was pressed (its move starts at once, its contact on the buffered tick); -1 otherwise.</summary>
+    internal int SkillBufFakeFrom = -1;
     /// <summary>World tick a move ended on, when the touch planner may make the exit touch at once; -1 otherwise.</summary>
     internal int SkillExitTick = -1;
+    /// <summary>World tick a heel-to-heel ended on, when its exit burst starts (its flick was the exit touch); -1 otherwise.</summary>
+    internal int SkillBurstAtTick = -1;
     /// <summary>Simulation seconds before which no move starts (the drag-back's cooldown).</summary>
     internal float SkillCooldownUntil = -100f;
     /// <summary>Simulation seconds until which a new move continues the chain.</summary>
@@ -313,7 +317,7 @@ public sealed class PlayerState
         GSideConsumed = o.GSideConsumed; GKnockUsed = o.GKnockUsed; GKnockWaitTick = o.GKnockWaitTick; GPrevCancel = o.GPrevCancel;
         LastGesture = o.LastGesture; LastGestureTick = o.LastGestureTick; SkillEffective = o.SkillEffective; SkillChainCount = o.SkillChainCount;
         SkillAction = o.SkillAction; SkillBufKind = o.SkillBufKind; SkillBufSide = o.SkillBufSide; SkillBufCut = o.SkillBufCut;
-        SkillBufTick = o.SkillBufTick; SkillExitTick = o.SkillExitTick; SkillCooldownUntil = o.SkillCooldownUntil; SkillChainUntil = o.SkillChainUntil;
+        SkillBufTick = o.SkillBufTick; SkillBufFakeFrom = o.SkillBufFakeFrom; SkillExitTick = o.SkillExitTick; SkillBurstAtTick = o.SkillBurstAtTick; SkillCooldownUntil = o.SkillCooldownUntil; SkillChainUntil = o.SkillChainUntil;
         SkillBoostUntil = o.SkillBoostUntil; SkillBoostFactor = o.SkillBoostFactor; SkillBoostDuration = o.SkillBoostDuration;
         SkillBoostCap = o.SkillBoostCap; SkillBurstUntil = o.SkillBurstUntil; SkillBurstFactor = o.SkillBurstFactor; SkillBurstCap = o.SkillBurstCap;
         return this;

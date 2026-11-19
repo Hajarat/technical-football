@@ -43,6 +43,8 @@ public sealed class World
     int _strikeEstMax = -1;    // the latest strike tick published for the shot under way (the estimate never moves earlier)
     int _shotStartTick = -1;   // tick shoot was pressed for the shot under way (for the fake shot), or -1
     bool _shotCancelled;       // the shot was turned into a fake: the rest of this press of shoot is ignored
+    GestureRead _fake;         // a fake shot recognised: the shot winds up as a real one until the fake's contact ...
+    int _fakeTick = -1;        // ... on this tick (fake_contact_after_press after the press), or -1
 
     const ulong KeeperSeedSalt = 0x6B65657065723144UL;
 
@@ -186,7 +188,7 @@ public sealed class World
         _pending = default; _outcomeLeft = 0f;
         _liveSeconds = 0f; _endTick = 0; _endClock = 0f; _lastShot = null;
         _controller = null; _awayFor = 0f; _softPending = false; _shotAtFoot = false; _strikeFoot = Foot.Right;
-        _shotStartTick = -1; _shotCancelled = false; _strikeEstMax = -1;
+        _shotStartTick = -1; _shotCancelled = false; _strikeEstMax = -1; _fakeTick = -1; _fake = default;
 
         float r = Tuning.Ball.Radius;
         Ball.Position = new Vector3(Scenario.Ball.X, r, Scenario.Ball.Z);
@@ -414,7 +416,7 @@ public sealed class World
     /// ball, after any stun),
     /// whether a shot is winding up, and whether a struck shot is in flight.
     /// </summary>
-    KeeperSituation KeeperSituation()
+    internal KeeperSituation KeeperSituation()
     {
         var a = Attacker;
         float best = float.PositiveInfinity;
@@ -429,6 +431,13 @@ public sealed class World
             if (a.TouchAction is { Pending: true } ta) Take(ta.ContactTick);
             else if (a.ForecastTick >= Tick) Take(a.ForecastTick);
             if (a.SkillAction is { Made: false } sk && sk.ContactTick > Tick && sk.Phase != ActionPhase.Done) Take(sk.ContactTick);
+            // Between a two-contact move's contacts its next touch is the second one; through a spin the body is between ball and
+            // opponent and the ball counts as at his foot (his next touch is now).
+            else if (a.SkillAction is { Made: true, Contact2Tick: > 0 } s2 && s2.Phase != ActionPhase.Done)
+            {
+                if (s2.Kind == ActionKind.Spin) { best = 0f; tick = s2.StartTick; }
+                else if (s2.Contact2Tick > Tick) Take(s2.Contact2Tick);
+            }
             if (a.ShotAction is { Made: false } sh) Take(sh.ContactTick);
         }
         if (float.IsPositiveInfinity(best))
@@ -462,17 +471,33 @@ public sealed class World
         if (it.Move.Length() >= tuning.Movement.StickDeadZone) { _lastPushedStick = it.Move; _lastPushedTick = Tick; }
         bool inPossession = _controller == p;
 
-        // Skill gestures are read every tick so their timing runs on through every state. A fake shot aborts the shot under
-        // way and asks for its move; a knock-on flick asks for a knock-on like the knock-on button.
+        // Skill gestures are read every tick so their timing runs on through every state. A fake shot is recognised on the
+        // cancel, but the shot winds up on as a real one (the same legs, the same shot action the keeper reads) until the fake's
+        // contact, fake_contact_after_press after the press: only then is the shot aborted and the fake move made, its contact
+        // on that tick. A knock-on flick asks for a knock-on like the knock-on button.
         var gesture = GestureReader.Read(p, it, Tick, tuning);
         bool shotUnderWay = State == RoundState.Strike && _pending.Active || State == RoundState.Live && _shootWasHeld;
         var fake = GestureReader.ReadFakeShot(p, it, Tick, _shotStartTick, shotUnderWay, tuning);
-        if (fake.Kind != Gesture.None) { AbortShot(it.ShootHeld); gesture = fake; }
+        if (fake.Kind != Gesture.None && _fakeTick < 0)
+        {
+            _fake = fake;
+            _fakeTick = _shotStartTick + Ticks(tuning.Skill.FakeContactAfterPress);
+        }
+        int fakeFrom = -1;
+        if (_fakeTick >= 0 && Tick >= _fakeTick)
+        {
+            _fakeTick = -1;
+            if (shotUnderWay && p.ShotAction is { Made: false })
+            {
+                fakeFrom = _shotStartTick;
+                AbortShot(it.ShootHeld);
+                gesture = _fake;
+            }
+        }
         if (!it.ShootHeld) _shotCancelled = false;
         bool shootHeld = it.ShootHeld && !_shotCancelled;
         bool knockGesture = gesture.Kind == Gesture.KnockOn;
-        // A gesture with no move yet (elastico, heel-to-heel, spin) is recognised and ignored.
-        if (gesture.Kind is not (Gesture.None or Gesture.KnockOn) && !GestureReader.NotBuilt(gesture.Kind)) SkillMoves.Request(p, gesture, Tick);
+        if (gesture.Kind is not (Gesture.None or Gesture.KnockOn)) SkillMoves.Request(p, gesture, Tick, fakeFrom);
         if (State == RoundState.Strike && _pending.Active && shootHeld && !_shootWasHeld) PressShootAgain(p, it);
         if (State == RoundState.Live && !shootHeld
             && SkillMoves.TryStart(p, Ball, inPossession, Tick, SimTime, tuning) is SimEvent started)
@@ -623,6 +648,7 @@ public sealed class World
     {
         var tuning = Tuning;
         _shotStartTick = Tick;
+        _fakeTick = -1;
         _charge = 0f;
         _latchFinesse = _latchChip = _latchDriven = false;
         SkillMoves.Abort(p);

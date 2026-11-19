@@ -145,16 +145,15 @@ public class GestureReaderTests
 
     [Theory]
     [MemberData(nameof(SidesAndEntries))]
-    public void ElasticoIsBackThenTheSideAndIsNotBuilt(Entry e, int side)
+    public void ElasticoIsBackThenTheSide(Entry e, int side)
     {
         AssertOnly(Read(e, Hold(Back(), 6).Concat(Hold(Side(side), 8))), Gesture.Elastico, S(side));
         AssertOnly(Read(e, Hold(Back(), 6).Concat(Hold(Rot(Back(), side * -50f), 2)).Concat(Hold(Side(side), 30))), Gesture.Elastico, S(side));
-        Assert.True(GestureReader.NotBuilt(Gesture.Elastico));
     }
 
     [Theory]
     [MemberData(nameof(Entries))]
-    public void HeelToHeelIsAForwardFlickNeutralThenBackAndIsNotBuilt(Entry e)
+    public void HeelToHeelIsAForwardFlickNeutralThenBack(Entry e)
     {
         var got = Read(e, Hold(Fwd(), 5).Concat(Neutral(4)).Concat(Hold(Back(), 5)));
         AssertOnly(got, Gesture.HeelToHeel, SkillSide.None);
@@ -164,19 +163,17 @@ public class GestureReaderTests
         // Too slow a step (a forward hold or a neutral pause past 0.125 s): nothing.
         Assert.DoesNotContain(Read(e, Hold(Fwd(), 20).Concat(Neutral(4)).Concat(Hold(Back(), 5))), x => x.G.Kind != Gesture.KnockOn);
         Assert.DoesNotContain(Read(e, Hold(Fwd(), 5).Concat(Neutral(20)).Concat(Hold(Back(), 5))), x => x.G.Kind != Gesture.KnockOn);
-        Assert.True(GestureReader.NotBuilt(Gesture.HeelToHeel));
     }
 
     [Theory]
     [MemberData(nameof(SidesAndEntries))]
-    public void SpinIsAForwardFlickNeutralThenTheSideAndIsNotBuilt(Entry e, int side)
+    public void SpinIsAForwardFlickNeutralThenTheSide(Entry e, int side)
     {
         var got = Read(e, Hold(Fwd(), 5).Concat(Neutral(4)).Concat(Hold(Side(side), 4)));
         AssertOnly(got, Gesture.SpinAndGo, S(side));
         Assert.Equal(10 + 5 + 4 + 1, got[0].Tick);
         // The side held on is still only the spin (no roll after it), and released gives no feint.
         AssertOnly(Read(e, Hold(Fwd(), 5).Concat(Neutral(4)).Concat(Hold(Side(side), 40))), Gesture.SpinAndGo, S(side));
-        Assert.True(GestureReader.NotBuilt(Gesture.SpinAndGo));
     }
 
     [Theory]

@@ -111,7 +111,9 @@ public static class Movement
         speed = MathF.Min(speed, MathF.Max(assist.HardCap, speed0 - budget));
 
         float facing = p.Facing;
-        if (mag > 0f)
+        // A spin sets the facing itself.
+        if (!float.IsNaN(assist.Facing)) facing = Movement.WrapAngle(assist.Facing);
+        else if (mag > 0f)
         {
             float desired = MathF.Atan2(stick.Y, stick.X);
             float diff = WrapAngle(desired - facing);
@@ -205,8 +207,8 @@ public static class Movement
 /// X, Z) and, for a skill move, the running speed to use this tick (NaN: the legs ease toward the stick's target as usual), a
 /// running speed the run is brought down to within the deceleration budget (the post-strike stun), whether a stick turned about brakes the run (without the
 /// ball), the steering's part along the run, m/s, added to the legs' target speed (it reaches the running speed through the
-/// speed law), and a skill move's step, a velocity (world X, Z) that, unlike <see cref="Steer"/>, does not turn with the body; with ShareCarry its ease-out from CarryFrom is held within the deceleration budget.
+/// speed law), and a skill move's step, a velocity (world X, Z) that, unlike <see cref="Steer"/>, does not turn with the body; with ShareCarry its ease-out from CarryFrom is held within the deceleration budget; and the facing to take this tick (NaN: it turns toward the stick as usual; a spin sets it).
 /// </summary>
 internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Steer, float RunSpeed = float.NaN,
     float HardCap = float.PositiveInfinity, bool TurnAbout = false, float SteerAlong = 0f, Vector2 Carry = default,
-    Vector2 CarryFrom = default, bool ShareCarry = false);
+    Vector2 CarryFrom = default, bool ShareCarry = false, float Facing = float.NaN);

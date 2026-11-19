@@ -360,7 +360,8 @@ static class SessionProbe
         Console.WriteLine("steps = possession ticks whose |d|v||/dt is over 15 m/s^2 (shots excluded, skill moves included; skill = those during a move), acc_max = largest |dv|/dt over the same ticks, m/s^2");
         Console.WriteLine("shot = speed steps from a shoot press to 0.5 s after the strike (in possession or not); shots = presses in possession: struck / keeper touched first / neither (dropped or faked), committed = dribble touches committed after a press, foot_ok = strikes on the swinging foot in its window (or standing)");
         Console.WriteLine($"{"round",-50} {"ticks",6} {"unplayed",8} {"unplayed_pushed",15} {"poss_ticks",10} {"steps",6} {"skill",6} {"wall",5} {"shot",5} {"acc_max",8}  {"shots",8} {"committed",9} {"foot_ok",7}  outcome");
-        int totalDrops = 0, totalPushedDrops = 0;
+        int totalDrops = 0, totalPushedDrops = 0, totalLostAfter = 0;
+        var moves = new SortedDictionary<string, int>();
         var all = new SpeedSteps();
         var shots = new ShotAudit();
         foreach (var f in files)
@@ -372,20 +373,24 @@ static class SessionProbe
             var kee = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", rp.KeeperId + ".json")).Value;
             if (sc == null || att == null || kee == null) { Console.Error.WriteLine($"{f}: scenario or players not found"); return 1; }
             var c = Audit(rp, tuning, sc, att, kee);
-            totalDrops += c.Drops; totalPushedDrops += c.DropsPushed;
+            totalDrops += c.Drops; totalPushedDrops += c.DropsPushed; totalLostAfter += c.LostAfterMove;
+            foreach (var (k, n) in c.Moves) moves[k] = moves.GetValueOrDefault(k) + n;
             all.Add(c.Steps);
             string name = Path.GetFileName(Path.GetDirectoryName(f)) + "/" + Path.GetFileName(f);
             var a = c.Shots;
             shots.Add(a);
-            Console.WriteLine($"{name,-50} {rp.TickCount,6} {c.Drops,8} {c.DropsPushed,15} {c.Steps.Ticks,10} {c.Steps.Steps,6} {c.Steps.SkillSteps,6} {c.Steps.Wall,5} {c.Steps.ShotSteps,5} {c.Steps.AccMax,8:F1}  {$"{a.Struck}/{a.KeeperFirst}/{a.Neither}",8} {a.CommittedAfter,9} {$"{a.FootOk}/{a.Struck}",7}  {c.Outcome}");
+            Console.WriteLine($"{name,-50} {rp.TickCount,6} {c.Drops,8} {c.DropsPushed,15} {c.Steps.Ticks,10} {c.Steps.Steps,6} {c.Steps.SkillSteps,6} {c.Steps.Wall,5} {c.Steps.ShotSteps,5} {c.Steps.AccMax,8:F1}  {$"{a.Struck}/{a.KeeperFirst}/{a.Neither}",8} {a.CommittedAfter,9} {$"{a.FootOk}/{a.Struck}",7}  {c.Outcome}" +
+                (c.Moves.Count > 0 ? $"  moves {string.Join(",", c.Moves.Select(m => $"{m.Key}:{m.Value}"))}" + (c.LostAfterMove > 0 ? $" lost_after_move {c.LostAfterMove}" : "") : ""));
         }
+        Console.WriteLine($"skill moves made: {(moves.Count == 0 ? "none" : string.Join(", ", moves.Select(m => $"{m.Key} {m.Value}")))}; possession lost within 2 s of a move's end: {totalLostAfter}");
         Console.WriteLine($"shots pressed in possession: {shots.Presses}, struck {shots.Struck}, keeper touched first {shots.KeeperFirst}, neither {shots.Neither}; dribble touches committed after a press {shots.CommittedAfter}; strikes on the swinging foot {shots.FootOk}/{shots.Struck}; shot speed steps {all.ShotSteps} in {all.ShotTicks} ticks");
         Console.WriteLine($"total: {totalDrops} committed touches not played ({totalPushedDrops} with the stick pushed), " +
                           $"{all.Steps} speed steps in {all.Ticks} possession ticks ({all.PerThousand:F1} per 1000, skill {all.SkillSteps}; {all.Wall} more against the boards), acc_max {all.AccMax:F1} m/s^2");
         return 0;
     }
 
-    public readonly record struct Counts(int Drops, int DropsPushed, SpeedSteps Steps, string Outcome, ShotAudit Shots);
+    public readonly record struct Counts(int Drops, int DropsPushed, SpeedSteps Steps, string Outcome, ShotAudit Shots,
+        SortedDictionary<string, int> Moves, int LostAfterMove);
 
     /// <summary>Plays a replay's recorded ticks and counts the committed touches not played at their contact.</summary>
     public static Counts Audit(Replay rp, Tuning t, Scenario sc, PlayerSheet att, PlayerSheet kee)
@@ -398,6 +403,8 @@ static class SessionProbe
         var p = w.Attacker;
         var steps = new SpeedSteps();
         var shots = new ShotAudit();
+        var moves = new SortedDictionary<string, int>();
+        int moveEnd = -1, lostAfter = 0;
         for (int tick = 0; tick < rp.TickCount && w.State != RoundState.Report; tick++)
         {
             Array.Clear(buf);
@@ -406,6 +413,17 @@ static class SessionProbe
             steps.Before(p);
             shots.Before(p);
             w.Step(buf);
+            foreach (var e in w.Events)
+            {
+                if (e.Team != 0 || e.PlayerIndex != 0) continue;
+                if (e.Kind == EventKind.SkillMove && e.Skill is ActionKind sk)
+                {
+                    moves[sk.ToString()] = moves.GetValueOrDefault(sk.ToString()) + 1;
+                    moveEnd = p.SkillMove?.EndTick ?? w.Tick;
+                }
+                // Lost to the keeper or by distance within 2 s of a move's end.
+                if (e.Kind == EventKind.PossessionLost && moveEnd >= 0 && w.Tick <= moveEnd + 2 * t.TickRate && w.State != RoundState.Flight && !w.Events.Any(x => x.Kind == EventKind.Strike)) lostAfter++;
+            }
             shots.After(w);
             steps.After(p, t.Dt, w.State == RoundState.Live, w.IsSimulating);
             bool pushed = buf[0].Move.Length() >= t.Touch.StickThreshold;
@@ -415,6 +433,6 @@ static class SessionProbe
                 if (pushed) dropsPushed++;
             }
         }
-        return new Counts(drops, dropsPushed, steps, w.Report?.Outcome.Label() ?? w.State.ToString(), shots);
+        return new Counts(drops, dropsPushed, steps, w.Report?.Outcome.Label() ?? w.State.ToString(), shots, moves, lostAfter);
     }
 }

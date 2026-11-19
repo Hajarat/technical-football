@@ -318,6 +318,13 @@ public static class TouchPlanner
         p.Chasing = false;
         p.SetForecast(p.SkillAction is { Made: false } sk && sk.ContactTick >= tick ? sk.ContactTick : -1, p.SkillAction?.Foot ?? Foot.Right,
             p.SkillAction?.ContactPoint ?? Vector3.Zero);
+        // A spin's turn moves him by its step alone (see SkillMoves.SpinTick), its ground velocity planned to run on smoothly.
+        if (p.SkillAction is { Kind: ActionKind.Spin } spin && tick >= spin.ContactTick)
+        {
+            p.PlannerSteer = Vector2.Zero;
+            p.SteerCarry = m.Carry;
+            return m;
+        }
         Vector2 from = p.PlannerSteer + p.SteerCarry;
         // A turn at the feet moves the player by his run alone, the body coming round onto the stick (no step against the run
         // that the turning run would then swing into).
@@ -359,7 +366,7 @@ public static class TouchPlanner
 
     /// <summary>The moves whose run and step <see cref="SkillTick"/> keeps within the deceleration budget.</summary>
     static bool Smoothed(BallAction? a) =>
-        a is { FeetTurn: true } or { Kind: ActionKind.BallRoll or ActionKind.FakeStop or ActionKind.FakeCut };
+        a is { FeetTurn: true } or { Kind: ActionKind.BallRoll or ActionKind.FakeStop or ActionKind.FakeCut or ActionKind.Elastico or ActionKind.Spin or ActionKind.HeelToHeel };
 
     /// <summary>True during the stun after a strike: the shooter is slowed and makes no touches.</summary>
     internal static bool Stunned(PlayerState p, float now) => now < p.StunUntil;
@@ -981,6 +988,11 @@ public static class TouchPlanner
         if (p.StepBegun) p.StepsSinceTouch++;
         // A skill move under way plays the ball itself, whatever the shoot button does.
         if (inPossession && p.SkillAction != null) return SkillMoves.Step(p, ball, tick, now, t);
+        if (p.SkillBurstAtTick == tick)
+        {
+            p.SkillBurstAtTick = -1;
+            SkillMoves.ApplyExitBurst(p, now);
+        }
         if (mode == TouchStepMode.None) return null;
         if (!inPossession) return mode == TouchStepMode.Normal ? FirstTouch(p, rawIntent, ball, tick, now, t, pitch, rng) : null;
         var intent = Debounced(p, rawIntent, t);
@@ -1211,7 +1223,7 @@ public static class TouchPlanner
     /// where it starts than he covers at his running speed (or the share of his top speed) in <see cref="CatchSeconds"/> (a push faster than that could
     /// be lost by a player who chases it at once; with this bound the controller's go-get-it legs always get back to it).
     /// </summary>
-    static float CatchablePush(PlayerState p, Ball ball, Vector3 dir, float liftDeg, Tuning t)
+    internal static float CatchablePush(PlayerState p, Ball ball, Vector3 dir, float liftDeg, Tuning t)
     {
         // He covers at least his running speed over that time, and at least the share of top speed allowing for his acceleration.
         float reach = MathF.Max(p.RunSpeed, Movement.TopSpeed(p.Sheet, t) * CatchMargin) * CatchSeconds;

@@ -2,10 +2,7 @@ using System.Numerics;
 
 namespace FootballSim.Core;
 
-/// <summary>
-/// What a right-stick gesture, a skill key or a cancelled shot asks for. <see cref="Elastico"/>, <see cref="HeelToHeel"/> and
-/// <see cref="SpinAndGo"/> are recognised (so they never set off another move) but not built: the world ignores them.
-/// </summary>
+/// <summary>What a right-stick gesture, a skill key or a cancelled shot asks for (<see cref="SpinAndGo"/> is the spin).</summary>
 public enum Gesture { None, StepOver, BodyFeint, BallRoll, DragBack, KnockOn, FakeStop, FakeCut, Elastico, HeelToHeel, SpinAndGo }
 
 /// <summary>A recognised gesture: its kind, its side (relative to the running direction) and, for a fake cut, the cut direction.</summary>
@@ -30,9 +27,8 @@ public readonly record struct GestureRead(Gesture Kind, SkillSide Side, Vector2 
 /// <item>Knock-on: a forward flick past knock_on_actuation while sprinting, fired knock_on_wait later unless the stick went to
 /// a side or back (a step-over, spin or heel-to-heel) or another gesture came first; a flick released to neutral also waits
 /// while a spin or heel-to-heel could still follow (combo_step_window). Not sprinting, a forward flick does nothing.</item>
-/// <item>Not built, recognised and ignored: elastico (back, then straight on to a side as for the step-over), heel-to-heel
-/// (from neutral a forward flick, neutral, then back) and spin (from neutral a forward flick, neutral, then a side), each step
-/// of the last two within combo_step_window.</item>
+/// <item>Elastico: back, then straight on to a side as for the step-over. Heel-to-heel: from neutral a forward flick, neutral,
+/// then back. Spin: from neutral a forward flick, neutral, then a side. Each step of the last two within combo_step_window.</item>
 /// <item>Fake shot (<see cref="ReadFakeShot"/>): cancel pressed within fake_shot_window of the shot starting; the left stick
 /// released is a fake stop, pushed a fake cut that way.</item>
 /// </list>
@@ -45,9 +41,6 @@ public static class GestureReader
     internal enum Zone : byte { Neutral, Forward, Back, Left, Right, Between }
 
     static int Ticks(float seconds, Tuning t) => Math.Max(1, (int)MathF.Round(seconds * t.TickRate));
-
-    /// <summary>True for a gesture that is recognised but has no move yet (elastico, heel-to-heel, spin): the world ignores it.</summary>
-    public static bool NotBuilt(Gesture g) => g is Gesture.Elastico or Gesture.HeelToHeel or Gesture.SpinAndGo;
 
     /// <summary>Clears the reader (a new round).</summary>
     internal static void Reset(PlayerState p)
@@ -154,7 +147,7 @@ public static class GestureReader
                 p.GFwdStart = tick;
                 p.GFwdFromNeutral = p.GHist0 == Zone.Neutral;
             }
-            // From neutral a forward flick, neutral, then back: a heel-to-heel (not built). It is not an elastico's start.
+            // From neutral a forward flick, neutral, then back: a heel-to-heel. It is not an elastico's start.
             if (z == Zone.Back && found == Gesture.None && ComboFinish(p, tick, t)) found = Gesture.HeelToHeel;
         }
         if (z == Zone.Forward) p.GFwdLastTick = tick;

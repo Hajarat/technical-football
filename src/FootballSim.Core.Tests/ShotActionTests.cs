@@ -163,6 +163,14 @@ public class ShotActionTests
         var shot = w.Attacker.Action!;
         for (int i = 0; i < 4; i++) Step(w, new TickIntent { ShootHeld = true });
         Step(w, new TickIntent { ShootHeld = true, Cancel = true });
+        // The shot winds up on as a real one until the fake's contact, 0.30 s (36 ticks) after the press (2026-11-19: the fake
+        // used to abort it on the cancel).
+        for (int i = 0; i < 31; i++)
+        {
+            Assert.Same(shot, w.Attacker.Action);
+            Assert.NotEqual(ActionPhase.Done, shot.Phase);
+            Step(w, new TickIntent { ShootHeld = true });
+        }
         Assert.Equal(ActionPhase.Done, shot.Phase);
         Assert.False(shot.Made);
         Assert.NotSame(shot, w.Attacker.Action);

@@ -1066,14 +1066,59 @@ public sealed class SkillTuning
     public float FeetTurnDistance { get; set; } = 1.0f;
     public float FeetTurnStepBack { get; set; } = 0.3f;
     public float FeetTurnReachMax { get; set; } = 0.1f;
-    /// <summary>Fake stop and fake cut.</summary>
+    /// <summary>
+    /// A fake shot's contact (the fake stop's sole landing, the fake cut's hook) comes this long after the shoot press, seconds:
+    /// until then the shot winds up as a real one (the cancel is not seen before the contact).
+    /// </summary>
+    public float FakeContactAfterPress { get; set; } = 0.3f;
+    /// <summary>The fake cut, from its contact to its end.</summary>
     public float FakeSeconds { get; set; } = 0.1f;
+    /// <summary>The fake stop's sole on the ball, from its landing to its end.</summary>
+    public float FakeStopSeconds { get; set; } = 0.15f;
     /// <summary>The fake stop leaves the ball at rest this far ahead of where the player stops.</summary>
-    public float FakeStopAhead { get; set; } = 0.25f;
+    public float FakeStopAhead { get; set; } = 0.15f;
     /// <summary>The fake cut pushes the ball this far along the left stick ...</summary>
     public float FakeCutDistance { get; set; } = 1.2f;
     /// <summary>... in this long.</summary>
     public float FakeCutTime { get; set; } = 0.5f;
+    /// <summary>
+    /// Elastico: the reach for the ball (at most, seconds); from the first contact the outside's push away from the exit side
+    /// (this long, this far), the inside's snap back (its contact this long after the first) and the release; the ball ends
+    /// elastico_snap_distance to the exit side of where it was first played. The running speed eases down to at most
+    /// elastico_forward_speed (within balance_deceleration).
+    /// </summary>
+    public float ElasticoReachMax { get; set; } = 0.10f;
+    public float ElasticoPushSeconds { get; set; } = 0.11f;
+    public float ElasticoPushDistance { get; set; } = 0.30f;
+    public float ElasticoContact2Seconds { get; set; } = 0.22f;
+    public float ElasticoSeconds { get; set; } = 0.26f;
+    public float ElasticoSnapDistance { get; set; } = 0.30f;
+    public float ElasticoForwardSpeed { get; set; } = 2.0f;
+    /// <summary>
+    /// Spin: the reach (at most, seconds); from the first sole's landing the move's length, the second sole's contact and the
+    /// first sole's lift (seconds after the landing); the player's displacement forward and toward the side from where the ball
+    /// was first taken, metres; the running speed eased down to at most spin_forward_speed; the ball kept within
+    /// spin_ball_radius of him.
+    /// </summary>
+    public float SpinReachMax { get; set; } = 0.12f;
+    public float SpinSeconds { get; set; } = 0.60f;
+    public float SpinContact2Seconds { get; set; } = 0.30f;
+    public float SpinLiftSeconds { get; set; } = 0.25f;
+    public float SpinForward { get; set; } = 0.6f;
+    public float SpinSide { get; set; } = 0.5f;
+    public float SpinForwardSpeed { get; set; } = 2.0f;
+    public float SpinBallRadius { get; set; } = 0.35f;
+    /// <summary>
+    /// Heel-to-heel: the move's length, the heel's contact and the trailing foot's flick (seconds from the start), how far the
+    /// heel knocks the ball back, and the flick's speed: this times the player's running speed, at least the minimum, never
+    /// faster than he can catch.
+    /// </summary>
+    public float HeelToHeelSeconds { get; set; } = 0.35f;
+    public float HeelToHeelContactSeconds { get; set; } = 0.12f;
+    public float HeelToHeelContact2Seconds { get; set; } = 0.22f;
+    public float HeelToHeelBack { get; set; } = 0.15f;
+    public float HeelToHeelFlickRatio { get; set; } = 1.3f;
+    public float HeelToHeelFlickMinSpeed { get; set; } = 5.0f;
 
     // ---- chain and exit burst ----
     /// <summary>A move starting within this long of the previous one's end is chained.</summary>
