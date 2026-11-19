@@ -1481,7 +1481,11 @@ public partial class PlayerFigure : Node3D
                 if (!ft.Tracking) { ft.Tracking = true; ft.TrackStart = ankle[i]; ft.TrackMax = 0; }
                 else ft.TrackMax = Math.Max(ft.TrackMax, (ankle[i] - ft.TrackStart).Length());
             }
-            else if (ft.Tracking) { (IsKeeper ? Stats?.SlideKeeper : Stats?.Slide)?.Add(ft.TrackMax); ft.Tracking = false; }
+            else if (ft.Tracking)
+            {
+                (IsKeeper ? Stats?.SlideKeeper : Stats?.Slide)?.Add(ft.TrackMax); ft.Tracking = false;
+                if (MocapLogOn && ft.TrackMax > 0.015f) GD.Print($"MOCAP_SLIDE tick={Stats?.Tick} foot={i} max={ft.TrackMax:F3} from=({ft.TrackStart.X:F3},{ft.TrackStart.Y:F3},{ft.TrackStart.Z:F3}) to=({ankle[i].X:F3},{ankle[i].Y:F3},{ankle[i].Z:F3})");
+            }
         }
     }
 
