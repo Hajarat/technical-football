@@ -322,7 +322,10 @@ public static class TouchPlanner
         Vector2 aim = p.SkillAction is { FeetTurn: true } ? Vector2.Zero : m.Steer;
         Vector2 steer = Toward(from, aim, MathF.Max(SteerStep(t), SkillSteerAccel * t.Dt));
         p.PlannerSteer = Vector2.Zero;
-        if (p.SkillAction is not { FeetTurn: true })
+        // A turn at the feet, the ball roll, fake stop and fake cut are kept to a smooth speed (below); the step-over and body
+        // feint pace themselves, and the drag-back keeps its own stop (shed within the budget, the player would run on past the
+        // ball he pulls back).
+        if (!Smoothed(p.SkillAction))
         {
             // A skill move of the player's steps as it was built, its step eased in from the steering under way; it is kept as
             // the carry, which the controller eases out from there once the move ends.
@@ -351,6 +354,10 @@ public static class TouchPlanner
         p.SteerCarry = steer;
         return m with { Steer = Vector2.Zero, Carry = steer, RunSpeed = run };
     }
+
+    /// <summary>The moves whose run and step <see cref="SkillTick"/> keeps within the deceleration budget.</summary>
+    static bool Smoothed(BallAction? a) =>
+        a is { FeetTurn: true } or { Kind: ActionKind.BallRoll or ActionKind.FakeStop or ActionKind.FakeCut };
 
     /// <summary>True during the stun after a strike: the shooter is slowed and makes no touches.</summary>
     internal static bool Stunned(PlayerState p, float now) => now < p.StunUntil;

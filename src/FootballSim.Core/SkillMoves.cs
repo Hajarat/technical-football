@@ -161,7 +161,8 @@ public static class SkillMoves
     /// sole_reach_tolerance of the ball by steering at most sole_reach_steer and the foot can have got there at
     /// sole_reach_foot_speed, with the miss left there; if none can, the offset with the smallest miss.
     /// </summary>
-    static (int Ticks, float Miss) PlanReach(PlayerState p, Foot foot, Vector2 fwd, Ball ball, float now, Tuning t, float maxSeconds)
+    static (int Ticks, float Miss) PlanReach(PlayerState p, Foot foot, Vector2 fwd, Ball ball, float now, Tuning t, float maxSeconds,
+        bool eased = true)
     {
         var k = t.Skill;
         var c = p.Scratch();
@@ -171,7 +172,7 @@ public static class SkillMoves
         var legs = new TickIntent { MoveX = fwd.X, MoveZ = fwd.Y, Sprint = 1f };
         int max = Math.Max(0, (int)MathF.Round(maxSeconds * t.TickRate));
         int best = 0;
-        float bestMiss = float.MaxValue;
+        float bestMiss = float.MaxValue, reached = 0f;
         for (int j = 0; j <= max; j++)
         {
             // Contact on tick +j: the player has moved j + 1 times, the ball j times (it moves after the player each tick).
@@ -179,7 +180,10 @@ public static class SkillMoves
             if (j > 0) b.Step(t.Dt, null, null);
             var cp = TouchPlanner.ContactPointFor(c, foot, t);
             float d = new Vector2(b.Position.X - cp.X, b.Position.Z - cp.Z).Length();
-            float miss = MathF.Max(0f, d - k.SoleReachSteer * j * t.Dt);
+            // The reach's step is eased in no faster than balance_deceleration (the move is kept to a smooth speed), so it covers
+            // less than sole_reach_steer held from the start.
+            float miss = MathF.Max(0f, d - reached);
+            reached += (eased ? MathF.Min(k.SoleReachSteer, t.Movement.BalanceDeceleration * (j + 1) * t.Dt) : k.SoleReachSteer) * t.Dt;
             // The foot needs time to get there from wherever it is in the stride (up to a half stride from the feet): no faster
             // than sole_reach_foot_speed, so the drawn foot never snaps onto the ball.
             float fromFeet = new Vector2(b.Position.X - c.Position.X, b.Position.Z - c.Position.Z).Length() + SoleStrideAllowance;
@@ -236,7 +240,7 @@ public static class SkillMoves
         };
         int dur = Ticks(seconds, t);
         Foot foot = FootFor(p, kind, side, ball, t);
-        int reach = IsSole(kind) ? PlanReach(p, foot, fwd, ball, now, t, feetTurn ? k.FeetTurnReachMax : k.SoleReachMax).Ticks : contactless ? CloseInTicks(p, ball, fwd, entry, t) : 0;
+        int reach = IsSole(kind) ? PlanReach(p, foot, fwd, ball, now, t, feetTurn ? k.FeetTurnReachMax : k.SoleReachMax, eased: !feetTurn).Ticks : contactless ? CloseInTicks(p, ball, fwd, entry, t) : 0;
         FootSurface surface = kind switch
         {
             ActionKind.BallRoll or ActionKind.DragBack or ActionKind.FakeStop => FootSurface.Sole,
@@ -328,8 +332,8 @@ public static class SkillMoves
             }
             case ActionKind.BallRoll:
             {
-                // The run eases down to ball_roll_forward_speed (never faster than balance_deceleration) while the player
-                // travels sideways with the ball; from standing nothing changes.
+                // The run eases down to ball_roll_forward_speed (never faster than balance_deceleration, from the move's start)
+                // while the player travels sideways with the ball; from standing nothing changes.
                 float hold = MathF.Min(entry, cap);
                 run = MathF.Min(hold, MathF.Max(MathF.Min(hold, k.BallRollForwardSpeed), p.RunSpeed - t.Movement.BalanceDeceleration * t.Dt));
                 var d = a.SkillBallTo - a.SkillBallFrom;
@@ -395,15 +399,22 @@ public static class SkillMoves
     /// </summary>
     static MoveAssist ReachTick(PlayerState p, BallAction a, Ball ball, int tick, float cap, Tuning t)
     {
-        float run = MathF.Min(a.SkillEntry, cap);
+        // A ball roll's run eases toward ball_roll_forward_speed from the move's start, the reach included.
+        float hold = MathF.Min(a.SkillEntry, cap);
+        bool roll = a.Kind == ActionKind.BallRoll;
+        float floor = MathF.Min(hold, t.Skill.BallRollForwardSpeed), budget = t.Movement.BalanceDeceleration * t.Dt;
+        float Next(float r) => roll ? MathF.Min(hold, MathF.Max(floor, r - budget)) : hold;
+        float run = Next(MathF.Min(hold, p.RunSpeed));
         Vector2 fwd = a.HoldDirection;
         var legs = new TickIntent { MoveX = fwd.X, MoveZ = fwd.Y, Sprint = 1f };
         int moves = a.ContactTick - tick + 1;
         var c = p.Scratch();
         var b = ball.ScratchA();
+        float rp = run;
         for (int i = 0; i < moves; i++)
         {
-            Movement.Step(c, legs, t.Dt, p.MoveTime + (i + 1) * t.Dt, new MoveAssist(cap, 1f, Vector2.Zero, run), t, null);
+            Movement.Step(c, legs, t.Dt, p.MoveTime + (i + 1) * t.Dt, new MoveAssist(cap, 1f, Vector2.Zero, rp), t, null);
+            rp = Next(rp);
             if (i < moves - 1) b.Step(t.Dt, null, null);
         }
         var cp = TouchPlanner.ContactPointFor(c, a.Foot, t);

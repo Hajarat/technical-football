@@ -107,6 +107,8 @@ static class SkillProbe
         public int Steps;
         /// <summary>Ball roll: the largest forward (running) speed from 0.15 s after the move's start to its end, m/s.</summary>
         public float FwdLate = float.NaN;
+        /// <summary>Ball roll: the running speed at the sole's landing, 0.15 s and 0.25 s after it, and at the release, m/s.</summary>
+        public float RLand = float.NaN, R15 = float.NaN, R25 = float.NaN, REnd = float.NaN;
         /// <summary>From the move's start to its end, along and across the run: the player's travel and the ball's sideways travel, and the ball's distance ahead of the player at the end (negative: behind), metres.</summary>
         public float PFwd = float.NaN, PSide = float.NaN, BSide = float.NaN, BAhead = float.NaN;
         /// <summary>With --list-failed: the ball and the planned touch every 4 ticks for 40 ticks from the gesture.</summary>
@@ -133,9 +135,10 @@ static class SkillProbe
                           "(the sole's reach included) to its end, steps = ticks in it whose |d|v||/dt is over 15 m/s^2 (all seeds), fwd_late_max = " +
                           "the ball roll's largest running speed from 0.15 s after its start, p_fwd / p_side = the player's travel along and across " +
                           "the run (side: toward the move's side positive), ball_side = the ball's, ball_end_ahead = the ball ahead of the player at " +
-                          "the end (negative behind), means");
+                          "the end (negative behind), means; run_land/... = the ball roll's running speed at the sole's landing, 0.15 s and 0.25 s " +
+                          "after it and on its last tick, means");
         var header = new[] { "move", "side", "entry", "skill_moves", "recognised_pct", "made_pct", "kept_pct", "t90_s", "base_t90_s", "ball_dist_end_m",
-            "start_ahead_m", "exec_ahead_m", "mid_ahead_m", "sole_miss_m", "dur_s", "steps", "fwd_late_max", "p_fwd_m", "p_side_m", "ball_side_m", "ball_end_ahead_m" };
+            "start_ahead_m", "exec_ahead_m", "mid_ahead_m", "sole_miss_m", "dur_s", "steps", "fwd_late_max", "p_fwd_m", "p_side_m", "ball_side_m", "ball_end_ahead_m", "run_land/+0.15/+0.25/release" };
         var rows = new List<string[]>();
         foreach (var move in Moves)
         {
@@ -185,6 +188,7 @@ static class SkillProbe
                         MeanMax(r => r.StartAhead), MeanMax(r => r.ExecAhead), MeanMax(r => r.MidAhead), MeanMax(r => r.SoleMiss),
                         Mean(r => r.Dur), results.Where(r => r.Made).Sum(r => r.Steps).ToString(), Max(r => r.FwdLate),
                         Mean(r => r.PFwd), Mean(r => r.PSide), Mean(r => r.BSide), Mean(r => r.BAhead),
+                        move.Name == "ball_roll" ? $"{Mean(r => r.RLand)}/{Mean(r => r.R15)}/{Mean(r => r.R25)}/{Mean(r => r.REnd)}" : "-",
                     });
                 }
         }
@@ -243,6 +247,14 @@ static class SkillProbe
             {
                 if (MathF.Abs(p.Speed - sp0) / t.Dt > 15f) { res.Steps++; if (diag) res.Diag += $" [step t+{w.Tick - startTick} {sp0:F2}->{p.Speed:F2} run {p.RunSpeed:F2}]"; }
                 if (diag) res.Diag += $" [t+{w.Tick - startTick} run {p.RunSpeed:F2} v {p.Speed:F2}]";
+                if (act.Kind == ActionKind.BallRoll)
+                {
+                    int since = w.Tick - act.ContactTick, at15 = (int)MathF.Round(0.15f * t.TickRate), at25 = (int)MathF.Round(0.25f * t.TickRate);
+                    if (since == 0) res.RLand = p.RunSpeed;
+                    if (since == at15) res.R15 = p.RunSpeed;
+                    if (since == at25) res.R25 = p.RunSpeed;
+                    if (w.Tick == act.EndTick - 1) res.REnd = p.RunSpeed;
+                }
                 if (act.Kind == ActionKind.BallRoll && (w.Tick - startTick) * t.Dt > 0.15f && w.Tick < act.EndTick) res.FwdLate = float.IsNaN(res.FwdLate) ? p.RunSpeed : MathF.Max(res.FwdLate, p.RunSpeed);
                 if (w.Tick == act.EndTick)
                 {
