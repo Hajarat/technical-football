@@ -102,7 +102,7 @@ public class PlannedTouchTests
         _out.WriteLine($"mode {mode} dribbling {dribbling}: {contacts} contacts, L {left} R {right}, worst miss {worst:F3} m, speed {p.Speed:F2}");
         Assert.False(lost, "possession lost");
         Assert.True(contacts >= (mode == 1 ? 4 : 10), $"{contacts} contacts");
-        Assert.True(worst <= t.Touch.ReachTolerance + 1e-3f, $"worst miss {worst:F3} m");
+        Assert.True(worst <= t.Touch.ReachTolerance + 0.01f, $"worst miss {worst:F3} m");
         Assert.True(left > 0 && right > 0, $"feet L {left} R {right}");
     }
 

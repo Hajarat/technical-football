@@ -342,8 +342,11 @@ public static class SkillMoves
                 // drag_back_step_back behind where he started.
                 run = entry * MathF.Max(0f, 1f - u1 / DragBackStopShare);
                 float drift = entry * DragBackStopShare * 0.5f * durSec;
-                // A turn at the feet steps toward the stick's line, where the sole pulls the ball.
-                steer = (a.FeetTurn ? a.SkillCut : -fwd) * ((k.DragBackStepBack + drift) / durSec);
+                // A turn at the feet steps toward the stick's line, where the sole pulls the ball. The step rises and falls
+                // (a half sine over the move, the same distance), so the player is at rest when the move ends and nothing is left
+                // to vanish then.
+                float um = u1;
+                steer = (a.FeetTurn ? a.SkillCut : -fwd) * ((k.DragBackStepBack + drift) / durSec * MathF.PI * 0.5f * MathF.Sin(MathF.PI * um));
                 break;
             }
             case ActionKind.FakeStop:

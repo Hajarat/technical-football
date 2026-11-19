@@ -294,9 +294,12 @@ public static class TouchPlanner
         p.PlannerSteer = Vector2.Zero;
         if (p.SkillAction is not { FeetTurn: true })
         {
-            // A skill move of the player's keeps its own step as it was built (its drag-back stops and steps back at once).
-            p.SteerCarry = Vector2.Zero;
-            return m;
+            // A skill move of the player's steps as it was built, its step eased in from the steering under way; it is kept as
+            // the carry, which the controller eases out from there once the move ends.
+            // (A drag-back's step is shaped to rise from and fall to rest itself.)
+            if (p.SkillAction.Kind == ActionKind.DragBack) steer = m.Steer;
+            p.SteerCarry = steer;
+            return m with { Steer = Vector2.Zero, Carry = steer };
         }
         float budget = t.Movement.BalanceDeceleration * t.Dt;
         float run0 = p.RunSpeed, run = Math.Clamp(m.RunSpeed, run0 - budget, run0 + budget);
@@ -451,7 +454,8 @@ public static class TouchPlanner
             {
                 // The stick's legs where they cost no time (the body already turns to the stick), else go and get it sooner.
                 tg = Search(p, intent, ball, chase: false, need, minJ, h, now, t, pitch, turnish: turnish);
-                var c = Search(p, intent, ball, chase: true, need, minJ, tg.Found ? tg.J - 1 : h, now, t, pitch, turnish: turnish);
+                // (Leaving the stick's legs for the go-get-it legs needs a gain of a few ticks, so they do not flick between.)
+                var c = Search(p, intent, ball, chase: true, need, minJ, tg.Found ? tg.J - (p.Chasing ? 1 : LegsSwitchTicks) : h, now, t, pitch, turnish: turnish);
                 if (c.Found) tg = c;
             }
             else
@@ -759,6 +763,9 @@ public static class TouchPlanner
     const float TurnReachMargin = 0.05f;
     /// <summary>... and never with the ball less than this ahead of the feet (the foot never reaches back), metres.</summary>
     const float MinAhead = 0.1f;
+
+    /// <summary>How many ticks sooner the go-get-it legs must play the ball for a demand to leave the stick's legs.</summary>
+    const int LegsSwitchTicks = 4;
 
     /// <summary>Going back from the go-get-it legs to the stick's needs this much less of a miss left, metres (no flicking between them).</summary>
     const float ReachableBackTol = 0.06f;
