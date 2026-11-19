@@ -86,6 +86,22 @@ public class SkillClipTests
         Assert.Equal(25 / 60f, map.ClipTime(close + dur), 4);
     }
 
+    [Fact]
+    public void ASpinsLiftAndSecondContactLandOnTheirTicks()
+    {
+        // the spin as authored: contact 7, lift 23, contact2 25, release 43, end 55 (60 fps); the core: contact after a 0.1 s reach,
+        // lift at contact + 30 ticks, contact2 at + 36, end at + 72
+        float c(int fr) => fr / 60f;
+        float sc = 0.1f, sl = sc + 30 * Dt, s2 = sc + 36 * Dt, se = sc + 72 * Dt;
+        var map = new SkillTimeMap(0f, new[] { (sc, c(7)), (sl, c(23)), (s2, c(25)), (se, c(43)) }, c(55), 0f);
+        Assert.Equal(c(7), map.ClipTime(sc), 4);
+        Assert.Equal(c(23), map.ClipTime(sl), 4);
+        Assert.Equal(c(25), map.ClipTime(s2), 4);
+        Assert.Equal(c(43), map.ClipTime(se), 4);
+        float prev = -1f;
+        for (float t = 0f; t < se + 0.3f; t += Dt / 4f) { float v = map.ClipTime(t); Assert.True(v >= prev - 1e-6f); prev = v; }
+    }
+
     [Theory]
     [InlineData(0f, 0f)]
     [InlineData(-1f, 0f)]
@@ -133,10 +149,10 @@ public class SkillClipTests
         var dir = SkillClipDir();
         Assert.NotNull(dir);
         var lib = SkillClipLibrary.Parse(File.ReadAllText(Path.Combine(dir!, "clips.json")), f => File.ReadAllBytes(Path.Combine(dir!, f)));
-        foreach (var move in new[] { "ball_roll", "drag_back", "step_over", "body_feint", "fake_stop", "fake_cut" })
+        foreach (var move in new[] { "ball_roll", "drag_back", "step_over", "body_feint", "fake_stop", "fake_cut", "elastico", "spin", "heel_to_heel" })
             for (int foot = 0; foot < 2; foot++)
             {
-                int side = move is "ball_roll" ? (foot == 1 ? -1 : 1) : move is "step_over" or "body_feint" ? (foot == 1 ? 1 : -1) : move == "fake_cut" ? (foot == 1 ? -1 : 1) : 0;
+                int side = move is "ball_roll" or "elastico" or "spin" ? (foot == 1 ? -1 : 1) : move is "step_over" or "body_feint" ? (foot == 1 ? 1 : -1) : move == "fake_cut" ? (foot == 1 ? -1 : 1) : 0;
                 var pair = lib.Pair(move, foot, side);
                 Assert.True(pair.HasValue, $"{move} foot {foot}");
                 var (stand, run) = pair!.Value;

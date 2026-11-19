@@ -18,6 +18,13 @@ public partial class Match
     public FigureStats FootStats { get; } = new();
 
     /// <summary>Everything the attacker's figure needs this tick, copied from the world's state and events. No gameplay is decided here.</summary>
+    /// <summary>The figure's name for a skill move's kind (the moves added after the shots have their own values).</summary>
+    static SkillKind SkillKindOf(ActionKind k) => k switch
+    {
+        ActionKind.Elastico => SkillKind.Elastico, ActionKind.Spin => SkillKind.Spin, ActionKind.HeelToHeel => SkillKind.HeelToHeel,
+        _ => (SkillKind)((int)k - (int)ActionKind.StepOver),
+    };
+
     FigureFrame AttackerFrame(PlayerState p)
     {
         var w = World;
@@ -31,13 +38,16 @@ public partial class Match
         if (p.Action is { IsSkill: true } sk && sk.Phase != ActionPhase.Done)
             f.Skill = new FigureSkill
             {
-                Valid = true, Kind = (SkillKind)((int)sk.Kind - (int)ActionKind.StepOver), Id = sk.StartTick,
+                Valid = true, Kind = SkillKindOf(sk.Kind), Id = sk.StartTick,
                 Side = sk.Side == SkillSide.Left ? -1f : sk.Side == SkillSide.Right ? 1f : 0f,
                 Right = sk.Foot == Foot.Right, Surface = (BootSurface)(int)sk.Surface,
                 Elapsed = (p.CurrentTick - sk.StartTick) * f.Dt, Duration = (sk.EndTick - sk.StartTick) * f.Dt,
                 ExecElapsed = (p.CurrentTick - sk.ExecuteTick) * f.Dt, ExecDuration = (sk.EndTick - sk.ExecuteTick) * f.Dt,
                 ContactElapsed = (p.CurrentTick - sk.ContactTick) * f.Dt, ReachSpan = (sk.ContactTick - sk.StartTick) * f.Dt,
                 ContactPoint = G(sk.ContactPoint), OutVelocity = G(sk.BallOutVelocity),
+                Contact2Elapsed = sk.Contact2Tick >= 0 ? (p.CurrentTick - sk.Contact2Tick) * f.Dt : float.NaN,
+                LiftElapsed = sk.LiftTick >= 0 ? (p.CurrentTick - sk.LiftTick) * f.Dt : float.NaN,
+                Right2 = sk.Foot2 == Foot.Right, Surface2 = (BootSurface)(int)sk.Surface2,
             };
         foreach (var e in w.Events)
         {
@@ -48,7 +58,7 @@ public partial class Match
             else if (e.Kind == EventKind.Strike) { f.StrikeEvent = true; f.EventRight = e.Foot == Foot.Right; f.BallPos = G(e.Position); }
         }
         FillGait(ref f, p);
-        if (p.Action is { Kind: >= ActionKind.Power, Phase: not ActionPhase.Done } sa)
+        if (p.Action is { IsShot: true, Phase: not ActionPhase.Done } sa)
             f.Shot = new FigureShot
             {
                 Valid = true, Kind = (ShotKind)((int)sa.Kind - (int)ActionKind.Power), Right = sa.Foot == Foot.Right, Surface = (BootSurface)(int)sa.Surface,
@@ -204,7 +214,7 @@ public partial class Match
 
     static FigureAction ActionFrame(BallAction? a, PlayerState p, float dt)
     {
-        if (a == null || a.Kind >= ActionKind.Power) return default;   // a shot is drawn from FigureFrame.Shot
+        if (a == null || a.IsShot) return default;   // a shot is drawn from FigureFrame.Shot
         return new FigureAction
         {
             Valid = true, Kind = (int)a.Kind, Phase = (TouchPhase)(int)a.Phase, Right = a.Foot == Foot.Right, Surface = (BootSurface)(int)a.Surface,
@@ -254,7 +264,7 @@ public partial class Match
 
         Hud.SetPower(w.ShotCharge);
         Hud.SetIdealMarker(w.IdealCharge, w.ShotCharge > 0.001f);
-        if (w.Attacker.Action is { Kind: >= ActionKind.Power } shot && shot.PlanTick != _shotId)
+        if (w.Attacker.Action is { IsShot: true } shot && shot.PlanTick != _shotId)
         {
             _shotId = shot.PlanTick;
             Hud.ShowShotType(shot.Kind switch { ActionKind.Finesse => "FINESSE", ActionKind.Chip => "CHIP", ActionKind.Driven => "DRIVEN", ActionKind.LowFinesse => "LOW FINESSE", _ => "POWER" });

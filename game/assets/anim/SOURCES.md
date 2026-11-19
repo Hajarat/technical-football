@@ -196,11 +196,10 @@ a file of key poses in `tools/anim/moves/` (pelvis, chest and head angles, feet 
 ball, hands, knee and elbow directions, the ball's path, events and timings), which `tools/anim/author.py` solves onto the 22
 driven bones of `player.glb`, mirrors to the other side and checks (no joint under the ground, no leg past its length, no bone
 over 1,500 deg/s, the sole within 1 cm of the ball while it is on it, no boot more than 1 cm inside the ball, a named foot's
-boot on the ball at each touch event). The game plays the six moves the simulation makes (`game/SkillClipLayer.cs`, `--skill-anim clips`, the
+boot on the ball at each touch event). The game plays all nine moves (`game/SkillClipLayer.cs`, `--skill-anim clips`, the
 default): it reads `entry_speed` to blend each move's standing and running clips, the events to time the clip onto the core's ticks, `ball.on`
 and `ball.touch` for where the playing foot is pinned to the live ball, `ball.track` for the contact direction on the ball, `contacts` for the
-planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its hips from the first frame to the last. The elastico, spin and
-heel-to-heel clips load with the rest but no move plays them yet.
+planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its hips from the first frame to the last.
 
 | Move file | Clips | What it shows |
 | --- | --- | --- |
@@ -216,11 +215,11 @@ heel-to-heel clips load with the rest but no move plays them yet.
 | `fake_cut_run.toml` | `fake_cut_left_run`, `fake_cut_right_run` | the same at 3 m/s |
 | `fake_stop.toml` | `fake_stop_right`, `fake_stop_left` | fake shot from standing: the same wind-up, the leg comes through short and the sole stops the ball under him (named by the shooting foot) |
 | `fake_stop_run.toml` | `fake_stop_right_run`, `fake_stop_left_run` | the same at 3 m/s, the run dying over the stop |
-| `elastico.toml` | `elastico_left`, `elastico_right` | from standing, the outside pushes the ball away from the exit side, the foot wraps round the back of the ball, the inside snaps it back at 45 deg (not in the simulation yet) |
+| `elastico.toml` | `elastico_left`, `elastico_right` | from standing, the outside pushes the ball away from the exit side, the foot wraps round the back of the ball, the inside snaps it back at 45 deg |
 | `elastico_run.toml` | `elastico_left_run`, `elastico_right_run` | the same at 2 m/s |
-| `spin.toml` | `spin_left`, `spin_right` | from standing, a 360 roulette: one sole drags the ball round through 180 deg, the feet swap, the other completes the turn (not in the simulation yet) |
+| `spin.toml` | `spin_left`, `spin_right` | from standing, a 360 roulette: one sole drags the ball round through 180 deg, the feet swap, the other completes the turn |
 | `spin_run.toml` | `spin_left_run`, `spin_right_run` | the same entered at 2 m/s |
-| `heel_to_heel.toml` | `heel_to_heel_right`, `heel_to_heel_left` | from standing, the leading heel knocks the ball back, the trailing inside flicks it forward (named by the leading foot; not in the simulation yet) |
+| `heel_to_heel.toml` | `heel_to_heel_right`, `heel_to_heel_left` | from standing, the leading heel knocks the ball back, the trailing inside flicks it forward (named by the leading foot) |
 | `heel_to_heel_run.toml` | `heel_to_heel_right_run`, `heel_to_heel_left_run` | the same at 3 m/s |
 
 A move's standing and running files share their events at the same normalised times, so the two can be blended by entry speed.

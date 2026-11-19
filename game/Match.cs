@@ -203,7 +203,7 @@ public partial class Match : Node3D
         var w = World; int now = w.Attacker.CurrentTick;
         if (now == _shotLastTick) return;
         _shotLastTick = now;
-        if (w.Attacker.Action is { Kind: >= FootballSim.Core.ActionKind.Power, Phase: not FootballSim.Core.ActionPhase.Done } a)
+        if (w.Attacker.Action is { IsShot: true, Phase: not FootballSim.Core.ActionPhase.Done } a)
         {
             string? label = null;
             int since = now - a.PlanTick;

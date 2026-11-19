@@ -42,8 +42,25 @@ public sealed class SkillClip
         _ball = ball != null && ball.Length == clip.FrameCount ? ball : new Vector3[clip.FrameCount];
         var h0 = clip.Hips(0); var h1 = clip.Hips(clip.FrameCount - 1);
         _root0 = new Vector2(h0.X, h0.Z); _root1 = new Vector2(h1.X, h1.Z);
-        var flat = Features.Heading(clip.Rotations(0)[sk.Hips] * Quaternion.Inverse(sk.RestGlobal[sk.Hips]));
-        RootYaw = flat.LengthSquared() > 1e-8f ? MathF.Atan2(flat.X, flat.Y) : 0f;
+        // the hips' heading per frame, unwrapped (a spin turns through 360 degrees)
+        _yaw = new float[clip.FrameCount];
+        var inv = Quaternion.Inverse(sk.RestGlobal[sk.Hips]);
+        for (int f = 0; f < clip.FrameCount; f++)
+        {
+            var flat = Features.Heading(clip.Rotations(f)[sk.Hips] * inv);
+            float a = flat.LengthSquared() > 1e-8f ? MathF.Atan2(flat.X, flat.Y) : f > 0 ? _yaw[f - 1] : 0f;
+            _yaw[f] = f == 0 ? a : _yaw[f - 1] + Spring.WrapPi(a - _yaw[f - 1]);
+        }
+        RootYaw = _yaw[0];
+    }
+    readonly float[] _yaw;
+
+    /// <summary>The hips' heading (model yaw, unwrapped from the first frame's) at <paramref name="seconds"/>.</summary>
+    public float Heading(float seconds)
+    {
+        float f = Math.Clamp(seconds * Clip.Fps, 0f, Clip.FrameCount - 1);
+        int a = (int)MathF.Floor(f), b = Math.Min(a + 1, Clip.FrameCount - 1);
+        return _yaw[a] + (_yaw[b] - _yaw[a]) * (f - a);
     }
 
     /// <summary>An event's time (seconds into the clip).</summary>
@@ -167,14 +184,27 @@ public sealed class SkillTimeMap
 
     public SkillTimeMap(float clipStart, float clipContact, float clipRelease, float clipEnd,
         float simOrigin, float simContact, float simEnd, float maxRate = MaxRate)
+        : this(clipStart, new[] { (simContact, clipContact), (simEnd, clipRelease) }, clipEnd, simOrigin, maxRate) { }
+
+    /// <summary>
+    /// The map through <paramref name="knots"/>: (simulation time, clip time) from the contact to the release, in order (a move with
+    /// more events, a second contact or a sole lifting, has them between); knots that would not move both times forward are dropped.
+    /// </summary>
+    public SkillTimeMap(float clipStart, IReadOnlyList<(float Sim, float Clip)> knots, float clipEnd, float simOrigin, float maxRate = MaxRate)
     {
         var x = new List<float>(); var y = new List<float>();
-        simContact = Math.Max(simContact, simOrigin);
-        simEnd = Math.Max(simEnd, simContact + 1e-3f);
+        float simContact = Math.Max(knots[0].Sim, simOrigin), clipContact = knots[0].Clip;
         float c0 = Math.Max(clipStart, clipContact - maxRate * (simContact - simOrigin));
         if (simContact - simOrigin > 1e-5f && clipContact - c0 > 1e-5f) { x.Add(simOrigin); y.Add(c0); }
         x.Add(simContact); y.Add(clipContact);
-        x.Add(simEnd); y.Add(clipRelease);
+        for (int i = 1; i < knots.Count; i++)
+        {
+            float sx = knots[i].Sim, cy = knots[i].Clip;
+            if (i == knots.Count - 1) sx = Math.Max(sx, x[^1] + 1e-3f);
+            if (sx <= x[^1] + 1e-5f || cy <= y[^1] + 1e-5f) { if (i < knots.Count - 1) continue; }
+            x.Add(sx); y.Add(Math.Max(cy, y[^1] + 1e-5f));
+        }
+        float clipRelease = y[^1], simEnd = x[^1];
         float settle = Math.Max(0f, clipEnd - clipRelease);
         if (settle > 1e-5f) { x.Add(simEnd + settle); y.Add(clipEnd); }
         _x = x.ToArray(); _y = y.ToArray();

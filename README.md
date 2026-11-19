@@ -156,18 +156,21 @@ still solved every tick, the cycles' share of it rises to 1 while stepping above
 and the foot pitch is rate-limited, so a hand-over does not pop.
 
 Skill moves (`--skill-anim clips`, the default) are drawn from hand-authored full-body clips (`game/SkillClipLayer.cs`,
-`src/FootballSim.Anim/SkillClips.cs`, the clips in `game/assets/anim/attacker/skills/`, see `game/assets/anim/SOURCES.md`) for the six moves
-the simulation makes, each foot (and side), from standing and from a run. When a move starts, its standing and running clips are blended by the
+`src/FootballSim.Anim/SkillClips.cs`, the clips in `game/assets/anim/attacker/skills/`, see `game/assets/anim/SOURCES.md`) for all nine moves
+the simulation makes, each foot (and side), from standing and from a run; the quick turn at the feet (a drag-back kind with its own short
+timing, told apart by its sole span under 0.3 s) stays procedural. When a move starts, its standing and running clips are blended by the
 speed he came in at (0 at the standing clip's entry speed, 1 at the running clip's, smoothstep between; fixed for the move). The clip's time
 follows the core's ticks: its `start`→`contact` span plays over the move's start→contact tick (a step-over's or feint's contact is its middle
-tick), `contact`→`release` over contact→end tick, and `release`→`end` in real time after the end tick (the settle), through a monotone cubic, so
+tick; a fake shot's start is the shoot press, so the clip's 0.30 s wind-up is the shot's), `contact`→`release` over contact→end tick (with the
+spin's `lift` and the second contact `contact2` of the elastico, spin and heel-to-heel on their ticks), and `release`→`end` in real time after the end tick (the settle), through a monotone cubic, so
 each event lands on its tick and the rate changes smoothly from one span to the next. A reach the core makes more than 1.5 times shorter than
 the clip's starts the clip part way in (a fake shot counts its wind-up from the shot's press). The pose relative to the clip's root (a straight
-line under its hips from first frame to last, heading fixed at its first frame, so a turn the clip makes is kept) is put on the simulation's
-position and facing. The hand-in from the cycles or the standing pose and the hand-back at the clip's end are inertialised (each bone's
+line under its hips from first frame to last, heading fixed at its first frame, so a turn the clip makes is kept; for the spin the clip's
+own heading is taken out, since the simulation's facing makes the 360 degrees) is put on the simulation's position and facing. The hand-in from the cycles or the standing pose and the hand-back at the clip's end are inertialised (each bone's
 offset and its velocity die away, half-life 0.08 s); at the hand-back each foot keeps its offset from the figure's ankle, dying away while the
 foot swings and held while the figure has it planted. On top of the clip: the playing foot's surface (the sole, or the inside or outside the
-core names) is brought onto the live ball by leg IK over the clip's on-ball spans (and on a fake cut's hook), the weight rising through the reach
+core names, the heel for heel-to-heel's first contact; the second span's foot and surface are the core's second contact's) is brought onto
+the live ball by leg IK over the clip's on-ball spans (and at each touch the core also makes: a fake cut's hook, an elastico's two contacts), the weight rising through the reach
 and falling over 0.08 s after it, with the contact direction the clip has on its own ball; on the end tick it holds where the ball was, as the
 core's exit touch moves it; the hips come up to 0.18 m toward a ball the leg cannot reach. A step-over's circling foot keeps its path relative
 to the live ball. A foot the clip plants is held where it landed (`PlantLock`), let go when the clip lifts it. A touch the figure draws after
@@ -182,8 +185,7 @@ The game shows the controls for the device in use: keyboard and mouse or gamepad
 meaningful input (a key, a mouse button or more than a few pixels of mouse movement; a pad button or a stick or trigger past 0.3).
 A small hint in the top-right corner names the toggle: `H: controls` on the keyboard, `Menu: controls` on the pad (`Options` on PlayStation, `+` on Nintendo). The
 full list opens on `H` and, on either device, while the game is paused (`P` / `Esc` / Menu), and stays out of the play area otherwise. It lists
-movement, shooting, skill moves (the right-stick gesture in words for the pad, the keys for the keyboard; elastico, heel-to-heel and
-spin are still marked not built yet there, as `game/Bindings.cs` marks them, though the simulation makes them now) and round / menu actions. Pad buttons use the pad's own names (Xbox, PlayStation or Nintendo, picked
+movement, shooting, skill moves (the right-stick gesture in words for the pad, the keys for the keyboard) and round / menu actions. Pad buttons use the pad's own names (Xbox, PlayStation or Nintendo, picked
 from the name the OS reports; Xbox names when unknown), and the face-button swap keeps the shoot button the right-hand one, so the
 labels match what is pressed. Every label is read from `game/Bindings.cs`, where `InputReader` also takes its keys and buttons, so
 changing a binding there changes the panel. `-- --controls-panel keyboard|xbox|playstation|nintendo` opens the panel for that

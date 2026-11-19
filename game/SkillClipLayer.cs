@@ -106,11 +106,19 @@ public sealed class SkillClipLayer
     public static string MoveName(SkillKind k) => k switch
     {
         SkillKind.StepOver => "step_over", SkillKind.BodyFeint => "body_feint", SkillKind.DragBack => "drag_back",
-        SkillKind.BallRoll => "ball_roll", SkillKind.FakeStop => "fake_stop", _ => "fake_cut",
+        SkillKind.BallRoll => "ball_roll", SkillKind.FakeStop => "fake_stop", SkillKind.Elastico => "elastico", SkillKind.Spin => "spin",
+        SkillKind.HeelToHeel => "heel_to_heel", _ => "fake_cut",
     };
 
     /// <summary>Whether the clips can draw this move (mode clips, a clip pair for its foot and side).</summary>
-    public bool Covers(in FigureSkill s) => Mode == "clips" && _lib != null && s.Valid && _lib.Pair(MoveName(s.Kind), s.Right ? 1 : 0, Math.Sign((int)s.Side)) != null;
+    public bool Covers(in FigureSkill s) => Mode == "clips" && _lib != null && s.Valid && !QuickTurn(s)
+        && _lib.Pair(MoveName(s.Kind), s.Right ? 1 : 0, Math.Sign((int)s.Side)) != null;
+
+    /// <summary>
+    /// The quick turn at the feet: a drag-back kind with its own short timing (the core does not name it to the view; its sole span is
+    /// under 0.3 s where a drag-back's is 0.40 s). It stays on the procedural drawing.
+    /// </summary>
+    static bool QuickTurn(in FigureSkill s) => s.Kind == SkillKind.DragBack && s.Duration - (s.Elapsed - s.ContactElapsed) < 0.3f;
 
     /// <summary>True while a clip draws the body or the body is still being handed back from one.</summary>
     public bool Active => _playing || _handBack;
@@ -127,7 +135,7 @@ public sealed class SkillClipLayer
         _haveShown = _haveShownPrev = _haveBase = _haveBasePrev = false; _prevSpeed = float.NaN;
         _in.Reset(); foreach (var l in _lock) l.Reset();
         for (int i = 0; i < 2; i++) { _legOff[i] = _legOffVel[i] = NVec3.Zero; _pinW[i] = 0f; _planted[i] = false; }
-        _reachOff = NVec3.Zero; _pinBallHave = false;
+        _reachOff = NVec3.Zero; Array.Clear(_pinHave);
     }
 
     static NVec3 M(Vector3 world, float sc) => ModelSpace.FromWorld(new NVec3(world.X, world.Y, world.Z)) / sc;
@@ -146,7 +154,7 @@ public sealed class SkillClipLayer
         if (teleport) Reset();
 
         bool covers = Covers(f.Skill);
-        if (covers && f.Skill.Id != _moveId) { Start(f, sc); for (int i = 0; i < 2; i++) _twBlocked[i] = tw[i] > 0f; }
+        if (covers && f.Skill.Id != _moveId) { Start(f, sc); for (int i = 0; i < 2; i++) { _twBlocked[i] = tw[i] > 0f; _twS[i] = 0f; } }
         else if (!f.Skill.Valid && !_playing) _shotElapsed = f.Shot.Valid ? f.Shot.Elapsed : float.NaN;
         if (_playing)
         {
@@ -222,10 +230,16 @@ public sealed class SkillClipLayer
         // a fake shot's wind-up began at the shot's press: the time since then counts as gone
         float origin = float.IsNaN(_shotElapsed) ? 0f : -Math.Max(0f, _shotElapsed + f.Dt - s.Elapsed);
         var c = _stand;
-        _map = new SkillTimeMap(c.EventSeconds("start"), c.EventSeconds("contact"), c.EventSeconds("release"), c.EventSeconds("end"), origin, simContact, simEnd);
+        // the clip's events onto the core's ticks: contact, the spin's lift, the second contact, release on the end tick
+        var knots = new System.Collections.Generic.List<(float, float)> { (simContact, c.EventSeconds("contact")) };
+        if (c.HasEvent("lift") && !float.IsNaN(s.LiftElapsed)) knots.Add((s.Elapsed - s.LiftElapsed, c.EventSeconds("lift")));
+        if (c.HasEvent("contact2") && !float.IsNaN(s.Contact2Elapsed)) knots.Add((s.Elapsed - s.Contact2Elapsed, c.EventSeconds("contact2")));
+        knots.Add((simEnd, c.EventSeconds("release")));
+        _map = new SkillTimeMap(c.EventSeconds("start"), knots, c.EventSeconds("end"), origin);
         _moveId = s.Id; _t = s.Elapsed; _playing = true; _handBack = false; _transition = true;
         foreach (var l in _lock) l.Reset();
-        _shotElapsed = float.NaN; _pinBallHave = false;
+        _shotElapsed = float.NaN; Array.Clear(_pinHave);
+        BuildPins(s);
         GD.Print($"SKILL_CLIP start move={_move} foot={(foot == 1 ? "R" : "L")} clip={_stand.Clip.Name}/{_run.Clip.Name} w_run={_wRun:F2} speed={speed:F2} clip_from={_map.ClipStart:F3} contact_s={simContact:F3} end_s={simEnd:F3} origin_s={origin:F3}");
     }
 
@@ -245,7 +259,15 @@ public sealed class SkillClipLayer
         outRot[_sk.Hips] = NQuat.Normalize(q * outRot[_sk.Hips]);
     }
 
-    NQuat Placement(in FigureFrame f) => Spring.Yaw(ModelSpace.YawFromFacing(f.Facing) - (_stand!.RootYaw * (1f - _wRun) + _run!.RootYaw * _wRun));
+    /// <summary>
+    /// The clip's turn onto the simulation's facing: relative to its root's fixed heading, so a turn the clip makes is kept, except for
+    /// the spin, whose 360 degrees the simulation's facing already makes (the clip's own heading is taken out).
+    /// </summary>
+    NQuat Placement(in FigureFrame f)
+    {
+        float own = _move == "spin" ? _stand!.Heading(_ct) * (1f - _wRun) + _run!.Heading(_ct) * _wRun : _stand!.RootYaw * (1f - _wRun) + _run!.RootYaw * _wRun;
+        return Spring.Yaw(ModelSpace.YawFromFacing(f.Facing) - own);
+    }
 
     /// <summary>The authored ball centre this tick, placed as the pose is.</summary>
     NVec3 ClipBall(in FigureFrame f, float sc)
@@ -268,29 +290,71 @@ public sealed class SkillClipLayer
     readonly NQuat[] _clipPrevR = new NQuat[64];
     readonly NVec3[] _clipPrevP = new NVec3[64];
 
-    /// <summary>The pin weight of the playing foot at clip time <paramref name="ct"/>: up through the reach, 1 over an on-ball span, down after it.</summary>
-    float PinWeightAt(float ct, out bool exact)
+    /// <summary>A span of the clip during which a foot's surface is pinned to the ball (clip seconds), and the surface the core names for it.</summary>
+    struct Pin { public int Foot; public float From, To, RampFrom; public BootSurface Surface; public bool Path; }
+    readonly System.Collections.Generic.List<Pin> _pins = new();
+
+    /// <summary>
+    /// The move's pins from its clip: each <c>ball.on</c> span, each touch the core also makes (<c>contact</c>, <c>contact2</c>), and a
+    /// step-over's circling foot (its path kept relative to the ball from contact to release). Each foot and surface must agree with
+    /// the core's <c>Foot</c> / <c>Foot2</c>; a disagreement is printed (SKILL_CLIP disagree) and the clip's foot is kept.
+    /// </summary>
+    void BuildPins(FigureSkill s)
+    {
+        _pins.Clear();
+        var c = _stand!;
+        int f1 = s.Right ? 1 : 0, f2 = s.Right2 ? 1 : 0;
+        bool two = !float.IsNaN(s.Contact2Elapsed);
+        BootSurface SurfaceFor(int foot, string ev, string what)
+        {
+            bool second = ev == "contact2";
+            if (second && two) { if (foot != f2) Disagree(what, foot, f2); return s.Surface2; }
+            if (foot == f1) return s.Surface;
+            if (two && foot == f2) return s.Surface2;
+            Disagree(what, foot, f1); return s.Surface;
+        }
+        foreach (var o in c.On)
+            _pins.Add(new Pin { Foot = o.Foot, From = c.EventSeconds(o.From), To = c.EventSeconds(o.To), Surface = SurfaceFor(o.Foot, o.From, $"on {o.From}-{o.To}") });
+        foreach (var t in c.Touches)
+            if (t.From is "contact" or "contact2" && !_pins.Exists(q => q.Foot == t.Foot && Math.Abs(q.From - c.EventSeconds(t.From)) < 1e-4f))
+                _pins.Add(new Pin { Foot = t.Foot, From = c.EventSeconds(t.From), To = c.EventSeconds(t.From), Surface = SurfaceFor(t.Foot, t.From, $"touch {t.From}") });
+        if (_pins.Count == 0 && _move == "step_over")
+            _pins.Add(new Pin { Foot = f1, From = c.EventSeconds("contact"), To = c.EventSeconds("release"), Surface = BootSurface.Outside, Path = true });
+        _pins.Sort((a, b) => a.From.CompareTo(b.From));
+        float prevTo = float.NegativeInfinity;
+        for (int i = 0; i < _pins.Count; i++)
+        {
+            var q = _pins[i];
+            // the first ramps in from where the clip starts, a later one over at most 0.12 s after the one before it ends
+            q.RampFrom = i == 0 ? Math.Min(_map!.ClipStart, q.From) : Math.Min(q.From, Math.Max(prevTo, q.From - 0.12f));
+            prevTo = Math.Max(prevTo, q.To);
+            _pins[i] = q;
+        }
+    }
+
+    void Disagree(string what, int clipFoot, int coreFoot) =>
+        GD.Print($"SKILL_CLIP disagree move={_move} clip={_stand!.Clip.Name} {what}: clip foot {(clipFoot == 1 ? "R" : "L")}, core foot {(coreFoot == 1 ? "R" : "L")}");
+
+    /// <summary>A pin's weight at clip time <paramref name="ct"/>: up through its reach, 1 over its span, down after it; <paramref name="exact"/> inside the span before its last tick.</summary>
+    static float PinWeight(in Pin q, float ct, out bool exact)
     {
         exact = false;
-        var c = _stand!;
-        float w = 0f;
-        float from = float.NaN, to = float.NaN;
-        foreach (var s in c.On) if (s.Foot == _foot) { from = c.EventSeconds(s.From); to = c.EventSeconds(s.To); break; }
-        // a touch event (the fake cut's hook): the surface meets the ball on it, the pin letting go after it
-        if (float.IsNaN(from))
-            foreach (var s in c.Touches)
-                if (s.Foot == _foot)
-                {
-                    float e = c.EventSeconds(s.From);
-                    if (float.IsNaN(from) || e < from) from = to = e;
-                }
-        if (float.IsNaN(from) && _move == "step_over") { from = c.EventSeconds("contact"); to = c.EventSeconds("release"); }
-        if (float.IsNaN(from)) return 0f;
-        float c0 = Math.Min(_map!.ClipStart, from);
-        if (ct < from) w = from - c0 > 1e-4f ? Ramp((ct - c0) / (from - c0)) : 1f;
-        else if (ct <= to) { w = 1f; exact = ct < to - 1e-4f; }   // (on the end tick the core's exit touch may already move the ball: the pin holds where it was)
-        else w = 1f - Smooth((ct - to) / PinRampOut);
-        return w;
+        if (ct < q.From - 1e-4f) return q.From - q.RampFrom > 1e-4f ? Ramp((ct - q.RampFrom) / (q.From - q.RampFrom)) : (ct >= q.RampFrom ? 1f : 0f);
+        if (ct <= q.To) { exact = ct < q.To - 1e-4f || q.To == q.From; return 1f; }   // (on the end tick the core's exit touch may already move the ball: the pin holds where it was)
+        return 1f - Smooth((ct - q.To) / PinRampOut);
+    }
+
+    /// <summary>The strongest pin on foot <paramref name="i"/> now (-1 when none).</summary>
+    int PinOn(int i, out float w, out bool exact)
+    {
+        w = 0f; exact = false; int best = -1;
+        for (int k = 0; k < _pins.Count; k++)
+        {
+            if (_pins[k].Foot != i) continue;
+            float wk = PinWeight(_pins[k], _ct, out bool ek);
+            if (wk > w) { w = wk; exact = ek; best = k; }
+        }
+        return best;
     }
 
     static float Smooth(float x) { x = Math.Clamp(x, 0f, 1f); return x * x * (3f - 2f * x); }
@@ -314,25 +378,50 @@ public sealed class SkillClipLayer
     void Constrain(in FigureFrame f, float sc, ReadOnlySpan<float> tw, float dt)
     {
         _sk.Forward(_out, _outP[0], _gr, _gp, _outP);
-        // the ball the pin holds: the live ball while the clip has the foot on it, then where it was at the span's end (the core's
-        // exit touch moves the ball away as the foot lets go)
+        // per foot the strongest pin, and the ball it holds: the live ball while the clip has the foot on it, then where it was at
+        // the span's end (the core's exit touch moves the ball away as the foot lets go)
         var live = M(f.BallPos, sc);
-        float pin = PinWeightAt(_ct, out bool exact);
-        if (exact || !_pinBallHave) { _pinBall = live; _pinBallHave = true; }
-        var ball = exact || _ct < PinFrom() ? live : _pinBall;
-        if (_ct < PinFrom()) _pinBallHave = false;
-        // a ball the playing leg cannot reach brings the hips toward it (eased, at most ReachShiftMax)
         var want = NVec3.Zero;
-        if (pin > 0f)
+        for (int i = 0; i < 2; i++)
         {
-            int fp = _foot;
-            var tgt = PinTarget(f, sc, fp, ball, pin);
-            var hip = _gp[_sk.UpLeg[fp]];
-            var d = tgt - hip;
-            float len = d.Length(), most = ReachFrom * _legLen;
-            if (len > most) { want = d * ((len - most) / len); want.Y = Math.Min(0f, want.Y); }
-            if (want.Length() > ReachShiftMax / sc) want *= ReachShiftMax / sc / want.Length();
+            // every pin on this foot adds its shift by its weight (two pins of one foot overlap as one lets go and the next takes
+            // it, as an elastico's outside push hands to its inside snap): the target moves on smoothly between them
+            _pinRaw[i] = 0f; _pinShift[i] = NVec3.Zero; _pinIdx[i] = -1; _pinOwn[i] = false;
+            float sum = 0f;
+            for (int k2 = 0; k2 < _pins.Count; k2++)
+            {
+                var q = _pins[k2];
+                if (q.Foot != i) continue;
+                float wk = PinWeight(q, _ct, out bool exact);
+                if (!_pinHave[k2] || exact || _ct < q.From - 1e-4f) { _pinBallK[k2] = live; _pinHave[k2] = _ct >= q.From - 1e-4f; }
+                if (wk <= 0f) continue;
+                _pinShift[i] += (PinTarget(f, sc, i, q, _pinBallK[k2], 1f) - _gp[_sk.Foot[i]]) * wk;
+                sum += wk;
+                if (_pinIdx[i] < 0 || wk > PinWeight(_pins[_pinIdx[i]], _ct, out _)) _pinIdx[i] = k2;
+            }
+            if (sum > 1f) _pinShift[i] /= sum;
+            // a pin on its span (or at its touch) has the foot to itself: the core's contact is drawn exactly
+            for (int k2 = 0; k2 < _pins.Count; k2++)
+            {
+                var q = _pins[k2];
+                if (q.Foot != i) continue;
+                if (_ct >= q.From - 1e-4f && _ct <= q.To + 1e-4f)
+                { _pinShift[i] = PinTarget(f, sc, i, q, _pinBallK[k2], 1f) - _gp[_sk.Foot[i]]; sum = 1f; _pinIdx[i] = k2; }
+                // a touch of the move itself (an elastico's snap, a heel-to-heel's flick) is not a touch for the figure to draw
+                // over it: from its ramp to its tick the pin has the foot
+                if (q.From == q.To && _ct >= q.RampFrom && _ct <= q.To + 1e-4f) _pinOwn[i] = true;
+            }
+            _pinRaw[i] = Math.Min(1f, sum);
+            // a ball the leg cannot reach brings the hips toward it (eased, at most ReachShiftMax)
+            if (_pinRaw[i] > 0f)
+            {
+                var tgt = _gp[_sk.Foot[i]] + _pinShift[i];
+                var d = tgt - _gp[_sk.UpLeg[i]];
+                float len = d.Length(), most = ReachFrom * _legLen;
+                if (len > most) { var wi = d * ((len - most) / len); wi.Y = Math.Min(0f, wi.Y); if (wi.LengthSquared() > want.LengthSquared()) want = wi; }
+            }
         }
+        if (want.Length() > ReachShiftMax / sc) want *= ReachShiftMax / sc / want.Length();
         float k = 1f - MathF.Exp(-dt / ReachShiftTau);
         _reachOff = NVec3.Lerp(_reachOff, want, k);
         if (_reachOff.LengthSquared() > 1e-10f)
@@ -341,17 +430,20 @@ public sealed class SkillClipLayer
             _sk.Forward(_out, _outP[0], _gr, _gp, _outP);
         }
         // the figure's own pose, for a touch it draws now (the exit touch)
-        bool anyTouch = tw[0] > 0f && !_twBlocked[0] || tw[1] > 0f && !_twBlocked[1];
-        var baseGp = anyTouch ? new NVec3[_n] : null;
-        if (anyTouch) _sk.Forward(_baseR, _baseP[0], _baseG, baseGp!, _baseP);
         // a touch the figure draws (the exit touch) takes its leg by its weight; one still recovering as the clip began is left to
         // the hand-over's offset until it has faded out
         for (int i = 0; i < 2; i++)
         {
             if (_twBlocked[i] && tw[i] <= 0f) _twBlocked[i] = false;
-            _twx[i] = _twBlocked[i] ? 0f : Math.Clamp(tw[i], 0f, 1f);
+            // a touch that is dropped (an exit touch the core then does not make) lets go of the leg over TouchFade, not in a tick
+            float raw = _twBlocked[i] ? 0f : Math.Clamp(tw[i], 0f, 1f);
+            _twS[i] = Math.Max(raw, _twS[i] - dt / TouchFade);
+            _twx[i] = _twS[i];
         }
         tw = _twx;
+        bool anyTouch = tw[0] > 0f || tw[1] > 0f;
+        var baseGp = anyTouch ? new NVec3[_n] : null;
+        if (anyTouch) _sk.Forward(_baseR, _baseP[0], _baseG, baseGp!, _baseP);
         for (int i = 0; i < 2; i++)
         {
             int up = _sk.UpLeg[i], leg = _sk.Leg[i], foot = _sk.Foot[i];
@@ -359,12 +451,12 @@ public sealed class SkillClipLayer
             NQuat gFoot = _gr[foot];
             _pinW[i] = 0f;
             // a touch the core makes with this foot (the exit touch) takes it from the pin
-            float pinI = pin * (1f - tw[i]);
-            if (i == _foot && pinI > 0f) { _pinW[i] = pinI; target = PinTarget(f, sc, i, ball, pinI); }
+            float pinI = _pinIdx[i] < 0 ? 0f : _pinOwn[i] ? _pinRaw[i] : _pinRaw[i] * (1f - tw[i]);
+            if (pinI > 0f) { _pinW[i] = pinI; target = ankle + _pinShift[i] * (1f - tw[i]); }
             // a foot the clip plants is held where it landed (not while it plays the ball or a touch)
             bool contact = (_stand!.Contacts(_ct) & (i == 0 ? Clip.LeftFoot : Clip.RightFoot)) != 0;
             if (_wRun > 0.5f) contact = (_run!.Contacts(_ct) & (i == 0 ? Clip.LeftFoot : Clip.RightFoot)) != 0;
-            bool stance = contact && _pinW[i] <= 1e-3f && tw[i] <= 1e-3f && target.Y < _restAnkleY + PlantAbove;
+            bool stance = contact && _pinW[i] <= 1e-3f && (_pinOwn[i] ? 0f : tw[i]) <= 1e-3f && target.Y < _restAnkleY + PlantAbove;
             var lk = _lock[i];
             var held = new NVec3(lk.Lock.X, target.Y, lk.Lock.Z);
             bool far = lk.Locked && (held - _gp[up]).Length() > 0.99f * _legLen;
@@ -372,7 +464,7 @@ public sealed class SkillClipLayer
             target = got;
             _planted[i] = lk.Settled;
             // (not the playing foot while the clip has it on the ball: a touch the figure still draws there is the move's own)
-            float twi = tw[i];
+            float twi = _pinOwn[i] ? 0f : tw[i];
             if (twi > 0f)
             {
                 target = NVec3.Lerp(target, baseGp![foot], twi);
@@ -386,15 +478,15 @@ public sealed class SkillClipLayer
     }
 
     /// <summary>The playing foot's ankle that puts its surface on <paramref name="ball"/> as the clip has it on its own ball (or, for a step-over, its path moved with the ball), by weight <paramref name="w"/>.</summary>
-    NVec3 PinTarget(in FigureFrame f, float sc, int i, NVec3 ball, float w)
+    NVec3 PinTarget(in FigureFrame f, float sc, int i, in Pin q, NVec3 ball, float w)
     {
         NVec3 ankle = _gp[_sk.Foot[i]];
         var cb = ClipBall(f, sc);
         NVec3 shift;
-        if (_move == "step_over") { shift = ball - cb; shift.Y = 0f; }
+        if (q.Path) { shift = ball - cb; shift.Y = 0f; }
         else
         {
-            var sp = SurfacePoint(i, _surface, _gr[_sk.Foot[i]], ankle);
+            var sp = SurfacePoint(i, q.Surface, _gr[_sk.Foot[i]], ankle);
             var d = sp - cb;
             var nrm = d.LengthSquared() > 1e-8f ? NVec3.Normalize(d) : NVec3.UnitY;
             shift = ball + nrm * (f.BallRadius / sc) - sp;
@@ -402,21 +494,17 @@ public sealed class SkillClipLayer
         return ankle + shift * w;
     }
 
-    /// <summary>The clip time the pin's span (or touch) begins.</summary>
-    float PinFrom()
-    {
-        var c = _stand!;
-        foreach (var s in c.On) if (s.Foot == _foot) return c.EventSeconds(s.From);
-        float from = float.NaN;
-        foreach (var s in c.Touches) if (s.Foot == _foot) { float e = c.EventSeconds(s.From); if (float.IsNaN(from) || e < from) from = e; }
-        if (float.IsNaN(from) && _move == "step_over") from = c.EventSeconds("contact");
-        return float.IsNaN(from) ? float.MaxValue : from;
-    }
-
-    NVec3 _pinBall, _reachOff;
+    NVec3 _reachOff;
+    readonly NVec3[] _pinShift = new NVec3[2], _pinBallK = new NVec3[8];
+    readonly bool[] _pinHave = new bool[8];
+    readonly int[] _pinIdx = { -1, -1 };
+    readonly float[] _pinRaw = new float[2];
+    readonly bool[] _pinOwn = new bool[2];
     readonly float[] _twx = new float[2];
     readonly bool[] _twBlocked = new bool[2];
-    bool _pinBallHave;
+    readonly float[] _twS = new float[2];
+    /// <summary>Seconds over which a touch's hold on a leg fades when the touch is dropped.</summary>
+    const float TouchFade = 0.10f;
     /// <summary>The playing leg reaches its pinned target up to this share of its length; beyond, the hips come toward it (at most ReachShiftMax metres, eased over ReachShiftTau seconds).</summary>
     const float ReachFrom = 0.95f, ReachShiftMax = 0.18f, ReachShiftTau = 0.04f;
 

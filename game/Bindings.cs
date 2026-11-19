@@ -177,9 +177,9 @@ public static class Bindings
                 new("Ball roll", $"{Skill3.Label} (side from {Left.Label} / {Right.Label})", "Right stick → or ← held"),
                 new("Drag-back", $"{Skill4.Label}, or back + {Finesse.Label} + {Chip.Label}", $"Left stick ↓ + {lb} + {rb}"),
                 new("Knock-on", KnockOn.Label, "Right stick ↑ flick while sprinting"),
-                new("Elastico", "no key", "Right stick ↓ then → or ←", true),
-                new("Heel-to-heel", "no key", "Right stick ↑ flick, centre, then ↓", true),
-                new("Spin and go", "no key", "Right stick ↑ flick, centre, then → or ←", true),
+                new("Elastico", "no key", "Right stick ↓ then → or ←"),
+                new("Heel-to-heel", "no key", "Right stick ↑ flick, centre, then ↓"),
+                new("Spin and go", "no key", "Right stick ↑ flick, centre, then → or ←"),
             }),
             new("Round and menu", new()
             {

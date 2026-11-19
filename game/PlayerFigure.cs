@@ -5,7 +5,7 @@ using Godot;
 namespace FootballSim.Game;
 
 /// <summary>The part of the boot that plays the ball (same order as the simulation's FootSurface).</summary>
-public enum BootSurface { Inside, Laces, Outside, Sole }
+public enum BootSurface { Inside, Laces, Outside, Sole, Heel }
 
 /// <summary>Where a touch is in time (same order as the simulation's ActionPhase).</summary>
 public enum TouchPhase { Planned, PreWindup, Windup, Contact, Recovery, Done }
@@ -67,7 +67,7 @@ public struct FigureShot
 }
 
 /// <summary>The simulation's skill moves, in the order of its ActionKind from StepOver on.</summary>
-public enum SkillKind { StepOver, BodyFeint, DragBack, BallRoll, FakeStop, FakeCut }
+public enum SkillKind { StepOver, BodyFeint, DragBack, BallRoll, FakeStop, FakeCut, Elastico, Spin, HeelToHeel }
 
 /// <summary>A skill move under way as plain values: the figure draws the pose for its elapsed time and decides no timing.</summary>
 public struct FigureSkill
@@ -89,6 +89,10 @@ public struct FigureSkill
     public float ContactElapsed, ReachSpan;
     /// <summary>Ball centre at the sole's first contact (fixed once made), and the ball velocity applied then.</summary>
     public Vector3 ContactPoint, OutVelocity;
+    /// <summary>Seconds since the second contact (elastico, spin, heel-to-heel; NaN without one) and since the spin's first sole lifted (NaN otherwise); the foot and surface of the second contact.</summary>
+    public float Contact2Elapsed, LiftElapsed;
+    public bool Right2;
+    public BootSurface Surface2;
 }
 
 /// <summary>Plain-value input for one figure for one physics tick. The figure never sees the simulation types.</summary>
@@ -1268,6 +1272,7 @@ public partial class PlayerFigure : Node3D
             BootSurface.Laces => new Vector3(0.172f, 0.027f, 0f),
             BootSurface.Inside => new Vector3(0.122f, -0.016f, -sg * 0.065f),
             BootSurface.Outside => new Vector3(0.122f, -0.016f, sg * 0.065f),
+            BootSurface.Heel => new Vector3(-0.06f, -0.045f, 0f),
             _ => new Vector3(0.122f, -0.063f, 0f),
         };
     }
@@ -1280,6 +1285,7 @@ public partial class PlayerFigure : Node3D
         {
             BootSurface.Inside => right ? new Vector3(-d.Z, 0, d.X) : new Vector3(d.Z, 0, -d.X),
             BootSurface.Outside => right ? new Vector3(d.Z, 0, -d.X) : new Vector3(-d.Z, 0, d.X),
+            BootSurface.Heel => -d,
             _ => d,
         };
     }
@@ -1887,7 +1893,16 @@ public partial class PlayerFigure : Node3D
             Stats.StepOverClearMinM = Math.Min(Stats.StepOverClearMinM, clear);
         }
         if (s.Kind is SkillKind.StepOver or SkillKind.BodyFeint) return;
-        if (s.Kind != SkillKind.FakeCut && s.ContactElapsed >= 0f && Stats != null)
+        // the sole moves' span: from the landing to the end tick (the spin: the first sole to its lift, the second from its contact)
+        int sf = fi;
+        bool soleSpan = s.Kind is SkillKind.DragBack or SkillKind.BallRoll or SkillKind.FakeStop && s.ContactElapsed >= 0f;
+        if (s.Kind == SkillKind.Spin)
+        {
+            if (s.ContactElapsed >= 0f && !(s.LiftElapsed >= 0f)) soleSpan = true;
+            else if (s.Contact2Elapsed >= 0f) { soleSpan = true; sf = s.Right2 ? 1 : 0; }
+        }
+        fi = sf;
+        if (soleSpan && Stats != null)
         {
             // sole on the ball from the landing until the hand-back at the end begins; and over the whole span to the end tick
             float er = Math.Abs((SurfaceAt(fi, BootSurface.Sole, ank, dir) - f.BallPos).Length() - f.BallRadius);
@@ -1896,6 +1911,16 @@ public partial class PlayerFigure : Node3D
             if (tw[fi] <= 0f) Stats.SkillOnBallMaxErr = Math.Max(Stats.SkillOnBallMaxErr, er);
             else { Stats.SkillOnBallTouchTicks++; Stats.SkillOnBallTouchMaxErr = Math.Max(Stats.SkillOnBallTouchMaxErr, er); }
             if (MocapLogOn) GD.Print($"SKILL_SOLE tick={Stats.Tick} err_m={er:F3} t={s.Elapsed:F3} layer={_atkAnim?.Skills?.Describe() ?? "-"}");
+        }
+        fi = s.Right ? 1 : 0;
+        // the second contact (elastico, spin, heel-to-heel) is measured on its own tick, with its foot and surface
+        if (f.SkillTouch && s.Contact2Elapsed >= 0f && s.Contact2Elapsed < 0.5f * f.Dt + 1e-4f)
+        {
+            int f2 = s.Right2 ? 1 : 0;
+            float e2 = Math.Abs((SurfaceAt(f2, s.Surface2, ank, dir) - f.BallPos).Length() - f.BallRadius);
+            GD.Print($"SKILL_FOOT kind={s.Kind} contact2 t={s.Elapsed:F3} err_m={e2:F3}");
+            Stats?.SkillContact.Add(e2);
+            return;
         }
         bool atContact = f.SkillTouch && !_skSoleLogged;
         bool arrived = s.ContactElapsed >= 0.04f && !_skInLogged;

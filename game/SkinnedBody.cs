@@ -177,7 +177,7 @@ public sealed partial class SkinnedBody : Node3D
     }
 
     // ---- boot contact surfaces: points on the boot mesh (rest pose), carried rigidly by the foot bone ----
-    readonly Vector3[,] _surfRest = new Vector3[2, 4];   // rest offset (model space) from the foot bone to the surface point
+    readonly Vector3[,] _surfRest = new Vector3[2, 5];   // rest offset (model space) from the foot bone to the surface point
     readonly Basis[] _footRot = new Basis[2];
     readonly Vector3[] _footPos = new Vector3[2];
     bool _hasSurfaces;
@@ -187,7 +187,7 @@ public sealed partial class SkinnedBody : Node3D
 
     /// <summary>
     /// Picks one point per boot surface from the boot mesh vertices of each foot: the medial and lateral extremes at mid-foot (inside, outside),
-    /// the top of the vamp (laces) and the underside at mid-foot (sole).
+    /// the top of the vamp (laces), the underside at mid-foot (sole) and the back of the heel, low on its centre line (heel).
     /// </summary>
     void BuildSurfaces()
     {
@@ -220,8 +220,8 @@ public sealed partial class SkinnedBody : Node3D
             foreach (var v in list) if (v.Z > zmin + 0.4f * dz && v.Z < zmin + 0.7f * dz) yTop = Math.Max(yTop, v.Y);
             float hz = yTop - ymin;
 
-            Vector3 inside = default, outside = default, laces = default, sole = default;
-            float bi = float.MaxValue, bo = float.MinValue, bl = float.MinValue, bs = float.MaxValue;
+            Vector3 inside = default, outside = default, laces = default, sole = default, heel = default;
+            float bi = float.MaxValue, bo = float.MinValue, bl = float.MinValue, bs = float.MaxValue, bh = float.MaxValue;
             foreach (var v in list)
             {
                 float l = (v.X - b.X) * outward;
@@ -234,11 +234,14 @@ public sealed partial class SkinnedBody : Node3D
                 bool central = Math.Abs(l - lmid) < 0.25f * half;
                 if (central && v.Z > zmin + 0.5f * dz && v.Z < zmin + 0.8f * dz && v.Y > bl) { bl = v.Y; laces = v; }
                 if (central && mid && v.Y < bs) { bs = v.Y; sole = v; }
+                // the heel: the rearmost point of the boot's centre line, low on the heel counter
+                if (central && v.Y > ymin + 0.1f * hz && v.Y < ymin + 0.5f * hz && v.Z < bh) { bh = v.Z; heel = v; }
             }
             _surfRest[i, (int)BootSurface.Inside] = inside - b;
             _surfRest[i, (int)BootSurface.Outside] = outside - b;
             _surfRest[i, (int)BootSurface.Laces] = laces - b;
             _surfRest[i, (int)BootSurface.Sole] = sole - b;
+            _surfRest[i, (int)BootSurface.Heel] = heel - b;
         }
         _hasSurfaces = true;
     }
