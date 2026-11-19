@@ -1694,7 +1694,7 @@ public partial class PlayerFigure : Node3D
         float len = KindEase(0, SequenceSeconds(sh.Kind, cb), dt);
         float swingT = KindEase(1, Math.Min(sh.Kind switch { ShotKind.Driven => 0.12f, ShotKind.Chip => 0.14f, ShotKind.Power => 0.14f, _ => 0.17f }, 0.6f * len), dt);
         // the plant step (when one is drawn) starts a stride step before it lands, so it is as long as a step of the run
-        float plantLen = Math.Max(len, PlantLand(swingT) + 1f / Math.Max(f.StepFrequency, 2.5f));
+        float plantLen = Math.Max(len, PlantLand(swingT) + PlantSteps / Math.Max(f.StepFrequency, 2.5f));
         // (the estimate is only drawn toward while the ball will be within the body's reach at the contact)
         Vector3 bodyAtC = posXZ + new Vector3(f.Velocity.X, 0, f.Velocity.Z) * tau;
         bool inRange = Dist2(sh.ContactPoint, bodyAtC) < ShotReachM * k;

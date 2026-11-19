@@ -41,14 +41,18 @@ public partial class PlayerFigure
 
     // the plant: 0 undecided, 1 the stride's own stance foot, 2 a step to beside the ball; its foot, weight, ankle, direction, held flag,
     // the point it lands on, whether it has landed, and the release's progress (0..1)
-    int _plMode, _plFoot; float _plW, _plRel, _plDhLand; Vector3 _plAnkle, _plDir = new(1, 0, 0), _plPoint; bool _plHeld, _plLanded;
+    int _plMode, _plFoot; float _plW, _plRel, _plDhLand, _plStartTau; bool _plStarted; Vector3 _plAnkle, _plDir = new(1, 0, 0), _plPoint; bool _plHeld, _plLanded;
 
     /// <summary>The hip-to-ankle ground distance (share of a straight-ish leg's ground reach) at which a held plant foot is let go while the body runs on.</summary>
     const float PlantReleaseReach = 0.80f;
     /// <summary>The most the pelvis comes down for the plant foot (metres at 1.8 m).</summary>
     const float PlantDropMaxM = 0.06f;
     /// <summary>How long the let-go plant foot takes to go back to the stride (seconds).</summary>
-    const float PlantReleaseSeconds = 0.20f;
+    const float PlantReleaseSeconds = 0.25f;
+    /// <summary>How many of the run's steps the plant step takes, to its landing.</summary>
+    const float PlantSteps = 1.3f;
+    /// <summary>The shortest plant step (seconds to its landing) when the stride keeps that foot down late.</summary>
+    const float PlantMinStep = 0.14f;
     /// <summary>How far ahead of the hip (share of the straight-ish leg's ground reach) the plant may land while running: short of straight, so the knee is not whipped as it lands.</summary>
     const float PlantReach = 0.72f;
 
@@ -136,7 +140,7 @@ public partial class PlayerFigure
                 float q = Frac((j == 0 ? f.LeftFootPhase : f.RightFootPhase) + 0.5f * f.StepFrequency * Math.Max(tau, 0f));
                 if (q > 0.58f && q < 0.92f) _plMode = 1;
             }
-            _plFoot = j; _plLanded = false; _plRel = 0f;
+            _plFoot = j; _plLanded = false; _plRel = 0f; _plStarted = false;
             if (ShotLog && Stats != null) GD.Print($"SHOT_PLANT tick={Stats.Tick} mode={(_plMode == 1 ? "stride" : "step")} foot={(j == 1 ? "R" : "L")} tau={tau:F3}");
         }
         if (_plMode == 1) { PlantIdle(dt); return; }
@@ -154,7 +158,14 @@ public partial class PlayerFigure
             if (dv.Length() > maxD) pt = hipL + dv.Normalized() * maxD;
             pt.Y = AnkleH;
             _plPoint = pt; _plDhLand = Dist2(hipL, pt);
-            float wp = made ? 1f : Smooth((len - tauD) / Math.Max(len - land, 0.02f)) * _sqGate;
+            // the step starts when the stride lifts that foot (so a planted foot is never dragged forward), or at the latest a short step's time before the landing
+            if (!_plStarted && !made)
+            {
+                bool down = stepping && (_atkAnim != null && _mW > 0.5f ? _mLock[j].Locked : _feet[j].Planted);
+                if (down && tauD > land + PlantMinStep) { _plW = 0f; _plHeld = false; _plAnkle = pt; return; }
+                _plStarted = true; _plStartTau = Math.Max(tauD, land + 0.05f);
+            }
+            float wp = made ? 1f : Smooth((_plStartTau - tauD) / Math.Max(_plStartTau - land, 0.02f)) * _sqGate;
             Vector3 a = pt + Vector3.Up * (0.08f * k * Mathf.Sin(Mathf.Pi * wp));
             _plAnkle = a; _plW = wp; _plDir = fwd; _plHeld = false;
             if (wp >= 0.999f && (made || tauD <= land + 0.5f * dt) && !_sqFading) { _plLanded = true; _plAnkle = _plPoint; _plHeld = true; }
