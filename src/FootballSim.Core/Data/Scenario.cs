@@ -57,4 +57,10 @@ public sealed class Scenario
     public float? ClockLimit { get; set; }
     /// <summary>Distance from the goal centre at which the scripted attacker shoots. 0 means at once.</summary>
     public float ShootDistance { get; set; }
+    /// <summary>
+    /// The scripted attacker's intended strike distance from the goal, metres (0: none): running in, it presses shoot only once
+    /// the ball, carried on at his speed through the wind-up, will be this close at the strike. The scoring bands were measured
+    /// at these distances.
+    /// </summary>
+    public float StrikeDistance { get; set; }
 }

@@ -4,14 +4,14 @@ using FootballSim.Core;
 /// <summary>
 /// The speed-step count every probe shares: ticks on which the attacker's ground speed |v| changes faster than
 /// <see cref="Threshold"/> while he has the ball (in possession before and after the tick), shots excluded. Skill-move ticks
-/// count, and are also counted on their own. The per-tick acceleration |dv|/dt over the same ticks is kept for its maximum.
+/// count, and are also counted on their own; ticks on which the arena boards stopped him are counted apart (<see cref="Wall"/>). The per-tick acceleration |dv|/dt over the same ticks is kept for its maximum.
 /// </summary>
 sealed class SpeedSteps
 {
     /// <summary>A speed change faster than this is a step, m/s^2.</summary>
     public const float Threshold = 15f;
 
-    public int Ticks, Steps, SkillSteps;
+    public int Ticks, Steps, SkillSteps, Wall;
     public float AccMax, DspdMax;
     readonly List<float> _acc = new();
     readonly List<float> _dspd = new();
@@ -39,6 +39,10 @@ sealed class SpeedSteps
         AccMax = MathF.Max(AccMax, acc);
         DspdMax = MathF.Max(DspdMax, d);
         if (d <= Threshold) return false;
+        // The boards stopped him (his velocity is not his run plus the steering): counted on its own, not as a step.
+        var fwd = new Vector2(MathF.Cos(p.Facing), MathF.Sin(p.Facing));
+        var moved = fwd * p.RunSpeed + new Vector2(p.SteerVelocity.X, p.SteerVelocity.Z);
+        if (Vector2.Distance(moved, new Vector2(p.Velocity.X, p.Velocity.Z)) > 0.05f) { Wall++; return false; }
         Steps++;
         if (_skill0 || p.SkillMove != null) SkillSteps++;
         return true;
@@ -46,7 +50,7 @@ sealed class SpeedSteps
 
     public void Add(SpeedSteps o)
     {
-        Ticks += o.Ticks; Steps += o.Steps; SkillSteps += o.SkillSteps;
+        Ticks += o.Ticks; Steps += o.Steps; SkillSteps += o.SkillSteps; Wall += o.Wall;
         AccMax = MathF.Max(AccMax, o.AccMax); DspdMax = MathF.Max(DspdMax, o.DspdMax);
         _acc.AddRange(o._acc); _dspd.AddRange(o._dspd);
     }

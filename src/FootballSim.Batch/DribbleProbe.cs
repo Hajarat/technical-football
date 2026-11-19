@@ -358,7 +358,7 @@ static class SessionProbe
         if (files.Length == 0) { Console.WriteLine($"session probe: no round-*.json under {src}; skipped"); return 0; }
         Console.WriteLine($"session probe: {files.Length} rounds from {src}");
         Console.WriteLine("steps = possession ticks whose |d|v||/dt is over 15 m/s^2 (shots excluded, skill moves included; skill = those during a move), acc_max = largest |dv|/dt over the same ticks, m/s^2");
-        Console.WriteLine($"{"round",-50} {"ticks",6} {"unplayed",8} {"unplayed_pushed",15} {"poss_ticks",10} {"steps",6} {"skill",6} {"acc_max",8}  outcome");
+        Console.WriteLine($"{"round",-50} {"ticks",6} {"unplayed",8} {"unplayed_pushed",15} {"poss_ticks",10} {"steps",6} {"skill",6} {"wall",5} {"acc_max",8}  outcome");
         int totalDrops = 0, totalPushedDrops = 0;
         var all = new SpeedSteps();
         foreach (var f in files)
@@ -373,10 +373,10 @@ static class SessionProbe
             totalDrops += c.Drops; totalPushedDrops += c.DropsPushed;
             all.Add(c.Steps);
             string name = Path.GetFileName(Path.GetDirectoryName(f)) + "/" + Path.GetFileName(f);
-            Console.WriteLine($"{name,-50} {rp.TickCount,6} {c.Drops,8} {c.DropsPushed,15} {c.Steps.Ticks,10} {c.Steps.Steps,6} {c.Steps.SkillSteps,6} {c.Steps.AccMax,8:F1}  {c.Outcome}");
+            Console.WriteLine($"{name,-50} {rp.TickCount,6} {c.Drops,8} {c.DropsPushed,15} {c.Steps.Ticks,10} {c.Steps.Steps,6} {c.Steps.SkillSteps,6} {c.Steps.Wall,5} {c.Steps.AccMax,8:F1}  {c.Outcome}");
         }
         Console.WriteLine($"total: {totalDrops} committed touches not played ({totalPushedDrops} with the stick pushed), " +
-                          $"{all.Steps} speed steps in {all.Ticks} possession ticks ({all.PerThousand:F1} per 1000, skill {all.SkillSteps}), acc_max {all.AccMax:F1} m/s^2");
+                          $"{all.Steps} speed steps in {all.Ticks} possession ticks ({all.PerThousand:F1} per 1000, skill {all.SkillSteps}; {all.Wall} more against the boards), acc_max {all.AccMax:F1} m/s^2");
         return 0;
     }
 

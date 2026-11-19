@@ -461,13 +461,17 @@ public static class TouchPlanner
             {
                 // The step the push was solved for if half the trim reaches it; a push far enough off that it needs more is
                 // played sooner, where its miss is smaller.
-                tg = Search(p, intent, ball, chase: false, need, minJ, h, now, t, pitch, trim: ComfortTrim, turnish: turnish, firstOnly: true);
+                // At a sprint the push runs out and comes back: its step is kept while the full trim reaches it.
+                float comfort = TouchModel.ModeFor(intent, t) == TouchMode.Sprint ? 1f : ComfortTrim;
+                tg = Search(p, intent, ball, chase: false, need, minJ, h, now, t, pitch, trim: comfort, turnish: turnish, firstOnly: true);
                 // A push that ran short or wide of its meet: the first step that reaches it on the stick's legs; else go and get
                 // it without slowing more than the stick's legs may; else the stick's legs with the leg stretched (a mis-hit
                 // costs a stretched touch, not a slowdown); else go and get it however.
                 if (!tg.Found) tg = Search(p, intent, ball, chase: false, 1, minJ, h, now, t, pitch, turnish: turnish);
                 if (!tg.Found && stickActive) tg = Search(p, intent, ball, chase: true, 1, minJ, h, now, t, pitch, held: true, turnish: turnish);
                 if (!tg.Found && stickActive) tg = Search(p, intent, ball, chase: false, 1, minJ, h, now, t, pitch, k.StretchReach, turnish: turnish);
+                // The go-get-it legs within 15% of the pace, stretching for it, before they may run at any speed.
+                if (!tg.Found && stickActive) tg = Search(p, intent, ball, chase: true, 1, minJ, h, now, t, pitch, k.StretchReach, held: true, turnish: turnish);
                 if (!tg.Found) tg = Search(p, intent, ball, chase: true, 1, minJ, h, now, t, pitch, turnish: turnish);
             }
         }
@@ -517,7 +521,10 @@ public static class TouchPlanner
     /// <summary>How much faster the stride may run to bring a swing onto the ball for a demand (+25%).</summary>
     const float GaitNudge = 0.25f;
 
-    /// <summary>The share of the speed trim the swing a push was solved for may ask for before an earlier swing is taken.</summary>
+    /// <summary>
+    /// The share of the speed trim the step a jog or close-control push was solved for may ask for before an earlier step is
+    /// taken (a sprint push's step is kept while the full trim reaches it).
+    /// </summary>
     const float ComfortTrim = 0.25f;
 
     /// <summary>A swing found up to this many ticks inside the windup may still be committed (the stride clock moves with the speed).</summary>
@@ -1002,6 +1009,7 @@ public static class TouchPlanner
         int horizon = nearTicks > 0 ? nearTicks + Ticks(1f, t) : Ticks(3f, t);
         int count = 0, bestGap = int.MaxValue;
         bool found = false;
+        Meet prev = default;
         float tn = now;
         float cap = Possession.SpeedCap(from, true, false, t);
         for (int j = 1; j <= horizon; j++)
@@ -1020,7 +1028,13 @@ public static class TouchPlanner
             }
             // A push never spans more than max_meet_seconds (a slow stride after a turn would stretch its steps): the last
             // swing middle inside that is its meet.
-            if (j > Ticks(MaxMeetSeconds, t) && found) return true;
+            // (Cut short there, it keeps the foot the requested steps would have played: one step sooner if the parity differs.)
+            if (j > Ticks(MaxMeetSeconds, t) && found)
+            {
+                if ((steps - meet.Swings) % 2 != 0 && prev.Swings > 0) meet = prev;
+                return true;
+            }
+            prev = meet;
             meet = new Meet { J = j, Foot = f, Cp = ContactPointFor(c, f, t), Swings = count };
             found = true;
             if (count >= steps) return true;
@@ -1029,7 +1043,7 @@ public static class TouchPlanner
     }
 
     /// <summary>The longest a push is solved for, seconds (inside the 1.5 s the player is always back on the ball).</summary>
-    const float MaxMeetSeconds = 1.2f;
+    const float MaxMeetSeconds = 1.1f;
 
     /// <summary>
     /// The meet of a reversal: predicts the player on the stick's legs (braking, turning about and running back) and returns
@@ -1124,12 +1138,13 @@ public static class TouchPlanner
 
     /// <summary>
     /// The fastest push along <paramref name="dir"/> the player can still catch: one whose ball has not run further ahead of
-    /// where it starts than he covers at his off-ball top speed after <see cref="CatchSeconds"/> (a push faster than that could
+    /// where it starts than he covers at his running speed (or the share of his top speed) in <see cref="CatchSeconds"/> (a push faster than that could
     /// be lost by a player who chases it at once; with this bound the controller's go-get-it legs always get back to it).
     /// </summary>
     static float CatchablePush(PlayerState p, Ball ball, Vector3 dir, float liftDeg, Tuning t)
     {
-        float reach = Movement.TopSpeed(p.Sheet, t) * CatchSeconds * CatchMargin;
+        // He covers at least his running speed over that time, and at least the share of top speed allowing for his acceleration.
+        float reach = MathF.Max(p.RunSpeed, Movement.TopSpeed(p.Sheet, t) * CatchMargin) * CatchSeconds;
         var target = ball.Position + dir * reach;
         return SolvePush(ball, target, Ticks(CatchSeconds, t), liftDeg, 0f, t.Touch.MaxPush, t, out _, out _, out _);
     }

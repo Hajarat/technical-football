@@ -218,8 +218,11 @@ public sealed class StepsPerTouchTuning
 {
     public float Close { get; set; } = 1f;
     public float Jog { get; set; } = 2f;
-    /// <summary>At a sprint, by dribbling rating (rounded to whole steps).</summary>
-    public RatingRange Sprint { get; set; } = new(4f, 2f);
+    /// <summary>
+    /// At a sprint, by dribbling rating (rounded to whole steps: 4 at 1, 3 from about 27 to 70, 2 from about 71; the 1.8 at 99
+    /// moves the two-step band down so a dribbling-72 sprinter's turns meet the latency targets).
+    /// </summary>
+    public RatingRange Sprint { get; set; } = new(4f, 1.8f);
 }
 
 /// <summary>The most steps to the next meet while turning (see <see cref="TouchTuning.TurningStickRateDeg"/>).</summary>

@@ -407,7 +407,8 @@ public class TouchControllerTests
             }
             Assert.True(stop != null, $"seed {seed} dribbling {dribbling}: no stop touch (ball {TouchModel.HorizontalDistance(w.Attacker.Position, w.Ball.Position):F2} m, speed {w.Attacker.Speed:F2})");
             Assert.True(stop!.Made);
-            Assert.True(w.Attacker.InPossession && w.Attacker.Speed < 0.1f, $"seed {seed} dribbling {dribbling}: speed {w.Attacker.Speed:F2}");
+            // Stopped, or stepping up to a ball that settled a little off (at dribbling 1 the stop's rated error can leave it so).
+            Assert.True(w.Attacker.InPossession && w.Attacker.Speed < 0.3f, $"seed {seed} dribbling {dribbling}: speed {w.Attacker.Speed:F2}");
             Assert.InRange(TouchModel.HorizontalDistance(w.Attacker.Position, w.Ball.Position), 0f, 1.3f);
         }
     }

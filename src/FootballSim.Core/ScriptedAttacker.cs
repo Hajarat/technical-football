@@ -226,7 +226,10 @@ public sealed class ScriptedAttacker
             || w.BallController == a && a.NextTouchEta <= toContact - PressMargin
             || w.BallController == a && running && toGoal <= w.Scenario.ShootDistance - LateDistance;
         // Taking the keeper round, the shot waits until he is beaten; a chip is played as soon as the ball can be struck.
-        bool hold = _heldFor == 0f && (_roundSide != 0 || !close || running && toGoal > w.Scenario.ShootDistance);
+        // With an intended strike distance it presses once the ball, carried on at his speed through the time to the contact,
+        // is that close at the strike.
+        float pressAt = w.Scenario.StrikeDistance > 0f ? w.Scenario.StrikeDistance + a.Speed * toContact : w.Scenario.ShootDistance;
+        bool hold = _heldFor == 0f && (_roundSide != 0 || !close || running && toGoal > pressAt);
         if (_chipThis && (strikable || close)) hold = false;
         if (hold)
         {

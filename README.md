@@ -18,7 +18,8 @@ The pitch (`src/FootballSim.Core/Pitch.cs`) is a walled arena whose lengths come
 | Batch run, 10 000 scripted rounds | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario penalty --n 10000 --seed 1` |
 | Save a scripted round as a replay | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario breakaway --seed 6 --save-replay game/tests/smoke_replay.json` |
 | Re-run a replay in the batch tool | `dotnet run -c Release --project src/FootballSim.Batch -- --replay game/tests/smoke_replay.json` |
-| Dribble probe: scripted stick traces per dribbling rating, the idealised ones and human-like ones at a pad's 60 Hz (a wandering stick, 45 and 100 degree sweeps, a reversal flick through neutral at a jog and in close control): possession kept, touches per second, ball ahead, feet, steering, contact miss, committed touches not played at their contact (`drops`), stretched touches (played beyond the reach, with heavier errors), touches whose push was clamped to 30 degrees of the stick at the commit (`clamped`), the turn touches' contact miss (p50/p90/max), the time from a stick turn past the execution angle to the turn touch, the time for the ball to move along a flicked stick, the lowest speed of the wandering jog, and the speed steps (`steps`: ticks from 1 s on with the ball whose ground speed changes faster than 15 m/s^2, shots excluded, skill-move ticks included; `skill_steps`: those during a move or a turn at the feet); a pooled summary follows the table. `--dtrace <probe> --ratings R [--index i --seeds n --from T --to T --steps-only 1]` prints one probe tick by tick (the legs: the stick's or the go-get-it legs, and the forecast contact) with its speed steps and committed touches not played | `dotnet run -c Release --project src/FootballSim.Batch -- --probe dribble` |
+| Dribble probe: scripted stick traces per dribbling rating, the idealised ones and human-like ones at a pad's 60 Hz (a wandering stick, 45 and 100 degree sweeps, a reversal flick through neutral at a jog and in close control): possession kept, touches per second, ball ahead, feet, steering, contact miss, committed touches not played at their contact (`drops`), stretched touches (played beyond the reach, with heavier errors), touches whose push was clamped to 30 degrees of the stick at the commit (`clamped`), the turn touches' contact miss (p50/p90/max), the time from a stick turn past the execution angle to the turn touch, the time for the ball to move along a flicked stick, the lowest speed of the wandering jog, and the speed steps (`steps`: ticks from 1 s on with the ball whose ground speed changes faster than 15 m/s^2, shots excluded, skill-move ticks included; `skill_steps`: those during a move or a turn at the feet; the session probe counts ticks where the arena boards stop the
+player apart, in `wall`, not as steps); a pooled summary follows the table. `--dtrace <probe> --ratings R [--index i --seeds n --from T --to T --steps-only 1]` prints one probe tick by tick (the legs: the stick's or the go-get-it legs, and the forecast contact) with its speed steps and committed touches not played | `dotnet run -c Release --project src/FootballSim.Batch -- --probe dribble` |
 | Session probe: replays the play-test rounds kept in `src/FootballSim.Core.Tests/TestData/playtest` (or `--replays <dir\|file>`; a folder is searched with its subfolders, so a folder of session folders such as `sessions` gives every round in them) with the current code and counts committed touches not played at their contact, and the speed steps (as the dribble probe counts them) and largest per-tick acceleration in possession, with a total per 1000 possession ticks | `dotnet run -c Release --project src/FootballSim.Batch -- --probe sessions` |
 | Feel probe: speed surges, per-tick acceleration, touch cadence, ball distance and facing wobble of straight dribbles, and the heading response to a 45/90/180 degree stick turn with and without the ball, each row with its speed steps counted as the dribble probe counts them; `--replays sessions` gives the acceleration and speed-step numbers over recorded play-test rounds, `--trace sprint45` (`jog90`, `sprint90off`, ...) prints one turn tick by tick, `--rtrace <replay> [--from T --to T --steps-only 1]` one recorded round tick by tick with each speed step attributed to the touch controller's state | `dotnet run -c Release --project src/FootballSim.Batch -- --probe feel` |
 | Shot diagnostic for the scoring calibration: per scripted round the distance, speed, charge and ball offset at the strike, the shot's accuracy factors, how it ended, why wide shots were wide and why rounds had no shot | `dotnet run -c Release --project src/FootballSim.Batch -- --probe shots --scenario breakaway --n 1000` |
@@ -64,15 +65,19 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   speed is shed while he turns about.
 - Touches: the stick pushed no further than `walk_max_input` (0.7, GOALS' MaximumInputSizeForWalkTouch) dribbles with
   walking touches, played as close control (a touch every step). A jog pushes the ball two steps on, and every
-  `foot_switch_every`-th (4th) push takes one step more so the other foot takes over; a sprint 4 steps at dribbling 1 to 2 at
-  99 (`steps_per_touch`). No push is solved for more than 1.2 s, nor faster than the player can catch within 1.5 s.
+  `foot_switch_every`-th (4th) push takes one step more so the other foot takes over; a sprint 4 steps at dribbling 1, 3 from
+  about 27 and 2 from about 71 (`steps_per_touch.sprint`, 4 to 1.8 by rating). No push is solved for more than 1.1 s, nor
+  faster than the player can catch within 1.5 s (at his running speed, or 0.8 of his top speed). A sprint push runs out and
+  comes back: its step is kept while the full speed trim can still reach the ball; a jog's or close control's while a
+  quarter of it can, else an earlier step plays it.
 - The touch controller (a closed loop, `TouchPlanner`): every tick in possession it predicts the stick's legs and the free
   ball and looks for the earliest step, past a cooldown of the last push's steps, whose contact window (swing progress 0.3 to
   0.8 of the playing foot) can meet the ball; of that window's ticks it takes the one that meets it best. The legs follow the
   stick, the miss trimmed by a sideways step (eased in and out at `steer_accel`, 6 m/s^2, at most `steer_max` 0.6 m/s) and a
   change of the target speed held to the contact, which reaches the running speed through the speed law and keeps it within
   15% of the pace (as much either way near the off-ball top speed). When the stick's legs cannot reach the ball, the
-  go-get-it legs run to where it will be, at the stick's pace or faster up to the off-ball top speed. The steering stops
+  go-get-it legs run to where it will be, at the stick's pace or faster up to the off-ball top speed (first within 15% of the
+  pace, the leg stretching if need be, and only then at any speed). The steering stops
   correcting within `reach_tolerance` (0.08 m) of the contact point; the foot reaches the rest.
 - A demand (the stick turned past the execution angle off the ball's travel and off the run, the stick released for a stop,
   a skill gesture waiting, a shot's soft touch) shortens the cooldown to `early_execution` of the cadence (by the angle and
@@ -101,6 +106,12 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   after it the controller eases it out (the drag-back's step itself rises and falls to rest).
 - The keeper and the view read the next expected contact (`NextTouchEta`, `NextTouchFoot`, `NextTouchPoint`): the committed
   touch's, else the one the controller steers for.
+
+Scripted rounds: the batch tool's scripted attacker runs at the goal and, in a scenario with `shoot_distance`, presses shoot
+inside it once the ball is strikable or its next touch comes early enough in the wind-up; with `strike_distance` (breakaway
+11.3, halfway run 12.4, angled run 11.1 m, the distances the scoring bands were first measured at) it presses only once the
+ball, carried on at his speed to the contact, will be that close at the strike. Within 4 m of the keeper it stops sprinting
+and within 6 m takes close control.
 
 ## Character models
 
