@@ -20,6 +20,10 @@ public sealed class ToolArgs
     public string? GalleryDir;
     /// <summary>--clip-gallery &lt;dir&gt;: play every keeper clip (res://assets/anim/keeper) and write a contact sheet per clip there.</summary>
     public string? ClipGalleryDir;
+    /// <summary>--clip-folder &lt;res:// path&gt;: the clip gallery's clips.json folder (default res://assets/anim/keeper).</summary>
+    public string ClipFolder = "res://assets/anim/keeper";
+    /// <summary>--clip-model &lt;res:// path&gt;: the model the clip gallery plays them on (default res://assets/characters/keeper.glb; any other model wears the attacker's kit).</summary>
+    public string ClipModel = "res://assets/characters/keeper.glb";
     /// <summary>--video: the clip gallery (and the keeper gallery) also writes every frame, for tools/anim/encode_video.py.</summary>
     public bool Video;
     /// <summary>--clip-only a,b: the clip gallery shows only these clips.</summary>
@@ -35,6 +39,8 @@ public sealed class ToolArgs
     public string Figure = "skinned";
     /// <summary>--keeper-anim mocap|procedural: the keeper's body from motion clips (the default; needs the skinned figure) or from the hand-built poses (the fallback).</summary>
     public string KeeperAnim = "mocap";
+    /// <summary>--attacker-anim mocap|procedural: the attacker's running body from the motion-captured stride cycles (the default; needs the skinned figure; see AttackerAnimator) or from the procedural run cycle.</summary>
+    public string AttackerAnim = "mocap";
     /// <summary>--keeper-anim-log: print a KEEPER_MM line at every mocap switch (clip, frame, playback rate).</summary>
     public bool KeeperAnimLog;
     /// <summary>--keeper-anim-drop-set a,b: the pose database leaves these clip sets empty (the procedural fallback's check).</summary>
@@ -66,6 +72,8 @@ public sealed class ToolArgs
                 case "--replay": a.ReplayPath = Next(); break;
                 case "--keeper-gallery": a.GalleryDir = Next(); break;
                 case "--clip-gallery": a.ClipGalleryDir = Next(); break;
+                case "--clip-folder": a.ClipFolder = Next() ?? a.ClipFolder; break;
+                case "--clip-model": a.ClipModel = Next() ?? a.ClipModel; break;
                 case "--video": a.Video = true; break;
                 case "--clip-only":
                     foreach (var s in (Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) a.ClipOnly.Add(s);
@@ -88,6 +96,10 @@ public sealed class ToolArgs
                     if (a.KeeperAnim != "procedural" && a.KeeperAnim != "mocap") { GD.PushWarning($"--keeper-anim expects mocap or procedural, got '{a.KeeperAnim}'; using mocap"); a.KeeperAnim = "mocap"; }
                     break;
                 case "--keeper-anim-log": a.KeeperAnimLog = true; break;
+                case "--attacker-anim":
+                    a.AttackerAnim = (Next() ?? "").ToLowerInvariant();
+                    if (a.AttackerAnim != "procedural" && a.AttackerAnim != "mocap") { GD.PushWarning($"--attacker-anim expects mocap or procedural, got '{a.AttackerAnim}'; using procedural"); a.AttackerAnim = "procedural"; }
+                    break;
                 case "--keeper-anim-drop-set":
                     a.KeeperAnimDropSets.AddRange((Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                     break;

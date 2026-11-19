@@ -1,0 +1,437 @@
+{
+ "fps": 60,
+ "bones": [
+  "mixamorig_Hips",
+  "mixamorig_Spine",
+  "mixamorig_Spine1",
+  "mixamorig_Spine2",
+  "mixamorig_Neck",
+  "mixamorig_Head",
+  "mixamorig_LeftShoulder",
+  "mixamorig_LeftArm",
+  "mixamorig_LeftForeArm",
+  "mixamorig_LeftHand",
+  "mixamorig_LeftUpLeg",
+  "mixamorig_LeftLeg",
+  "mixamorig_LeftFoot",
+  "mixamorig_LeftToeBase",
+  "mixamorig_RightShoulder",
+  "mixamorig_RightArm",
+  "mixamorig_RightForeArm",
+  "mixamorig_RightHand",
+  "mixamorig_RightUpLeg",
+  "mixamorig_RightLeg",
+  "mixamorig_RightFoot",
+  "mixamorig_RightToeBase"
+ ],
+ "skeleton": {
+  "parents": [
+   -1,
+   0,
+   1,
+   2,
+   3,
+   4,
+   3,
+   6,
+   7,
+   8,
+   0,
+   10,
+   11,
+   12,
+   3,
+   14,
+   15,
+   16,
+   0,
+   18,
+   19,
+   20
+  ],
+  "offsets": [
+   [
+    -0.001838,
+    1.017063,
+    0.012588
+   ],
+   [
+    0.0,
+    0.095315,
+    0.0
+   ],
+   [
+    0.0,
+    0.103036,
+    -0.0
+   ],
+   [
+    -0.0,
+    0.138759,
+    -0.0
+   ],
+   [
+    0.0,
+    0.221644,
+    -0.0
+   ],
+   [
+    0.002226,
+    0.038199,
+    0.01986
+   ],
+   [
+    0.066028,
+    0.18751,
+    0.011786
+   ],
+   [
+    -0.0,
+    0.146764,
+    0.0
+   ],
+   [
+    -0.0,
+    0.26458,
+    0.0
+   ],
+   [
+    0.0,
+    0.271822,
+    -0.0
+   ],
+   [
+    0.114476,
+    -0.049465,
+    -0.011858
+   ],
+   [
+    0.0,
+    0.450376,
+    0.0
+   ],
+   [
+    -0.0,
+    0.44869,
+    0.0
+   ],
+   [
+    0.0,
+    0.15664,
+    0.0
+   ],
+   [
+    -0.064371,
+    0.177663,
+    0.017188
+   ],
+   [
+    0.0,
+    0.143275,
+    -0.0
+   ],
+   [
+    -0.0,
+    0.26458,
+    0.0
+   ],
+   [
+    -0.0,
+    0.271822,
+    0.0
+   ],
+   [
+    -0.109236,
+    -0.053779,
+    -0.006703
+   ],
+   [
+    -0.0,
+    0.450376,
+    0.0
+   ],
+   [
+    0.0,
+    0.44869,
+    0.0
+   ],
+   [
+    -0.0,
+    0.15664,
+    -0.0
+   ]
+  ],
+  "rest": [
+   [
+    0.078159,
+    -0.010727,
+    -0.010511,
+    0.996828
+   ],
+   [
+    -0.170575,
+    0.007869,
+    0.011781,
+    0.985243
+   ],
+   [
+    -0.114094,
+    0.001848,
+    0.000212,
+    0.993468
+   ],
+   [
+    0.341759,
+    -0.0,
+    -0.0,
+    0.939788
+   ],
+   [
+    -0.288277,
+    0.0,
+    -0.0,
+    0.957547
+   ],
+   [
+    0.162558,
+    0.004465,
+    0.00607,
+    0.98667
+   ],
+   [
+    0.458345,
+    0.195149,
+    -0.718118,
+    0.485946
+   ],
+   [
+    0.136949,
+    -0.290059,
+    -0.111873,
+    0.940529
+   ],
+   [
+    0.26104,
+    0.056895,
+    0.293132,
+    0.917984
+   ],
+   [
+    0.016357,
+    -0.037773,
+    -0.063097,
+    0.997158
+   ],
+   [
+    0.027102,
+    -0.113702,
+    -0.991118,
+    0.063426
+   ],
+   [
+    -0.054649,
+    0.02864,
+    -0.00156,
+    0.998094
+   ],
+   [
+    0.605674,
+    0.058753,
+    0.095017,
+    0.787832
+   ],
+   [
+    -0.035196,
+    0.983838,
+    -2.2e-05,
+    0.17557
+   ],
+   [
+    0.468355,
+    -0.240496,
+    0.69105,
+    0.495233
+   ],
+   [
+    0.176201,
+    0.320985,
+    0.117595,
+    0.923089
+   ],
+   [
+    0.260092,
+    -0.055756,
+    -0.293973,
+    0.918054
+   ],
+   [
+    0.033568,
+    0.150537,
+    0.068294,
+    0.985671
+   ],
+   [
+    0.047707,
+    0.115635,
+    0.99127,
+    0.04167
+   ],
+   [
+    -0.054649,
+    -0.02865,
+    0.001558,
+    0.998093
+   ],
+   [
+    0.575863,
+    -0.210013,
+    -0.210357,
+    0.761594
+   ],
+   [
+    -0.009999,
+    0.274649,
+    -0.033746,
+    0.9609
+   ]
+  ]
+ },
+ "clips": [
+  {
+   "name": "cycle_walk",
+   "file": "cycle_walk.kclip",
+   "source_clip": "walk_brisk_16_21",
+   "source_frames": [
+    17,
+    76
+   ],
+   "set": "cycle",
+   "side": "none",
+   "verdict": "keep",
+   "loop": true,
+   "events": {
+    "strike_l": 10,
+    "toeoff_l": 46,
+    "strike_r": 40,
+    "toeoff_r": 18
+   },
+   "fps": 60,
+   "frame_count": 59,
+   "seconds": 0.9833,
+   "speed": 1.8289,
+   "steps_per_s": 2.0339,
+   "step_m": 0.8992,
+   "blend_speed": 1.8,
+   "stance_share": {
+    "left": 0.627,
+    "right": 0.644
+   },
+   "close_mean_deg": 1.6,
+   "close_max_deg": 4.85,
+   "close_hips_cm": 0.38,
+   "notes": "brisk walk, 1.8 m/s on the model"
+  },
+  {
+   "name": "cycle_jog",
+   "file": "cycle_jog.kclip",
+   "source_clip": "jog_16_36",
+   "source_frames": [
+    39,
+    86
+   ],
+   "set": "cycle",
+   "side": "none",
+   "verdict": "keep",
+   "loop": true,
+   "events": {
+    "strike_l": 3,
+    "toeoff_l": 20,
+    "strike_r": 25,
+    "toeoff_r": 43
+   },
+   "fps": 60,
+   "frame_count": 47,
+   "seconds": 0.7833,
+   "speed": 2.878,
+   "steps_per_s": 2.5532,
+   "step_m": 1.1272,
+   "blend_speed": 4.0,
+   "stance_share": {
+    "left": 0.383,
+    "right": 0.404
+   },
+   "close_mean_deg": 2.83,
+   "close_max_deg": 11.47,
+   "close_hips_cm": 1.98,
+   "notes": "relaxed jog, 2.9 m/s; with the walk in close control (2.6 m/s), with the upright run at the game's jog (4.85 m/s)"
+  },
+  {
+   "name": "cycle_run",
+   "file": "cycle_run.kclip",
+   "source_clip": "run_16_46",
+   "source_frames": [
+    10,
+    51
+   ],
+   "set": "cycle",
+   "side": "none",
+   "verdict": "keep",
+   "loop": true,
+   "events": {
+    "strike_l": 19,
+    "toeoff_l": 31,
+    "strike_r": 40,
+    "toeoff_r": 13
+   },
+   "fps": 60,
+   "frame_count": 41,
+   "seconds": 0.6833,
+   "speed": 4.4466,
+   "steps_per_s": 2.9268,
+   "step_m": 1.5193,
+   "blend_speed": 5.8,
+   "stance_share": {
+    "left": 0.317,
+    "right": 0.366
+   },
+   "close_mean_deg": 6.32,
+   "close_max_deg": 15.03,
+   "close_hips_cm": 3.24,
+   "notes": "upright run, 4.5 m/s; half of the game's jog, half of its sprint"
+  },
+  {
+   "name": "cycle_sprint",
+   "file": "cycle_sprint.kclip",
+   "source_clip": "run_78_12",
+   "source_frames": [
+    7,
+    46
+   ],
+   "set": "cycle",
+   "side": "none",
+   "verdict": "keep",
+   "loop": true,
+   "events": {
+    "strike_l": 38,
+    "toeoff_l": 9,
+    "strike_r": 18,
+    "toeoff_r": 27
+   },
+   "fps": 60,
+   "frame_count": 39,
+   "seconds": 0.65,
+   "speed": 5.1881,
+   "steps_per_s": 3.0769,
+   "step_m": 1.6861,
+   "blend_speed": 10.0,
+   "stance_share": {
+    "left": 0.282,
+    "right": 0.256
+   },
+   "close_mean_deg": 6.31,
+   "close_max_deg": 19.82,
+   "close_hips_cm": 1.86,
+   "notes": "athletic run (lean, knee lift, arm drive), 5.2 m/s; takes over toward the sprint (40 per cent of it at 7.4 m/s), its stance shortened above its own step"
+  }
+ ]
+}

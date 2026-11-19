@@ -57,7 +57,6 @@ public partial class Match
                 ContactPoint = G(sa.ContactPoint), BallOutVelocity = G(sa.BallOutVelocity), Made = sa.Made,
                 Held = !sa.Released,
             };
-        if (p.TouchAction is { } ta) f.Action.Surface = ContactSurface(p, ta, f.Action.Surface);
         f.Upcoming = UpcomingTouch(p, out f.UpcomingReady);
         f.NextTouchEta = p.NextTouchEta; f.NextTouchRight = p.NextTouchFoot == Foot.Right; f.NextTouchPoint = G(p.NextTouchPoint);
         f.ShotCharge = w.ShotCharge;
@@ -201,27 +200,6 @@ public partial class Match
             Id = -1 - ((int)kind << 22) - (anchor & 0x3FFFFF), ContactTick = p.CurrentTick + j, ContactEta = j * dt, RecoverySeconds = 0f,
             ContactPoint = G(cp), BallOutVelocity = Vector3.Zero, NextMeetPoint = G(cp + dir * 2f), ContactMiss = float.NaN,
         };
-    }
-
-    /// <summary>
-    /// The surface a touch still waiting for its contact is expected to be made with: the core settles the kind at the contact, a push sent
-    /// more than the execution angle off the ball's travel becoming a turn or cut played with the side of the foot (presentation only).
-    /// </summary>
-    BootSurface ContactSurface(PlayerState p, BallAction a, BootSurface planned)
-    {
-        var t = World.Tuning;
-        if (a.Made || a.Phase == ActionPhase.Done || a.IsSkill || a.IsShot) return planned;
-        if (a.Kind is not (ActionKind.Close or ActionKind.Jog or ActionKind.Sprint or ActionKind.Slowdown or ActionKind.Turn or ActionKind.Cut)) return planned;
-        var stick = new System.Numerics.Vector2(_intent.MoveX, _intent.MoveZ);
-        if (stick.Length() < t.Touch.StickThreshold) return planned;
-        var bv = new System.Numerics.Vector2(World.Ball.Velocity.X, World.Ball.Velocity.Z);
-        float refA = bv.Length() > 0.3f ? MathF.Atan2(bv.Y, bv.X) : p.Facing;
-        float turnDeg = MathF.Abs(Movement.WrapAngle(MathF.Atan2(stick.Y, stick.X) - refA)) * 180f / MathF.PI;
-        bool turn = p.RunSpeed > t.Touch.ExecutionMinSpeed && turnDeg > t.Touch.ExecutionAngle || turnDeg > t.Touch.CutDeg && p.RunSpeed > t.Touch.CutMinSpeed;
-        if (!turn) return a.Kind is ActionKind.Turn or ActionKind.Cut ? BootSurface.Inside : planned;
-        var to = a.NextMeetTick >= 0 ? new System.Numerics.Vector2(a.NextMeetPoint.X - a.ContactPoint.X, a.NextMeetPoint.Z - a.ContactPoint.Z) : stick;
-        float turnSign = MathF.Sign(Movement.WrapAngle(MathF.Atan2(to.Y, to.X) - MathF.Atan2(bv.Y, bv.X)));
-        return (turnSign > 0f) == (a.Foot == Foot.Right) ? BootSurface.Outside : BootSurface.Inside;
     }
 
     static FigureAction ActionFrame(BallAction? a, PlayerState p, float dt)

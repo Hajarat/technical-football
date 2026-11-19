@@ -1,0 +1,1582 @@
+{
+ "fps": 60,
+ "bones": [
+  "mixamorig_Hips",
+  "mixamorig_Spine",
+  "mixamorig_Spine1",
+  "mixamorig_Spine2",
+  "mixamorig_Neck",
+  "mixamorig_Head",
+  "mixamorig_LeftShoulder",
+  "mixamorig_LeftArm",
+  "mixamorig_LeftForeArm",
+  "mixamorig_LeftHand",
+  "mixamorig_LeftUpLeg",
+  "mixamorig_LeftLeg",
+  "mixamorig_LeftFoot",
+  "mixamorig_LeftToeBase",
+  "mixamorig_RightShoulder",
+  "mixamorig_RightArm",
+  "mixamorig_RightForeArm",
+  "mixamorig_RightHand",
+  "mixamorig_RightUpLeg",
+  "mixamorig_RightLeg",
+  "mixamorig_RightFoot",
+  "mixamorig_RightToeBase"
+ ],
+ "skeleton": {
+  "parents": [
+   -1,
+   0,
+   1,
+   2,
+   3,
+   4,
+   3,
+   6,
+   7,
+   8,
+   0,
+   10,
+   11,
+   12,
+   3,
+   14,
+   15,
+   16,
+   0,
+   18,
+   19,
+   20
+  ],
+  "offsets": [
+   [
+    -0.001838,
+    1.017063,
+    0.012588
+   ],
+   [
+    0.0,
+    0.095315,
+    0.0
+   ],
+   [
+    0.0,
+    0.103036,
+    -0.0
+   ],
+   [
+    -0.0,
+    0.138759,
+    -0.0
+   ],
+   [
+    0.0,
+    0.221644,
+    -0.0
+   ],
+   [
+    0.002226,
+    0.038199,
+    0.01986
+   ],
+   [
+    0.066028,
+    0.18751,
+    0.011786
+   ],
+   [
+    -0.0,
+    0.146764,
+    0.0
+   ],
+   [
+    -0.0,
+    0.26458,
+    0.0
+   ],
+   [
+    0.0,
+    0.271822,
+    -0.0
+   ],
+   [
+    0.114476,
+    -0.049465,
+    -0.011858
+   ],
+   [
+    0.0,
+    0.450376,
+    0.0
+   ],
+   [
+    -0.0,
+    0.44869,
+    0.0
+   ],
+   [
+    0.0,
+    0.15664,
+    0.0
+   ],
+   [
+    -0.064371,
+    0.177663,
+    0.017188
+   ],
+   [
+    0.0,
+    0.143275,
+    -0.0
+   ],
+   [
+    -0.0,
+    0.26458,
+    0.0
+   ],
+   [
+    -0.0,
+    0.271822,
+    0.0
+   ],
+   [
+    -0.109236,
+    -0.053779,
+    -0.006703
+   ],
+   [
+    -0.0,
+    0.450376,
+    0.0
+   ],
+   [
+    0.0,
+    0.44869,
+    0.0
+   ],
+   [
+    -0.0,
+    0.15664,
+    -0.0
+   ]
+  ],
+  "rest": [
+   [
+    0.078159,
+    -0.010727,
+    -0.010511,
+    0.996828
+   ],
+   [
+    -0.170575,
+    0.007869,
+    0.011781,
+    0.985243
+   ],
+   [
+    -0.114094,
+    0.001848,
+    0.000212,
+    0.993468
+   ],
+   [
+    0.341759,
+    -0.0,
+    -0.0,
+    0.939788
+   ],
+   [
+    -0.288277,
+    0.0,
+    -0.0,
+    0.957547
+   ],
+   [
+    0.162558,
+    0.004465,
+    0.00607,
+    0.98667
+   ],
+   [
+    0.458345,
+    0.195149,
+    -0.718118,
+    0.485946
+   ],
+   [
+    0.136949,
+    -0.290059,
+    -0.111873,
+    0.940529
+   ],
+   [
+    0.26104,
+    0.056895,
+    0.293132,
+    0.917984
+   ],
+   [
+    0.016357,
+    -0.037773,
+    -0.063097,
+    0.997158
+   ],
+   [
+    0.027102,
+    -0.113702,
+    -0.991118,
+    0.063426
+   ],
+   [
+    -0.054649,
+    0.02864,
+    -0.00156,
+    0.998094
+   ],
+   [
+    0.605674,
+    0.058753,
+    0.095017,
+    0.787832
+   ],
+   [
+    -0.035196,
+    0.983838,
+    -2.2e-05,
+    0.17557
+   ],
+   [
+    0.468355,
+    -0.240496,
+    0.69105,
+    0.495233
+   ],
+   [
+    0.176201,
+    0.320985,
+    0.117595,
+    0.923089
+   ],
+   [
+    0.260092,
+    -0.055756,
+    -0.293973,
+    0.918054
+   ],
+   [
+    0.033568,
+    0.150537,
+    0.068294,
+    0.985671
+   ],
+   [
+    0.047707,
+    0.115635,
+    0.99127,
+    0.04167
+   ],
+   [
+    -0.054649,
+    -0.02865,
+    0.001558,
+    0.998093
+   ],
+   [
+    0.575863,
+    -0.210013,
+    -0.210357,
+    0.761594
+   ],
+   [
+    -0.009999,
+    0.274649,
+    -0.033746,
+    0.9609
+   ]
+  ]
+ },
+ "clips": [
+  {
+   "name": "walk_16_47",
+   "file": "walk_16_47.kclip",
+   "trial": "16_47",
+   "frames": null,
+   "set": "walk",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 208,
+   "seconds": 3.467,
+   "contacts": {
+    "left": [
+     [
+      4,
+      30
+     ],
+     [
+      71,
+      97
+     ],
+     [
+      138,
+      164
+     ],
+     [
+      205,
+      207
+     ]
+    ],
+    "right": [
+     [
+      45,
+      64
+     ],
+     [
+      111,
+      131
+     ],
+     [
+      178,
+      198
+     ]
+    ]
+   },
+   "notes": "straight walk, about 1.3 m/s (subject 16)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0752,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.044,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     70,
+     68
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.6,
+     6.5
+    ],
+    "lowest_joint_at": 77
+   }
+  },
+  {
+   "name": "walk_brisk_16_21",
+   "file": "walk_brisk_16_21.kclip",
+   "trial": "16_21",
+   "frames": null,
+   "set": "walk",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 156,
+   "seconds": 2.6,
+   "contacts": {
+    "left": [
+     [
+      30,
+      46
+     ],
+     [
+      88,
+      102
+     ],
+     [
+      145,
+      155
+     ]
+    ],
+    "right": [
+     [
+      0,
+      16
+     ],
+     [
+      59,
+      74
+     ],
+     [
+      116,
+      131
+     ]
+    ]
+   },
+   "notes": "straight walk, about 1.7 m/s (subject 16)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0752,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.042,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     50,
+     41
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -1.1,
+     4.5
+    ],
+    "lowest_joint_at": 89
+   }
+  },
+  {
+   "name": "jog_16_36",
+   "file": "jog_16_36.kclip",
+   "trial": "16_36",
+   "frames": null,
+   "set": "jog",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 95,
+   "seconds": 1.583,
+   "contacts": {
+    "left": [
+     [
+      0,
+      2
+     ],
+     [
+      45,
+      49
+     ],
+     [
+      92,
+      94
+     ]
+    ],
+    "right": [
+     [
+      21,
+      25
+     ],
+     [
+      68,
+      73
+     ]
+    ]
+   },
+   "notes": "run/jog, straight, about 2.7 m/s (subject 16)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0752,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.046,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     8,
+     9
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.5,
+     4.0
+    ],
+    "lowest_joint_at": 72
+   }
+  },
+  {
+   "name": "run_09_01",
+   "file": "run_09_01.kclip",
+   "trial": "09_01",
+   "frames": null,
+   "set": "run",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 74,
+   "seconds": 1.233,
+   "contacts": {
+    "left": [
+     [
+      0,
+      10
+     ],
+     [
+      43,
+      55
+     ]
+    ],
+    "right": [
+     [
+      21,
+      33
+     ],
+     [
+      65,
+      73
+     ]
+    ]
+   },
+   "notes": "run, straight, about 3.6 m/s (subject 9)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0456,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.042,
+    "guarded_frames": {
+     "LeftHand": 1
+    },
+    "flat_foot_frames": [
+     6,
+     5
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.9,
+     3.7
+    ],
+    "lowest_joint_at": 67
+   }
+  },
+  {
+   "name": "run_16_46",
+   "file": "run_16_46.kclip",
+   "trial": "16_46",
+   "frames": null,
+   "set": "run",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 68,
+   "seconds": 1.133,
+   "contacts": {
+    "left": [
+     [
+      0,
+      1
+     ],
+     [
+      30,
+      41
+     ]
+    ],
+    "right": [
+     [
+      10,
+      20
+     ],
+     [
+      51,
+      61
+     ]
+    ]
+   },
+   "notes": "run/jog, straight, about 4.1 m/s (subject 16)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0752,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.047,
+    "guarded_frames": {
+     "LeftHand": 4
+    },
+    "flat_foot_frames": [
+     2,
+     5
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -1.0,
+     5.8
+    ],
+    "lowest_joint_at": 15
+   }
+  },
+  {
+   "name": "run_104_48",
+   "file": "run_104_48.kclip",
+   "trial": "104_48",
+   "frames": null,
+   "set": "run",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 60,
+   "seconds": 1.0,
+   "contacts": {
+    "left": [
+     [
+      41,
+      50
+     ]
+    ],
+    "right": [
+     [
+      18,
+      26
+     ]
+    ]
+   },
+   "notes": "run through, straight, about 4.1 m/s (subject 104)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1217,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.027,
+    "guarded_frames": {
+     "LeftFoot": 12,
+     "RightFoot": 26
+    },
+    "flat_foot_frames": [
+     1,
+     0
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -6.6,
+     5.0
+    ],
+    "lowest_joint_at": 38
+   }
+  },
+  {
+   "name": "run_78_12",
+   "file": "run_78_12.kclip",
+   "trial": "78_12",
+   "frames": null,
+   "set": "run",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 49,
+   "seconds": 0.817,
+   "contacts": {
+    "left": [
+     [
+      7,
+      15
+     ],
+     [
+      46,
+      48
+     ]
+    ],
+    "right": [
+     [
+      26,
+      33
+     ]
+    ]
+   },
+   "notes": "running without a ball, straight, about 4.5 m/s (basketball session, subject 78)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1528,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.049,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     1,
+     1
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.9,
+     2.9
+    ],
+    "lowest_joint_at": 28
+   }
+  },
+  {
+   "name": "veer_jog_left_16_37",
+   "file": "veer_jog_left_16_37.kclip",
+   "trial": "16_37",
+   "frames": null,
+   "set": "turn",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "left",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 92,
+   "seconds": 1.533,
+   "contacts": {
+    "left": [
+     [
+      20,
+      26
+     ],
+     [
+      67,
+      72
+     ]
+    ],
+    "right": [
+     [
+      0,
+      2
+     ],
+     [
+      43,
+      48
+     ]
+    ]
+   },
+   "notes": "jog veering left about 45 degrees (subject 16)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0752,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.045,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     9,
+     5
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.5,
+     3.7
+    ],
+    "lowest_joint_at": 1
+   }
+  },
+  {
+   "name": "veer_jog_right_16_39",
+   "file": "veer_jog_right_16_39.kclip",
+   "trial": "16_39",
+   "frames": null,
+   "set": "turn",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 74,
+   "seconds": 1.233,
+   "contacts": {
+    "left": [
+     [
+      18,
+      22
+     ],
+     [
+      61,
+      64
+     ]
+    ],
+    "right": [
+     [
+      0,
+      3
+     ],
+     [
+      40,
+      44
+     ]
+    ]
+   },
+   "notes": "jog veering right about 45 degrees (subject 16)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0752,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.046,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     7,
+     7
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.5,
+     3.8
+    ],
+    "lowest_joint_at": 63
+   }
+  },
+  {
+   "name": "turn90_jog_left_16_42",
+   "file": "turn90_jog_left_16_42.kclip",
+   "trial": "16_42",
+   "frames": null,
+   "set": "turn",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "left",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 103,
+   "seconds": 1.717,
+   "contacts": {
+    "left": [
+     [
+      18,
+      25
+     ],
+     [
+      53,
+      66
+     ]
+    ],
+    "right": [
+     [
+      0,
+      0
+     ],
+     [
+      40,
+      47
+     ],
+     [
+      81,
+      86
+     ]
+    ]
+   },
+   "notes": "jog with a 90 degree left turn (subject 16)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0752,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.045,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     7,
+     13
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -1.6,
+     5.3
+    ],
+    "lowest_joint_at": 102
+   }
+  },
+  {
+   "name": "turn90_jog_right_16_44",
+   "file": "turn90_jog_right_16_44.kclip",
+   "trial": "16_44",
+   "frames": null,
+   "set": "turn",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 108,
+   "seconds": 1.8,
+   "contacts": {
+    "left": [
+     [
+      0,
+      3
+     ],
+     [
+      39,
+      43
+     ],
+     [
+      78,
+      84
+     ]
+    ],
+    "right": [
+     [
+      18,
+      25
+     ],
+     [
+      58,
+      65
+     ],
+     [
+      100,
+      107
+     ]
+    ]
+   },
+   "notes": "jog with a 90 degree right turn (subject 16)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0752,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.045,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     14,
+     14
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -1.1,
+     4.2
+    ],
+    "lowest_joint_at": 105
+   }
+  },
+  {
+   "name": "veer_run_left_16_48",
+   "file": "veer_run_left_16_48.kclip",
+   "trial": "16_48",
+   "frames": null,
+   "set": "turn",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "left",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 64,
+   "seconds": 1.067,
+   "contacts": {
+    "left": [
+     [
+      13,
+      20
+     ],
+     [
+      42,
+      53
+     ]
+    ],
+    "right": [
+     [
+      0,
+      7
+     ],
+     [
+      29,
+      37
+     ],
+     [
+      60,
+      63
+     ]
+    ]
+   },
+   "notes": "run veering left about 45 degrees, about 4 m/s (subject 16)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0752,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.042,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     2,
+     5
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.2,
+     3.7
+    ],
+    "lowest_joint_at": 30
+   }
+  },
+  {
+   "name": "turn90_run_right_16_54",
+   "file": "turn90_run_right_16_54.kclip",
+   "trial": "16_54",
+   "frames": null,
+   "set": "turn",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 69,
+   "seconds": 1.15,
+   "contacts": {
+    "left": [
+     [
+      23,
+      25
+     ],
+     [
+      53,
+      55
+     ]
+    ],
+    "right": [
+     [
+      11,
+      13
+     ],
+     [
+      35,
+      43
+     ]
+    ]
+   },
+   "notes": "run with a 90 degree right turn (subject 16)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0752,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.045,
+    "guarded_frames": {
+     "RightFoot": 2
+    },
+    "flat_foot_frames": [
+     8,
+     2
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.3,
+     3.7
+    ],
+    "lowest_joint_at": 54
+   }
+  },
+  {
+   "name": "stop_run_104_56",
+   "file": "stop_run_104_56.kclip",
+   "trial": "104_56",
+   "frames": null,
+   "set": "stop",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 184,
+   "seconds": 3.067,
+   "contacts": {
+    "left": [
+     [
+      71,
+      80
+     ],
+     [
+      104,
+      183
+     ]
+    ],
+    "right": [
+     [
+      53,
+      59
+     ],
+     [
+      88,
+      183
+     ]
+    ]
+   },
+   "notes": "run to a stop (subject 104)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1217,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.042,
+    "guarded_frames": {
+     "LeftFoot": 12,
+     "RightFoot": 8
+    },
+    "flat_foot_frames": [
+     4,
+     7
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -2.1,
+     12.0
+    ],
+    "lowest_joint_at": 107
+   }
+  },
+  {
+   "name": "stop_run_127_05",
+   "file": "stop_run_127_05.kclip",
+   "trial": "127_05",
+   "frames": null,
+   "set": "stop",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 194,
+   "seconds": 3.233,
+   "contacts": {
+    "left": [
+     [
+      56,
+      98
+     ],
+     [
+      135,
+      142
+     ],
+     [
+      152,
+      193
+     ]
+    ],
+    "right": [
+     [
+      4,
+      6
+     ],
+     [
+      62,
+      138
+     ],
+     [
+      168,
+      193
+     ]
+    ]
+   },
+   "notes": "run to a quick stop, turning (subject 127; the keeper's trial)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0504,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.041,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     95,
+     101
+    ],
+    "hips_roll_deg": -1.67,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -4.9,
+     5.0
+    ],
+    "lowest_joint_at": 36
+   }
+  },
+  {
+   "name": "start_run_104_53",
+   "file": "start_run_104_53.kclip",
+   "trial": "104_53",
+   "frames": null,
+   "set": "start",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 150,
+   "seconds": 2.5,
+   "contacts": {
+    "left": [
+     [
+      0,
+      54
+     ]
+    ],
+    "right": [
+     [
+      0,
+      70
+     ]
+    ]
+   },
+   "notes": "standing start into a run (subject 104)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1217,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.009,
+    "guarded_frames": {
+     "LeftFoot": 26,
+     "RightFoot": 25
+    },
+    "flat_foot_frames": [
+     3,
+     1
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -5.5,
+     9.5
+    ],
+    "lowest_joint_at": 98
+   }
+  },
+  {
+   "name": "start_jog_104_06",
+   "file": "start_jog_104_06.kclip",
+   "trial": "104_06",
+   "frames": null,
+   "set": "start",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 169,
+   "seconds": 2.817,
+   "contacts": {
+    "left": [
+     [
+      0,
+      38
+     ],
+     [
+      61,
+      69
+     ],
+     [
+      114,
+      117
+     ],
+     [
+      163,
+      168
+     ]
+    ],
+    "right": [
+     [
+      0,
+      52
+     ],
+     [
+      90,
+      92
+     ],
+     [
+      139,
+      141
+     ]
+    ]
+   },
+   "notes": "standing start into a jog (subject 104)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1217,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.037,
+    "guarded_frames": {
+     "LeftHand": 1,
+     "LeftFoot": 27,
+     "RightFoot": 38
+    },
+    "flat_foot_frames": [
+     8,
+     30
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -2.3,
+     3.2
+    ],
+    "lowest_joint_at": 135
+   }
+  },
+  {
+   "name": "sidestep_run_127_13",
+   "file": "sidestep_run_127_13.kclip",
+   "trial": "127_13",
+   "frames": null,
+   "set": "sidestep",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "left",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 93,
+   "seconds": 1.55,
+   "contacts": {
+    "left": [
+     [
+      5,
+      10
+     ],
+     [
+      44,
+      50
+     ],
+     [
+      83,
+      87
+     ]
+    ],
+    "right": [
+     [
+      24,
+      29
+     ],
+     [
+      61,
+      66
+     ]
+    ]
+   },
+   "notes": "run with a side step to his left (subject 127; the keeper's trial)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0504,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.046,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     10,
+     12
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -3.9,
+     4.3
+    ],
+    "lowest_joint_at": 42
+   }
+  },
+  {
+   "name": "kick_soccer_11_01",
+   "file": "kick_soccer_11_01.kclip",
+   "trial": "11_01",
+   "frames": null,
+   "set": "kick",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 299,
+   "seconds": 4.983,
+   "contacts": {
+    "left": [
+     [
+      0,
+      46
+     ],
+     [
+      55,
+      97
+     ],
+     [
+      126,
+      161
+     ],
+     [
+      198,
+      209
+     ],
+     [
+      227,
+      298
+     ]
+    ],
+    "right": [
+     [
+      6,
+      127
+     ],
+     [
+      166,
+      181
+     ],
+     [
+      253,
+      277
+     ]
+    ]
+   },
+   "notes": "soccer: walk up and kick the ball (subject 11)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0495,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.044,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     158,
+     159
+    ],
+    "hips_roll_deg": -0.35,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     0.0,
+     5.8
+    ],
+    "lowest_joint_at": 118
+   }
+  },
+  {
+   "name": "kick_soccer_10_02",
+   "file": "kick_soccer_10_02.kclip",
+   "trial": "10_02",
+   "frames": null,
+   "set": "kick",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 295,
+   "seconds": 4.917,
+   "contacts": {
+    "left": [
+     [
+      0,
+      137
+     ],
+     [
+      169,
+      203
+     ],
+     [
+      228,
+      277
+     ]
+    ],
+    "right": [
+     [
+      0,
+      115
+     ],
+     [
+      133,
+      137
+     ],
+     [
+      141,
+      154
+     ],
+     [
+      200,
+      235
+     ],
+     [
+      242,
+      277
+     ],
+     [
+      292,
+      294
+     ]
+    ]
+   },
+   "notes": "soccer: walk up and kick the ball (subject 10)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0462,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.043,
+    "guarded_frames": {
+     "RightFoot": 1
+    },
+    "flat_foot_frames": [
+     214,
+     91
+    ],
+    "hips_roll_deg": -2.47,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     0.1,
+     9.3
+    ],
+    "lowest_joint_at": 240
+   }
+  }
+ ]
+}

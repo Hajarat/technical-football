@@ -3,6 +3,8 @@
     python3 tools/anim/cmu.py                                  # fetch the listed trials (once)
     uv run --with numpy python3 tools/anim/retarget.py         # all clips
     uv run --with numpy python3 tools/anim/retarget.py dive_side_takeoff_141_05 ...   # some clips
+    uv run --with numpy python3 tools/anim/retarget.py --config tools/anim/attacker_clips.toml \\
+        --model game/assets/characters/player.glb --out game/assets/anim/attacker            # the attacker's clips
 
 Method (spec appendix D):
 
@@ -23,7 +25,7 @@ Method (spec appendix D):
   in the files) at 120 Hz; clips are kept at 60 Hz (every other frame).
 * Foot contacts: the foot's lowest point under 4 cm and its speed under 0.35 m/s, debounced over 3 frames.
 * Checks: every mapped bone's direction (after quantisation) within 3 degrees of its source bone (the constant corrections above
-  excepted), and the foot in every contact span within 2 cm of the ground at its lowest (a clip may set contact_tolerance_cm). A clip that fails is not written; it is
+  excepted), and the foot in every contact span within 2 cm of the ground at its lowest (a clip may set contact_tolerance_cm, and contact_speed for a fast runner's feet). A clip that fails is not written; it is
   reported and the run exits non-zero.
 
 .kclip layout (little-endian), version 1:
@@ -36,6 +38,7 @@ order are stored as round(v / sqrt(1/2) * 16383) shifted left by one; the droppe
 """
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import struct
@@ -433,14 +436,14 @@ def locals_from(t: Target, G: np.ndarray) -> np.ndarray:
     return L
 
 
-def source_contacts(st: dict, flat_h: list[float]) -> np.ndarray:
+def source_contacts(st: dict, flat_h: list[float], vmax: float = CONTACT_V) -> np.ndarray:
     """(n,2) contact labels on the subject's feet: ankle or ball of the foot within CONTACT_H of where it sits standing, and slow."""
     out = []
     for i, c in enumerate("lr"):
         ank, ball = st[c + "foot"], st[c + "toes"]
         hb = ball[:, 1] - (np.median(ball[:, 1][ank[:, 1] < flat_h[i] + 0.01]) if (ank[:, 1] < flat_h[i] + 0.01).any() else ball[:, 1].min())
         h = np.minimum(ank[:, 1] - flat_h[i], hb)
-        out.append(label_contacts(h, speed((ank + ball) * 0.5)))
+        out.append(label_contacts(h, speed((ank + ball) * 0.5), vmax))
     return np.stack(out, axis=1)
 
 
@@ -471,8 +474,8 @@ def speed(p: np.ndarray, half: int = 2) -> np.ndarray:
     return np.linalg.norm(p[b] - p[a], axis=1) / np.maximum(b - a, 1) * FPS
 
 
-def label_contacts(h: np.ndarray, v: np.ndarray) -> np.ndarray:
-    raw = (h < CONTACT_H) & (v < CONTACT_V)
+def label_contacts(h: np.ndarray, v: np.ndarray, vmax: float = CONTACT_V) -> np.ndarray:
+    raw = (h < CONTACT_H) & (v < vmax)
     out = raw.copy()
     state = bool(raw[0])
     run = 0
@@ -607,17 +610,18 @@ def retarget(clip: dict, t: Target, cache: Path = CACHE) -> Result:
     # cm above or below the floor (more so on a raised heel). Contacts are labelled on the subject's own feet (against his floor),
     # and the hips are lifted or lowered per frame so the keeper's lowest planted foot is on the ground; between contacts the
     # correction is interpolated, then smoothed over 0.15 s so it never pops.
-    sc = source_contacts(st, flat_h)
+    cv = float(clip.get("contact_speed", CONTACT_V))   # per-clip override (clips.toml): a running foot is rarely as slow as 0.35 m/s
+    sc = source_contacts(st, flat_h, cv)
     base = hips[:, 1].copy()
     h, v, gr, gt = feet(hips)
     for _ in range(3):
         # contacts: the subject's, plus any the keeper's own feet show; nothing may go through the floor
-        c = sc | np.stack([label_contacts(h[:, s], v[:, s]) for s in range(2)], axis=1)
+        c = sc | np.stack([label_contacts(h[:, s], v[:, s], cv) for s in range(2)], axis=1)
         lowest = np.minimum(h.min(axis=1), (gt[:, :, 1] - JOINT_CLEAR).min(axis=1))
         hips[:, 1] += ground_curve(h, c, -lowest)
         h, v, gr, gt = feet(hips)
     ground_lift = hips[:, 1] - base
-    c = np.stack([label_contacts(h[:, s], v[:, s]) for s in range(2)], axis=1)
+    c = np.stack([label_contacts(h[:, s], v[:, s], cv) for s in range(2)], axis=1)
 
     problems = []
     tol = float(clip.get("contact_tolerance_cm", MAX_CONTACT_H * 100)) / 100   # per-clip override (clips.toml)
@@ -762,18 +766,25 @@ def verdict(clip: dict) -> str:
 
 
 def main(argv: list[str]) -> int:
-    clips = load_clips()
-    only = set(argv)
-    t = load_target()
+    ap = argparse.ArgumentParser(description="Retarget the CMU trials of a clip list onto a model and write its .kclip files + clips.json.")
+    ap.add_argument("clips", nargs="*", help="only these clips (and no clips.json); default all")
+    ap.add_argument("--config", type=Path, default=HERE / "clips.toml", help="clip list (default: the keeper's clips.toml)")
+    ap.add_argument("--model", type=Path, default=GLB, help="target model (default: the keeper's keeper.glb)")
+    ap.add_argument("--out", type=Path, default=OUT, help="output folder (default: game/assets/anim/keeper)")
+    args = ap.parse_args(argv)
+    out = args.out
+    clips = load_clips(args.config)
+    only = set(args.clips)
+    t = load_target(args.model)
     names = [nm.replace(":", "_") for nm in t.names]   # Godot imports mixamorig:X as mixamorig_X
-    OUT.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     index, failed = [], []
     for c in clips:
         if only and c["name"] not in only:
             continue
         if c.get("source") == "baked":
             # recorded from the procedural keeper (tools/anim/bake_procedural.py): listed as it is, never retargeted
-            path = OUT / f"{c['name']}.kclip"
+            path = out / f"{c['name']}.kclip"
             if not path.exists():
                 failed.append(c["name"])
                 print(f"MISSING {c['name']}: run tools/anim/bake_procedural.py first")
@@ -793,7 +804,7 @@ def main(argv: list[str]) -> int:
             failed.append(c["name"])
             print(f"REFUSED {c['name']}: " + "; ".join(r.problems))
             continue
-        write_kclip(OUT / f"{c['name']}.kclip", r, names)
+        write_kclip(out / f"{c['name']}.kclip", r, names)
         cs = {("left", "right")[s]: spans(r.contacts[:, s]) for s in range(2)}
         index.append({"name": c["name"], "file": f"{c['name']}.kclip", "trial": c["trial"], "frames": c.get("frames"),
                       "set": c["set"], "cut": c.get("cut", []), "tags": list(c.get("tags", [])), "match_bias": float(c.get("match_bias", 1.0)), "verdict": verdict(c), "side": c.get("side", "none"), "kind": c.get("kind", ""), "loop": r.loop,
@@ -806,9 +817,9 @@ def main(argv: list[str]) -> int:
         # the skeleton the clips were made for, so the game's pose database can run forward kinematics without Godot
         skeleton = {"parents": t.parent, "offsets": [[round(float(v), 6) for v in o] for o in t.rest_local_t],
                     "rest": [[round(float(v), 6) for v in q] for q in mats_to_quats(t.rest_local_r)]}
-        (OUT / "clips.json").write_text(json.dumps({"fps": FPS, "bones": names, "skeleton": skeleton, "clips": index}, indent=1) + "\n")
+        (out / "clips.json").write_text(json.dumps({"fps": FPS, "bones": names, "skeleton": skeleton, "clips": index}, indent=1) + "\n")
         keep = {e["file"] for e in index}
-        for old in OUT.glob("*.kclip"):
+        for old in out.glob("*.kclip"):
             if old.name not in keep:
                 old.unlink()
     if failed:

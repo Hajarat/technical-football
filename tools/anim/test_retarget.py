@@ -29,6 +29,13 @@ def test_target_rest_pose():
         assert np.allclose(r @ r.T, np.eye(3), atol=1e-6)
 
 
+def test_attacker_model_has_the_keepers_driven_rest_pose():
+    k, a = R.load_target(), R.load_target(R.REPO / "game/assets/characters/player.glb")
+    assert a.names == k.names and a.parent == k.parent
+    assert np.array_equal(a.rest_local_t, k.rest_local_t) and np.array_equal(a.rest_local_r, k.rest_local_r)
+    assert a.sole_y == k.sole_y
+
+
 def test_smallest_three_error_under_a_milliradian():
     q = np.concatenate([random_quats(5000), np.eye(4), -np.eye(4), [[0.5, 0.5, 0.5, 0.5]]])
     back = R.decode_quats(R.encode_quats(q))

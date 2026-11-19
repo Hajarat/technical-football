@@ -7,7 +7,8 @@ using Godot;
 namespace FootballSim.Game;
 
 /// <summary>
-/// --clip-gallery &lt;dir&gt;: the keeper clip audition. Plays every clip in res://assets/anim/keeper (clips.json) on keeper.glb,
+/// --clip-gallery &lt;dir&gt;: the clip audition. Plays every clip in --clip-folder (default res://assets/anim/keeper, clips.json) on --clip-model
+/// (default keeper.glb; the attacker's clips: --clip-folder res://assets/anim/attacker --clip-model res://assets/characters/player.glb),
 /// without the simulation, and writes per clip a contact sheet &lt;dir&gt;/&lt;clip&gt;.png: six evenly spaced moments plus the tagged
 /// event frames, side view (from his right) over front view, each tile labelled with the clip, view and frame. With --video it also
 /// writes every frame (side and front next to each other) to &lt;dir&gt;/video/&lt;clip&gt;/f_NNNN.png for tools/anim/encode_video.py.
@@ -33,7 +34,7 @@ public sealed class ClipGallery
     }
 
     readonly Match _m;
-    readonly string _dir;
+    readonly string _dir, _folder;
     readonly bool _video;
     readonly SkinnedBody _body;
     readonly Label _label;
@@ -48,15 +49,16 @@ public sealed class ClipGallery
     Image? _sheet, _frame;
     bool _failed;
 
-    public ClipGallery(Match m, string dir, bool video, HashSet<string> only, float goalLineX)
+    public ClipGallery(Match m, string dir, bool video, HashSet<string> only, float goalLineX,
+        string folder = "res://assets/anim/keeper", string model = "res://assets/characters/keeper.glb")
     {
-        _m = m; _dir = dir; _video = video;
+        _m = m; _dir = dir; _video = video; _folder = folder;
         _origin = new Vector3(goalLineX * 0.4f, 0, 0);
         m.Camera.Fov = 38f; m.Camera.Near = 0.2f;
 
-        var body = SkinnedBody.TryLoad("res://assets/characters/keeper.glb", out string err);
+        var body = SkinnedBody.TryLoad(model, out string err);
         if (body == null) { GD.PushError($"--clip-gallery: {err}"); _failed = true; _body = null!; }
-        else { _body = body; m.AddChild(_body); _body.ApplyKit(FigureKit.Keeper); _body.Transform = new Transform3D(ModelToWorld, _origin); }
+        else { _body = body; m.AddChild(_body); _body.ApplyKit(model.EndsWith("keeper.glb") ? FigureKit.Keeper : FigureKit.Attacker); _body.Transform = new Transform3D(ModelToWorld, _origin); }
 
         var layer = new CanvasLayer { Layer = 10 };
         m.AddChild(layer);
@@ -87,7 +89,7 @@ public sealed class ClipGallery
 
     void Load(HashSet<string> only)
     {
-        string folder = ProjectSettings.GlobalizePath("res://assets/anim/keeper");
+        string folder = ProjectSettings.GlobalizePath(_folder);
         string index = System.IO.Path.Combine(folder, "clips.json");
         if (!System.IO.File.Exists(index)) { GD.PushError($"--clip-gallery: {index} not found"); return; }
         using var doc = JsonDocument.Parse(System.IO.File.ReadAllText(index));

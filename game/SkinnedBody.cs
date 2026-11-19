@@ -578,6 +578,15 @@ public sealed partial class SkinnedBody : Node3D
     /// <summary>A driven bone's head in model space from the latest <see cref="Pose"/> or <see cref="PoseBones"/> (the physics-tick pose).</summary>
     public Vector3 DrivenBoneOrigin(int k) => _glob[_driven[k]].Origin;
 
+    /// <summary>A driven bone's head in world space from the latest pose (the physics-tick pose).</summary>
+    public Vector3 DrivenBoneWorld(int k) => ModelToWorld * _glob[_driven[k]].Origin * _scale;
+
+    /// <summary>A driven bone's own +Y axis (its direction toward its child) in world space from the latest pose.</summary>
+    public Vector3 DrivenBoneAxisWorld(int k) => (ModelToWorld * _glob[_driven[k]].Basis.Y).Normalized();
+
+    /// <summary>A driven bone's rest offset from its parent (its local position in the rest pose, model metres).</summary>
+    public Vector3 RestLocalPosition(int k) => _sk.GetBoneRest(_driven[k]).Origin;
+
     /// <summary>The ankle joint's height above the ground when the boot stands flat on it (world metres at the body's current scale).</summary>
     public float AnkleRestHeight => _restAnkleHeight * _scale;
 
