@@ -12,8 +12,20 @@ public sealed class FigureJoints
 {
     /// <summary>Pelvis joint (the figure's root).</summary>
     public Vector3 Pelvis;
-    /// <summary>Trunk orientation: X = forward, Y = up, Z = the character's right. Pelvis, spine, neck and head share it.</summary>
+    /// <summary>Trunk orientation: X = forward, Y = up, Z = the character's right. Pelvis, spine, neck and head share it unless <see cref="SplitTrunk"/>.</summary>
     public Basis Torso;
+    /// <summary>
+    /// The trunk is posed in three parts (same axes as <see cref="Torso"/>): the pelvis, the chest (the top of the spine; <see cref="Torso"/> is
+    /// then the chest too) and the head. The spine bones turn by thirds from the pelvis to the chest and the neck halfway to the head. Off: the
+    /// whole trunk takes <see cref="Torso"/> (the keeper).
+    /// </summary>
+    public bool SplitTrunk;
+    public Basis PelvisBasis, HeadBasis;
+    /// <summary>
+    /// Per foot: the foot's pitch about its own lateral axis through the ankle joint (radians, positive = toes up; 0 = flat), and the toes'
+    /// bend up from the foot (radians, so a foot rolling onto its toes keeps them on the ground).
+    /// </summary>
+    public readonly float[] FootPitch = new float[2], ToeBend = new float[2];
     /// <summary>Figure height in metres and the ankle joint's height above the sole.</summary>
     public float Height, AnkleHeight;
     public readonly Vector3[] Hip = new Vector3[2], Knee = new Vector3[2], Ankle = new Vector3[2], FootDir = new Vector3[2];
@@ -275,6 +287,29 @@ public sealed partial class SkinnedBody : Node3D
         _number.Transform = rest.AffineInverse() * want;
     }
 
+    /// <summary>
+    /// Gives the fingers (not driven per tick) a static relaxed curl: each finger joint bends by <paramref name="angle"/> radians toward the
+    /// palm side (down in the rest pose), the thumb by <paramref name="thumb"/>. Call once after loading; the pose stays until changed.
+    /// </summary>
+    public void CurlFingers(float angle, float thumb)
+    {
+        for (int b = 0; b < _sk.GetBoneCount(); b++)
+        {
+            string name = _sk.GetBoneName(b);
+            bool isThumb = name.Contains("HandThumb");
+            if (!isThumb && !name.Contains("HandIndex") && !name.Contains("HandMiddle") && !name.Contains("HandRing") && !name.Contains("HandPinky")) continue;
+            int child = -1;
+            for (int c = 0; c < _sk.GetBoneCount(); c++) if (_sk.GetBoneParent(c) == b) { child = c; break; }
+            Vector3 dir = child >= 0 ? _restPos[child] - _restPos[b] : _restPos[b] - _restPos[_parent[b]];
+            Vector3 axis = dir.Cross(Vector3.Down);
+            if (axis.LengthSquared() < 1e-8f) continue;
+            // the turn in skeleton space, expressed in the bone's own rest frame and put after its local rest rotation
+            Basis turn = new Basis(axis.Normalized(), isThumb ? thumb : angle);
+            Basis local = _restBasis[b].Transposed() * turn * _restBasis[b];
+            _sk.SetBonePoseRotation(b, (_sk.GetBoneRest(b).Basis.Orthonormalized() * local).GetRotationQuaternion());
+        }
+    }
+
     /// <summary>Tints the clothing, skin and hair materials and sets the shirt number from the kit.</summary>
     public void ApplyKit(FigureKit kit)
     {
@@ -367,10 +402,12 @@ public sealed partial class SkinnedBody : Node3D
         }
 
         // Trunk: one rigid rotation (the figure's torso basis), expressed as a turn of the rest pose; the legs' hip joints centre on the figure's.
+        // A split trunk turns the pelvis (hips bone) by its own basis and the chest by the torso's (see PoseTrunk).
         Basis dT = WorldToModel * j.Torso * ModelToWorld;
+        Basis dP = j.SplitTrunk ? WorldToModel * j.PelvisBasis * ModelToWorld : dT;
         Vector3 hipMid = Sk((j.Hip[0] + j.Hip[1]) * 0.5f);
         Vector3 restMid = (_restPos[_up[0]] + _restPos[_up[1]]) * 0.5f;
-        Vector3 pHips = hipMid - dT * (restMid - _restPos[_hips]);
+        Vector3 pHips = hipMid - dP * (restMid - _restPos[_hips]);
 
         float ankleH = j.AnkleHeight / _scale;
         Span<Vector3> ankleT = stackalloc Vector3[2];
@@ -388,7 +425,7 @@ public sealed partial class SkinnedBody : Node3D
         float reach = (_thigh0 + _shin0) * 0.999f, drop = 0f;
         for (int i = 0; i < 2; i++)
         {
-            Vector3 hip = pHips + dT * (_restPos[_up[i]] - _restPos[_hips]);
+            Vector3 hip = pHips + dP * (_restPos[_up[i]] - _restPos[_hips]);
             Vector3 d = ankleT[i] - hip;
             float over = d.Length() - reach;
             if (over > 0f) drop = Math.Max(drop, over * d.Length() / Math.Max(0.3f * d.Length(), Math.Abs(d.Y)));
@@ -396,14 +433,18 @@ public sealed partial class SkinnedBody : Node3D
         pHips.Y -= Math.Min(drop, HipDropMax);
 
         // trunk bones
-        foreach (int b in _trunk)
-            Put(b, dT, pHips + dT * (_restPos[b] - _restPos[_hips]));
+        if (j.SplitTrunk) PoseTrunk(dP, dT, WorldToModel * j.HeadBasis * ModelToWorld, pHips);
+        else
+            foreach (int b in _trunk)
+                Put(b, dT, pHips + dT * (_restPos[b] - _restPos[_hips]));
+        // the chest bone's turn and head (what the clavicles hang from)
+        Vector3 chestAt = j.SplitTrunk ? _glob[_spine2].Origin : pHips + dT * (_restPos[_spine2] - _restPos[_hips]);
 
         for (int i = 0; i < 2; i++)
         {
 
             // leg
-            Vector3 hip = pHips + dT * (_restPos[_up[i]] - _restPos[_hips]);
+            Vector3 hip = pHips + dP * (_restPos[_up[i]] - _restPos[_hips]);
             Solve(hip, ankleT[i], pole[i], _thigh0, _shin0, out Vector3 knee, out Vector3 ankle);
             Vector3 rp = Vector3.Back;   // +Z: the knee points forward in the rest pose
             Basis thigh = Swing(_restPos[_leg[i]] - _restPos[_up[i]], rp, knee - hip, pole[i]);
@@ -415,14 +456,25 @@ public sealed partial class SkinnedBody : Node3D
             fd.Y = 0;
             fd = fd.LengthSquared() > 1e-6f ? fd.Normalized() : Vector3.Back;
             Basis foot = new Basis(fd, Vector3.Up, fd.Cross(Vector3.Up)) * new Basis(Vector3.Back, Vector3.Up, Vector3.Back.Cross(Vector3.Up)).Transposed();
+            // pitched about its own lateral axis through the ankle (heel strike, toe-off); the toes may bend back up from it
+            Vector3 lat = fd.Cross(Vector3.Up).Normalized();
+            if (j.FootPitch[i] != 0f) foot = new Basis(lat, j.FootPitch[i]) * foot;
             Put(_foot[i], foot, ankle);
             _footRot[i] = foot; _footPos[i] = ankle;
-            Put(_toe[i], foot, ankle + foot * (_restPos[_toe[i]] - _restPos[_foot[i]]));
+            Basis toe = j.ToeBend[i] != 0f ? new Basis(lat, j.ToeBend[i]) * foot : foot;
+            Put(_toe[i], toe, ankle + foot * (_restPos[_toe[i]] - _restPos[_foot[i]]));
 
             // arm: the figure's arms are longer than the model's, so the shoulder girdle reaches toward a hand that is out of reach (as a real one does)
-            Vector3 clavHead = pHips + dT * (_restPos[_clav[i]] - _restPos[_hips]);
-            Vector3 armHead = pHips + dT * (_restPos[_arm[i]] - _restPos[_hips]);
+            Vector3 clavHead = j.SplitTrunk ? chestAt + dT * (_restPos[_clav[i]] - _restPos[_spine2]) : pHips + dT * (_restPos[_clav[i]] - _restPos[_hips]);
+            Vector3 armHead = j.SplitTrunk ? chestAt + dT * (_restPos[_arm[i]] - _restPos[_spine2]) : pHips + dT * (_restPos[_arm[i]] - _restPos[_hips]);
             Vector3 handT = Sk(j.Hand[i]);
+            // a split-trunk figure gives its arm's shape: the hand goes where the figure's does from its shoulder, scaled by the arm lengths, so
+            // the model's shorter arm keeps the figure's elbow bend instead of straightening to reach the figure's hand
+            if (j.SplitTrunk)
+            {
+                float figLen = ((j.Elbow[i] - j.Shoulder[i]).Length() + (j.Hand[i] - j.Elbow[i]).Length()) / _scale;
+                if (figLen > 1e-4f) handT = armHead + (Sk(j.Hand[i]) - Sk(j.Shoulder[i])) * ((_arm0 + _fore0) / figLen);
+            }
             Vector3 toHand = handT - armHead;
             float over = toHand.Length() - (_arm0 + _fore0) * 0.999f;
             if (over > 0f) armHead += toHand.Normalized() * Math.Min(over, ShoulderReachMax);
@@ -452,6 +504,25 @@ public sealed partial class SkinnedBody : Node3D
                 rot = (inv * _glob[b].Basis).Orthonormalized().GetRotationQuaternion();
             }
             _solvePos[k] = pos; _solveRot[k] = rot;
+        }
+    }
+
+    /// <summary>
+    /// A split trunk: the hips bone takes the pelvis turn <paramref name="dP"/>, Spine and Spine1 a third and two thirds of the way to the chest
+    /// turn <paramref name="dC"/>, Spine2 the chest turn, the neck halfway from it to the head turn <paramref name="dH"/> and the head that turn;
+    /// each bone hangs from its parent's head at its rest offset, so the chain bends instead of moving as one block.
+    /// </summary>
+    void PoseTrunk(Basis dP, Basis dC, Basis dH, Vector3 pHips)
+    {
+        Quaternion qP = dP.Orthonormalized().GetRotationQuaternion(), qC = dC.Orthonormalized().GetRotationQuaternion(), qH = dH.Orthonormalized().GetRotationQuaternion();
+        Span<Basis> turn = stackalloc Basis[6];
+        turn[0] = dP; turn[1] = new Basis(qP.Slerp(qC, 1f / 3f)); turn[2] = new Basis(qP.Slerp(qC, 2f / 3f)); turn[3] = dC;
+        turn[4] = new Basis(qC.Slerp(qH, 0.5f)); turn[5] = dH;
+        Vector3 at = pHips;
+        for (int n = 0; n < _trunk.Length; n++)
+        {
+            if (n > 0) at += turn[n - 1] * (_restPos[_trunk[n]] - _restPos[_trunk[n - 1]]);
+            Put(_trunk[n], turn[n], at);
         }
     }
 
@@ -509,6 +580,9 @@ public sealed partial class SkinnedBody : Node3D
 
     /// <summary>The ankle joint's height above the ground when the boot stands flat on it (world metres at the body's current scale).</summary>
     public float AnkleRestHeight => _restAnkleHeight * _scale;
+
+    /// <summary>The same for a figure of the given height (before the first pose has set the body's scale).</summary>
+    public float AnkleRestHeightFor(float height) => _restAnkleHeight * ScaleFor(height);
 
     /// <summary>The number of driven bones.</summary>
     public int DrivenCount => _driven.Length;
