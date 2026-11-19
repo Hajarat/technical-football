@@ -6,6 +6,11 @@
 #   set     the chooser set (spec appendix F); a set's left and right share clips through mirroring
 #   side    which way the source moves or reaches: left / right of the subject, or none
 #   events  AMC frame numbers; save sets (catch, reflex_*, body_block, dive_*, back_leap, smother) need "contact"
+#   tags    optional labels the chooser can narrow a set by: "idle" marks a stance clip for standing still (the Set, Planted and
+#           Reacting states play only idle-tagged stance clips when there are any)
+#   match_bias  optional cost factor for the matcher (default 1): above 1 the clip is picked only when it fits clearly better
+#   verdict the audition's verdict: keep, trim (frames narrowed, then kept) or reject (still written and shown in the clip gallery,
+#           never in the pose database); a clip without one counts as keep
 #   loop    true only for a clip whose end runs into its start (none yet: the matcher treats every clip as one-shot)
 #   notes   what the trial shows
 #   contact_tolerance_cm  optional: how far a contact foot may stay off the ground (default 2); recorded in clips.json so it can be
@@ -30,6 +35,8 @@ trial = "77_03"
 frames = [241, 600]
 set = "stance"
 side = "none"
+tags = ["idle"]
+verdict = "keep"
 loop = false
 notes = "crouched ready stance with small weight shifts"
 
@@ -39,6 +46,8 @@ trial = "83_01"
 frames = [260, 520]
 set = "stance"
 side = "right"
+match_bias = 2.0
+verdict = "keep"
 loop = false
 notes = "one sidestep to his right from standing (subject stands on a raised floor)"
 
@@ -48,6 +57,7 @@ trial = "83_13"
 frames = [121, 420]
 set = "stance"
 side = "right"
+verdict = "keep"
 loop = false
 notes = "wide sidestep to his right into a low stance"
 
@@ -58,6 +68,7 @@ frames = [121, 600]
 set = "stance"
 side = "none"
 contact_tolerance_cm = 4
+verdict = "keep"
 loop = false
 notes = "walking forward crouched (spread / jockey)"
 
@@ -67,6 +78,7 @@ trial = "76_11"
 frames = [61, 420]
 set = "backpedal"
 side = "none"
+verdict = "keep"
 loop = false
 notes = "quick large steps backwards"
 
@@ -76,6 +88,7 @@ trial = "136_11"
 frames = [181, 660]
 set = "backpedal"
 side = "none"
+verdict = "keep"
 loop = false
 notes = "walking backwards crouched"
 
@@ -85,6 +98,7 @@ trial = "16_35"
 frames = [1, 162]
 set = "run"
 side = "none"
+verdict = "keep"
 loop = false
 notes = "run, about 2.8 m/s"
 
@@ -94,6 +108,7 @@ trial = "127_03"
 frames = [121, 332]
 set = "run"
 side = "none"
+verdict = "keep"
 loop = false
 notes = "from standing into a run"
 
@@ -103,6 +118,7 @@ trial = "127_05"
 frames = [1, 300]
 set = "run"
 side = "none"
+verdict = "keep"
 loop = false
 notes = "run to a quick stop, turning"
 
@@ -112,6 +128,7 @@ trial = "127_13"
 frames = [1, 185]
 set = "run"
 side = "left"
+verdict = "keep"
 loop = false
 notes = "run with a side step to his left"
 
@@ -122,6 +139,7 @@ frames = [61, 240]
 set = "catch"
 side = "none"
 events = { contact = 121 }
+verdict = "keep"
 loop = false
 notes = "catch in front of the chest (then the throw starts)"
 
@@ -132,6 +150,7 @@ frames = [340, 480]
 set = "catch"
 side = "none"
 events = { contact = 388 }
+verdict = "keep"
 loop = false
 notes = "catch above the head"
 
@@ -142,6 +161,7 @@ frames = [91, 240]
 set = "catch"
 side = "none"
 events = { contact = 118 }
+verdict = "keep"
 loop = false
 notes = "step forward into a catch"
 
@@ -152,6 +172,7 @@ frames = [150, 330]
 set = "reflex_hand"
 side = "left"
 events = { contact = 259 }
+verdict = "keep"
 loop = false
 notes = "left hand reaches high to his left"
 
@@ -162,6 +183,7 @@ frames = [2380, 2580]
 set = "reflex_hand"
 side = "left"
 events = { contact = 2475 }
+verdict = "keep"
 loop = false
 notes = "crouch and reach low to his left"
 
@@ -172,6 +194,7 @@ frames = [330, 500]
 set = "reflex_hand"
 side = "right"
 events = { contact = 413 }
+verdict = "keep"
 loop = false
 notes = "right hand reaches high to his right"
 
@@ -182,6 +205,7 @@ frames = [2300, 2500]
 set = "reflex_hand"
 side = "none"
 events = { contact = 2426 }
+verdict = "keep"
 loop = false
 notes = "crouch, right hand reaches low in front of him (slightly to his left)"
 
@@ -192,6 +216,7 @@ frames = [1050, 1250]
 set = "reflex_foot"
 side = "none"
 events = { contact = 1110 }
+verdict = "keep"
 loop = false
 notes = "deep lunge forward onto the knee, left arm up"
 
@@ -202,6 +227,7 @@ frames = [760, 960]
 set = "reflex_foot"
 side = "none"
 events = { contact = 847 }
+verdict = "keep"
 loop = false
 notes = "deep lunge straight forward, right arm sweeping over his head"
 
@@ -212,6 +238,7 @@ frames = [1340, 1540]
 set = "body_block"
 side = "none"
 events = { contact = 1392 }
+verdict = "reject"
 loop = false
 notes = "arms up, block"
 
@@ -222,6 +249,7 @@ frames = [1460, 1620]
 set = "body_block"
 side = "none"
 events = { contact = 1499 }
+verdict = "reject"
 loop = false
 notes = "step and block with both arms"
 
@@ -232,6 +260,7 @@ frames = [30, 140]
 set = "dive_side"
 side = "left"
 events = { takeoff = 84, contact = 91, landing = 99 }
+verdict = "keep"
 loop = false
 notes = "jump sideways to his left (a small hop: take-off and landing only)"
 
@@ -242,6 +271,7 @@ frames = [121, 300]
 set = "dive_high"
 side = "none"
 events = { takeoff = 186, contact = 214, landing = 238 }
+verdict = "keep"
 loop = false
 notes = "two-foot jump forward"
 
@@ -252,6 +282,7 @@ frames = [301, 520]
 set = "dive_high"
 side = "none"
 events = { takeoff = 414, contact = 444, landing = 470 }
+verdict = "keep"
 loop = false
 notes = "crouch and jump"
 
@@ -262,6 +293,7 @@ frames = [2160, 2340]
 set = "dive_low"
 side = "none"
 events = { contact = 2262 }
+verdict = "keep"
 loop = false
 notes = "low lunge forward, hands down to the ground"
 
@@ -272,6 +304,7 @@ frames = [61, 340]
 set = "back_leap"
 side = "none"
 events = { takeoff = 132, contact = 146, landing = 189 }
+verdict = "reject"
 loop = false
 notes = "jump backwards off a ledge and land"
 
@@ -282,6 +315,7 @@ frames = [400, 620]
 set = "lie_front"
 side = "none"
 events = { landing = 453 }
+verdict = "keep"
 loop = false
 notes = "fall on his face onto a mat, lying"
 
@@ -292,6 +326,7 @@ frames = [61, 300]
 set = "lie_back"
 side = "none"
 events = { landing = 127 }
+verdict = "keep"
 loop = false
 notes = "rug-pull fall onto his back, lying"
 
@@ -301,6 +336,7 @@ trial = "111_21"
 frames = [851, 1250]
 set = "lie_side"
 side = "none"
+verdict = "keep"
 loop = false
 notes = "lying, rolling over"
 
@@ -312,6 +348,7 @@ set = "smother"
 side = "none"
 events = { contact = 88, landing = 122 }
 contact_tolerance_cm = 4
+verdict = "keep"
 loop = false
 notes = "run, dive forward over, roll and get up"
 
@@ -323,6 +360,7 @@ set = "smother"
 side = "none"
 events = { contact = 345, landing = 408 }
 contact_tolerance_cm = 4
+verdict = "reject"
 loop = false
 notes = "forward roll from standing, wide legs"
 
@@ -334,6 +372,7 @@ set = "getup"
 side = "none"
 events = { up = 472 }
 contact_tolerance_cm = 4
+verdict = "keep"
 loop = false
 notes = "get up from lying face down"
 
@@ -345,6 +384,7 @@ set = "getup"
 side = "none"
 events = { up = 695 }
 contact_tolerance_cm = 4
+verdict = "keep"
 loop = false
 notes = "get up from lying on his side"
 
@@ -356,6 +396,7 @@ set = "getup"
 side = "none"
 events = { up = 603 }
 contact_tolerance_cm = 4
+verdict = "keep"
 loop = false
 notes = "get up from lying on his back"
 
@@ -366,5 +407,6 @@ frames = [121, 600]
 set = "getup"
 side = "none"
 events = { up = 501 }
+verdict = "keep"
 loop = false
 notes = "get up from his back, rolling over"

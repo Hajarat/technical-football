@@ -67,3 +67,17 @@ uv run --with imageio-ffmpeg python3 tools/anim/encode_video.py out/clips
 `tools/anim/clips.toml` is the only file edited to add, trim or drop a clip. `retarget.py` refuses to write a clip whose mapped
 bones point more than 3 degrees away from their source bones, or whose feet in a contact span stay more than 2 cm off the
 ground; it names such clips and exits non-zero, and the rest are still written.
+
+Per clip, `clips.toml` also carries:
+
+- `verdict`: the audition's verdict, `keep`, `trim` (frames narrowed, then kept) or `reject`. A rejected clip is still written
+  and shown by `--clip-gallery`, but never enters the game's pose database. Rejected after the 2026-11-18 audition:
+  `body_block_144_07`, `body_block_144_26`, `back_leap_jump_81_12`, `smother_roll_90_34`.
+- `tags`: labels the chooser narrows a set by. `idle` marks a stance clip for standing still (Set, Planted, Reacting play only
+  idle-tagged stance clips when there are any); `stance_ready_77_03` carries it.
+- `match_bias`: a cost factor for the matcher (default 1); above 1 the clip is picked only when it fits clearly better.
+  `stance_shuffle_83_01` (its subject steps off a raised floor) has 2, so shuffles prefer `stance_shuffle_83_13`.
+
+`retarget.py`'s flip guard holds the hands, feet, upper arms, neck and head within a range of their rest and a turning speed
+(16 degrees per 60 Hz frame for the neck and head). The neck and head entries remove a one-frame roll swap between the two in
+`getup_back_140_08` at 0.98 s.

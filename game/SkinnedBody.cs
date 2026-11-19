@@ -124,6 +124,7 @@ public sealed partial class SkinnedBody : Node3D
         _driven = driven.ToArray();
         _posPrev = new Vector3[_driven.Length]; _posCur = new Vector3[_driven.Length];
         _rotPrev = new Quaternion[_driven.Length]; _rotCur = new Quaternion[_driven.Length];
+        _solvePos = new Vector3[_driven.Length]; _solveRot = new Quaternion[_driven.Length];
 
         _fit = 0.48f * ModelHeight / (_thigh0 + _shin0);
         Measure(root);
@@ -337,6 +338,27 @@ public sealed partial class SkinnedBody : Node3D
     /// <summary>Poses the skeleton from the figure's joints. Call once per physics tick, after the figure has computed them.</summary>
     public void Pose(FigureJoints j)
     {
+        Solve(j);
+        for (int k = 0; k < _driven.Length; k++)
+        {
+            _posPrev[k] = _havePose ? _posCur[k] : _solvePos[k]; _rotPrev[k] = _havePose ? _rotCur[k] : _solveRot[k];
+            _posCur[k] = _solvePos[k]; _rotCur[k] = _solveRot[k];
+        }
+        _havePose = true;
+        _poseFrame = Engine.GetPhysicsFrames();
+    }
+
+    // the joint solve's local poses (driven order), before they are committed
+    Vector3[] _solvePos = Array.Empty<Vector3>();
+    Quaternion[] _solveRot = Array.Empty<Quaternion>();
+
+    /// <summary>
+    /// Solves the bone local poses for the figure's joints without showing them (<see cref="Pose"/> = this, then show): read them from
+    /// <see cref="SolvedRotations"/> and <see cref="SolvedPositions"/> (driven order; position 0 is the hips' in the body's own frame).
+    /// The body's scale is set as <see cref="Pose"/> sets it.
+    /// </summary>
+    public void Solve(FigureJoints j)
+    {
         float s = j.Height / ModelHeight * _fit;
         if (Math.Abs(s - _scale) > 1e-4f)
         {
@@ -429,12 +451,17 @@ public sealed partial class SkinnedBody : Node3D
                 pos = inv * (_glob[b].Origin - parent.Origin);
                 rot = (inv * _glob[b].Basis).Orthonormalized().GetRotationQuaternion();
             }
-            _posPrev[k] = _havePose ? _posCur[k] : pos; _rotPrev[k] = _havePose ? _rotCur[k] : rot;
-            _posCur[k] = pos; _rotCur[k] = rot;
+            _solvePos[k] = pos; _solveRot[k] = rot;
         }
-        _havePose = true;
-        _poseFrame = Engine.GetPhysicsFrames();
     }
+
+    /// <summary>The local rotations of the latest <see cref="Solve"/> (driven order).</summary>
+    public ReadOnlySpan<Quaternion> SolvedRotations => _solveRot;
+    /// <summary>The local positions of the latest <see cref="Solve"/> (driven order; index 0 is the hips' position in the body's frame).</summary>
+    public ReadOnlySpan<Vector3> SolvedPositions => _solvePos;
+
+    /// <summary>The body's scale for a figure of the given height (the model is fitted to the figure's leg length).</summary>
+    public float ScaleFor(float height) => height / ModelHeight * _fit;
 
     /// <summary>Names of the driven bones in the order <see cref="PoseBones"/> takes their rotations (the .kclip bone order).</summary>
     public IReadOnlyList<string> DrivenBoneNames
@@ -453,14 +480,21 @@ public sealed partial class SkinnedBody : Node3D
     /// model's own 1.80 m size, ground at y = 0). The other bones keep their rest offsets. The node's transform is left alone: the
     /// caller places and scales the body. Call once per physics tick instead of <see cref="Pose"/>; it is interpolated the same way.
     /// </summary>
-    public void PoseBones(ReadOnlySpan<Quaternion> local, Vector3 hips)
+    public void PoseBones(ReadOnlySpan<Quaternion> local, Vector3 hips) => PoseBones(local, hips, default);
+
+    /// <summary>
+    /// <see cref="PoseBones(ReadOnlySpan{Quaternion}, Vector3)"/> with every driven bone's local position given too
+    /// (<paramref name="positions"/>, driven order; index 0 is ignored for <paramref name="hips"/>; empty = rest offsets), as the joint
+    /// solve produces them.
+    /// </summary>
+    public void PoseBones(ReadOnlySpan<Quaternion> local, Vector3 hips, ReadOnlySpan<Vector3> positions)
     {
         if (local.Length < _driven.Length) throw new ArgumentException($"PoseBones needs {_driven.Length} rotations, got {local.Length}");
         for (int k = 0; k < _driven.Length; k++)
         {
             int b = _driven[k];
             Quaternion rot = local[k].Normalized();
-            Vector3 pos = k == 0 ? hips : _sk.GetBoneRest(b).Origin;
+            Vector3 pos = k == 0 ? hips : positions.IsEmpty ? _sk.GetBoneRest(b).Origin : positions[k];
             _glob[b] = k == 0 ? new Transform3D(new Basis(rot), pos) : _glob[_parent[b]] * new Transform3D(new Basis(rot), pos);
             _posPrev[k] = _havePose ? _posCur[k] : pos; _rotPrev[k] = _havePose ? _rotCur[k] : rot;
             _posCur[k] = pos; _rotCur[k] = rot;
@@ -472,6 +506,15 @@ public sealed partial class SkinnedBody : Node3D
 
     /// <summary>A driven bone's head in model space from the latest <see cref="Pose"/> or <see cref="PoseBones"/> (the physics-tick pose).</summary>
     public Vector3 DrivenBoneOrigin(int k) => _glob[_driven[k]].Origin;
+
+    /// <summary>The ankle joint's height above the ground when the boot stands flat on it (world metres at the body's current scale).</summary>
+    public float AnkleRestHeight => _restAnkleHeight * _scale;
+
+    /// <summary>The number of driven bones.</summary>
+    public int DrivenCount => _driven.Length;
+
+    /// <summary>A driven bone's local rotation as last shown (the physics-tick pose).</summary>
+    public Quaternion DrivenLocalRotation(int k) => _rotCur[k];
 
     /// <summary>Forget the previous tick (teleport): the next render shows the new pose with no blend.</summary>
     public void ResetInterpolation()

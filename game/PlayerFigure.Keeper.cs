@@ -42,6 +42,43 @@ public partial class PlayerFigure
     readonly Vector3[] _dHand = new Vector3[2], _dAnk = new Vector3[2];
     KPose _rushSnap;   // the last run-cycle pose, relative to the keeper's feet position (XZ), blended out when the rush ends
 
+    // --keeper-anim mocap: the rigged body is driven from motion clips in the states that have them (KeeperAnimator.cs); the poses here
+    // still run every tick, for the other states and to blend from and to
+    KeeperAnimator? _keeperAnim;
+    FigureFrame _animFrame;
+    bool _animFailed;
+
+    /// <summary>"procedural" (the poses below, the default) or "mocap" (motion clips where the chooser has a set, see KeeperAnimator). Keeper only; needs the skinned body.</summary>
+    public string KeeperAnimMode { get; set; } = "procedural";
+
+    /// <summary>The mocap animator while --keeper-anim mocap drives the body, else null.</summary>
+    public KeeperAnimator? KeeperAnim => _keeperAnim;
+
+    /// <summary>The rigged body, while one replaces the primitive meshes.</summary>
+    public SkinnedBody? Body => _body;
+
+    /// <summary>
+    /// Whether the keeper's foot (0 = left) is planted in what is drawn: in mocap a foot the foot lock holds (see
+    /// <see cref="KeeperAnimator.FootPlanted"/>); procedurally a standing foot that is not stepping, or a run-cycle foot that is planted.
+    /// False in a dive.
+    /// </summary>
+    public bool KeeperFootPlanted(int foot)
+    {
+        if (_keeperAnim != null) return _keeperAnim.FootPlanted(foot);
+        if (_wD > 0.02f) return false;
+        if (_wR >= 0.5f) return _feet[foot].Planted;
+        return !_kf[foot].Stepping;
+    }
+
+    void BindKeeperAnim()
+    {
+        bool want = KeeperAnimMode == "mocap" && _body != null && !_animFailed;
+        if (!want) { _keeperAnim = null; return; }
+        if (_keeperAnim != null && _keeperAnim.Body == _body) return;
+        _keeperAnim = KeeperAnimator.TryCreate(_body!, out string err);
+        if (_keeperAnim == null) { _animFailed = true; GD.PushWarning($"--keeper-anim mocap unavailable, using procedural: {err}"); }
+    }
+
     const float Deg = Mathf.Pi / 180f;
     static readonly float[] GetUpG = { 0f, 0.25f, 0.6f, 1f };
     static readonly float[] GetUpTilt = { 86f, 64f, 32f, 8f };
@@ -97,6 +134,8 @@ public partial class PlayerFigure
     {
         float k = H / 1.8f;
         _strikeT = -1f;
+        BindKeeperAnim();
+        _animFrame = f;
         if (!_kInit) KeeperInit(f, pos, fwd, right, k);
         var act = f.KeeperAction;
         float getUp = Mathf.Clamp(f.KeeperActionTime / KeeperView.GetUpSeconds, 0f, 1f);

@@ -8,4 +8,9 @@
     <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- read-only use of the keeper's contract types (KeeperAction, KeeperDive) for the chooser -->
+    <ProjectReference Include="..\FootballSim.Core\FootballSim.Core.csproj" />
+  </ItemGroup>
+
 </Project>

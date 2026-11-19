@@ -465,6 +465,7 @@ public partial class PlayerFigure : Node3D
         foreach (var t in _tfUp) { t.Id = t.ContactId = int.MinValue; }
         for (int i = 0; i < 2; i++) { _twPrev[i] = 0f; _kwPrev[i] = 0f; _dropT[i] = 0f; _ovWindPrev[i] = false; }
         _teleporting = true;
+        _keeperAnim?.Teleport();
         Update(f);
         _teleporting = false;
         ResetPhysicsInterpolation();
@@ -1558,7 +1559,8 @@ public partial class PlayerFigure : Node3D
             _joints.Shoulder[i] = sh; _joints.Elbow[i] = elbow; _joints.Hand[i] = hand;
         }
         _joints.Pelvis = pel; _joints.Torso = B; _joints.Height = H; _joints.AnkleHeight = AnkleH;
-        _body?.Pose(_joints);
+        if (_keeperAnim != null) _keeperAnim.Present(_joints, _animFrame);   // --keeper-anim mocap (PlayerFigure.Keeper.cs)
+        else _body?.Pose(_joints);
     }
 
     /// <summary>Stretches a limb mesh (centred on its midpoint, +Y distal, built for <paramref name="refLen"/> metres plus end caps) between two joints.</summary>

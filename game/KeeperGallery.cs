@@ -9,7 +9,13 @@ namespace FootballSim.Game;
 /// --keeper-gallery &lt;dir&gt;: shows every keeper state without the simulation. It drives the keeper's figure from scripted frames (the same
 /// FigureFrame the match builds, with plausible hand positions and velocities), once for each dive side, and writes screenshots at a few moments
 /// of each, from the side and from the front. Name format: shot_&lt;script&gt;_&lt;moment&gt;_&lt;view&gt;.png. Joint sanity (non-finite values,
-/// lowest joint) is printed per script as GALLERY_CHECK.
+/// lowest joint) is printed per script as GALLERY_CHECK. Run it once with --keeper-anim procedural and once with mocap for
+/// before/after sheets; --gallery-only a,b plays only the scripts whose names start with one of those.
+/// GALLERY_CHECK's lowest_joint_y_m and max_joint_step are the figure's own (procedural) joints; foot_slide_cm, body_lowest_joint_m and
+/// max_bone_deg_per_s measure the rigged body as drawn, in either mode: the largest horizontal drift of an ankle while its foot stays
+/// planted (mocap: a foot the foot lock holds; procedural: the figure's own planted foot; see PlayerFigure.KeeperFootPlanted), the
+/// lowest bone joint, the fastest bone turn from one tick to the next (POP above 1,500 deg/s), and how far the chest (the line
+/// between the shoulder joints) faces away from his facing in the stance and movement states other than the run.
 /// </summary>
 public sealed class KeeperGallery
 {
@@ -36,6 +42,7 @@ public sealed class KeeperGallery
     readonly ShotTool _shots;
     readonly Vector3 _p0, _fwd, _right;
     readonly float _facing = Mathf.Pi;   // toward the ball, down the arena
+    const float PopDegPerSec = 1500f;
     readonly List<Script> _scripts = new();
     int _si = -1;
     Script _s = null!;
@@ -47,6 +54,15 @@ public sealed class KeeperGallery
     Vector3[]? _prevJ;
     string _minWhere = "";
     bool _bad;
+    // the rigged body as drawn: ankle plants, lowest joint, bone turning speed
+    Quaternion[]? _prevRot;
+    readonly bool[] _planted = new bool[2];
+    readonly Vector3[] _plantAt = new Vector3[2], _prevAnkle = new Vector3[2];
+    float _slide, _bodyLow, _boneSpeed;
+    string _slideWhere = "", _bodyLowWhere = "", _boneWhere = "";
+    int[] _ankleBone = { -1, -1 }, _armBone = { -1, -1 };
+    float _chestOff;
+    string _chestWhere = "";
 
     public KeeperGallery(Match m, string dir, float goalLineX)
     {
@@ -57,6 +73,8 @@ public sealed class KeeperGallery
         _right = new Vector3(-_fwd.Z, 0, _fwd.X);
         m.Camera.Fov = 38f; m.Camera.Near = 0.2f;
         Build();
+        var only = ToolArgs.Current?.GalleryOnly;
+        if (only != null && only.Count > 0) _scripts.RemoveAll(sc => !only.Exists(o => sc.Name.StartsWith(o, StringComparison.Ordinal)));
     }
 
     // ---- scripts ----
@@ -237,6 +255,7 @@ public sealed class KeeperGallery
             if (_s != null) Report();
             if (++_si >= _scripts.Count) { _finished = true; return false; }
             _s = _scripts[_si]; _t = 0; _mi = 0; _minY = 1e9f; _bad = false; _maxStep = 0; _prevJ = null;
+            _prevRot = null; _planted[0] = _planted[1] = false; _slide = 0; _bodyLow = 1e9f; _boneSpeed = 0; _slideWhere = _bodyLowWhere = _boneWhere = ""; _chestOff = 0; _chestWhere = "";
             var f0 = Frame(0, out _);
             _m.Keeper.Teleport(f0);
             _m.Camera.ResetPhysicsInterpolation();
@@ -293,7 +312,9 @@ public sealed class KeeperGallery
     {
         var f = Frame(Math.Max(0, _t - Dt), out int phase);
         var ph = _s.Phases[phase];
-        string label = $"{_s.Name} {_s.Moments[_mi].Tag} | {ph.Action}{(ph.Dive != KeeperDive.None ? " " + ph.Dive : "")} t={f.KeeperActionTime:F2}s";
+        var anim = _m.Keeper.Figure.KeeperAnim;
+        string label = $"{_s.Name} {_s.Moments[_mi].Tag} | {ph.Action}{(ph.Dive != KeeperDive.None ? " " + ph.Dive : "")} t={f.KeeperActionTime:F2}s" +
+                       (anim != null ? $" | mocap: {anim.Describe()}" : " | procedural");
         _m.Hud.SetSpotLine(label);
         Vector3 c = f.Position;
         if (f.KeeperAction is KeeperAction.Diving or KeeperAction.Smother or KeeperAction.Grounded or KeeperAction.GettingUp or KeeperAction.Holding && f.HandPosition != f.Position)
@@ -329,7 +350,84 @@ public sealed class KeeperGallery
             }
         _prevJ = cur;
         for (int i = 0; i < 2; i++) { One("hip", j.Hip[i]); One("knee", j.Knee[i]); One("shoulder", j.Shoulder[i]); One("elbow", j.Elbow[i]); One("hand", j.Hand[i]); One("ankle", j.Ankle[i] - new Vector3(0, j.AnkleHeight, 0)); }
+        CheckBody(act);
     }
+
+    /// <summary>The rigged body as drawn this tick: ankle plants and their drift, the lowest joint, the fastest bone turn.</summary>
+    void CheckBody(KeeperAction act)
+    {
+        var body = _m.Keeper.Figure.Body;
+        if (body == null) return;
+        int n = body.DrivenCount;
+        var names = body.DrivenBoneNames;
+        if (_ankleBone[0] < 0)
+            for (int k = 0; k < n; k++)
+            {
+                if (names[k].EndsWith("LeftFoot")) _ankleBone[0] = k;
+                if (names[k].EndsWith("RightFoot")) _ankleBone[1] = k;
+            }
+        var xf = body.GlobalTransform;
+        for (int k = 0; k < n; k++)
+        {
+            var w = xf * body.DrivenBoneOrigin(k);
+            if (!float.IsFinite(w.X) || !float.IsFinite(w.Y) || !float.IsFinite(w.Z)) _bad = true;
+            if (w.Y < _bodyLow) { _bodyLow = w.Y; _bodyLowWhere = $"{Short(names[k])}@{_t:F2}s {act}"; }
+        }
+        // the chest's heading against his facing (stance and movement states but the run): the line between the shoulder joints
+        if (_armBone[0] < 0)
+            for (int k = 0; k < n; k++)
+            {
+                if (names[k].EndsWith("LeftArm")) _armBone[0] = k;
+                if (names[k].EndsWith("RightArm")) _armBone[1] = k;
+            }
+        if (_armBone[0] >= 0 && act is KeeperAction.Set or KeeperAction.Planted or KeeperAction.Reacting or KeeperAction.Shuffle
+                or KeeperAction.Spread or KeeperAction.Jockey or KeeperAction.Backpedal)
+        {
+            var across = xf * body.DrivenBoneOrigin(_armBone[1]) - xf * body.DrivenBoneOrigin(_armBone[0]);   // toward his right
+            var chest = new Vector3(across.Z, 0, -across.X);   // his right is (-fwd.z, 0, fwd.x), so his front is (right.z, 0, -right.x)
+            if (chest.LengthSquared() > 1e-6f)
+            {
+                float off = Mathf.RadToDeg(Math.Abs(Mathf.Wrap(Mathf.Atan2(chest.Z, chest.X) - _facing, -Mathf.Pi, Mathf.Pi)));
+                if (off > _chestOff) { _chestOff = off; _chestWhere = $"{_t:F2}s {act}"; }
+            }
+        }
+        var fig = _m.Keeper.Figure;
+        for (int i = 0; i < 2; i++)
+        {
+            if (_ankleBone[i] < 0) continue;
+            var a = xf * body.DrivenBoneOrigin(_ankleBone[i]);
+            var flat = new Vector3(a.X, 0, a.Z);
+            bool planted = fig.KeeperFootPlanted(i);
+            if (planted && !_planted[i]) _plantAt[i] = flat;
+            _planted[i] = planted;
+            if (planted)
+            {
+                float d = (flat - _plantAt[i]).Length();
+                if (d > _slide) { _slide = d; _slideWhere = $"{(i == 0 ? "L" : "R")}@{_t:F2}s {act}"; }
+            }
+            _prevAnkle[i] = flat;
+        }
+        if (_prevRot == null) _prevRot = new Quaternion[n];
+        else
+            for (int k = 0; k < n; k++)
+            {
+                float dot = Math.Min(1f, Math.Abs(body.DrivenLocalRotation(k).Normalized().Dot(_prevRot[k].Normalized())));
+                float deg = Mathf.RadToDeg(2f * MathF.Acos(dot)) / Dt;
+                if (deg > _boneSpeed) { _boneSpeed = deg; _boneWhere = $"{Short(names[k])}@{_t:F2}s {act}"; }
+                if (deg > PopDegPerSec)
+                {
+                    var anim = _m.Keeper.Figure.KeeperAnim;
+                    string feet = anim == null ? "" : $" feet={Feet(anim, 0)}{Feet(anim, 1)}";
+                    GD.Print($"GALLERY_POP script={_s.Name} t={_t:F3} {act} bone={Short(names[k])} deg_per_s={deg:F0} anim={(anim != null ? anim.Describe() : "procedural")}{feet}");
+                }
+            }
+        for (int k = 0; k < n; k++) _prevRot[k] = body.DrivenLocalRotation(k);
+    }
+
+    /// <summary>A foot's lock state for logs: L locked, s stepping, - free.</summary>
+    static string Feet(KeeperAnimator a, int foot) => a.Motion.FootLock.Locked(foot) ? "L" : a.Motion.FootLock.Stepping(foot) ? "s" : "-";
+
+    static string Short(string bone) => bone.StartsWith("mixamorig_") ? bone["mixamorig_".Length..] : bone;
 
     /// <summary>KEEPER_TRACE every 0.05 s: torso lean from upright (deg), its sideways and forward parts (along the keeper's own right and facing, + = right / ahead), the torso's front direction's height (-1 = face down, 0 = on his side, +1 = on his back), the hands' mean height and the pelvis height.</summary>
     void Trace(FigureJoints j)
@@ -349,5 +447,8 @@ public sealed class KeeperGallery
 
     int PhaseAt(float t) { Frame(t, out int ph); return ph; }
 
-    void Report() => GD.Print($"GALLERY_CHECK script={_s.Name} non_finite={_bad} lowest_joint_y_m={_minY:F3} at={_minWhere} max_joint_step_m_per_tick={_maxStep:F3} at={_maxStepWhere}");
+    void Report() => GD.Print($"GALLERY_CHECK script={_s.Name} anim={_m.Keeper.AnimMode}{(_m.Keeper.Figure.KeeperAnim == null && _m.Keeper.AnimMode == "mocap" ? "(unavailable)" : "")} non_finite={_bad} " +
+        $"lowest_joint_y_m={_minY:F3} at={_minWhere} max_joint_step_m_per_tick={_maxStep:F3} at={_maxStepWhere} " +
+        $"foot_slide_cm={_slide * 100f:F1} at={_slideWhere} body_lowest_joint_m={_bodyLow:F3} at={_bodyLowWhere} " +
+        $"max_bone_deg_per_s={_boneSpeed:F0} at={_boneWhere}{(_boneSpeed > PopDegPerSec ? " POP" : "")} chest_off_facing_deg={_chestOff:F0} at={_chestWhere}");
 }
