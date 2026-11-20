@@ -223,8 +223,8 @@ planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its
 | `elastico_run.toml` | `elastico_left_run`, `elastico_right_run` | the same at 2 m/s |
 | `spin.toml` | `spin_left`, `spin_right` | from standing, a 360 roulette: one sole drags the ball round through 180 deg, the feet swap, the other completes the turn |
 | `spin_run.toml` | `spin_left_run`, `spin_right_run` | the same entered at 2 m/s |
-| `heel_to_heel.toml` | `heel_to_heel_right`, `heel_to_heel_left` | from a walk, the leading foot swings past the ball on its outer side and its heel knocks it back and across between the feet, the foot steps out beside it, and the trailing foot, turned out behind the ball, pushes it on with its inside (named by the leading foot; spans at the core's 0.117 / 0.217 / 0.35 s) |
-| `heel_to_heel_run.toml` | `heel_to_heel_right_run`, `heel_to_heel_left_run` | the same at a run |
+| `heel_to_heel.toml` | `heel_to_heel_right`, `heel_to_heel_left` | from a walk, the leading foot swings past the ball on its outer side and its heel knocks it back and across between the feet, the foot steps out beside it, and the trailing foot, turned out behind the ball, pushes it on with its inside (named by the leading foot; spans at the core's 0.117 / 0.217 / 0.35 s); the lead knee lifts and the heel is cocked before the knock and flicks up after it, the trunk leaning hard into the burst |
+| `heel_to_heel_run.toml` | `heel_to_heel_right_run`, `heel_to_heel_left_run` | the same at a run; the lead knee lifts and the heel flicks, the trunk leaning hard into the burst |
 
 A move's standing and running files share their events at the same normalised times, so the two can be blended by entry speed.
 
