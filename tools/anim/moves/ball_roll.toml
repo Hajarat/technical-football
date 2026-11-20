@@ -1,6 +1,6 @@
 # Ball roll from standing: the sole of the right foot rolls the ball across the body to the player's left; author.py writes this
 # side as ball_roll_left and mirrors it into ball_roll_right. Exits into a run to the left-forward. ball_roll_run.toml is the same
-# move entered at 1.5 m/s, with the same events at the same normalised times and comparable poses (the runtime blends the two).
+# move entered at a run, with the same events at the same normalised times and comparable poses (the runtime blends the two).
 #
 # Units: metres on the 1.80 m model, degrees. Model space: he faces +Z, his left is +X, the ground is y = 0 under the start.
 # Frames for a foot's pos: "ground" (the start's ground), "pelvis", "ball" (from the ball's centre, moving with it).

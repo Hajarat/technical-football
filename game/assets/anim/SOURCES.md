@@ -204,7 +204,7 @@ planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its
 | Move file | Clips | What it shows |
 | --- | --- | --- |
 | `ball_roll.toml` | `ball_roll_left`, `ball_roll_right` | from standing, the far foot's sole rolls the ball 0.6 m across the body (sole lands 0.12 s in, rolls 0.40 s), support-foot hop, exit to a run |
-| `ball_roll_run.toml` | `ball_roll_left_run`, `ball_roll_right_run` | the same at 1.5 m/s: 0.75 m across while everything travels 0.6 m forward, a crossover hop of the support foot |
+| `ball_roll_run.toml` | `ball_roll_left_run`, `ball_roll_right_run` | the same at a run (3.9 m/s, the simulation's 0.30 s roll): the sole takes the ball across the body while he runs on and steps sideways with it, a side hop of the support foot that lands by the ball for the next touch, facing along the run |
 | `drag_back.toml` | `drag_back_right`, `drag_back_left` | from standing, the sole pulls the ball 0.65 m back to under the body over 0.40 s, rock back, hips open, neutral exit (named by the foot: the move has no side) |
 | `drag_back_run.toml` | `drag_back_right_run`, `drag_back_left_run` | the same braking from 3 m/s: hard plant, the sole stops the ball |
 | `step_over.toml` | `step_over_left`, `step_over_right` | from standing, the foot circles over the front of the ball without touching it, shoulder drop and hip swivel to the side, push off the other way |
