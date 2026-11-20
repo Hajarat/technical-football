@@ -3560,8 +3560,8 @@
    "contacts": {
     "left": [
      [
-      11,
-      26
+      12,
+      25
      ]
     ],
     "right": [
@@ -3571,7 +3571,7 @@
      ]
     ]
    },
-   "notes": "body feint from standing: hard plant and lunge to the left, shoulder drop, push off the left foot to the right",
+   "notes": "body feint from standing: hard wide plant and deep lunge to the left, shoulder and hip drop with the right arm across, push off the left foot to the right",
    "timing": {
     "spans": [
      0.18,
@@ -3947,8 +3947,8 @@
    "checks": {
     "lowest_joint_m": 0.041,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 575,
-    "max_turn_at": "LeftForeArm@13",
+    "max_bone_deg_per_s": 850,
+    "max_turn_at": "LeftArm@20",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.006,
     "boot_in_ball_max_m": 0.0,
@@ -3989,12 +3989,12 @@
     ],
     "right": [
      [
-      11,
-      26
+      12,
+      25
      ]
     ]
    },
-   "notes": "body feint from standing: hard plant and lunge to the left, shoulder drop, push off the left foot to the right",
+   "notes": "body feint from standing: hard wide plant and deep lunge to the left, shoulder and hip drop with the right arm across, push off the left foot to the right",
    "timing": {
     "spans": [
      0.18,
@@ -4370,8 +4370,8 @@
    "checks": {
     "lowest_joint_m": 0.041,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 576,
-    "max_turn_at": "RightForeArm@13",
+    "max_bone_deg_per_s": 850,
+    "max_turn_at": "RightArm@20",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.006,
     "boot_in_ball_max_m": 0.0,

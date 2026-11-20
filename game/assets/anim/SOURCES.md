@@ -211,7 +211,7 @@ planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its
 | `drag_back_run.toml` | `drag_back_right_run`, `drag_back_left_run` | the same braking from 3 m/s: hard plant, the sole stops the ball |
 | `step_over.toml` | `step_over_left`, `step_over_right` | from standing, the foot circles over the front of the ball without touching it, shoulder drop and hip swivel to the side, push off the other way; the boot circles wide and high, the hip and shoulder drop deep to that side with the other arm swinging across |
 | `step_over_run.toml` | `step_over_left_run`, `step_over_right_run` | the same at 2 m/s with the ball rolling ahead, a skip on the support foot |
-| `body_feint.toml` | `body_feint_left`, `body_feint_right` | from standing, a hard plant and lunge to the side (pelvis shift, shoulder drop, eyes), push off the planted foot the other way |
+| `body_feint.toml` | `body_feint_left`, `body_feint_right` | from standing, a hard plant and lunge to the side (pelvis shift, shoulder drop, eyes), push off the planted foot the other way; a wider plant, a deeper drop of hip and shoulder, the other arm across, then the push off |
 | `body_feint_run.toml` | `body_feint_left_run`, `body_feint_right_run` | the same at 2 m/s |
 | `fake_cut.toml` | `fake_cut_left`, `fake_cut_right` | fake shot from standing: a full shooting wind-up, then the inside of the shooting foot hooks the ball 60 deg across and he turns with it |
 | `fake_cut_run.toml` | `fake_cut_left_run`, `fake_cut_right_run` | the same at 3 m/s |
