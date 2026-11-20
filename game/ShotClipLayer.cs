@@ -294,6 +294,13 @@ public sealed class ShotClipLayer
 
         if (on && sh.Valid && sh.Id != _shotId) { if (_playing) BeginHandBack(dt, "next shot"); NewShot(f); }
         if (_shotId != int.MinValue && sh.Valid && sh.Id == _shotId) _shot = sh;
+        // the core moved the strike to the other foot before the contact (a touch played in the wind-up): drawn again on that foot,
+        // from the pose shown
+        if (on && sh.Valid && sh.Id == _shotId && !sh.Made && (sh.Right ? 1 : 0) != _foot)
+        {
+            if (_playing) BeginHandBack(dt, "strike foot changed");
+            NewShot(f);
+        }
         // the shot's recovery may end before the clip's follow-through: the follow-through plays on (from the shot as it was last)
         // unless a skill move or another shot takes over
         bool carry = _playing && _contactDone && !sh.Valid && !fake && on;

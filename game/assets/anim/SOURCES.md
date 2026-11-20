@@ -133,6 +133,30 @@ game/tests/run-bg.sh -- --clip-gallery ../out/cycles --clip-folder res://assets/
 uv run --with imageio-ffmpeg python3 tools/anim/encode_video.py out/cycles
 ```
 
+### Shot clips
+
+`tools/anim/shots.py` cuts the attacker's struck shot (`--shot-anim mocap`, `game/ShotClipLayer.cs`) from the two retargeted kicks above into
+`game/assets/anim/attacker/shots/` (4 `.kclip` + `clips.json`). Both subjects strike with the right foot; each clip is written as recorded
+(`_right`) and mirrored (`_left`, the same reflection as `FootballSim.Anim.Mirror`), so the game never mirrors them:
+
+| Clip | From | Frames (60 Hz) | Entry | Approach | Backswing ankle | Follow-through ankle |
+| --- | --- | --- | --- | --- | --- | --- |
+| `shot_run_*` | `kick_soccer_11_01` | 162-239 | run | 2.8 m/s, three jogging steps | 0.67 m | 0.69 m (a hop on the plant foot) |
+| `shot_stand_*` | `kick_soccer_10_02` | 138-212 | stand | one long plant step from standing | 0.53 m | 0.33 m |
+
+The events are found from the motion: `start` (the plant foot leaves the ground for its last step; the first frame), `takeoff` (the striking
+foot's last stance before the contact ends), `backswing` (the striking ankle's highest point between the takeoff and the contact), `plant`
+(the plant foot's stance that lasts through the contact begins), `contact` (the striking ankle's peak speed among the frames with its boot
+within 0.25 m of the ground; 12.6 and 11.6 m/s) and `end` (the next landing of either foot after the contact); 12 frames after `end` are kept
+for the hand-back. Each clip is turned so its approach (the hips from `start` to `plant`) runs along +Z, its hips over the origin at the
+contact; `clips.json` adds the root (the hips' ground track averaged over 13 frames), the kick's direction at the contact, the approach speed,
+and the swing's heights and contact speed. `tools/anim/test_shots.py` checks the events against the motion and that the committed files are
+what the tool writes.
+
+```sh
+uv run --with numpy python3 tools/anim/shots.py
+```
+
 ## Baked clips
 
 CMU has no goalkeeper dives, so a dive (low, side, high) and the smother take off on CMU motion (the clips tagged `takeoff`) and fly
