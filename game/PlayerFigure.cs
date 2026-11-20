@@ -254,7 +254,39 @@ public sealed class FigureStats
                 $" over_m={Math.Max(0f, JumpOver[i]):F3} dv_max_mps={Max(JumpDv[i]):F2} dv_p99_mps={P99(JumpDv[i]):F2} dv_tick={dw.Tick} dv_foot={(dw.Foot == 1 ? "R" : "L")}";
         }
         yield return $"FOOT_JUMP ctx=all dt_s={JumpDt:F5} n={all.Count} max_m={Max(all):F3} p99_m={P99(all):F3} max60_m={Max(all60):F3} p99_60_m={P99(all60):F3}";
+        for (int i = 0; i < 4; i++)
+        {
+            var w = SkateWorst[i];
+            yield return $"FOOT_SKATE ctx={SkateNames[i]} n={Skate[i].Count} max_mps={Max(Skate[i]):F2} p95_mps={P95(Skate[i]):F2} over_0.5={SkateOver[i]} worst_tick={w.Tick} worst_foot={(w.Foot == 1 ? "R" : "L")}";
+        }
         yield return StrideLine();
+    }
+
+    /// <summary>The contexts of <see cref="Skate"/>: a skill move, a shot, a touch (the exit after a move included), anything else.</summary>
+    static readonly string[] SkateNames = { "skill", "shot", "touch", "other" };
+    /// <summary>
+    /// Per context (<see cref="SkateNames"/>): each attacker foot's speed over the ground (m/s) on the ticks its sole is within
+    /// <see cref="SkateSoleM"/> of the ground and it is not pinned to the ball by a skill clip: of the boot tip and the heel, the
+    /// slower of those on the ground (a foot rolling or turning on one of them is not sliding); the ticks over 0.5 m/s; the worst.
+    /// </summary>
+    public readonly List<float>[] Skate = { new(), new(), new(), new() };
+    public readonly int[] SkateOver = new int[4];
+    public readonly (int Tick, int Foot, float M)[] SkateWorst = new (int, int, float)[4];
+    public const float SkateSoleM = 0.03f, SkateFastMps = 0.5f;
+
+    public void AddSkate(JumpContext c, int foot, float mps)
+    {
+        int i = c switch { JumpContext.Skill => 0, JumpContext.Shot => 1, JumpContext.Touch or JumpContext.Exit => 2, _ => 3 };
+        Skate[i].Add(mps);
+        if (mps > SkateFastMps) SkateOver[i]++;
+        if (mps > SkateWorst[i].M) SkateWorst[i] = (Tick, foot, mps);
+    }
+
+    static float P95(List<float> l)
+    {
+        if (l.Count == 0) return 0;
+        var s = new List<float>(l); s.Sort();
+        return s[Math.Min(s.Count - 1, (int)Math.Ceiling(0.95 * s.Count) - 1)];
     }
 
     /// <summary>
@@ -1272,6 +1304,22 @@ public partial class PlayerFigure : Node3D
                 float dv = _jN >= 2 ? Math.Max(((ank[i] - _jAnk[i, 0]) - (_jAnk[i, 0] - _jAnk[i, 1])).Length(), ((toe - _jToe[i, 0]) - (_jToe[i, 0] - _jToe[i, 1])).Length()) / dt : float.NaN;
                 float limit = _atkAnim != null ? 0.10f + 1.2f * new Vector2(f.Velocity.X, f.Velocity.Z).Length() * dt : 0.10f;
                 Stats.AddJump(c, i, m, m60, limit, dv);
+                // foot skate: a sole on the ground (boot tip or heel within SkateSoleM of it) moving over it, a foot a skill clip pins
+                // to the ball apart
+                float heelY = ank[i].Y - AnkleH;
+                bool toeDown = toe.Y <= FigureStats.SkateSoleM, heelDown = heelY <= FigureStats.SkateSoleM;
+                bool pinned = _atkAnim?.Skills is { Playing: true } sp && sp.PinWeight(i) > 0f;
+                if (MocapLogOn && f.Skill.Valid)
+                    GD.Print($"MOCAP_SOLE tick={Stats.Tick} foot={i} toe_y={toe.Y:F3} heel_y={heelY:F3} v_toe={new Vector2(toe.X - _jToe[i, 0].X, toe.Z - _jToe[i, 0].Z).Length() / dt:F2} v_heel={new Vector2(ank[i].X - _jAnk[i, 0].X, ank[i].Z - _jAnk[i, 0].Z).Length() / dt:F2} pinned={(pinned ? 1 : 0)} body_mps={new Vector2(f.Velocity.X, f.Velocity.Z).Length():F2}");
+                if ((toeDown || heelDown) && !pinned)
+                {
+                    float vToe = new Vector2(toe.X - _jToe[i, 0].X, toe.Z - _jToe[i, 0].Z).Length() / dt;
+                    float vHeel = new Vector2(ank[i].X - _jAnk[i, 0].X, ank[i].Z - _jAnk[i, 0].Z).Length() / dt;
+                    float v = toeDown && heelDown ? Math.Min(vToe, vHeel) : toeDown ? vToe : vHeel;
+                    Stats.AddSkate(c, i, v);
+                    if (MocapLogOn && v > FigureStats.SkateFastMps)
+                        GD.Print($"MOCAP_SKATE tick={Stats.Tick} foot={i} ctx={c} mps={v:F2} toe_y={toe.Y:F3} heel_y={heelY:F3} v_toe={vToe:F2} v_heel={vHeel:F2} body_mps={new Vector2(f.Velocity.X, f.Velocity.Z).Length():F2}");
+                }
                 if (MocapLogOn && (m > 0.09f || dv > 6f)) GD.Print($"MOCAP_JUMP tick={Stats.Tick} foot={i} ctx={c} m={m:F3} dv={dv:F2} ank={(ank[i] - _jAnk[i, 0]).Length():F3} toe={(toe - _jToe[i, 0]).Length():F3} tw={tw[i]:F2} w={_mW:F2} act={(f.Action.Valid ? $"{f.Action.Phase}/{(f.Action.Right ? "R" : "L")}/{f.Action.Surface}/eta{f.Action.ContactEta:F3}/made{(f.Action.Made ? 1 : 0)}/id{f.Action.Id}/cp({f.Action.ContactPoint.X:F2},{f.Action.ContactPoint.Z:F2})/tf{_tf[i].Surf}{_tf[i].SurfId}" : "-")} prev={(f.PrevAction.Valid ? $"{f.PrevAction.Phase}/{(f.PrevAction.Right ? "R" : "L")}/eta{f.PrevAction.ContactEta:F3}" : "-")} up={(f.Upcoming.Valid ? "1" : "0")} next={f.NextTouchEta:F3}{(f.NextTouchRight ? "R" : "L")} pitch={_pitch[i]:F2} yaw={Mathf.Atan2(dir[i].Z, dir[i].X):F2}");
             }
             _jAnk[i, 1] = _jAnk[i, 0]; _jToe[i, 1] = _jToe[i, 0];
