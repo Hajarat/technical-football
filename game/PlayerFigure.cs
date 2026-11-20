@@ -508,7 +508,7 @@ public partial class PlayerFigure : Node3D
     float _kW; int _kFoot; Vector3 _kAnkle, _kDir; bool _pinOn; int _pinFoot; Vector3 _pinTarget; float _leanExtra; bool _seq;
     float _leanExtraS; bool _pinWas; Vector3 _pinLock;
     // skill moves: the move being drawn, where the foot was when it started (relative to the body), body offsets for this tick, last frame's final ankles
-    int _skId = int.MinValue; Vector3 _skFromRel; bool _skActive, _skSoleLogged, _skInLogged; int _skFoot, _skTail; bool _skJumpValid; readonly Vector3[] _prevAnkWorld = new Vector3[2];
+    int _skId = int.MinValue; Vector3 _skFromRel; float _skFromYaw; bool _skActive, _skSoleLogged, _skInLogged; int _skFoot, _skTail; bool _skJumpValid; readonly Vector3[] _prevAnkWorld = new Vector3[2];
     Vector3 _skPelOff, _skShoulderOff;
     readonly Vector3[] _prevAnkRel = new Vector3[2];
     // bob measurement: extremes of the pelvis height above its commanded height within one step
@@ -1984,7 +1984,7 @@ public partial class PlayerFigure : Node3D
         Vector3 posXZ = new(pos.X, 0, pos.Z);
         if (s.Id != _skId)
         {
-            _skId = s.Id; _skFromRel = _prevAnkRel[fi]; _skSoleLogged = _skInLogged = false;
+            _skId = s.Id; _skFromRel = _prevAnkRel[fi]; _skFromYaw = _yawPrev[fi]; _skSoleLogged = _skInLogged = false;
             SkillStartFromProcedural(fi, posXZ);
         }
         Vector3 from = posXZ + new Vector3(_skFromRel.X, 0, _skFromRel.Z); from.Y = _skFromRel.Y;
@@ -2072,7 +2072,10 @@ public partial class PlayerFigure : Node3D
             Vector3 p = from.Lerp(target, rs);
             p.Y += 0.12f * k * Mathf.Sin(Mathf.Pi * rs);
             target = p;
-            fd = (fwd * (1f - rs) + fd * rs).Normalized();
+            // (the toes turn from where they pointed as the move began, by the angle: a foot still turned sideways from a touch, or
+            // pointing back against a turn at the feet, would swing round in a tick on the way between the two directions)
+            float fy = Mathf.LerpAngle(_teleporting ? Mathf.Atan2(fwd.Z, fwd.X) : _skFromYaw, Mathf.Atan2(fd.Z, fd.X), rs);
+            fd = new Vector3(Mathf.Cos(fy), 0, Mathf.Sin(fy));
             _skPelOff = Vector3.Zero; _skShoulderOff = Vector3.Zero; _leanExtra = 0f;
             inW = 1f;
         }
