@@ -89,21 +89,24 @@ foot_r = { pos = [-0.08, 0.21, 0.76], yaw = -6, pitch = 10, knee = [-0.1, 0.4, 1
 [[key]]
 t = 0.5
 label = "contact: the sole lands on top of the rolling ball instead of striking it, the body braking back"
-pelvis = { pos = [0.06, 0.87, 0.85], yaw = -2, pitch = 10, roll = 2 }
-chest = { yaw = 2, pitch = 8, roll = 0 }
-head = { yaw = -2, pitch = 36 }
+pelvis = { pos = [0.06, 0.85, 0.85], yaw = -2, pitch = 4, roll = 2 }
+chest = { yaw = 2, pitch = -2, roll = 0 }
+head = { yaw = -2, pitch = 42 }
 foot_r = { pos = [0.0, 0.108, 0.02], frame = "ball", yaw = -6, pitch = 15, knee = [-0.2, 0.3, 1], ease = 0.3 }
-hand_l = { swing = 15, abduct = 40, bend = 35, trail = 90 }
-hand_r = { swing = 0, abduct = 30, bend = 40 }
+hand_l = { swing = 30, abduct = 55, bend = 28, trail = 90 }
+hand_r = { swing = 15, abduct = 48, bend = 30, trail = 90 }
 ball = { pos = [-0.04, 0.11, 1.01], ease = [1, 1, 0] }
 
 [[key]]
 t = 0.65
 label = "release: the ball stopped just ahead of where he stops, the sole lets go"
-pelvis = { pos = [0.05, 0.875, 1.04], yaw = 0, pitch = 5, roll = 0 }
-chest = { pitch = 4 }
+pelvis = { pos = [0.05, 0.83, 1.04], yaw = 0, pitch = 0, roll = 0 }
+chest = { yaw = 0, pitch = -8, roll = 0 }
 foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = -6, pitch = 12, knee = [-0.25, 0.3, 1], ease = 0 }
 ball = { pos = [-0.04, 0.11, 1.20], ease = 1 }
+head = { yaw = 0, pitch = 44 }
+hand_l = { swing = 32, abduct = 60, bend = 25, trail = 90 }
+hand_r = { swing = 28, abduct = 55, bend = 25, trail = 90 }
 
 [[key]]
 t = 0.75
@@ -123,11 +126,11 @@ foot_r = { pos = [-0.22, 0.04, 1.12], yaw = -10, pitch = 0, knee = [-0.2, 0, 1] 
 [[key]]
 t = 1.0
 label = "end: stopped, balanced over the ball, a foot either side"
-pelvis = { pos = [0.0, 0.90, 1.06], yaw = 0, pitch = 10, roll = 0 }
-chest = { yaw = 0, pitch = 8, roll = 0 }
-head = { yaw = 0, pitch = 30 }
+pelvis = { pos = [0.0, 0.88, 1.06], yaw = 0, pitch = 12, roll = 0 }
+chest = { yaw = 0, pitch = 12, roll = 0 }
+head = { yaw = 0, pitch = 36 }
 foot_l = { pos = [0.21, 0.002, 1.10], yaw = 8, pitch = 0, ease = 1 }
 foot_r = { pos = [-0.22, 0.002, 1.12], yaw = -10, pitch = 0, knee = [-0.2, 0, 1], ease = 1 }
-hand_l = { swing = 0, abduct = 20, bend = 45 }
-hand_r = { swing = 0, abduct = 20, bend = 45 }
+hand_l = { swing = 10, abduct = 35, bend = 40 }
+hand_r = { swing = 10, abduct = 35, bend = 40 }
 ball = { pos = [-0.04, 0.11, 1.20] }

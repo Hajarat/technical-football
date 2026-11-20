@@ -213,12 +213,12 @@ planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its
 | `step_over_run.toml` | `step_over_left_run`, `step_over_right_run` | the same at 2 m/s with the ball rolling ahead, a skip on the support foot |
 | `body_feint.toml` | `body_feint_left`, `body_feint_right` | from standing, a hard plant and lunge to the side (pelvis shift, shoulder drop, eyes), push off the planted foot the other way; a wider plant, a deeper drop of hip and shoulder, the other arm across, then the push off |
 | `body_feint_run.toml` | `body_feint_left_run`, `body_feint_right_run` | the same at 2 m/s |
-| `fake_cut.toml` | `fake_cut_left`, `fake_cut_right` | fake shot from standing: a full shooting wind-up, then the inside of the shooting foot hooks the ball 60 deg across and he turns with it |
-| `fake_cut_run.toml` | `fake_cut_left_run`, `fake_cut_right_run` | the same at 3 m/s |
+| `fake_cut.toml` | `fake_cut_left`, `fake_cut_right` | fake shot from standing: a full shooting wind-up, then the inside of the shooting foot hooks the ball 60 deg across and he turns with it; from the hook the weight is thrown toward the cut, hip and shoulder dropping into it, the arms following |
+| `fake_cut_run.toml` | `fake_cut_left_run`, `fake_cut_right_run` | the same at 3 m/s; from the hook the weight is thrown toward the cut |
 | `fake_cut_out.toml` | `fake_cut_out_right`, `fake_cut_out_left` | the fake shot's cut toward the shooting foot's own side: the same wind-up with the plant foot wide, the leg comes through on the ball's inner side, foot turned in, and its outside hooks the ball 60 deg across; he turns with it |
 | `fake_cut_out_run.toml` | `fake_cut_out_right_run`, `fake_cut_out_left_run` | the same at 3 m/s |
-| `fake_stop.toml` | `fake_stop_right`, `fake_stop_left` | fake shot from standing: the same wind-up, the leg comes through short and the sole stops the ball under him (named by the shooting foot) |
-| `fake_stop_run.toml` | `fake_stop_right_run`, `fake_stop_left_run` | the same at 3 m/s, the run dying over the stop |
+| `fake_stop.toml` | `fake_stop_right`, `fake_stop_left` | fake shot from standing: the same wind-up, the leg comes through short and the sole stops the ball under him (named by the shooting foot); from the sole's landing the body brakes over the ball, sitting back with the arms out, then settles over it |
+| `fake_stop_run.toml` | `fake_stop_right_run`, `fake_stop_left_run` | the same at 3 m/s, the run dying over the stop; from the sole's landing the body brakes over the ball, sitting back with the arms out |
 | `elastico.toml` | `elastico_left`, `elastico_right` | from standing, the outside pushes the ball away from the exit side, the foot wraps round the back of the ball, the inside snaps it back at 45 deg; the knee and hip go out with the push and back with the snap, the upper body selling the first push with the arm out |
 | `elastico_run.toml` | `elastico_left_run`, `elastico_right_run` | the same at 2 m/s |
 | `spin.toml` | `spin_left`, `spin_right` | from standing, a 360 roulette: one sole drags the ball round through 180 deg, the feet swap, the other completes the turn; the shoulders and head lead the turn, arms out, the body low over the ball |
