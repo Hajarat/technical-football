@@ -639,6 +639,13 @@ public static class SkillMoves
     /// <summary>At a run the ball closes on the release this much faster than his planned ground speed (it is never slower than him), m/s.</summary>
     const float RollReleaseMargin = 0.15f;
 
+    /// <summary>The ball roll's release pace along the run for a player moving at <paramref name="pv"/>: his pace along it from standing, his ground speed at a run, m/s.</summary>
+    static float RollReleasePace(BallAction a, Vector2 pv, Tuning t)
+    {
+        float along = MathF.Max(0f, Vector2.Dot(pv, a.HoldDirection));
+        return along + (pv.Length() - along) * RollRunShare(a.SkillEntry, t);
+    }
+
     /// <summary>How much of the run version of the ball roll a roll entered at <paramref name="entry"/> m/s takes, 0..1.</summary>
     static float RollRunShare(float entry, Tuning t) => Math.Clamp(t.Skill.BallRollRunBlend.Evaluate(entry), 0f, 1f);
 
@@ -853,13 +860,14 @@ public static class SkillMoves
         if (Reaches(a.Kind) && tick >= a.ContactTick)
         {
             b = CarriedBall(p, a, a.EndTick - 1, t);
-            // (the carried ball goes along the run with the player: moved on with him to the tick before the end)
-            if (a.Kind is ActionKind.BallRoll or ActionKind.Elastico)
+            // (the carried ball goes along the run with the player: moved on with him to the tick before the end; the ball roll's
+            // also goes across with his step)
+            if (a.Kind == ActionKind.Elastico)
             {
                 var f3 = new Vector3(a.HoldDirection.X, 0f, a.HoldDirection.Y);
                 b += f3 * (Vector3.Dot(pv, f3) * (n - 1) * dt);
             }
-            else if (a.Kind == ActionKind.Spin) b += pv * ((n - 1) * dt);
+            else if (a.Kind is ActionKind.Spin or ActionKind.BallRoll) b += pv * ((n - 1) * dt);
         }
         else b = ball.Position + new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z) * ((n - 1) * dt);
         b.Y = ball.Position.Y;
@@ -869,7 +877,7 @@ public static class SkillMoves
         Vector2 fwd = a.HoldDirection;
         Vector3 bv = a.Kind switch
         {
-            ActionKind.BallRoll => new Vector3(fwd.X, 0f, fwd.Y) * MathF.Max(0f, Vector2.Dot(new Vector2(pv.X, pv.Z), fwd)),
+            ActionKind.BallRoll => new Vector3(fwd.X, 0f, fwd.Y) * RollReleasePace(a, new Vector2(pv.X, pv.Z), t),
             ActionKind.DragBack or ActionKind.FakeStop => Vector3.Zero,
             ActionKind.Elastico => ElasticoReleaseVelocity(p, a),
             ActionKind.Spin => FacedPace(p),
@@ -1073,11 +1081,9 @@ public static class SkillMoves
             {
                 // Released along the run: at his pace along it from standing, at his ground speed at a run (his step toward the
                 // side eases out after the move, so the ball is not left behind).
-                var pv = new Vector2(p.Velocity.X, p.Velocity.Z);
-                float along = MathF.Max(0f, Vector2.Dot(pv, fwd));
-                float pace = along + (pv.Length() - along) * RollRunShare(a.SkillEntry, t);
                 // ... and never slower than the sole was taking it along the run.
-                pace = MathF.Max(pace, Vector2.Dot(new Vector2(ball.Velocity.X, ball.Velocity.Z), fwd));
+                float pace = MathF.Max(RollReleasePace(a, new Vector2(p.Velocity.X, p.Velocity.Z), t),
+                    Vector2.Dot(new Vector2(ball.Velocity.X, ball.Velocity.Z), fwd));
                 var v = new Vector3(fwd.X * pace, ball.Velocity.Y, fwd.Y * pace);
                 ball.Velocity = v;
                 ball.Spin = ball.RollingSpin(v);
