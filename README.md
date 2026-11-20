@@ -121,6 +121,12 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   `feet_turn_reach` (0.6 m, GOALS' execution radius) the leg stretches for it, with 1.5 times the rated errors. A ball further
   off at the contact is not played: the legs keep going to it and the next step plays it. The rated speed and direction errors
   are cut at two sigma.
+- At the boards: a ball closer to a board than his body's radius, the contact zone's lead at rest and its radius (0.72 m) may
+  be played by any touch or by the strike anywhere within `turn_reach` of the body, from beside the feet too (he cannot always
+  get behind it). When such a ball is about still (under 1 m/s) and within 0.8 m of him (`turn_reach` at rest plus his
+  body's radius), the go-get-it legs turn him to it where he stands rather than running at it at the stick's pace. A turn at
+  the feet whose pull along the stick would run into a board within `feet_turn_distance` is not made: a touch plays the ball
+  instead.
 - A stick released for no longer than `release_debounce` (0.04 s; a pad polled at 60 Hz can read neutral for a tick or two
   in a flick) reads as still held; a longer release is a stop (a touch already committed is played as committed).
 - Reversals (the stick at least `feet_turn_deg`, 120 degrees, from the ball's travel): up to `feet_turn_max_speed` (3 m/s),
