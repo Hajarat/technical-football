@@ -64,6 +64,8 @@ public struct FigureShot
     public bool Made;
     /// <summary>Shoot not released yet: the contact tick is then only the earliest possible one.</summary>
     public bool Held;
+    /// <summary>From the contact point toward the goal's centre (flat; zero when unknown): the drawn estimate of where the ball goes until the contact.</summary>
+    public Vector3 Aim;
 }
 
 /// <summary>The simulation's skill moves, in the order of its ActionKind from StepOver on.</summary>
@@ -190,11 +192,16 @@ public sealed class FigureStats
     public float MinToeYM = float.MaxValue, BoneMaxDegS; public string BoneMaxAt = "-"; public int BoneFast, MocapTicks, MocapFull;
     /// <summary>The same for the playing foot's own bones (foot, toes) while it plays the ball (touch, skill move, kick): exempt from the body check, reported apart.</summary>
     public float FootTurnMaxDegS; public string FootTurnAt = "-"; public int FootTurnFast;
+    /// <summary>The same bone turn on shot ticks (press to the end of the follow-through), the striking leg left out while it is drawn for the strike.</summary>
+    public float ShotBoneMaxDegS; public string ShotBoneAt = "-"; public int ShotBoneFast, ShotBoneTicks;
     public string MocapLine() =>
         $"MOCAP_POSE min_toe_y_m={(MinToeYM == float.MaxValue ? float.NaN : MinToeYM):F3} bone_max_deg_s={BoneMaxDegS:F0} at={BoneMaxAt} bone_over_1500={BoneFast} ticks={MocapTicks} full_mocap_ticks={MocapFull}" +
-        $"\nPLAYING_FOOT_TURN max_deg_s={FootTurnMaxDegS:F0} at={FootTurnAt} over_1500={FootTurnFast}";
+        $"\nPLAYING_FOOT_TURN max_deg_s={FootTurnMaxDegS:F0} at={FootTurnAt} over_1500={FootTurnFast}" +
+        $"\nSHOT_BONE max_deg_s={ShotBoneMaxDegS:F0} at={ShotBoneAt} over_1500={ShotBoneFast} ticks={ShotBoneTicks}";
     /// <summary>Touches counted, and those where the foot drawn in the swing differs from the simulation's action foot.</summary>
     public int Touches, FootMismatches;
+    /// <summary>The shots' soft touches (made on the press tick, not drawn; out of <see cref="Touches"/>).</summary>
+    public int SoftTouches;
 
     /// <summary>What the attacker is doing on a tick, for the per-frame foot-jump stat.</summary>
     public enum JumpContext { Skill, Exit, Touch, Shot, Other }
@@ -276,7 +283,7 @@ public sealed class FigureStats
     public string SkinLine() => Line("SKIN_CONTACT", Skin);
     public string SkillLine() => Line("SKILL_CONTACT", SkillContact) + $" skill_min_pelvis_ratio={F(SkillMinPelvisRatio)} skill_lean_max_deg={SkillLeanMaxDeg:F1} foot_jump_body_m={SkillFootJumpBody:F3} foot_jump_world_m={SkillFootJumpWorld:F3} plain_foot_jump_body_m={PlainFootJumpBody:F3} sole_max_err_m={SkillSoleMaxErr:F3} on_ball_max_err_m={SkillOnBallMaxErr:F3} on_ball_exit_touch_ticks={SkillOnBallTouchTicks} on_ball_exit_touch_max_err_m={SkillOnBallTouchMaxErr:F3} step_over_clear_min_m={F(StepOverClearMinM)}";
     public string TouchMissLine() => Line("TOUCH_MISS", TouchMiss);
-    public string TouchFootLine() => $"TOUCH_FOOT n={Touches} mismatches={FootMismatches}";
+    public string TouchFootLine() => $"TOUCH_FOOT n={Touches} mismatches={FootMismatches} soft_undrawn={SoftTouches}";
     public string PoseLine() =>
         $"POSE_LIMITS min_pelvis_ratio={MinPelvisRatio:F3} min_knee_m={MinKneeM:F3} min_limb_y_m={MinLimbYM:F3} lean_deg_min={LeanMinDeg:F1} lean_deg_max={LeanMaxDeg:F1}" +
         $" run_min_pelvis_ratio={F(RunMinPelvisRatio)} close_min_pelvis_ratio={F(CloseMinPelvisRatio)} run_lean_max_deg={RunLeanMaxDeg:F1} run_bob_max_m={RunBobMaxM:F3}" + "\n" + BodyLine() + (MocapTicks > 0 || BoneMaxDegS > 0 ? "\n" + MocapLine() : "");
@@ -854,11 +861,12 @@ public partial class PlayerFigure : Node3D
 
         var ank = new Vector3[2]; var dir = new Vector3[2]; var planted = new bool[2];
         var tsurf = new BootSurface[2]; var tw = new float[2];
+        var fTouch = SoftTouchFrame(f, dt);   // (the touch the shot's soft touch takes out of the core's slots still follows through)
         for (int i = 0; i < 2; i++)
         {
             ank[i] = _feet[i].Ankle; dir[i] = _feet[i].Dir; planted[i] = _feet[i].Planted && !_feet[i].Timed;
             MocapFoot(i, f, pelXZ, right, hmaxNow, speed, ref ank[i], ref dir[i], ref planted[i], dt);
-            tw[i] = TouchOverlay(f, i, pelXZ, hv, fm, k, ref ank[i], ref dir[i], out tsurf[i]);
+            tw[i] = TouchOverlay(fTouch, i, pelXZ, hv, fm, k, ref ank[i], ref dir[i], out tsurf[i]);
             if (tw[i] > 0f) planted[i] = false;
             if (_kW > 0f && i == _kFoot)
             {
@@ -869,13 +877,22 @@ public partial class PlayerFigure : Node3D
                 dir[i] = dir[i].Lerp(_kDir, kwi).Normalized();
                 planted[i] = false;
             }
+            // a shot's plant step to beside the ball (when the stride does not have that foot down at the strike), held where it lands
+            float plw = _plW > 0f && i == _plFoot && !IsKeeper ? _plW : 0f;
+            if (plw > 0f)
+            {
+                ank[i] = ank[i].Lerp(_plAnkle, plw);
+                dir[i] = dir[i].Lerp(_plDir, plw).Normalized();
+                planted[i] = _plHeld;
+            }
             // an unmade touch (a windup, or a predicted immediate touch) that vanishes without its contact (dropped, or not made as
             // predicted): the foot goes from where it was drawn back to its pose over a short swing instead of in one frame
             // the same when a shot or skill pose is dropped at once (a fake shot aborts the shot, a lost ball ends the move)
             float kw = _kW > 0f && i == _kFoot ? (f.Shot.Valid && !f.Shot.Made ? _kW * (1f - tw[i]) : _kW) : 0f;
             // the stride's foot pitch gives way to a touch, kick or skill pose by their weights (a contact is drawn flat, exactly as planned)
-            float pw = (1f - tw[i]) * (1f - kw);
-            bool dropped = _ovWindPrev[i] && _twPrev[i] > 0.05f && tw[i] < _twPrev[i] - 0.2f || kw < _kwPrev[i] - 0.2f;
+            float pw = (1f - tw[i]) * (1f - kw) * (1f - plw);
+            // (so does a made touch's follow-through the shot's soft touch takes out of the core's slots: the soft touch is not drawn)
+            bool dropped = (_ovWindPrev[i] || f.Action.Valid && f.Action.Kind == SoftTouchKind) && _twPrev[i] > 0.05f && tw[i] < _twPrev[i] - 0.2f || kw < _kwPrev[i] - 0.2f;
             if (dropped && !(tw[i] >= 0.999f && !_ovWind[i]))
             { _dropT[i] = DropFade; _dropFrom[i] = _ankRelPrev[i]; _dropYaw[i] = _yawPrev[i]; }
             _kwPrev[i] = kw;
@@ -926,6 +943,7 @@ public partial class PlayerFigure : Node3D
             float yawT = Mathf.Clamp(PelYawPerM * spread, -PelYawMax, PelYawMax);
             _pelYaw = _teleporting ? yawT : Mathf.Lerp(_pelYaw, yawT, 1f - Mathf.Exp(-dt / PelYawTau));
             pel = MocapPelvis(pel, right);
+            pel.Y -= PlantPelvisDrop(pel, right);
         }
         // a touch from a standstill (the first touch of a loose ball) can lie beyond a straight leg: only then the pelvis sinks by what is missing
         // (at most 6 cm); a running player never does, the simulation steers the ball into the zone ahead of the swinging foot
@@ -1002,7 +1020,9 @@ public partial class PlayerFigure : Node3D
         for (int i = 0; i < 2; i++)
         {
             Vector3 hip = body ? pel + P * new Vector3(0, 0, i == 0 ? -HipW : HipW) : pel + right * (i == 0 ? -HipW : HipW);
-            if (!planted[i] && tw[i] <= 0f && !(_kW > 0f && i == _kFoot)) ank[i] = MocapSoftReach(hip, ank[i]);
+            // (a shot's plant foot takes the soft reach out by its weight, so neither its landing nor its release moves it in a tick)
+            if (_plW > 0f && i == _plFoot && !IsKeeper) ank[i] = MocapSoftReach(hip, ank[i]).Lerp(ank[i], _plW);
+            else if (!planted[i] && tw[i] <= 0f && !(_kW > 0f && i == _kFoot)) ank[i] = MocapSoftReach(hip, ank[i]);
             SolveLeg(hip, ank[i], fwd, out knee[i], out ankEff[i]);
         }
 
@@ -1095,6 +1115,7 @@ public partial class PlayerFigure : Node3D
                 Stats.PlainFootJumpBody = Math.Max(Stats.PlainFootJumpBody, (relI - _prevAnkRel[i]).Length());
             }
         if (!IsKeeper && Stats != null) MeasureJump(f, ankEff, dir, tw);
+        if (ShotLog && !IsKeeper && Stats != null && _kW > 0f) GD.Print($"SHOT_ANK tick={Stats.Tick} kA=({_kAnkle.X:F3},{_kAnkle.Y:F3},{_kAnkle.Z:F3}) ank=({ankEff[_kFoot].X:F3},{ankEff[_kFoot].Y:F3},{ankEff[_kFoot].Z:F3}) pel=({pel.X:F3},{pel.Y:F3},{pel.Z:F3}) kW={_kW:F2} plA=({_plAnkle.X:F3},{_plAnkle.Y:F3},{_plAnkle.Z:F3}) plShown=({ankEff[_plFoot].X:F3},{ankEff[_plFoot].Y:F3},{ankEff[_plFoot].Z:F3}) plW={_plW:F2} held={(_plHeld ? 1 : 0)}");
         _skJumpValid = true;
         _prevAnkWorld[0] = ankEff[0]; _prevAnkWorld[1] = ankEff[1];
         for (int i = 0; i < 2; i++) { _prevAnkRel2[i] = _prevAnkRel[i]; _prevAnkRel[i] = ankEff[i] - posFlat; _prevAnkRel[i].Y = ankEff[i].Y; }
@@ -1133,7 +1154,12 @@ public partial class PlayerFigure : Node3D
             // the touch just made is the current action, or the previous one when the next touch was planned on the same tick
             bool curMade = f.Action.Valid && f.Action.Made && f.Action.Phase == TouchPhase.Contact;
             bool prevMade = f.PrevAction.Valid && f.PrevAction.Made && f.PrevAction.Phase == TouchPhase.Contact;
-            if (f.TouchEvent && !f.StrikeEvent && (curMade || prevMade))
+            // the shot's soft touch is not drawn (see TouchOverlay): counted apart, out of the contact and foot checks
+            if (f.TouchEvent && !f.StrikeEvent && (curMade || prevMade) && (curMade ? f.Action : f.PrevAction).Kind == SoftTouchKind)
+            {
+                Stats.SoftTouches++; LastContactError = float.NaN;
+            }
+            else if (f.TouchEvent && !f.StrikeEvent && (curMade || prevMade))
             {
                 // the boot's contact surface of the action's foot against the ball surface at the contact tick; the figure aims at the action's contact point
                 var a = curMade ? f.Action : f.PrevAction;
@@ -1310,6 +1336,9 @@ public partial class PlayerFigure : Node3D
             // the pending or latest touch, the one before it still following through, and the immediate touch the core is about to make
             FigureAction a = n == 0 ? f.Action : n == 1 ? f.PrevAction : f.Upcoming;
             if (!a.Valid || a.IsSkill || (a.Right ? 1 : 0) != i) continue;
+            // the shot's soft touch is not drawn: the core makes it on the press tick (no windup to draw), and it only keeps the ball
+            // rolling with him; the shot's own sequence plays the ball
+            if (a.Kind == SoftTouchKind) continue;
             // the foot starts toward a pending touch a little before the core's windup (TouchLead), so it need not cover the way from the stride's
             // swing to the contact zone in the windup alone
             if (a.Phase is TouchPhase.Planned or TouchPhase.Done || (a.Phase == TouchPhase.PreWindup && !(n == 0 && !a.Made && a.ContactEta <= TouchLead))) continue;
@@ -1564,11 +1593,14 @@ public partial class PlayerFigure : Node3D
             if (PlanSkill(f, pos, fwd, right, k)) return;
         }
         _skId = int.MinValue;
+        if (ShotLog && Stats != null && (f.Shot.Valid || !float.IsNaN(f.StrikeEta)))
+            GD.Print($"SHOT_LOG tick={Stats.Tick} el={f.Shot.Elapsed:F3} eta={f.Shot.ContactEta:F3} seta={f.StrikeEta:F3} sf={(f.StrikeRight ? "R" : "L")} foot={(f.Shot.Right ? "R" : "L")} kind={f.Shot.Kind} held={(f.Shot.Held ? 1 : 0)} made={(f.Shot.Made ? 1 : 0)} ch={f.ShotCharge:F2} d={Dist2(f.BallPos, pos):F3} v={new Vector2(f.Velocity.X, f.Velocity.Z).Length():F2} step={(f.IsStepping ? 1 : 0)} sw={(f.SwingRight ? "R" : "L")}/{f.SwingProgress:F2} act={(f.Action.Valid ? $"{f.Action.Phase}/{(f.Action.Right ? "R" : "L")}/eta{f.Action.ContactEta:F3}" : "-")} ev={(f.TouchEvent ? "T" : "")}{(f.StrikeEvent ? "S" : "")} mW={_mW:F2}");
         float r = f.BallRadius;
         Vector3 posXZ = new(pos.X, 0, pos.Z);
         Vector3 ballXZ = new(f.BallPos.X, 0, f.BallPos.Z);
         // a shot action owns the striking leg and the body from the press to the end of its recovery
         if (!IsKeeper && f.Shot.Valid) { PlanShot(f, pos, fwd, right, k, hmax); return; }
+        ShotIdle(dt);
         _shId = int.MinValue;
         bool strikePending = !float.IsNaN(f.StrikeEta);
         float c = f.ShotCharge;
@@ -1649,9 +1681,11 @@ public partial class PlayerFigure : Node3D
     static float StrikeAngle(ShotKind k) => k switch { ShotKind.Driven => -0.30f, ShotKind.Chip => 0.45f, ShotKind.Power => 0.12f, _ => 0.05f };
 
     /// <summary>
-    /// Poses the striking leg and body for the shot action: the foot is drawn back over the windup (further for more charge), swings
-    /// through in the last part before the contact tick, meets the ball with the action's surface at its contact point on that tick and follows
-    /// through during the recovery. Timing is read from the action; nothing here decides when the ball is struck.
+    /// Poses the shot action, timed backwards from its contact (the core's estimate, which may slip a step later until the commit):
+    /// until the strike sequence's length before it the run goes on untouched; then the striking foot is drawn back and swings
+    /// through to meet the ball with the action's surface at its contact point on the contact tick, and follows through during the
+    /// recovery. The other foot is the plant: the stride's own stance foot when the stride has it down at the strike, else a step
+    /// to beside the ball held where it lands (see <see cref="PlanPlant"/>). Nothing here decides when the ball is struck.
     /// </summary>
     void PlanShot(in FigureFrame f, Vector3 pos, Vector3 fwd, Vector3 right, float k, float hmax)
     {
@@ -1659,60 +1693,79 @@ public partial class PlayerFigure : Node3D
         int fi = sh.Right ? 1 : 0;
         float side = fi == 1 ? 1f : -1f;
         float r = f.BallRadius;
+        float dt = f.Dt > 0f ? f.Dt : 1f / 120f;
         Vector3 posXZ = new(pos.X, 0, pos.Z);
         if (sh.Id != _shId)
         {
             _shId = sh.Id; _shCharge = 0f; _shContactSet = false; _shReleased = false;
             _shFromRel = _prevAnkRel[fi];
+            ShotSequenceReset(fwd);
+            _shRelPrevOk = false; _shTfSet = false; _shVRel = Vector3.Zero;
         }
         _shCharge = Math.Max(_shCharge, f.ShotCharge);
         float cb = Mathf.Clamp(_shCharge, 0f, 1f);
-        // while the button is held the contact tick is only the earliest possible one, so the foot waits drawn back; after the release the
-        // tick is fixed, and the swing takes what is left of it (at most the kind's own swing time). A contact that cannot happen yet
-        // (ball out of reach) holds the foot at the ball until the core makes it.
         float tau = sh.Made ? sh.ContactEta : Math.Max(sh.ContactEta, 0f);
         float s = sh.Made ? Math.Max(0f, -tau) : 0f;     // seconds since the contact
         float rec = Math.Max(sh.RecoverySeconds, 0.08f);
         bool inside = sh.Kind is ShotKind.Finesse or ShotKind.LowFinesse or ShotKind.Chip;
 
-        // the direction the ball leaves in: the launch once made, else straight ahead
-        Vector3 d = new(sh.BallOutVelocity.X, 0, sh.BallOutVelocity.Z);
-        d = sh.Made && d.LengthSquared() > 0.04f ? d.Normalized() : fwd;
+        // the sequence's length and the swing's share of it; a later estimate before the contact eases the sequence out (ShotSlip)
+        // (the kind can change under way, at the release and at a second press: its numbers are eased, see KindEase)
+        float len = KindEase(0, SequenceSeconds(sh.Kind, cb), dt);
+        float swingT = KindEase(1, Math.Min(sh.Kind switch { ShotKind.Driven => 0.12f, ShotKind.Chip => 0.14f, ShotKind.Power => 0.14f, _ => 0.17f }, 0.6f * len), dt);
+        // the plant step (when one is drawn) starts a stride step before it lands, so it is as long as a step of the run
+        float plantLen = Math.Max(len, PlantLand(swingT) + PlantSteps / Math.Max(f.StepFrequency, 2.5f));
+        // (the estimate is only drawn toward while the ball will be within the body's reach at the contact)
+        Vector3 bodyAtC = posXZ + new Vector3(f.Velocity.X, 0, f.Velocity.Z) * tau;
+        bool inRange = Dist2(sh.ContactPoint, bodyAtC) < ShotReachM * k;
+        float tauD = sh.Made ? tau : ShotSlip(tau, plantLen, swingT, dt, inRange);
+
+        // the direction the ball leaves in: until the contact the drawn estimate (the run, turned toward the aim), kept for the contact
+        // tick itself (the boot surface is on the ball whichever way it faces); the follow-through turns to the launch
+        Vector3 launch = new(sh.BallOutVelocity.X, 0, sh.BallOutVelocity.Z);
+        launch = sh.Made && launch.LengthSquared() > 0.04f ? launch.Normalized() : _shDirPre;
+        if (!sh.Made) _shDirPre = AimEstimate(f, fwd);
+        Vector3 d = _shDirPre;
         Vector3 fd = SurfaceDir(sh.Surface, fi, d);
         Vector3 rv = new(-fd.Z, 0, fd.X);
         Vector3 off = Off(fi, sh.Surface);
         // the boot's surface point on the ball: behind it along the leave direction, higher or lower on it per kind
-        float th = StrikeAngle(sh.Kind);
+        float th = KindEase(2, StrikeAngle(sh.Kind), dt);
+        // (the core's estimate rolls the ball on to the contact tick, but the strike meets it before that tick's roll: one tick less)
         Vector3 centre = sh.ContactPoint;
+        if (!sh.Made && tau >= dt) centre -= new Vector3(f.BallVel.X, 0, f.BallVel.Z) * dt;
         Vector3 p = centre - d * (r * Mathf.Cos(th)) - Vector3.Up * (r * Mathf.Sin(th));
         Vector3 c0 = p - (fd * off.X + Vector3.Up * off.Y + rv * off.Z);
 
         // wind-up pose: the foot drawn back behind the hip and lifted; a finesse foot also goes out to its side, a chip stays low
         float b = 0.35f + 0.65f * cb;
-        float back = sh.Kind switch { ShotKind.Chip => 0.10f + 0.12f * b, ShotKind.Driven => 0.14f + 0.26f * b, ShotKind.Power => 0.16f + 0.30f * b, _ => 0.12f + 0.20f * b };
-        float lift = sh.Kind switch { ShotKind.Chip => 0.10f + 0.12f * b, ShotKind.Driven => 0.14f + 0.30f * b, ShotKind.Power => 0.22f + 0.50f * b, _ => 0.14f + 0.28f * b };
-        float outw = inside && sh.Kind != ShotKind.Chip ? 0.14f + 0.10f * b : 0f;
+        float back = KindEase(3, sh.Kind switch { ShotKind.Chip => 0.10f + 0.12f * b, ShotKind.Driven => 0.14f + 0.26f * b, ShotKind.Power => 0.16f + 0.30f * b, _ => 0.12f + 0.20f * b }, dt);
+        float lift = KindEase(4, sh.Kind switch { ShotKind.Chip => 0.10f + 0.12f * b, ShotKind.Driven => 0.14f + 0.30f * b, ShotKind.Power => 0.22f + 0.50f * b, _ => 0.14f + 0.28f * b }, dt);
+        float outw = KindEase(5, inside && sh.Kind != ShotKind.Chip ? 0.14f + 0.10f * b : 0f, dt);
         Vector3 wind = posXZ + right * (side * (HipW + outw * k)) - fwd * (back * k);
         wind.Y = AnkleH + lift * k;
 
-        float swingT = sh.Kind switch { ShotKind.Driven => 0.12f, ShotKind.Chip => 0.14f, ShotKind.Power => 0.14f, _ => 0.17f };
-        if (!sh.Held && !_shReleased) { _shReleased = true; _shSwingT = Mathf.Clamp(tau, 0.04f, swingT); }
-        float sw = sh.Held && !sh.Made ? 0f : Mathf.Clamp(1f - tau / Math.Max(_shSwingT, 0.04f), 0f, 1f);
-        float draw = Smooth(sh.Elapsed / 0.16f);
-        Vector3 from = posXZ + new Vector3(_shFromRel.X, 0, _shFromRel.Z); from.Y = _shFromRel.Y;
-        Vector3 drawn = from.Lerp(wind, draw);
-
         Vector3 ankle; Vector3 dirUse = fwd;
+        float seqW;
         if (!sh.Made)
         {
-            ankle = drawn.Lerp(c0, sw * sw);
+            // the backswing takes the foot from wherever the stride has it to the wind-up pose by the swing's start, then the swing
+            // brings it through to the contact pose like a pendulum (down first, then forward, accelerating), exactly there on the contact tick
+            seqW = Smooth((len - tauD) / Math.Max(len - swingT, 0.02f)) * _sqGate;
+            float sw = Mathf.Clamp(1f - tauD / swingT, 0f, 1f);
+            float hz = sw * sw, vt = Smooth(sw);
+            ankle = new Vector3(Mathf.Lerp(wind.X, c0.X, hz), Mathf.Lerp(wind.Y, c0.Y, vt), Mathf.Lerp(wind.Z, c0.Z, hz));
             dirUse = fwd.Lerp(fd, sw).Normalized();
+            // the foot's velocity relative to the body, which the follow-through carries on from the contact
+            Vector3 rel = ankle - posXZ;
+            _shVRel = _shRelPrevOk ? (rel - _shRelPrev) / dt : Vector3.Zero;
+            _shRelPrev = rel; _shRelPrevOk = true;
         }
         else
         {
             // the contact tick and the recovery: the foot follows through from where it met the ball, relative to the body
-            if (!_shContactSet) { _shContactSet = true; _shRelC = c0 - posXZ; }
-            var (len, up, across, tf) = sh.Kind switch
+            if (!_shContactSet) { _shContactSet = true; _shRelC = c0 - posXZ; _shPsiC = Mathf.Atan2(fd.Z, fd.X); }
+            var (flen, up, across, tf) = sh.Kind switch
             {
                 ShotKind.Driven => (0.45f, 0.08f, 0f, 0.08f),
                 ShotKind.Chip => (0.26f, 0.26f, 0f, 0.09f),
@@ -1720,26 +1773,35 @@ public partial class PlayerFigure : Node3D
                 ShotKind.LowFinesse => (0.42f, 0.04f, 0.22f, 0.12f),
                 _ => (0.42f + 0.15f * cb, 0.30f + 0.18f * cb, 0f, 0.14f),
             };
-            float x = Mathf.Clamp(s / tf, 0f, 1f), u = 1f - (1f - x) * (1f - x);   // the foot leaves the ball fast and slows as the leg runs out
-            ankle = posXZ + _shRelC + d * (len * k * u) - right * (side * across * k * u);
-            ankle.Y = _shRelC.Y + up * k * u;
-            dirUse = fd;
+            // the foot leaves the ball at the swing's own speed (relative to the body) and slows as the leg runs out: a cubic from the
+            // contact with that velocity to the follow-through's end at rest, over the time that speed gives it (no faster than the kind's)
+            float xd = Mathf.Clamp(s / tf, 0f, 1f);
+            Vector3 dl = d.Lerp(launch, Smooth(xd)).Normalized();
+            Vector3 end = dl * (flen * k) - right * (side * across * k) + Vector3.Up * (up * k);
+            if (!_shTfSet)
+            {
+                _shTfSet = true;
+                float ve = _shVRel.Dot(end.Normalized());
+                _shTf = ve > 0.5f ? Mathf.Clamp(1.5f * end.Length() / ve, 0.05f, 1.5f * tf) : tf;
+                _shV0 = _shVRel * _shTf;
+                if (_shV0.Dot(end.Normalized()) > 1.5f * end.Length()) _shV0 *= 1.5f * end.Length() / _shV0.Dot(end.Normalized());
+            }
+            float x = Mathf.Clamp(s / _shTf, 0f, 1f);
+            ankle = posXZ + _shRelC + _shV0 * (x * x * x - 2f * x * x + x) + end * (3f * x * x - 2f * x * x * x);
+            ankle.Y = Math.Max(ankle.Y, AnkleH);
+            Vector3 fdl = SurfaceDir(sh.Surface, fi, dl);
+            float psi = Mathf.LerpAngle(_shPsiC, Mathf.Atan2(fdl.Z, fdl.X), Smooth(x));
+            dirUse = new Vector3(Mathf.Cos(psi), 0, Mathf.Sin(psi));
+            seqW = 1f - Smooth((s - 0.45f * rec) / (0.55f * rec));
         }
-        _kFoot = fi; _kDir = dirUse; _seq = true; _kAnkle = ankle;
-        _kW = Math.Min(Smooth(sh.Elapsed / 0.10f), 1f - Smooth((s - 0.45f * rec) / (0.55f * rec)));
+        _kFoot = fi; _kDir = dirUse; _kAnkle = ankle;
+        _kW = seqW;
+        _seq = _kW > 0f;
 
-        // the support foot plants beside where the ball will be, as far forward as the leg reaches, for the strike
-        if (!sh.Held && tau < 0.14f && s < 0.12f)
-        {
-            Vector3 pt = new Vector3(centre.X, 0, centre.Z) + right * (-side * 0.22f * k) - fwd * (0.05f * k);
-            Vector3 dv = pt - posXZ;
-            float maxD = hmax + 0.25f;
-            if (dv.Length() > maxD) pt = posXZ + dv.Normalized() * maxD;
-            _pinOn = true; _pinFoot = 1 - fi; _pinTarget = pt;
-        }
+        PlanPlant(f, pos, fwd, right, k, hmax, fi, side, centre, tau, tauD, s, plantLen, swingT);
 
-        // body: leans back a little in the windup (more for power), over the ball for a driven shot, opened toward the target for a finesse
-        float wind01 = Smooth(sh.Elapsed / 0.2f) * (!sh.Made ? 1f : 1f - Smooth(s / 0.06f));
+        // body: over the ball for a driven shot, opened toward the target for a finesse; from the backswing on
+        float wind01 = sh.Made ? 1f - Smooth(s / 0.06f) : seqW;
         float fol = !sh.Made ? 0f : 1f - Smooth((s - 0.05f) / (rec - 0.05f));
         float fwdLean = sh.Kind switch { ShotKind.Driven => 0.26f, ShotKind.Power => 0.18f, ShotKind.Chip => 0.08f, _ => 0.10f };
         _leanExtra = (fwdLean + 0.05f * b) * fol;   // no backward lean here: the shoulders' offset shows the wind-up and the decel lean may already be at its limit
@@ -1748,6 +1810,8 @@ public partial class PlayerFigure : Node3D
         _skShoulderOff = right * (side * 0.12f * k * open * bodyW) - fwd * (0.05f * k * open * bodyW)
             + (sh.Kind == ShotKind.Power ? -fwd * (0.04f * k * b * wind01) : Vector3.Zero);
         _skPelOff = right * (side * 0.04f * k * open * bodyW);
+        // (eased: the follow-through's share starts whole on the contact tick)
+        _shUpper = Mathf.Lerp(_shUpper, Math.Max(0.6f * wind01, fol), 1f - Mathf.Exp(-dt / 0.06f));
     }
 
     // ---------------------------------------------------------------------------------------------------------------

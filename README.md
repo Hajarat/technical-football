@@ -151,9 +151,19 @@ shortens the feet's fore-aft travel, a longer one shortens its stance (more flig
 it landed until its heel rises. On top come the simulation's facing, the acceleration lean, the bank into turns, the head
 looking along the travel and partly at the ball, the arms a little wider in close control, and a foot about to play the ball swings low.
 Touches stay the figure's: its touch pose is the swinging leg's target, so the boot's surface meets the ball on the contact tick as before.
-Standing and idle steps, starts from rest and stops below a walking pace, shots and kicks stay procedural: the procedural pose is
-still solved every tick, the cycles' share of it rises to 1 while stepping above a walking pace with no skill, shot or kick, eased over 0.1 s,
-and the foot pitch is rate-limited, so a hand-over does not pop.
+Standing and idle steps, starts from rest and stops below a walking pace and kicks stay procedural: the procedural pose is
+still solved every tick, the cycles' share of it rises to 1 while stepping above a walking pace with no skill or kick, eased over 0.1 s,
+and the foot pitch is rate-limited, so a hand-over does not pop. A shot runs on the cycles (`PlanShot`, `game/PlayerFigure.Shot.cs`): from the
+press he runs on as he would without it and dribble touches are drawn as touches (the shot's soft touch, which the core makes on the press
+tick, is not drawn: it only keeps the ball rolling with him). The strike sequence is timed backwards from the published contact estimate
+and starts when that comes within its length (0.28 s for a full-power shot, 0.22-0.26 s for the other kinds, times 0.6 + 0.4 x the
+charge): the striking foot is drawn back from wherever the stride has it, swings through like a pendulum and meets the ball with the
+action's surface at its contact point on the contact tick, then follows through relative to the body at the swing's own speed and hands
+back to the cycles. If the estimate moves later before the commit, the sequence eases out from where it was over 0.12 s and starts again.
+The plant is the stride's own stance foot when the stride has the other foot down at the strike (the core's strike that takes the place of
+a touch is on the swinging foot); otherwise (standing, or an at-feet strike on the foot the press chose) that foot steps, from one stride
+step before, to beside the ball and is held where it lands until the body has run on (the hip 0.9 of a leg from it, or 0.1 s after the
+contact). The upper body takes half of the procedural shot lean and shoulder turn over the cycles during the strike.
 
 Skill moves (`--skill-anim clips`, the default) are drawn from hand-authored full-body clips (`game/SkillClipLayer.cs`,
 `src/FootballSim.Anim/SkillClips.cs`, the clips in `game/assets/anim/attacker/skills/`, see `game/assets/anim/SOURCES.md`) for all nine moves
