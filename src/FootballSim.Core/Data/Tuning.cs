@@ -354,6 +354,10 @@ public sealed class TouchTuning
     public float TurnArcMinSpeed { get; set; } = 2.4f;
     /// <summary>The braking arc ends when his travel is within this of the stick, degrees.</summary>
     public float TurnArcDoneDeg { get; set; } = 15f;
+    /// <summary>The braking arc brakes at this, m/s^2.</summary>
+    public float TurnArcBrake { get; set; } = 13.5f;
+    /// <summary>While the braking arc brakes, his body turns at least this fast, deg/s, by dribbling rating.</summary>
+    public RatingRange TurnArcRotation { get; set; } = new(600f, 900f);
     /// <summary>The steering correction changes by at most this, m/s^2 (0: at once), so it never steps the velocity.</summary>
     public float SteerAccel { get; set; } = 6f;
     /// <summary>With an even steps_per_touch, every this-many-th touch takes one step more so the other foot plays on.</summary>

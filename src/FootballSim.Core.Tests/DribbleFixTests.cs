@@ -134,6 +134,79 @@ public class DribbleFixTests
         }
     }
 
+    [Theory]
+    [InlineData(1, 0f)]
+    [InlineData(50, 0f)]
+    [InlineData(99, 0f)]
+    [InlineData(1, 1f)]
+    [InlineData(50, 1f)]
+    [InlineData(99, 1f)]
+    public void ASharpTurnAtARunIsTight(int dribbling, float sprint)
+    {
+        static World Field(ulong seed, int dribbling)
+        {
+            var sheet = TestData.Player("striker_a").Clone();
+            sheet.Dribbling = dribbling;
+            var sc = new Scenario
+            {
+                Id = "field",
+                Pitch = new PitchSpec { Length = 400f, Width = 200f },
+                Ball = new StartSpot { X = 150.5f },
+                Attacker = new StartSpot { X = 150f },
+            };
+            var w = new World(TestData.Tuning(), sc, sheet, TestData.Player("the_wall"), seed);
+            w.Begin();
+            return w;
+        }
+
+        // A jog or sprint with the ball (striker_a at the given dribbling), the stick turned 120, 150 or 180 degrees back and held.
+        // From the touch that hooks the ball round until he runs within 15 degrees of the stick the ball stays within 1.0 m of him
+        // (0.8 m at dribbling 99), and he gets there within 0.9 s of that touch (1.2 s at dribbling 1; the time to reach a ball
+        // already pushed on before the stick turned is the dribble's, not the turn's), at most 2 m off the line he came in on; his
+        // speed never falls below 40% of his entry speed (2.4 m/s at least) nor changes by more than 15 m/s^2 in a tick; he keeps
+        // the ball.
+        float ballMax = dribbling >= 99 ? 0.8f : 1.0f, within = dribbling <= 1 ? 1.2f : 0.9f;
+        foreach (float deg in new[] { 120f, 150f, 180f })
+            for (ulong seed = 1; seed <= 6; seed++)
+            {
+                var w = Field(seed, dribbling);
+                var p = w.Attacker;
+                float dt = w.Tuning.Dt;
+                // (the turn at every point of the touch cadence, by the seed)
+                int pre = 360 + (int)(seed * 13 % 84);
+                for (int i = 0; i < pre; i++) Step(w, Dir(0f) with { Sprint = sprint });
+                Assert.True(p.InPossession);
+                float entry = p.Speed, prev = entry;
+                float floor = MathF.Max(0.4f * entry, 2.4f), vmin = float.MaxValue, hookBall = 0f, lateral = 0f, dspd = 0f;
+                float z0 = p.Position.Z;
+                int aligned = -1, hookAt = -1;
+                bool hooked = false;
+                var stick = new Vector2(MathF.Cos(deg * MathF.PI / 180f), MathF.Sin(deg * MathF.PI / 180f));
+                string label = $"rating {dribbling} {(sprint > 0f ? "sprint" : "jog")} {deg} deg seed {seed}";
+                for (int i = 0; i < 180; i++)
+                {
+                    Step(w, Dir(deg) with { Sprint = sprint });
+                    Assert.True(p.InPossession, $"{label}: the ball lost in the turn");
+                    var v = new Vector2(p.Velocity.X, p.Velocity.Z);
+                    vmin = MathF.Min(vmin, v.Length());
+                    dspd = MathF.Max(dspd, MathF.Abs(v.Length() - prev) / dt);
+                    prev = v.Length();
+                    if (aligned >= 0) continue;
+                    if (!hooked && p.TouchAction is { Made: true, Kind: ActionKind.Turn or ActionKind.Cut } h && h.ContactTick == w.Tick) { hooked = true; hookAt = i; }
+                    if (hooked) hookBall = MathF.Max(hookBall, TouchModel.HorizontalDistance(p.Position, w.Ball.Position));
+                    lateral = MathF.Max(lateral, MathF.Abs(p.Position.Z - z0));
+                    if (v.Length() > 0.3f && Vector2.Dot(v / v.Length(), stick) >= MathF.Cos(15f * MathF.PI / 180f)) aligned = i + 1;
+                }
+                _out.WriteLine($"{label}: entry {entry:F2} vmin {vmin:F2} (floor {floor:F2}) ball {hookBall:F2} lateral {lateral:F2} along the stick {aligned * dt:F2} s after the stick, {(aligned - hookAt) * dt:F2} s after the hook, dspd {dspd:F1}");
+                Assert.True(hooked, $"{label}: no turn or cut touch");
+                Assert.True(hookBall <= ballMax, $"{label}: the ball {hookBall:F2} m from him in the turn");
+                Assert.True(aligned > 0 && (aligned - hookAt) * dt <= within + 1e-4f, $"{label}: along the stick {(aligned - hookAt) * dt:F2} s after the hook");
+                Assert.True(lateral <= 2f, $"{label}: {lateral:F2} m off his line");
+                Assert.True(vmin >= floor - 0.01f, $"{label}: down to {vmin:F2} m/s from {entry:F2}");
+                Assert.True(dspd <= 15f, $"{label}: speed changed at {dspd:F1} m/s^2");
+            }
+    }
+
     /// <summary>
     /// The play-test penalty rounds kept under TestData/playtest (the first session, and every round of the three recorded
     /// 2026-11-19 sessions), replayed with the current code (they play out differently from the recording): every committed

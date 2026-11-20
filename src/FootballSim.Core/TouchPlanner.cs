@@ -279,7 +279,7 @@ public static class TouchPlanner
         // The stick reversed with the ball at the feet: the sole turns it at once (a drag-back onto the stick's line); at a run,
         // a braking arc instead.
         if (live && FeetTurn(p, intent, ball, tick, now, t, pitch)) return SkillTick(p, ball, tick, t, pitch, out legs);
-        TurnArc(p, intent, live && !Stunned(p, now) && p.ShotAction == null, t);
+        TurnArc(p, intent, ball, live && !Stunned(p, now) && p.ShotAction == null, t);
 
         Vector2 steer;
         float along = 0f;
@@ -425,15 +425,30 @@ public static class TouchPlanner
     /// turn_arc_keep of the speed he has then (never below turn_arc_min_speed). He runs on to the ball, and from the touch that
     /// turns it round (see <see cref="Execute"/>) brakes to that speed within the deceleration budget and keeps it while he comes
     /// round with the ball, until he faces within turn_arc_done_deg of the stick (see <see cref="Movement"/>); the stick
-    /// released, a skill move, a shot or the ball lost ends it. Then he speeds up along the stick as usual.
+    /// released, a skill move, a shot, the ball lost or a ball he goes after running away faster than the arc's speed ends it.
+    /// Then he speeds up along the stick as usual.
     /// </summary>
-    static void TurnArc(PlayerState p, in TickIntent intent, bool live, Tuning t)
+    static void TurnArc(PlayerState p, in TickIntent intent, Ball ball, bool live, Tuning t)
     {
         var k = t.Touch;
         Vector2 stick = intent.Move;
         float mag = stick.Length();
         if (!live || p.TurnArcSpeed > 0f && mag < k.StickThreshold) { p.TurnArcSpeed = 0f; p.TurnArcBraking = false; return; }
-        if (p.TurnArcSpeed > 0f) { p.TurnArcStick = stick / mag; return; }
+        if (p.TurnArcSpeed > 0f)
+        {
+            p.TurnArcStick = stick / mag;
+            // Braking, he never lets the ball get away from him: a ball he goes after that runs away faster than the arc's speed
+            // ends it, and he speeds up after it.
+            var rel = new Vector2(ball.Position.X - p.Position.X, ball.Position.Z - p.Position.Z);
+            float d = rel.Length();
+            if (p.TurnArcBraking && p.Chasing && d > 1e-3f && Vector2.Dot(new Vector2(ball.Velocity.X, ball.Velocity.Z), rel / d) > p.TurnArcSpeed)
+            {
+                p.TurnArcSpeed = 0f;
+                p.TurnArcBraking = false;
+                p.TurnArcRelease = true;
+            }
+            return;
+        }
         if (mag < k.StickThreshold || p.RunSpeed <= k.FeetTurnMaxSpeed) return;
         var v = new Vector2(p.Velocity.X, p.Velocity.Z);
         float speed = v.Length();
@@ -1517,7 +1532,13 @@ public static class TouchPlanner
                 int ticks = hasMeet ? meet.J : Ticks(0.6f, t);
                 float u = SolveLiftedPush(p, ball, target, ticks, kind, mode, minPush, MathF.Max(k.MaxPush, minPush), t, out var dir,
                     out _, out float lift);
-                if (!immediate) dir = ClampToCommit(a, dir);
+                // (A braking arc's hook goes where he comes round, which a surface turned 30 degrees off the stick cannot always
+                // reach; the arc's quick turn of the body opens it.)
+                if (!immediate && !(reversal && hasMeet && p.TurnArcBraking)) dir = ClampToCommit(a, dir);
+                // A touch committed along his run before the stick turned back (a braking arc armed since, not yet braking):
+                // its surface plays the ball on no faster than he runs that way, so the next swing turns it instead of chasing it.
+                if (!first && !immediate && p.TurnArcSpeed > 0f && kind is not (ActionKind.Turn or ActionKind.Cut))
+                    u = MathF.Min(u, MathF.Max(0f, Vector3.Dot(TouchModel.Flat(p.Velocity), dir)));
                 // Never a push he cannot catch: the speed error is drawn on the bounded push, so the bound has room for it.
                 if (u > p.RunSpeed + 1f) u = MathF.Min(u, CatchablePush(p, ball, dir, lift, t) / (1f + 2f * sigmaS));
                 v = Launch(dir, u, lift, errDeg) * Rated(rng, 1f, sigmaS);

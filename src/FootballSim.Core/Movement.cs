@@ -109,12 +109,19 @@ public static class Movement
         // easing off no faster than the deceleration budget.
         if (law) speed = MathF.Max(speed + (target - speed) / tau * dt, speed0 - budget);
         else speed = assist.RunSpeed;
+        // Out of a braking arc he speeds up no faster than it braked him, until the speed law asks for less.
+        if (p.TurnArcRelease)
+        {
+            float up = speed0 + t.Touch.TurnArcBrake * dt;
+            if (law && speed > up) speed = up;
+            else p.TurnArcRelease = false;
+        }
         // The stun after a strike brings the running speed down to its cap, no faster than the deceleration budget (the strike
         // plants the shooter without a step in his speed); so does a braking arc (a sharp turn with the ball at a run) to its speed.
         speed = MathF.Min(speed, MathF.Max(assist.HardCap, speed0 - budget));
         // (The arc's braking is the turn's balance loss: no other is taken while it lasts.)
         bool arc = p.TurnArcBraking && p.TurnArcSpeed > 0f;
-        if (arc) { speed = MathF.Min(speed, MathF.Max(p.TurnArcSpeed, speed0 - budget)); p.SpeedDebt = 0f; }
+        if (arc) { speed = MathF.Min(speed, MathF.Max(p.TurnArcSpeed, speed0 - t.Touch.TurnArcBrake * dt)); p.SpeedDebt = 0f; }
 
         float facing = p.Facing;
         // A spin sets the facing itself.
@@ -132,6 +139,7 @@ public static class Movement
             }
             float rate = TurnRateDeg(p.Sheet, t) * assist.TurnScale * (1f - m.TurnSpeedPenalty * Math.Clamp(speed / top, 0f, 1f)) * MathF.PI / 180f;
             if (now < p.PostTurnUntil) rate = MathF.Max(rate, m.PostTurnRotationRate * MathF.PI / 180f);
+            if (arc) rate = MathF.Max(rate, t.Touch.TurnArcRotation.ForRating(p.Sheet.Dribbling) * MathF.PI / 180f);
             float maxTurn = rate * dt;
             // A small heading change eases in (time constant turn_ease) instead of snapping round at the full rate; a large
             // turn runs at the turn rate until it is within rate * turn_ease of the stick.
@@ -212,7 +220,7 @@ public static class Movement
         if (p.TurnArcSpeed > 0f && (offStick <= t.Touch.TurnArcDoneDeg || arc && offStick <= 45f && offLegs <= t.Touch.TurnArcDoneDeg))
         {
             // (the turn it made is paid for: no sharp-turn loss for it after the arc either)
-            if (p.TurnArcBraking) { p.SpeedDebt = 0f; p.TurnRefHeading = facing; p.TurnRefTime = now; }
+            if (p.TurnArcBraking) { p.SpeedDebt = 0f; p.TurnRefHeading = facing; p.TurnRefTime = now; p.TurnArcRelease = true; }
             p.TurnArcSpeed = 0f;
             p.TurnArcBraking = false;
         }

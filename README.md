@@ -135,11 +135,14 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
 - Reversals (the stick at least `feet_turn_deg`, 120 degrees, from the ball's travel): up to `feet_turn_max_speed` (3 m/s),
   with the ball within `feet_turn_reach` of the body the sole turns it at once (the drag-back's motion with its own `feet_turn_*` timing, pulled onto the stick's line; no chain, exit burst or
   gesture) while the body comes round onto the stick at the post-turn rate, the player moved by his run alone, slowing within
-  `balance_deceleration`. Faster, the stick that far from his travel arms a braking arc: he runs on to the ball, and from the
-  turn or cut touch that hooks it onto the stick's line (slowly enough to meet his predicted path) he brakes within
-  `balance_deceleration` to `turn_arc_keep` (40%) of the speed he had when the stick turned, never below `turn_arc_min_speed`
-  (2.4 m/s), and holds that speed (no other balance loss) while he comes round, until he faces within `turn_arc_done_deg` (15
-  degrees) of the stick (or, within 45 degrees of it, of the ball's line); then he speeds up along the stick as usual.
+  `balance_deceleration`. Faster, the stick that far from his travel arms a braking arc: he runs on to the ball (a touch
+  already committed along his run plays it on no faster than he runs), and from the turn or cut touch that hooks it toward
+  where his predicted path comes round (slowly enough to meet it there) he brakes at `turn_arc_brake` (13.5 m/s^2) to
+  `turn_arc_keep` (40%) of the speed he had when the stick turned, never below `turn_arc_min_speed` (2.4 m/s), and holds that
+  speed (no other balance loss) while his body comes round at `turn_arc_rotation` (600 deg/s at dribbling 1 to 900 at 99) or
+  faster, until he faces within `turn_arc_done_deg` (15 degrees) of the stick (or, within 45 degrees of it, of the ball's
+  line), or the ball he goes after runs away from him faster than that speed; then he speeds up along the stick, at first no
+  faster than `turn_arc_brake`.
 - Skill gestures in possession wait up to `skill.meet_wait_seconds` (1.5 s) on the controller's forecast, which treats them as
   a demand and commits no touch meanwhile; the move starts once the ball is in its radius. A move's own step eases in, and
   after it the controller eases it out (the drag-back's step itself rises and falls to rest).
