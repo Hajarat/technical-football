@@ -130,7 +130,8 @@ public sealed class SkillClipLibrary
     /// <summary>
     /// The standing and the running variant of <paramref name="move"/> played with <paramref name="foot"/> (0 left) toward
     /// <paramref name="side"/> (-1 left, +1 right, 0 none; a clip whose side is "none" fits any), or null when the library has none.
-    /// A move with only one entry gives it for both.
+    /// A move with only one entry gives it for both. The fake cut's two hooks share the move and are told apart by side: the inside
+    /// hook (fake_cut) cuts away from the playing foot's side, the outside hook (fake_cut_out) toward it.
     /// </summary>
     public (SkillClip Stand, SkillClip Run)? Pair(string move, int foot, int side)
     {
