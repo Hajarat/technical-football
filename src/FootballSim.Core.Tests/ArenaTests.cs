@@ -301,6 +301,125 @@ public class ArenaTests
         Assert.True(took <= (shoot ? 1.2f : 1.0f), $"{label}: {(shoot ? "no strike" : "the ball still at the wall")} {took:F2} s after the stick turned");
     }
 
+    public static IEnumerable<object[]> SkillMovesAtTheBoards() => new (string, int)[]
+    {
+        ("step_over", 1), ("step_over", -1), ("body_feint", 1), ("body_feint", -1), ("ball_roll", 1), ("ball_roll", -1),
+        ("drag_back", 0), ("fake_stop", 0), ("fake_cut", 1), ("fake_cut", -1), ("elastico", 1), ("elastico", -1),
+        ("heel_to_heel", 0), ("spin", 1), ("spin", -1),
+    }.Select(m => new object[] { m.Item1, m.Item2 });
+
+    /// <summary>
+    /// A skill move started by the boards plays the ball along them, never into them: the ball is not sent up off a board, he
+    /// keeps it, and the boards never stop him in one tick. Each move (both sides) at a jog and a sprint, its gesture made with the
+    /// ball 0.3, 0.6 or 1.0 m off the board: running straight at the back wall, a side wall and a rounded back corner, and running
+    /// along a side wall (the board on his left and on his right). From the gesture until 0.5 s after the move ends: the ball
+    /// stays below 0.6 m, he keeps the ball, and his speed never falls by more than 2 m/s in a tick (the drag-back 2.6: its sole's
+    /// reach steps his speed by up to 2.3 m/s in the open too).
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(SkillMovesAtTheBoards))]
+    public void ASkillMoveAtTheBoardsKeepsTheBallOffThem(string move, int side)
+    {
+        var corner = new Vector2(P.CornerRadius, -(P.HalfWidth - P.CornerRadius));
+        var cornerIn = Vector2.Normalize(new Vector2(1f, 1f));
+        var into = new (string Name, Vector2 Spot, Vector2 In)[]
+        {
+            ("back wall", new Vector2(0f, 0f), new Vector2(1f, 0f)),
+            ("side wall", new Vector2(16f, -P.HalfWidth), new Vector2(0f, 1f)),
+            ("back corner", corner - cornerIn * P.CornerRadius, cornerIn),
+        };
+        foreach (float sprint in new[] { 0f, 1f })
+            foreach (float d in new[] { 0.3f, 0.6f, 1.0f })
+            {
+                foreach (var (name, spot, inward) in into)
+                    MoveAtTheBoard($"{move} {side} into the {name}, {(sprint > 0f ? "sprint" : "jog")}, {d} m", move, side, sprint, d,
+                        spot + inward * 6f, -inward, along: false);
+                foreach (float s in new[] { -1f, 1f })
+                    MoveAtTheBoard($"{move} {side} along the {(s < 0f ? "near" : "far")} side wall, {(sprint > 0f ? "sprint" : "jog")}, {d} m", move, side, sprint, d,
+                        new Vector2(6.5f, s * (P.HalfWidth - d - R)), new Vector2(1f, 0f), along: true);
+            }
+    }
+
+    static Vector2 Turned(Vector2 v, Vector2 head) => new(v.X * head.X - v.Y * head.Y, v.X * head.Y + v.Y * head.X);
+
+    /// <summary>The move's stick trace on tick <paramref name="i"/> from its start, for a player running along +X (his right +Z).</summary>
+    static void MoveTrace(ref TickIntent it, string move, int i, int side)
+    {
+        var ahead = new Vector2(1f, 0f);
+        var sideV = new Vector2(0f, side);
+        Vector2 right = Vector2.Zero;
+        switch (move)
+        {
+            case "step_over": right = i < 6 ? ahead : i < 12 ? sideV : Vector2.Zero; break;
+            case "body_feint": right = i < 6 ? sideV : Vector2.Zero; break;
+            case "ball_roll": right = i < 20 ? sideV : Vector2.Zero; break;
+            case "elastico": right = i < 6 ? -ahead : i < 12 ? sideV : Vector2.Zero; break;
+            case "heel_to_heel": right = i < 5 ? ahead : i is >= 9 and < 14 ? -ahead : Vector2.Zero; break;
+            case "spin": right = i < 5 ? ahead : i is >= 9 and < 13 ? sideV : Vector2.Zero; break;
+            case "drag_back":
+                if (i < 8) { it.MoveX = -1f; it.MoveZ = 0f; it.Finesse = it.Chip = true; }
+                break;
+            case "fake_stop": it.MoveX = it.MoveZ = 0f; it.ShootHeld = i < 15; it.Cancel = i is >= 6 and < 10; break;
+            case "fake_cut":
+                if (i >= 1) { float a = side * MathF.PI / 3f; it.MoveX = MathF.Cos(a); it.MoveZ = MathF.Sin(a); }
+                it.ShootHeld = i < 15; it.Cancel = i is >= 6 and < 10;
+                break;
+        }
+        it.RightX = right.X; it.RightZ = right.Y;
+    }
+
+    static void MoveAtTheBoard(string label, string move, int side, float sprint, float d, Vector2 start, Vector2 head, bool along)
+    {
+        var sc = TestData.Scenario("penalty");
+        // (Along a side wall in a longer arena, so a sprint has room to get going before the move and to run on after it.)
+        if (along) sc.Pitch = new PitchSpec { Length = 60f, Width = sc.Pitch.Width };
+        sc.Attacker = new StartSpot { X = start.X, Z = start.Y, FacingDeg = MathF.Atan2(head.Y, head.X) * 180f / MathF.PI };
+        sc.Ball = new StartSpot { X = start.X + head.X * 0.6f, Z = start.Y + head.Y * 0.6f };
+        sc.ClockLimit = 60f;
+        sc.KeeperHoldLineThroughDribble = true;
+        var w = new World(new Tuning(), sc, TestData.Player("striker_a"), TestData.Player("the_wall"), 7);
+        w.Begin();
+        var p = w.Attacker;
+        var buf = new TickIntent[w.PlayerCount];
+        float BallGap() => w.Pitch.BoardGap(new Vector2(w.Ball.Position.X, w.Ball.Position.Z)) - R;
+        int g0 = -1, end = -1;
+        bool gained = false, started = false;
+        float prev = 0f;
+        for (int tick = 1; tick <= 1200 && w.IsSimulating; tick++)
+        {
+            if (g0 < 0 && gained && (along ? tick >= (sprint > 0f ? 264 : 180) : BallGap() <= d)) g0 = tick;
+            var it = new TickIntent { MoveX = head.X, MoveZ = head.Y, Sprint = sprint };
+            if (g0 > 0 && tick - g0 < 20)
+            {
+                var local = it with { MoveX = 1f, MoveZ = 0f };
+                MoveTrace(ref local, move, tick - g0, side);
+                var l = Turned(new Vector2(local.MoveX, local.MoveZ), head);
+                var r = Turned(new Vector2(local.RightX, local.RightZ), head);
+                it = local with { MoveX = l.X, MoveZ = l.Y, RightX = r.X, RightZ = r.Y };
+            }
+            buf[0] = it;
+            w.Step(buf);
+            foreach (var e in w.Events)
+            {
+                if (e.Team != 0) continue;
+                if (e.Kind == EventKind.PossessionGained) gained = true;
+                Assert.False(g0 > 0 && e.Kind == EventKind.PossessionLost, $"{label}: lost the ball at tick {w.Tick}");
+            }
+            if (g0 > 0 && p.SkillAction != null && !started) { started = true; end = p.SkillAction.EndTick; }
+            if (g0 > 0)
+            {
+                Assert.True(w.Ball.Position.Y < 0.6f, $"{label}: the ball went up to {w.Ball.Position.Y:F2} m at tick {w.Tick}");
+                float limit = move == "drag_back" ? 2.6f : 2f;
+                Assert.True(prev - p.Speed <= limit, $"{label}: speed {prev:F2} -> {p.Speed:F2} in one tick at tick {w.Tick}");
+                if (tick >= (end > 0 ? end + 60 : g0 + 180)) break;
+            }
+            prev = p.Speed;
+        }
+        Assert.True(g0 > 0, $"{label}: never had the ball by the board");
+        Assert.True(started, $"{label}: no move");
+        Assert.True(p.InPossession, $"{label}: lost the ball");
+    }
+
     [Fact]
     public void PlayersStayInsideTheOutlineAndStopAtTheEndWall()
     {

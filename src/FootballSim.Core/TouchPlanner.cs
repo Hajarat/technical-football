@@ -271,14 +271,14 @@ public static class TouchPlanner
         if (p.SkillAction is { } skill)
         {
             p.TurnArcSpeed = 0f; p.TurnArcBraking = false;
-            if (tick < skill.EndTick) return SkillTick(p, ball, tick, t, out legs);
+            if (tick < skill.EndTick) return SkillTick(p, ball, tick, t, pitch, out legs);
             SkillMoves.Finish(p, intent, ball, tick, now, t);
             UpdatePhases(p, tick, t);
         }
 
         // The stick reversed with the ball at the feet: the sole turns it at once (a drag-back onto the stick's line); at a run,
         // a braking arc instead.
-        if (live && FeetTurn(p, intent, ball, tick, now, t, pitch)) return SkillTick(p, ball, tick, t, out legs);
+        if (live && FeetTurn(p, intent, ball, tick, now, t, pitch)) return SkillTick(p, ball, tick, t, pitch, out legs);
         TurnArc(p, intent, live && !Stunned(p, now) && p.ShotAction == null, t);
 
         Vector2 steer;
@@ -322,7 +322,7 @@ public static class TouchPlanner
     /// far as needed for the ground speed to change no faster than that either. That step is kept as
     /// <see cref="PlayerState.SteerCarry"/>, so after the turn it eases out from there.
     /// </summary>
-    static MoveAssist SkillTick(PlayerState p, Ball ball, int tick, Tuning t, out TickIntent legs)
+    static MoveAssist SkillTick(PlayerState p, Ball ball, int tick, Tuning t, Pitch? pitch, out TickIntent legs)
     {
         var m = SkillMoves.BeginTick(p, ball, tick, t, out legs);
         p.Chasing = false;
@@ -332,8 +332,8 @@ public static class TouchPlanner
         if (p.SkillAction is { Kind: ActionKind.Spin } spin && tick >= spin.ContactTick)
         {
             p.PlannerSteer = Vector2.Zero;
-            p.SteerCarry = m.Carry;
-            return m;
+            p.SteerCarry = StepOffBoards(p, m.Carry, pitch, t);
+            return m with { Carry = p.SteerCarry };
         }
         Vector2 from = p.PlannerSteer + p.SteerCarry;
         // A turn at the feet moves the player by his run alone, the body coming round onto the stick (no step against the run
@@ -350,6 +350,7 @@ public static class TouchPlanner
             // the carry, which the controller eases out from there once the move ends.
             // (A drag-back's step is shaped to rise from and fall to rest itself.)
             if (p.SkillAction.Kind == ActionKind.DragBack) steer = m.Steer;
+            steer = StepOffBoards(p, steer, pitch, t);
             p.SteerCarry = steer;
             return m with { Steer = Vector2.Zero, Carry = steer };
         }
@@ -370,9 +371,19 @@ public static class TouchPlanner
             }
             steer = from + (steer - from) * lo;
         }
+        steer = StepOffBoards(p, steer, pitch, t);
         p.SteerCarry = steer;
         return m with { Steer = Vector2.Zero, Carry = steer, RunSpeed = run };
     }
+
+    /// <summary>
+    /// A move's step with its part into a board he is near cut as his run is at the boards (see Movement.Step): to what he can
+    /// shed at balance_deceleration before he reaches it and still arrive at wall_arrive_speed, so a step into a board slows
+    /// as he nears it instead of the board stopping him in one tick.
+    /// </summary>
+    static Vector2 StepOffBoards(PlayerState p, Vector2 step, Pitch? pitch, Tuning t) =>
+        pitch == null || step == Vector2.Zero ? step
+            : pitch.WallStepCap(new Vector2(p.Position.X, p.Position.Z) + step * t.Dt, step, t.Movement.WallArriveSpeed, t.Movement.BalanceDeceleration);
 
     /// <summary>The moves whose run and step <see cref="SkillTick"/> keeps within the deceleration budget.</summary>
     static bool Smoothed(BallAction? a) =>
