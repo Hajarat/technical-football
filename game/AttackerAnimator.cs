@@ -253,7 +253,7 @@ public partial class PlayerFigure
     /// <summary>--skill-anim: "clips" (a move with authored clips is drawn from them; needs mocap mode) or "procedural" (<see cref="PlanSkill"/> draws every move).</summary>
     public string SkillAnimMode { get; set; } = "clips";
     /// <summary>--shot-anim: "mocap" (a struck shot is drawn from the motion-captured kicks over the figure's pose; needs mocap mode) or "procedural" (<see cref="PlanShot"/> draws it).</summary>
-    public string ShotAnimMode { get; set; } = "procedural";
+    public string ShotAnimMode { get; set; } = "mocap";
     /// <summary>A skill move starts being drawn (see <see cref="SkillClipLayer.Started"/>; only with --attacker-anim mocap).</summary>
     public event Action<SkillStart>? SkillStarted;
     // this tick's touch weights and planted feet, for the skill layer

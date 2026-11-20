@@ -48,7 +48,7 @@ public sealed class ToolArgs
     /// <summary>--skill-anim clips|procedural: the attacker's skill moves from the authored full-body clips (the default; needs --attacker-anim mocap; see SkillClipLayer) or drawn procedurally (the fallback, and for moves without clips).</summary>
     public string SkillAnim = "clips";
     /// <summary>--shot-anim mocap|procedural: the attacker's struck shot from the motion-captured kicks (needs --attacker-anim mocap; see ShotClipLayer) or drawn procedurally (PlanShot, the default).</summary>
-    public string ShotAnim = "procedural";
+    public string ShotAnim = "mocap";
     /// <summary>--keeper-anim-log: print a KEEPER_MM line at every mocap switch (clip, frame, playback rate).</summary>
     public bool KeeperAnimLog;
     /// <summary>--keeper-anim-drop-set a,b: the pose database leaves these clip sets empty (the procedural fallback's check).</summary>
@@ -121,7 +121,7 @@ public sealed class ToolArgs
                     break;
                 case "--shot-anim":
                     a.ShotAnim = (Next() ?? "").ToLowerInvariant();
-                    if (a.ShotAnim != "procedural" && a.ShotAnim != "mocap") { GD.PushWarning($"--shot-anim expects mocap or procedural, got '{a.ShotAnim}'; using procedural"); a.ShotAnim = "procedural"; }
+                    if (a.ShotAnim != "procedural" && a.ShotAnim != "mocap") { GD.PushWarning($"--shot-anim expects mocap or procedural, got '{a.ShotAnim}'; using mocap"); a.ShotAnim = "mocap"; }
                     break;
                 case "--keeper-anim-drop-set":
                     a.KeeperAnimDropSets.AddRange((Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));

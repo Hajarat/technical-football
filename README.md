@@ -36,7 +36,7 @@ player apart, in `wall`, not as steps); a pooled summary follows the table. `--d
 | Keeper gallery: every keeper state and dive kind from a script (both sides, side and front views), no simulation; the keeper is animated from motion clips by default, `--keeper-anim procedural` shows the hand-built poses | `game/tests/run-bg.sh -- --keeper-gallery out/keeper-gallery` |
 | A replay with the attacker's running body from the procedural run cycle instead of the motion-captured stride cycles, the default (see "Character models"); measurements as below | `godot-mono --headless --path game -- --replay tests/dribble_replay.json --quit-after-round --attacker-anim procedural` |
 | A replay with the skill moves drawn procedurally instead of from the authored full-body clips, the default (see "Character models"); measurements as below | `godot-mono --headless --path game -- --replay tests/dribble_replay.json --quit-after-round --skill-anim procedural` |
-| A replay with the struck shot drawn from the motion-captured kicks instead of procedurally (the default; see "Character models"); measurements as below | `godot-mono --headless --path game -- --replay tests/smoke_replay.json --quit-after-round --shot-anim mocap` |
+| A replay with the struck shot drawn procedurally instead of from the motion-captured kicks, the default (see "Character models"); measurements as below | `godot-mono --headless --path game -- --replay tests/smoke_replay.json --quit-after-round --shot-anim procedural` |
 | Regenerate the attacker's shot clips from the retargeted kicks | `uv run --with numpy python3 tools/anim/shots.py` |
 | The authored skill clips' gallery (each clip with its authored ball, side, front and game-camera views, a sheet every 0.05 s, a per-tick strip around the contact; `--video` adds MP4 frames) | `game/tests/run-bg.sh -- --clip-gallery ../out/skills --clip-folder res://assets/anim/attacker/skills --clip-model res://assets/characters/player.glb --video` then `uv run --with imageio-ffmpeg python3 tools/anim/encode_video.py out/skills` |
 | Regenerate the attacker's stride cycles (after `retarget.py` has written the attacker clips) and their gallery sheets | `uv run --with numpy python3 tools/anim/cycles.py` then `game/tests/run-bg.sh -- --clip-gallery ../out/cycles --clip-folder res://assets/anim/attacker/cycles --clip-model res://assets/characters/player.glb` |
@@ -199,7 +199,7 @@ a touch is on the swinging foot); otherwise (standing, or an at-feet strike on t
 step before, to beside the ball and is held where it lands until the body has run on (the hip 0.9 of a leg from it, or 0.1 s after the
 contact). The upper body takes half of the procedural shot lean and shoulder turn over the cycles during the strike.
 
-With `--shot-anim mocap` (in `--attacker-anim mocap` only) the struck shot is drawn from motion capture instead (`game/ShotClipLayer.cs`, the
+By default (`--shot-anim mocap`, in `--attacker-anim mocap` only; `--shot-anim procedural` keeps the computed shot above) the struck shot is drawn from motion capture instead (`game/ShotClipLayer.cs`, the
 clips in `game/assets/anim/attacker/shots/` cut by `tools/anim/shots.py`, see `game/assets/anim/SOURCES.md`): a CMU kick from a jog and one
 from standing, for either foot, blended by his speed at the press (all standing below 1.2 m/s, all running from 3 m/s; a power or driven
 shot keeps at least 0.4 of the running kick's longer swing) on one timeline through the clips' events (`start`, `takeoff`, `backswing`,
