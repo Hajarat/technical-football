@@ -1129,6 +1129,14 @@ public sealed class SkillTuning
     public float ElasticoSeconds { get; set; } = 0.26f;
     public float ElasticoForwardSpeed { get; set; } = 2.0f;
     /// <summary>
+    /// How much of the run version of the elastico a move entered at this running speed takes, m/s to 0..1: at a run the running
+    /// speed eases from the entry pace no faster than elastico_run_brake to elastico_run_keep of it instead of down to
+    /// elastico_forward_speed.
+    /// </summary>
+    public Curve ElasticoRunBlend { get; set; } = new((1f, 0f), (2.5f, 1f));
+    public float ElasticoRunKeep { get; set; } = 0.8f;
+    public float ElasticoRunBrake { get; set; } = 6f;
+    /// <summary>
     /// Spin: the reach (at most, seconds); from the first sole's landing the move's length, the second sole's contact and the
     /// first sole's lift (seconds after the landing); the player's displacement forward and toward the side from where the ball
     /// was first taken, metres; the running speed eased down to at most spin_forward_speed; the ball kept within

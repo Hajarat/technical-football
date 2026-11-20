@@ -402,7 +402,7 @@ public class SkillMoveTests
 
     public static IEnumerable<object[]> FlowingMoves()
     {
-        foreach (string move in new[] { "step_over", "body_feint" })
+        foreach (string move in new[] { "step_over", "body_feint", "elastico" })
         foreach (var e in new[] { Entry.Jog, Entry.Sprint })
         foreach (int side in new[] { -1, 1 })
             yield return new object[] { move, e, side };
@@ -411,6 +411,8 @@ public class SkillMoveTests
     /// <summary>The share of his entry pace a flowing move keeps at least: the step-over and body feint 85% at a jog (4 m/s) to 75% at a sprint (7.5 m/s).</summary>
     static float Keep(string move, float entry) => move switch
     {
+        "elastico" => 0.7f,
+        "spin" => 0.6f,
         _ => 0.85f - 0.10f * Math.Clamp((entry - 4f) / 3.5f, 0f, 1f),
     };
 
@@ -472,11 +474,19 @@ public class SkillMoveTests
             Assert.True(minSpeed >= keep, $"{at}: ground speed fell to {minSpeed:F2} of the entry {a.SkillEntry:F2} m/s");
             if (move is "step_over" or "body_feint")
                 Assert.True(maxBrake <= t.Skill.StepOverRunBrake + 0.01f, $"{at}: braked at {maxBrake:F1} m/s^2");
-            Assert.InRange(along, 0.35f, 0.6f);
-            Assert.True(perp <= 0.25f, $"{at}: ball {perp:F2} m to the side of his travel");
+            if (move is "step_over" or "body_feint")
+            {
+                Assert.InRange(along, 0.35f, 0.6f);
+                Assert.True(perp <= 0.25f, $"{at}: ball {perp:F2} m to the side of his travel");
+                Assert.True(onStickAt >= 0 && (onStickAt - (a.EndTick - 1)) * t.Dt <= 0.25f + 1e-4f, $"{at}: on the stick at tick {onStickAt}, end {a.EndTick}");
+            }
+            else
+            {
+                // The elastico's inside plays the ball across in front of him toward its side (its exit touch): ahead of him.
+                Assert.True(along > 0f, $"{at}: the ball {along:F2} m ahead of him");
+            }
             Assert.True(ballSpeed >= speed, $"{at}: ball {ballSpeed:F2} m/s, player {speed:F2} m/s");
             Assert.True(backAt >= 0 && (backAt - (a.EndTick - 1)) * t.Dt <= 0.25f + 1e-4f, $"{at}: back to {keep} of the entry at tick {backAt}, end {a.EndTick}");
-            Assert.True(onStickAt >= 0 && (onStickAt - (a.EndTick - 1)) * t.Dt <= 0.25f + 1e-4f, $"{at}: on the stick at tick {onStickAt}, end {a.EndTick}");
             Assert.False(lost, $"{at}: lost the ball");
             Assert.True(p.InPossession, $"{at}: not in possession");
         }
@@ -842,6 +852,15 @@ public class SkillMoveTests
                 {
                     // He keeps his speed.
                     Assert.InRange(s.Run, tr.Entry - 0.2f, tr.Entry + 0.2f);
+                    continue;
+                }
+                if (move == "elastico" && e != Entry.Standing)
+                {
+                    // At a run the elastico's run eases from the entry pace no faster than elastico_run_brake to
+                    // elastico_run_keep of it (from the start, the reach included): never below 70% of the entry.
+                    float keep = t.Skill.ElasticoRunKeep * tr.Entry;
+                    Assert.InRange(s.Run, MathF.Max(keep, tr.Entry - t.Skill.ElasticoRunBrake * t.Dt * (tick - m.StartTick + 1)) - 0.05f, tr.Entry + 0.05f);
+                    Assert.True(s.Run >= 0.7f * tr.Entry, $"{move} {e} tick +{tick - m.StartTick}: run {s.Run:F2} from {tr.Entry:F2}");
                     continue;
                 }
                 // The elastico's and spin's run eases down to 2.0 m/s no faster than balance_deceleration (from the start, the

@@ -502,12 +502,17 @@ public static class SkillMoves
                 break;
             case ActionKind.Elastico:
             {
-                // The run eases down to elastico_forward_speed as in the ball roll; over the snap's half of the move the player
-                // starts driving toward the exit side, so he comes out of it going that way.
+                // The run eases down to elastico_forward_speed (at a run only to elastico_run_keep of the entry, see
+                // ElasticoRun); over the snap's half of the move the player starts driving toward the exit side, so he comes out
+                // of it going that way.
                 float hold = MathF.Min(entry, cap);
                 run = MathF.Min(hold, MathF.Max(MathF.Min(hold, k.ElasticoForwardSpeed), p.RunSpeed - t.Movement.BalanceDeceleration * t.Dt));
+                float share = ElasticoRunShare(entry, t);
+                run += (ElasticoRun(a, tick, t) - run) * share;
+                // (At a run he keeps most of his pace along the run and drives less hard toward the side: the ball played across
+                // in front of him then stays ahead of him and he runs onto it.)
                 float r = u1 <= 0.5f ? 0f : (u1 - 0.5f) / 0.5f;
-                steer = SideOf(a) * (ElasticoExitSideSpeed * r * r * (3f - 2f * r));
+                steer = SideOf(a) * (ElasticoExitSideSpeed * (1f - (1f - ElasticoRunExitSide) * share) * r * r * (3f - 2f * r));
                 break;
             }
             case ActionKind.Spin:
@@ -713,9 +718,15 @@ public static class SkillMoves
         float eased = EasedForwardSpeed(a.Kind, t);
         bool roll = float.IsFinite(eased), ballRoll = a.Kind == ActionKind.BallRoll;
         float floor = MathF.Min(hold, eased), budget = t.Movement.BalanceDeceleration * t.Dt;
+        float elastico = a.Kind == ActionKind.Elastico ? ElasticoRunShare(a.SkillEntry, t) : 0f;
+        float Eased(float r, int tk)
+        {
+            float e = MathF.Min(hold, MathF.Max(floor, r - budget));
+            return elastico > 0f ? e + (ElasticoRun(a, tk, t) - e) * elastico : e;
+        }
         int at = tick;
-        float Next(float r) => ballRoll ? RollRun(a, ++at, t) : roll ? MathF.Min(hold, MathF.Max(floor, r - budget)) : hold;
-        float run = ballRoll ? RollRun(a, tick, t) : Next(MathF.Min(hold, p.RunSpeed));
+        float Next(float r) => ballRoll ? RollRun(a, ++at, t) : roll ? Eased(r, ++at) : hold;
+        float run = ballRoll ? RollRun(a, tick, t) : roll ? Eased(MathF.Min(hold, p.RunSpeed), tick) : hold;
         Vector2 fwd = a.HoldDirection;
         var legs = new TickIntent { MoveX = fwd.X, MoveZ = fwd.Y, Sprint = 1f };
         int moves = a.ContactTick - tick + 1;
@@ -1059,6 +1070,21 @@ public static class SkillMoves
         return new Vector3(face.X * pace, 0f, face.Y * pace);
     }
 
+    /// <summary>How much of the run version of the elastico a move entered at <paramref name="entry"/> m/s takes, 0..1.</summary>
+    static float ElasticoRunShare(float entry, Tuning t) => Math.Clamp(t.Skill.ElasticoRunBlend.Evaluate(entry), 0f, 1f);
+
+    /// <summary>
+    /// The run elastico's running speed on <paramref name="tick"/>: from the entry pace (a move entered above the cap on a
+    /// touch's boost does not drop to it in a tick) it eases down from the move's start, the reach included, no faster than
+    /// elastico_run_brake to elastico_run_keep of it, m/s.
+    /// </summary>
+    static float ElasticoRun(BallAction a, int tick, Tuning t)
+    {
+        var k = t.Skill;
+        float hold = a.SkillEntry;
+        return MathF.Min(hold, MathF.Max(hold * k.ElasticoRunKeep, hold - k.ElasticoRunBrake * (tick + 1 - a.StartTick) * t.Dt));
+    }
+
     /// <summary>How much of the run version of the heel-to-heel a move entered at <paramref name="entry"/> m/s takes, 0..1.</summary>
     static float HeelRunShare(float entry, Tuning t) => Math.Clamp(t.Skill.HeelToHeelRunBlend.Evaluate(entry), 0f, 1f);
 
@@ -1101,8 +1127,10 @@ public static class SkillMoves
     const float ElasticoExitMaxDeg = 90f;
     /// <summary>With the stick released the elastico's inside sets the ball across in front of him this far off the run, degrees.</summary>
     const float ElasticoSetDeg = 45f;
-    /// <summary>The elastico's player drives toward the exit side at this pace by the release, m/s.</summary>
+    /// <summary>The elastico's player drives toward the exit side at this pace by the release, m/s ...</summary>
     const float ElasticoExitSideSpeed = 2.0f;
+    /// <summary>... at a run (elastico_run_blend) this share of it.</summary>
+    const float ElasticoRunExitSide = 0.5f;
     /// <summary>The spin brings the ball to this far ahead of the player in his own frame, metres ...</summary>
     const float SpinBallAhead = 0.3f;
     /// <summary>... over this share of the move.</summary>
