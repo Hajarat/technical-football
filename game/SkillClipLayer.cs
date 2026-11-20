@@ -145,7 +145,7 @@ public sealed class SkillClipLayer
         _haveShown = _haveShownPrev = _haveBase = _haveBasePrev = false; _prevSpeed = float.NaN;
         _in.Reset(); foreach (var l in _lock) l.Reset();
         for (int i = 0; i < 2; i++) { _legOff[i] = _legOffVel[i] = NVec3.Zero; _pinW[i] = 0f; _planted[i] = false; _hbStep[i] = false; }
-        _reachOff = NVec3.Zero; Array.Clear(_pinHave); Array.Clear(_legU); Array.Clear(_flagWas); Array.Clear(_anchor); Array.Clear(_anchor0); Array.Clear(_twLim);
+        _reachOff = NVec3.Zero; Array.Clear(_pinHave); Array.Clear(_legU); Array.Clear(_flagWas); Array.Clear(_anchor); Array.Clear(_anchor0); Array.Clear(_twLim); Array.Clear(_ballLift);
     }
 
     static NVec3 M(Vector3 world, float sc) => ModelSpace.FromWorld(new NVec3(world.X, world.Y, world.Z)) / sc;
@@ -613,6 +613,11 @@ public sealed class SkillClipLayer
                 }
                 _planted[i] = false;
             }
+            // a step-over's circling boot is lifted over the ball when it would pass through it, at most BallLiftRate: the hand-in
+            // from the stride can carry the swinging foot through a ball close ahead (a step-over begun at a sprint)
+            float needLift = twi <= 0f && _pinIdx[i] >= 0 && _pins[_pinIdx[i]].Path ? LiftOverBall(i, target, gFoot, live, (f.BallRadius + BallClear) / sc) : 0f;
+            _ballLift[i] = needLift > _ballLift[i] ? Math.Min(needLift, _ballLift[i] + BallLiftRate / sc * dt) : Math.Max(needLift, _ballLift[i] - BallLiftRate / sc * dt);
+            target.Y += _ballLift[i];
             target = KeepAboveGround(i, target, gFoot);
             if (Dbg) GD.Print($"SKILL_DBG ct={_ct:F3} foot={i} ank=({ankle.X:F3},{ankle.Y:F3},{ankle.Z:F3}) tgt=({target.X:F3},{target.Y:F3},{target.Z:F3}) pin={_pinW[i]:F2} st={(stance ? 1 : 0)} lock={(lk.Locked ? 1 : 0)} tw={tw[i]:F2} far={(far ? 1 : 0)} legw={_legU[i]:F2}");
             SolveLeg(i, target, gFoot);
@@ -720,6 +725,22 @@ public sealed class SkillClipLayer
         foreach (var q in _pins) if (q.Foot == i && q.From == q.To) return true;
         return false;
     }
+
+    /// <summary>How far the ankle target must rise for the boot's surfaces to be at least <paramref name="clear"/> from the ball's centre <paramref name="ball"/> (0 when they are).</summary>
+    float LiftOverBall(int i, NVec3 target, NQuat gFoot, NVec3 ball, float clear)
+    {
+        float lift = 0f;
+        for (int k = 0; k < 4; k++)
+        {
+            var p = SurfacePoint(i, (BootSurface)k, gFoot, target);
+            float h2 = (p.X - ball.X) * (p.X - ball.X) + (p.Z - ball.Z) * (p.Z - ball.Z);
+            if ((p - ball).LengthSquared() < clear * clear) lift = Math.Max(lift, ball.Y + MathF.Sqrt(clear * clear - h2) - p.Y);
+        }
+        return lift;
+    }
+    readonly float[] _ballLift = new float[2];
+    /// <summary>A step-over's boot lifted over the ball stays this far (metres) off its surface; the lift changes at most this fast (m/s).</summary>
+    const float BallClear = 0.01f, BallLiftRate = 1.5f;
 
     /// <summary>Raises the ankle target so the boot (toe joint, toe tip, sole) stays above the ground.</summary>
     NVec3 KeepAboveGround(int i, NVec3 target, NQuat gFoot)

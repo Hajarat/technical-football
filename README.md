@@ -203,7 +203,7 @@ core names, the heel for heel-to-heel's first contact; the second span's foot an
 the live ball by leg IK over the clip's on-ball spans (and at each touch the core also makes: a fake cut's hook, an elastico's two contacts), the weight rising through the reach
 and falling over 0.08 s after it, with the contact direction the clip has on its own ball; on the end tick it holds where the ball was, as the
 core's exit touch moves it; the hips come up to 0.18 m toward a ball the leg cannot reach. A step-over's circling foot keeps its path relative
-to the live ball. A foot the clip plants is held where it landed (`PlantLock`), let go when the clip lifts it. A clip whose move file
+to the live ball, lifted over it (1 cm clear, the lift changing at most 1.5 m/s) where the hand-in from the stride would carry the boot through it. A foot the clip plants is held where it landed (`PlantLock`), let go when the clip lifts it. A clip whose move file
 declares its stances (`[stance]` in `tools/anim/moves/`, written to clips.json; the ball roll at a run) has its planted feet from those
 spans, not read off its motion: such a foot is taken from the hand-in's offset onto the clip's own foot as its first stance begins
 (stepping into place at up to 6 m/s, lifted on the way), held from its first stance tick where the clip's foot stands then, and follows
