@@ -94,9 +94,10 @@ public static class TouchPlanner
     /// The go-get-it legs: toward where the ball will be, at the stick's own pace (<paramref name="user"/>; the touch
     /// controller's speed trim slows or speeds it to arrive at the ball on the swing), or faster when the ball runs away: its
     /// own speed away plus the gap over the speed time constant (so he arrives at a pace that lets him play it instead of
-    /// running past it), at least 0.8 m/s, up to the off-ball top speed.
+    /// running past it), at least 0.8 m/s, up to the off-ball top speed. <paramref name="offBall"/> (a loose ball he goes
+    /// for) measures the stick's pace and the cap against the off-ball top speed.
     /// </summary>
-    static TickIntent ChaseIntent(PlayerState p, Ball ball, in TickIntent user, Tuning t)
+    static TickIntent ChaseIntent(PlayerState p, Ball ball, in TickIntent user, Tuning t, bool offBall = false)
     {
         var rel = new Vector2(ball.Position.X - p.Position.X, ball.Position.Z - p.Position.Z);
         float dist = rel.Length();
@@ -104,9 +105,10 @@ public static class TouchPlanner
         Vector2 dir = InterceptDirection(p, ball);
         var bv = new Vector2(ball.Velocity.X, ball.Velocity.Z);
         float away = MathF.Max(0f, Vector2.Dot(bv, rel / dist));
-        float cap = Possession.SpeedCap(p, true, true, t);
+        float cap = offBall ? Movement.TopSpeed(p.Sheet, t) : Possession.SpeedCap(p, true, true, t);
         float stick = MathF.Min(1f, user.Move.Length());
-        float pace = stick < t.Movement.StickDeadZone ? 0f : Possession.SpeedCap(p, true, false, t) * stick * Movement.ModeFraction(user, p.Sheet, t);
+        float stickCap = offBall ? cap : Possession.SpeedCap(p, true, false, t);
+        float pace = stick < t.Movement.StickDeadZone ? 0f : stickCap * stick * Movement.ModeFraction(user, p.Sheet, t);
         float target = MathF.Max(pace, away + MathF.Max(0f, dist - 0.3f) / Movement.TimeConstant(p.Sheet, t));
         float mag = Math.Clamp(target, 0.8f, cap) / MathF.Max(cap, 1e-3f);
         return new TickIntent { MoveX = dir.X * mag, MoveZ = dir.Y * mag, Sprint = 1f };
@@ -249,7 +251,8 @@ public static class TouchPlanner
             p.PlannerSteer = Toward(Rotate(p.PlannerSteer, Movement.WrapAngle(p.Facing - p.SteerFacing)), Vector2.Zero, SteerStep(t));
             p.SteerFacing = p.Facing;
             p.SteerCarry = Toward(p.SteerCarry, Vector2.Zero, SteerStep(t));
-            legs = intent;
+            // A loose ball he goes for (see Regain): the go-get-it legs, off the ball.
+            legs = p.Regain != RegainMode.None ? ChaseIntent(p, ball, intent, t, offBall: true) : intent;
             float top = Movement.TopSpeed(p.Sheet, t);
             return Stunned(p, now)
                 ? new MoveAssist(top * t.Shot.StunSpeedFraction, 1f + t.Possession.OffBallTurnBonus, p.PlannerSteer, HardCap: top * t.Shot.StunSpeedFraction, TurnAbout: true, Carry: p.SteerCarry)
@@ -1249,7 +1252,7 @@ public static class TouchPlanner
         var k = t.Touch;
         Vector3 cp = immediate ? new Vector3(ball.Position.X, t.Ball.Radius, ball.Position.Z) : ContactPointFor(p, a.Foot, t);
         float miss = immediate ? 0f : Horizontal(ball.Position, cp);
-        bool far = false;
+        bool far = immediate && a.Stretched; // a touch made at once is stretched only when its caller says so (a regain toe-poke)
         if (!immediate)
         {
             // A plain touch plays a ball within stretch_reach of its contact point; a turn, cut, stop or close-control touch one
@@ -1457,12 +1460,15 @@ public static class TouchPlanner
     static TouchResult? FirstTouch(PlayerState p, in TickIntent intent, Ball ball, int tick, float now, Tuning t, Pitch? pitch, SimRng rng)
     {
         var k = t.Touch;
-        if (!TouchModel.InReach(p, ball, t)) return null;
+        // A free regain also takes a ball beyond foot reach, out to regain_reach: a toe-poke, at the stretched errors.
+        bool inReach = TouchModel.InReach(p, ball, t);
+        if (!inReach && !Regain.InRegainReach(p, ball, t)) return null;
         if (now - p.LastTouchTime < k.TurnMinInterval) return null;
         bool stickActive = intent.Move.Length() >= k.StickThreshold;
         float rel = TouchModel.Flat(ball.Velocity - p.Velocity).Length();
-        if (!stickActive && rel < k.FirstTouchMinRelativeSpeed) return null; // a still ball and no stick: stand by it
-        var a = new BallAction { Kind = ActionKind.First, PlanTick = tick, ContactTick = tick };
+        // A still ball and no stick: stand by it, unless he is going for it.
+        if (!stickActive && rel < k.FirstTouchMinRelativeSpeed && p.Regain == RegainMode.None) return null;
+        var a = new BallAction { Kind = ActionKind.First, PlanTick = tick, ContactTick = tick, Stretched = !inReach };
         a.Foot = p.IsStepping ? p.SwingFoot : TouchModel.ChooseFoot(p.Sheet, p.Position, p.Facing, ball.Position, t);
         p.TouchAction = a;
         p.PrevTouchAction = null;

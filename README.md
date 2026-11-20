@@ -126,6 +126,16 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   after it the controller eases it out (the drag-back's step itself rises and falls to rest).
 - The keeper and the view read the next expected contact (`NextTouchEta`, `NextTouchFoot`, `NextTouchPoint`): the committed
   touch's, else the one the controller steers for.
+- A lost ball (no one controls it, someone has controlled or struck it this round, play is live, no shot under way) in front of the player is gone for eagerly (`Regain`,
+  the `regain_*` keys in `possession`): within `regain_cone_deg` (75) either side of his facing and `regain_max_distance`
+  (10 m) of him, or anywhere within foot reach, the go-get-it legs run on to where it will be at the off-ball top speed,
+  whatever the stick and sprint button say, and the first touch takes it as soon as it is in reach, even with the stick
+  released. When the keeper contests it (within `regain_keeper_distance`, 3 m, of the ball, or reaching it no more than
+  `regain_keeper_margin`, 0.3 s, after the attacker, each timed as the gap beyond foot reach over his top speed: the keeper's
+  rush speed, the attacker's sprint speed) it is a race at normal foot reach; uncontested he also takes it from as far as
+  `regain_reach` (1.2 m) of his body, a toe-poke at 1.5 times the rated errors. Right bumper (the finesse modifier) held
+  with the left stick pushed more than 90 degrees away from the ball lets it run (FC's Let Ball Run). The trace's legs column
+  shows `Race` or `Regain`.
 
 Scripted rounds: the batch tool's scripted attacker runs at the goal and, in a scenario with `shoot_distance`, presses shoot
 inside it once the ball is strikable or its next touch comes early enough in the wind-up; with `strike_distance` (breakaway
@@ -219,6 +229,7 @@ The pad follows GOALS' Standard preset (Xbox names).
 | Right stick: a side flicked from rest and released | Body feint to that side |
 | Right stick: a side held 0.1 s | Ball roll to that side |
 | Right stick: forward flick while sprinting | Knock-on: a heavy touch ahead to sprint onto |
+| Right bumper + left stick away from a loose ball | Let it run: no eager regain (see Dribbling and movement) |
 | Left stick back with left and right bumpers held | Drag-back |
 | Right stick: back, then straight on to a side | Elastico toward that side |
 | Right stick: forward flick, rest, back | Heel-to-heel: the ball flicked on straight ahead |

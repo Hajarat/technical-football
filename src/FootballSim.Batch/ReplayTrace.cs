@@ -82,7 +82,7 @@ static class ReplayTrace
             var a = p.TouchAction;
             string kind = a == null ? "-" : a.Kind.ToString();
             string phase = a == null ? "-" : a.Phase.ToString();
-            string legs = p.Chasing ? "Chase" : "Stick";
+            string legs = p.Regain == RegainMode.Free ? "Regain" : p.Regain == RegainMode.Contested ? "Race" : p.Chasing ? "Chase" : "Stick";
             float debt = (float)Debt.GetValue(p)!;
             bool post = w.SimTime < (float)PostTurn.GetValue(p)!;
             bool skill = Skill.GetValue(p) != null;
