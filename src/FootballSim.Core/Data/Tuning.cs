@@ -176,6 +176,11 @@ public sealed class MovementTuning
     /// </summary>
     public float BalanceDeceleration { get; set; } = 12f;
     /// <summary>
+    /// Running at the boards a player brakes by himself, at balance_deceleration, so that he comes to them no faster than this
+    /// (his velocity into them, m/s): the boards never stop him from a run in one tick.
+    /// </summary>
+    public float WallArriveSpeed { get; set; } = 1.2f;
+    /// <summary>
     /// Without the ball, the stick more than this from the facing while running is a turn about (GOALS' moving capsule rotation
     /// threshold, 135 degrees): the player plants and brakes, losing <see cref="ReverseSpeedLoss"/> of his speed at
     /// balance_deceleration while he turns (GOALS plays a speed-dependent 180 turn instead of turning on the spot).
@@ -1064,6 +1069,20 @@ public sealed class SkillTuning
     /// </summary>
     public float PaceMatchAhead { get; set; } = 0.25f;
     public float BodyFeintSeconds { get; set; } = 0.35f;
+    /// <summary>
+    /// How much of the run version of the step-over and body feint (the run kept, the ball rolling on with him) a move entered at
+    /// this running speed takes, m/s to 0..1; the rest is the standing version (paced to the ball).
+    /// </summary>
+    public Curve StepOverRunBlend { get; set; } = new((1f, 0f), (2.5f, 1f));
+    /// <summary>
+    /// At a run the step-over's and body feint's running speed eases down from the move's start, no faster than
+    /// step_over_run_brake, to this share of the entry running speed, by entry speed m/s.
+    /// </summary>
+    public Curve StepOverRunKeep { get; set; } = new((4f, 0.9f), (7.5f, 0.82f));
+    /// <summary>The run step-over's and body feint's running speed eases down no faster than this, m/s^2.</summary>
+    public float StepOverRunBrake { get; set; } = 6f;
+    /// <summary>At a run the step-over and body feint turn the run toward the left stick by at most this off the move's line, degrees.</summary>
+    public float StepOverRunTurnDeg { get; set; } = 45f;
     /// <summary>The ball roll from standing when it is the first move of a chain (the sole on the ball, the reach before it apart).</summary>
     public float BallRollFirstSeconds { get; set; } = 0.4f;
     /// <summary>The same entered at a run (see <see cref="BallRollRunBlend"/>).</summary>
@@ -1134,6 +1153,14 @@ public sealed class SkillTuning
     public float ElasticoSeconds { get; set; } = 0.26f;
     public float ElasticoForwardSpeed { get; set; } = 2.0f;
     /// <summary>
+    /// How much of the run version of the elastico a move entered at this running speed takes, m/s to 0..1: at a run the running
+    /// speed eases from the entry pace no faster than elastico_run_brake to elastico_run_keep of it instead of down to
+    /// elastico_forward_speed.
+    /// </summary>
+    public Curve ElasticoRunBlend { get; set; } = new((1f, 0f), (2.5f, 1f));
+    public float ElasticoRunKeep { get; set; } = 0.8f;
+    public float ElasticoRunBrake { get; set; } = 6f;
+    /// <summary>
     /// Spin: the reach (at most, seconds); from the first sole's landing the move's length, the second sole's contact and the
     /// first sole's lift (seconds after the landing); the player's displacement forward and toward the side from where the ball
     /// was first taken, metres; the running speed eased down to at most spin_forward_speed; the ball kept within
@@ -1146,6 +1173,14 @@ public sealed class SkillTuning
     public float SpinForward { get; set; } = 0.6f;
     public float SpinSide { get; set; } = 0.5f;
     public float SpinForwardSpeed { get; set; } = 2.0f;
+    /// <summary>
+    /// How much of the run version of the spin a move entered at this running speed takes, m/s to 0..1: at a run his pace along
+    /// the run eases from the entry pace no faster than spin_run_brake to spin_run_keep of it (he travels on through the turn)
+    /// instead of down to spin_forward_speed.
+    /// </summary>
+    public Curve SpinRunBlend { get; set; } = new((1f, 0f), (2.5f, 1f));
+    public float SpinRunKeep { get; set; } = 0.7f;
+    public float SpinRunBrake { get; set; } = 6f;
     public float SpinBallRadius { get; set; } = 0.35f;
     /// <summary>
     /// Heel-to-heel: the move's length, the heel's contact and the trailing foot's flick (seconds from the start), how far the
@@ -1158,6 +1193,16 @@ public sealed class SkillTuning
     public float HeelToHeelBack { get; set; } = 0.15f;
     public float HeelToHeelFlickRatio { get; set; } = 1.3f;
     public float HeelToHeelFlickMinSpeed { get; set; } = 5.0f;
+    /// <summary>
+    /// How much of the run version of the heel-to-heel flick a move entered at this running speed takes, m/s to 0..1; the rest
+    /// is the standing flick (heel_to_heel_flick_ratio, at least heel_to_heel_flick_min_speed).
+    /// </summary>
+    public Curve HeelToHeelRunBlend { get; set; } = new((1f, 0f), (2.5f, 1f));
+    /// <summary>
+    /// At a run the flick is a short one he runs onto: paced so that, with him keeping his pace, the ball is this far ahead of
+    /// him 0.2 s after the move's end, metres (where the next dribble touch meets it).
+    /// </summary>
+    public float HeelToHeelRunFlickAhead { get; set; } = 0.45f;
 
     // ---- chain and exit burst ----
     /// <summary>A move starting within this long of the previous one's end is chained.</summary>

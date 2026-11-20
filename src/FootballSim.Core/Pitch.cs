@@ -209,6 +209,56 @@ public sealed class Pitch
     }
 
     /// <summary>
+    /// The fastest a player at <paramref name="pos"/> may run along <paramref name="dir"/> (unit, X, Z; <paramref name="steer"/> added
+    /// to his velocity) for his velocity into every board he is heading for to be no more than he can shed at
+    /// <paramref name="decel"/> before he reaches it and still arrive at <paramref name="arrive"/> or less, m/s; +infinity when he is
+    /// heading for none.
+    /// </summary>
+    internal float WallRunCap(Vector2 pos, Vector2 dir, Vector2 steer, float arrive, float decel)
+    {
+        float cap = float.PositiveInfinity;
+        void Wall(Vector2 n, float gap)
+        {
+            float dn = Vector2.Dot(dir, n);
+            if (dn <= 1e-3f) return;
+            float vn = MathF.Sqrt(arrive * arrive + 2f * decel * MathF.Max(0f, gap));
+            cap = MathF.Min(cap, MathF.Max(0f, (vn - Vector2.Dot(steer, n)) / dn));
+        }
+        for (int i = 0; i < _wallN.Length; i++) Wall(_wallN[i], _wallC[i] - PlayerRadius - Vector2.Dot(_wallN[i], pos));
+        if (CornerRadius > 0f)
+        {
+            float rr = MathF.Max(0f, CornerRadius - PlayerRadius);
+            for (int sgn = -1; sgn <= 1; sgn += 2)
+            {
+                var c = new Vector2(CornerRadius, sgn * (HalfWidth - CornerRadius));
+                if (pos.X >= c.X || sgn * pos.Y <= sgn * c.Y) continue;
+                Vector2 f = pos - c;
+                float len = f.Length();
+                if (len > 1e-4f) Wall(f / len, rr - len);
+            }
+        }
+        return cap;
+    }
+
+    /// <summary>
+    /// How far a point (X, Z) inside the outline is from the nearest board, metres (the rounded back corners measured along their
+    /// radius). The goal mouth counts as the goal-end wall, as it does for players.
+    /// </summary>
+    internal float BoardGap(Vector2 pos)
+    {
+        float gap = float.PositiveInfinity;
+        for (int i = 0; i < _wallN.Length; i++) gap = MathF.Min(gap, _wallC[i] - Vector2.Dot(_wallN[i], pos));
+        if (CornerRadius > 0f)
+            for (int sgn = -1; sgn <= 1; sgn += 2)
+            {
+                var c = new Vector2(CornerRadius, sgn * (HalfWidth - CornerRadius));
+                if (pos.X >= c.X || sgn * pos.Y <= sgn * c.Y) continue;
+                gap = MathF.Min(gap, CornerRadius - (pos - c).Length());
+            }
+        return gap;
+    }
+
+    /// <summary>
     /// Keeps a player's centre inside the outline, <see cref="PlayerRadius"/> in from every board. The goal mouth is closed for
     /// players: they stop at the goal-end wall like anywhere else. Any velocity into a board it was pushed off is removed.
     /// Returns true if the position was changed.

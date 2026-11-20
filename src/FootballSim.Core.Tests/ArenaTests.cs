@@ -170,6 +170,138 @@ public class ArenaTests
     }
 
     [Fact]
+    public void APlayerRunningAtABoardBrakesByHimselfBeforeIt()
+    {
+        // Sprinting from 8 m out straight at the side wall, at 45 degrees to it, into the back corner and at the end wall: he
+        // reaches it moving into it (along the board's normal) at 1.5 m/s or less and his speed never falls by more than 2 m/s in
+        // a tick.
+        var s = TestData.Sheet(99);
+        float r = MathF.Sqrt(0.5f);
+        foreach (var (start, stick, normal) in new[]
+        {
+            (new Vector2(15f, -2f), new Vector2(0f, 1f), new Vector2(0f, 1f)),
+            (new Vector2(15f, -2f), new Vector2(r, r), new Vector2(0f, 1f)),
+            (new Vector2(8f, -2f), new Vector2(-r, r), new Vector2(-r, r)),
+            (new Vector2(20f, -4.5f), new Vector2(1f, 0f), new Vector2(1f, 0f)),
+        })
+        {
+            var p = TestData.Outfield(s, start.X, start.Y, MathF.Atan2(stick.Y, stick.X));
+            float now = 0f, prev = 0f, into = float.NaN;
+            for (int i = 0; i < 480; i++)
+            {
+                now += T.Dt;
+                var before = p.Velocity;
+                Movement.Step(p, new TickIntent { MoveX = stick.X, MoveZ = stick.Y, Sprint = 1 }, T.Dt, now, false, T, P);
+                float speed = new Vector2(p.Velocity.X, p.Velocity.Z).Length();
+                Assert.True(prev - speed <= 2f, $"from {start}: speed {prev:F2} -> {speed:F2} in one tick at {p.Position}");
+                // The first tick the boards hold him (a step along their normal would leave the outline): his velocity into
+                // them the tick before.
+                // (in a rounded back corner the normal is the arc's, out from its centre)
+                var at = new Vector2(p.Position.X, p.Position.Z);
+                var corner = new Vector2(P.CornerRadius, MathF.Sign(at.Y) * (P.HalfWidth - P.CornerRadius));
+                var n = at.X < corner.X && MathF.Abs(at.Y) > MathF.Abs(corner.Y) ? Vector2.Normalize(at - corner) : normal;
+                var probe = p.Position + new Vector3(n.X, 0f, n.Y) * 0.02f;
+                if (float.IsNaN(into) && !Inside(probe with { Y = 0f }, Pitch.PlayerRadius)) into = Vector2.Dot(new Vector2(before.X, before.Z), n);
+                prev = speed;
+            }
+            Assert.False(float.IsNaN(into), $"from {start}: never reached the boards");
+            Assert.True(into <= 1.5f, $"from {start}: reached the boards at {into:F2} m/s");
+        }
+    }
+
+    [Fact]
+    public void WithTheBallStillAgainstABoardHeAlwaysPlaysItAwayOrStrikesIt()
+    {
+        // The ball lies still 0.2, 0.35 or 0.5 m from the back wall, a side wall or the goal-end wall (beside the goal). In
+        // possession, he comes to it from 6 m at a jog or a sprint, straight at the wall or 45 degrees either way, the stick held
+        // into the wall, until 0.3 s after he reaches the wall with no touch winding up (at most 0.8 s). Then either the stick
+        // turns straight away from the wall and within 1.0 s a touch sends the ball off it (0.3 m further out than it was, moving
+        // away), or shoot is pressed for 0.2 s with the stick toward the goal and the strike comes within 1.2 s. Throughout he keeps
+        // the ball, his speed never falls by more than 2 m/s in a tick, he reaches the wall at 1.5 m/s or less, and the ball is
+        // never sent up off the boards. (The keeper holds his line, so the goal-end ball is his to keep.)
+        var walls = new (string Name, Vector2 Spot, Vector2 In)[]
+        {
+            ("back wall", new Vector2(0f, 0.5f), new Vector2(1f, 0f)),
+            ("near side wall", new Vector2(12f, -10f), new Vector2(0f, 1f)),
+            ("far side wall", new Vector2(12f, 10f), new Vector2(0f, -1f)),
+            ("goal-end wall", new Vector2(30f, 5.5f), new Vector2(-1f, 0f)),
+        };
+        foreach (var (name, spot, inward) in walls)
+            foreach (float d in new[] { 0.2f, 0.35f, 0.5f })
+                foreach (float sprint in new[] { 0f, 1f })
+                    foreach (float angle in new[] { 0f, 45f, -45f })
+                        foreach (bool shoot in new[] { false, true })
+                            AtTheBoard($"{name}, ball {d} m off, {(sprint > 0f ? "sprint" : "jog")} at {angle} deg, {(shoot ? "shoot" : "stick away")}",
+                                spot, inward, d, sprint, angle, shoot);
+    }
+
+    static void AtTheBoard(string label, Vector2 spot, Vector2 inward, float d, float sprint, float angleDeg, bool shoot)
+    {
+        float a = angleDeg * MathF.PI / 180f;
+        var approach = new Vector2(-inward.X * MathF.Cos(a) + inward.Y * MathF.Sin(a), -inward.X * MathF.Sin(a) - inward.Y * MathF.Cos(a));
+        var ball = spot + inward * d;
+        var start = ball - approach * 6f;
+        var sc = TestData.Scenario("penalty");
+        sc.Attacker = new StartSpot { X = start.X, Z = start.Y, FacingDeg = MathF.Atan2(approach.Y, approach.X) * 180f / MathF.PI };
+        var b0 = start + approach * 0.6f;
+        sc.Ball = new StartSpot { X = b0.X, Z = b0.Y };
+        sc.ClockLimit = 60f;
+        sc.KeeperHoldLineThroughDribble = true;
+        var w = new World(new Tuning(), sc, TestData.Player("striker_a"), TestData.Player("the_wall"), 7);
+        w.Begin();
+        var p = w.Attacker;
+        var buf = new TickIntent[w.PlayerCount];
+        void Step(Vector2 stick, float spr = 0f, bool shootHeld = false)
+        {
+            buf[0] = new TickIntent { MoveX = stick.X, MoveZ = stick.Y, Sprint = spr, ShootHeld = shootHeld };
+            w.Step(buf);
+        }
+        // He takes the ball at his feet, then it is left lying still by the board, 6 m ahead of him.
+        for (int i = 0; i < 240 && !p.InPossession; i++) Step(approach * 0.5f);
+        for (int i = 0; i < 240 && p.TouchAction is { Pending: true }; i++) Step(approach * 0.5f);
+        Assert.True(p.InPossession, $"{label}: never had the ball");
+        w.Ball.Position = new Vector3(ball.X, w.Tuning.Ball.Radius, ball.Y);
+        w.Ball.Velocity = Vector3.Zero;
+        w.Ball.Spin = Vector3.Zero;
+
+        float Gap(Vector3 q) => Vector2.Dot(new Vector2(q.X, q.Z) - spot, inward);
+        var toGoal = Vector2.Normalize(new Vector2(P.GoalLineX, 0f) - ball);
+        float prev = p.Speed, into = float.NaN, gap0 = 0f;
+        int reached = -1, from = -1, done = -1;
+        for (int i = 0; i < 1200 && done < 0; i++)
+        {
+            var before = p.Velocity;
+            if (from < 0) Step(approach, sprint);
+            else if (!shoot) Step(inward);
+            else Step(toGoal, 0f, w.Tick - from < 24);
+            bool struck = w.Events.Any(e => e.Kind == EventKind.Strike);
+            Assert.True(p.InPossession || struck, $"{label}: lost the ball at tick {w.Tick} ({string.Join(",", w.Events.Select(e => e.Kind))})");
+            Assert.True(prev - p.Speed <= 2f, $"{label}: speed {prev:F2} -> {p.Speed:F2} in one tick at tick {w.Tick}");
+            Assert.True(w.Ball.Position.Y < 0.6f, $"{label}: the ball went up to {w.Ball.Position.Y:F2} m at tick {w.Tick}");
+            prev = p.Speed;
+            if (reached < 0 && Gap(p.Position) <= Pitch.PlayerRadius + 0.005f)
+            {
+                reached = w.Tick;
+                into = -Vector2.Dot(new Vector2(before.X, before.Z), inward);
+            }
+            if (from < 0 && (reached >= 0 && w.Tick - reached >= 36 && (p.TouchAction is not { Pending: true } || w.Tick - reached >= 96) || i >= 600))
+            {
+                from = w.Tick;
+                gap0 = Gap(w.Ball.Position);
+            }
+            if (from < 0) continue;
+            if (shoot ? struck
+                : Gap(w.Ball.Position) > MathF.Max(gap0, d) + 0.3f && Vector2.Dot(new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z), inward) > 0.3f)
+                done = w.Tick;
+            else if (w.Tick - from > 240) break;
+        }
+        Assert.True(reached >= 0, $"{label}: never reached the wall");
+        Assert.True(into <= 1.5f, $"{label}: reached the wall at {into:F2} m/s");
+        float took = done < 0 ? float.PositiveInfinity : (done - from) * T.Dt;
+        Assert.True(took <= (shoot ? 1.2f : 1.0f), $"{label}: {(shoot ? "no strike" : "the ball still at the wall")} {took:F2} s after the stick turned");
+    }
+
+    [Fact]
     public void PlayersStayInsideTheOutlineAndStopAtTheEndWall()
     {
         var s = TestData.Sheet(99);

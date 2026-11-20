@@ -95,9 +95,11 @@ public static class TouchPlanner
     /// controller's speed trim slows or speeds it to arrive at the ball on the swing), or faster when the ball runs away: its
     /// own speed away plus the gap over the speed time constant (so he arrives at a pace that lets him play it instead of
     /// running past it), at least 0.8 m/s, up to the off-ball top speed. <paramref name="offBall"/> (a loose ball he goes
-    /// for) measures the stick's pace and the cap against the off-ball top speed.
+    /// for) measures the stick's pace and the cap against the off-ball top speed. A ball against the boards (see
+    /// <see cref="AtBoard"/>) within his turn reach and about still is not run at at the stick's pace: he turns to it where he
+    /// stands instead of running a circle round it.
     /// </summary>
-    static TickIntent ChaseIntent(PlayerState p, Ball ball, in TickIntent user, Tuning t, bool offBall = false)
+    static TickIntent ChaseIntent(PlayerState p, Ball ball, in TickIntent user, Tuning t, bool offBall = false, Pitch? pitch = null)
     {
         var rel = new Vector2(ball.Position.X - p.Position.X, ball.Position.Z - p.Position.Z);
         float dist = rel.Length();
@@ -109,6 +111,7 @@ public static class TouchPlanner
         float stick = MathF.Min(1f, user.Move.Length());
         float stickCap = offBall ? cap : Possession.SpeedCap(p, true, false, t);
         float pace = stick < t.Movement.StickDeadZone ? 0f : stickCap * stick * Movement.ModeFraction(user, p.Sheet, t);
+        if (dist < t.Touch.TurnReach.Rest + Pitch.PlayerRadius && bv.Length() < BoardStillBall && AtBoard(ball, t, pitch)) pace = 0f;
         float target = MathF.Max(pace, away + MathF.Max(0f, dist - 0.3f) / Movement.TimeConstant(p.Sheet, t));
         float mag = Math.Clamp(target, 0.8f, cap) / MathF.Max(cap, 1e-3f);
         return new TickIntent { MoveX = dir.X * mag, MoveZ = dir.Y * mag, Sprint = 1f };
@@ -275,7 +278,7 @@ public static class TouchPlanner
 
         // The stick reversed with the ball at the feet: the sole turns it at once (a drag-back onto the stick's line); at a run,
         // a braking arc instead.
-        if (live && FeetTurn(p, intent, ball, tick, now, t)) return SkillTick(p, ball, tick, t, out legs);
+        if (live && FeetTurn(p, intent, ball, tick, now, t, pitch)) return SkillTick(p, ball, tick, t, out legs);
         TurnArc(p, intent, live && !Stunned(p, now) && p.ShotAction == null, t);
 
         Vector2 steer;
@@ -383,9 +386,10 @@ public static class TouchPlanner
     /// ball) while running, with the ball low and within feet_turn_reach of the body, and no touch already winding up (that one
     /// turns the ball sooner): the sole pulls the ball onto the stick's line at once, beside or behind the planted foot too,
     /// instead of waiting for a swing in front of the foot (see <see cref="SkillMoves.StartFeetTurn"/>). Not after a knock-on,
-    /// during a shot or the stun, or within a drag-back's cooldown.
+    /// during a shot or the stun, or within a drag-back's cooldown. Nor when the stick's line from the ball runs into a board
+    /// within the sole's pull: the sole would press it into the board; a touch plays it instead.
     /// </summary>
-    static bool FeetTurn(PlayerState p, in TickIntent intent, Ball ball, int tick, float now, Tuning t)
+    static bool FeetTurn(PlayerState p, in TickIntent intent, Ball ball, int tick, float now, Tuning t, Pitch? pitch)
     {
         var k = t.Touch;
         Vector2 stick = intent.Move;
@@ -396,6 +400,11 @@ public static class TouchPlanner
         if (Horizontal(ball.Position, p.Position) > k.FeetTurnReach) return false;
         var wanted = new Vector3(stick.X, 0f, stick.Y);
         if (TouchModel.TurnAngleDeg(p, ball, wanted) < k.FeetTurnDeg) return false;
+        if (pitch != null)
+        {
+            var from = new Vector3(ball.Position.X, t.Ball.Radius, ball.Position.Z);
+            if (pitch.SweepBoards(from, from + Vector3.Normalize(wanted) * t.Skill.FeetTurnDistance, t.Ball.Radius, out _)) return false;
+        }
         SkillMoves.StartFeetTurn(p, Vector2.Normalize(stick), ball, tick, now, t);
         return true;
     }
@@ -513,8 +522,10 @@ public static class TouchPlanner
         float offRun = stickActive ? MathF.Abs(Movement.WrapAngle(MathF.Atan2(intent.Move.Y, intent.Move.X) - p.Facing)) * 180f / MathF.PI : 0f;
         bool turn = stickActive && !restricted && turnDeg > k.ExecutionAngle && offRun > k.ExecutionAngle && p.RunSpeed > k.ExecutionMinSpeed;
         bool demand = turn || !stickActive || shot || p.SkillBufTick >= 0;
-        // A turn, a stop or a close-control touch may play the ball anywhere within the turn reach of the body.
-        bool turnish = turn || !stickActive || TouchModel.ModeFor(intent, t) == TouchMode.CloseControl;
+        // A turn, a stop or a close-control touch may play the ball anywhere within the turn reach of the body; so may any touch
+        // or strike of a ball against the boards, where he cannot always stand to bring it in front of his foot.
+        bool atBoard = AtBoard(ball, t, pitch);
+        bool turnish = turn || !stickActive || TouchModel.ModeFor(intent, t) == TouchMode.CloseControl || atBoard;
         Target tg;
         float openShare = 0f;
         int minJ = Math.Max(Math.Max(0, WindupTicks(t) - CommitSlack),
@@ -550,13 +561,13 @@ public static class TouchPlanner
             // Never sooner than early_min_interval after the last touch (minJ), and at least the windup ahead less the slack.
             int h = HorizonTicks(t);
             int need = Cooldown(p, demand, turn ? turnDeg : 90f, t);
-            if (shot) tg = StrikeSearch(p, ball, need, minJ, Math.Max(h, minJ + h), now, t, pitch);
+            if (shot) tg = StrikeSearch(p, ball, need, minJ, Math.Max(h, minJ + h), now, t, pitch, atBoard);
             else if (demand)
             {
                 // The stick's legs where they cost no time (the body already turns to the stick), else go and get it sooner.
-                tg = Search(p, intent, ball, chase: false, need, minJ, h, now, t, pitch, turnish: turnish);
+                tg = Search(p, intent, ball, chase: false, need, minJ, h, now, t, pitch, turnish: turnish, board: atBoard);
                 // (Leaving the stick's legs for the go-get-it legs needs a gain of a few ticks, so they do not flick between.)
-                var c = Search(p, intent, ball, chase: true, need, minJ, tg.Found ? tg.J - (p.Chasing ? 1 : LegsSwitchTicks) : h, now, t, pitch, turnish: turnish);
+                var c = Search(p, intent, ball, chase: true, need, minJ, tg.Found ? tg.J - (p.Chasing ? 1 : LegsSwitchTicks) : h, now, t, pitch, turnish: turnish, board: atBoard);
                 if (c.Found) tg = c;
             }
             else
@@ -569,17 +580,17 @@ public static class TouchPlanner
                 // A push that ran short or wide of its meet: the first step that reaches it on the stick's legs; else go and get
                 // it without slowing more than the stick's legs may; else the stick's legs with the leg stretched (a mis-hit
                 // costs a stretched touch, not a slowdown); else go and get it however.
-                if (!tg.Found) tg = Search(p, intent, ball, chase: false, 1, minJ, h, now, t, pitch, turnish: turnish);
-                if (!tg.Found && stickActive) tg = Search(p, intent, ball, chase: true, 1, minJ, h, now, t, pitch, held: true, turnish: turnish);
-                if (!tg.Found && stickActive) tg = Search(p, intent, ball, chase: false, 1, minJ, h, now, t, pitch, k.StretchReach, turnish: turnish);
+                if (!tg.Found) tg = Search(p, intent, ball, chase: false, 1, minJ, h, now, t, pitch, turnish: turnish, board: atBoard);
+                if (!tg.Found && stickActive) tg = Search(p, intent, ball, chase: true, 1, minJ, h, now, t, pitch, held: true, turnish: turnish, board: atBoard);
+                if (!tg.Found && stickActive) tg = Search(p, intent, ball, chase: false, 1, minJ, h, now, t, pitch, k.StretchReach, turnish: turnish, board: atBoard);
                 // The go-get-it legs within 15% of the pace, stretching for it, before they may run at any speed.
-                if (!tg.Found && stickActive) tg = Search(p, intent, ball, chase: true, 1, minJ, h, now, t, pitch, k.StretchReach, held: true, turnish: turnish);
-                if (!tg.Found) tg = Search(p, intent, ball, chase: true, 1, minJ, h, now, t, pitch, turnish: turnish);
+                if (!tg.Found && stickActive) tg = Search(p, intent, ball, chase: true, 1, minJ, h, now, t, pitch, k.StretchReach, held: true, turnish: turnish, board: atBoard);
+                if (!tg.Found) tg = Search(p, intent, ball, chase: true, 1, minJ, h, now, t, pitch, turnish: turnish, board: atBoard);
             }
         }
 
         p.Chasing = !tg.Found || tg.Chase;
-        legs = p.Chasing ? ChaseIntent(p, ball, shot ? ShotPace(p, t) : intent, t) : intent;
+        legs = p.Chasing ? ChaseIntent(p, ball, shot ? ShotPace(p, t) : intent, t, pitch: pitch) : intent;
         if (openShare > 0f) legs = Opened(legs, committed!.CommitMove, openShare);
         if (!tg.Found)
         {
@@ -622,8 +633,19 @@ public static class TouchPlanner
     /// The strike's contact: the first tick that meets the ball (the first eligible contact, not the best of its window), on
     /// whichever foot is swinging there: the strike takes the place of the next touch.
     /// </summary>
-    static Target StrikeSearch(PlayerState p, Ball ball, int need, int minJ, int maxJ, float now, Tuning t, Pitch? pitch) =>
-        Search(p, ShotPace(p, t), ball, chase: true, need, minJ, maxJ, now, t, pitch, firstTick: true);
+    static Target StrikeSearch(PlayerState p, Ball ball, int need, int minJ, int maxJ, float now, Tuning t, Pitch? pitch, bool atBoard) =>
+        Search(p, ShotPace(p, t), ball, chase: true, need, minJ, maxJ, now, t, pitch, turnish: atBoard, firstTick: true, board: atBoard);
+
+    /// <summary>A ball against the boards slower than this counts as about still for the go-get-it legs, m/s.</summary>
+    const float BoardStillBall = 1f;
+
+    /// <summary>
+    /// True when the ball is so close to a board that he may not be able to stand where it is in front of his foot: closer to
+    /// it than his body's radius, the contact zone's lead at rest and its radius.
+    /// </summary>
+    static bool AtBoard(Ball ball, Tuning t, Pitch? pitch) =>
+        pitch != null && pitch.BoardGap(new Vector2(ball.Position.X, ball.Position.Z))
+            <= Pitch.PlayerRadius + t.Touch.ContactZoneAhead.Rest + t.Touch.ContactZoneRadius;
 
     /// <summary>
     /// Commits the shot's strike on the target's swing, one windup before its contact: its contact tick and foot (the foot in
@@ -748,7 +770,8 @@ public static class TouchPlanner
     /// touch, which may also play the ball anywhere within the turn reach of the body.
     /// </summary>
     static Target Search(PlayerState p, in TickIntent user, Ball ball, bool chase, int need, int minJ, int maxJ, float now, Tuning t,
-        Pitch? pitch, float tol = 0f, bool held = false, float trim = 1f, bool turnish = false, bool firstOnly = false, bool firstTick = false)
+        Pitch? pitch, float tol = 0f, bool held = false, float trim = 1f, bool turnish = false, bool firstOnly = false, bool firstTick = false,
+        bool board = false)
     {
         var c = p.Scratch();
         var b = ball.ScratchA();
@@ -762,7 +785,7 @@ public static class TouchPlanner
         for (int i = 0; i <= maxJ; i++)
         {
             if (i > 0) tn += t.Dt;
-            var legs = chase ? ChaseIntent(c, b, user, t) : Turned(user, Lead(p, tn - now, t));
+            var legs = chase ? ChaseIntent(c, b, user, t, pitch: pitch) : Turned(user, Lead(p, tn - now, t));
             Movement.Step(c, legs, t.Dt, tn, new MoveAssist(cap, 1f, Vector2.Zero), t, pitch);
             if (c.StepBegun)
             {
@@ -775,7 +798,7 @@ public static class TouchPlanner
                 looked = true;
                 var tg = Make(c, b, c.SwingFoot, i, legs, chase, t);
                 tg.Held = held;
-                float res = Residual(p, tg, now, t, trim, turnish);
+                float res = Residual(p, tg, now, t, trim, turnish, board);
                 if (res <= tol && res < bestRes) { best = tg; bestRes = res; if (firstTick) return best; }
             }
             else if (best.Found || firstOnly && looked) return best;
@@ -809,7 +832,7 @@ public static class TouchPlanner
         for (int i = 0; i <= j; i++)
         {
             if (i > 0) tn += t.Dt;
-            legs = chase ? ChaseIntent(c, b, user, t) : Turned(user, Lead(p, tn - now, t));
+            legs = chase ? ChaseIntent(c, b, user, t, pitch: pitch) : Turned(user, Lead(p, tn - now, t));
             if (openShare > 0f) legs = Opened(legs, open, openShare);
             Movement.Step(c, legs, t.Dt, tn, new MoveAssist(cap, 1f, Vector2.Zero), t, pitch);
             if (i < j) b.Step(t.Dt, null, null);
@@ -876,14 +899,16 @@ public static class TouchPlanner
     /// <summary>
     /// What is left of the target's miss after the steering: the sideways step covers up to steer_max held (eased in at
     /// steer_accel), the speed trim its bounds (scaled by <paramref name="trim"/>) through the speed law. For a
-    /// <paramref name="turnish"/> touch a ball within the turn reach of the body and ahead of the feet counts as met (0).
+    /// <paramref name="turnish"/> touch a ball within the turn reach of the body and ahead of the feet counts as met (0); for a
+    /// ball against the boards (<paramref name="board"/>) beside the feet too.
     /// </summary>
-    static float Residual(PlayerState p, in Target tg, float now, Tuning t, float trim = 1f, bool turnish = false)
+    static float Residual(PlayerState p, in Target tg, float now, Tuning t, float trim = 1f, bool turnish = false, bool board = false)
     {
         var k = t.Touch;
         float span = (tg.J + 1) * t.Dt;
         Vector2 fwd = Dir(tg.Facing), right = new(-fwd.Y, fwd.X);
-        if (turnish && tg.Body.Length() <= tg.TurnReach - TurnReachMargin && Vector2.Dot(tg.Body, fwd) >= MinAhead) return 0f;
+        if (turnish && tg.Body.Length() <= tg.TurnReach - TurnReachMargin && Vector2.Dot(tg.Body, fwd) >= (board ? BoardMinAhead : MinAhead))
+            return 0f;
         float eLat = Vector2.Dot(tg.Miss, right), eAlong = Vector2.Dot(tg.Miss, fwd);
         float ramp = k.SteerAccel > 0f ? k.SteerMax / k.SteerAccel : 0f;
         float latCap = k.SteerMax * MathF.Max(0f, span - 0.5f * ramp);
@@ -900,6 +925,8 @@ public static class TouchPlanner
     const float TurnReachMargin = 0.05f;
     /// <summary>... and never with the ball less than this ahead of the feet (the foot never reaches back), metres.</summary>
     const float MinAhead = 0.1f;
+    /// <summary>... except a ball against the boards, which may be played from beside the feet (he cannot always get behind it).</summary>
+    const float BoardMinAhead = 0f;
 
     /// <summary>How many ticks sooner the go-get-it legs must play the ball for a demand to leave the stick's legs.</summary>
     const int LegsSwitchTicks = 4;
