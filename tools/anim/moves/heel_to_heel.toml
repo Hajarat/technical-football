@@ -59,8 +59,8 @@ ball = { pos = [-0.05, 0.11, 0.65], ease = [1, 1, 0] }
 [[key]]
 t = 0.1064
 label = "the right foot swings through high, to the right of the ball"
-pelvis = { pos = [0, 0.88, 0.12], yaw = 4, pitch = 12 }
-foot_r = { pos = [-0.19, 0.11, 0.33], yaw = -8, pitch = -15, toe = 0, knee = [-0.2, 0.3, 1] }
+pelvis = { pos = [0, 0.875, 0.12], yaw = 4, pitch = 14 }
+foot_r = { pos = [-0.19, 0.13, 0.33], yaw = -8, pitch = -15, toe = 0, knee = [-0.2, 0.3, 1] }
 hand_l = { swing = 12, abduct = 30, bend = 45 }
 hand_r = { swing = 0, abduct = 30, bend = 45 }
 
@@ -72,24 +72,24 @@ foot_l = { pos = [0.12, 0.002, 0.04], yaw = 6, pitch = 0, toe = 0, ease = 1 }
 [[key]]
 t = 0.1915
 label = "the right boot past the ball on its right, coming in in front of it"
-foot_r = { pos = [-0.27, 0.1, 0.836], yaw = -12, pitch = 5, knee = [-0.2, 0.3, 1] }
+foot_r = { pos = [-0.27, 0.17, 0.836], yaw = -12, pitch = -8, knee = [-0.2, 0.6, 1] }
 
 [[key]]
 t = 0.2483
 label = "contact: the right boot past the ball, its heel on the front of it, knocking it back and across"
 pelvis = { pos = [0, 0.8, 0.2834], yaw = 12, pitch = 14, roll = -2 }
-chest = { yaw = -8, pitch = 10, roll = 2 }
-head = { yaw = 4, pitch = 34 }
+chest = { yaw = -8, pitch = 14, roll = 2 }
+head = { yaw = 4, pitch = 38 }
 foot_r = { pos = [-0.135, -0.05, 0.285], frame = "ball", yaw = -15, pitch = 10, toe = 0, knee = [-0.2, 0.2, 1], ease = 0 }
 foot_l = { pos = [0.12, 0.002, 0.04], yaw = 6, pitch = 0, toe = 0, knee = [0.15, 0, 1], ease = 1 }
-hand_l = { swing = 15, abduct = 45, bend = 40 }
-hand_r = { swing = 5, abduct = 45, bend = 40 }
+hand_l = { swing = 15, abduct = 58, bend = 35 }
+hand_r = { swing = 5, abduct = 58, bend = 35 }
 ball = { pos = [-0.05, 0.11, 0.6434], ease = [1, 1, 0] }
 
 [[key]]
 t = 0.3085
 label = "the right foot steps out to the right of the ball, the left heel up"
-foot_r = { pos = [-0.29, 0.05, 0.803], yaw = -12, pitch = 5, knee = [-0.3, 0.1, 1] }
+foot_r = { pos = [-0.29, 0.09, 0.803], yaw = -12, pitch = -12, knee = [-0.3, 0.4, 1] }
 foot_l = { pos = [0.12, 0.03, 0.02], yaw = 10, pitch = -28, toe = 22 }
 
 [[key]]
@@ -103,11 +103,11 @@ foot_l = { pos = [0.08, 0.1, 0.181], yaw = 22, pitch = -15, toe = 10, knee = [0.
 t = 0.4611
 label = "contact2: the left foot turned out behind the ball, its inside pushing it on"
 pelvis = { pos = [0, 0.82, 0.4034], yaw = 3, pitch = 15, roll = 0 }
-chest = { yaw = -2, pitch = 11, roll = 0 }
-head = { yaw = 0, pitch = 32 }
+chest = { yaw = -2, pitch = 15, roll = 0 }
+head = { yaw = 0, pitch = 34 }
 foot_l = { pos = [0.05, -0.08, -0.15], frame = "ball", yaw = 55, pitch = 0, knee = [0.5, 0.2, 1], ease = 0 }
-hand_l = { swing = 0, abduct = 45, bend = 40 }
-hand_r = { swing = 15, abduct = 45, bend = 40 }
+hand_l = { swing = 0, abduct = 55, bend = 40 }
+hand_r = { swing = 25, abduct = 50, bend = 40 }
 ball = { pos = [-0.05, 0.11, 0.6834], ease = [1, 1, 0] }
 
 [[key]]
@@ -125,18 +125,18 @@ foot_r = { pos = [-0.24, 0.002, 0.8134], yaw = -10, pitch = 0, toe = 0, ease = 1
 [[key]]
 t = 0.6809
 label = "the left foot lands ahead, leaning into the exit"
-pelvis = { pos = [0, 0.86, 0.518], yaw = 0, pitch = 17 }
+pelvis = { pos = [0, 0.85, 0.518], yaw = 0, pitch = 20 }
 foot_l = { pos = [0.09, 0.002, 0.86], yaw = 10, pitch = 0, knee = [0.15, 0, 1], ease = 1 }
 
 [[key]]
 t = 0.7447
 label = "release: the ball away ahead; he drives after it"
-pelvis = { pos = [0.01, 0.87, 0.54], pitch = 18 }
-chest = { yaw = 2, pitch = 10 }
-head = { pitch = 22 }
+pelvis = { pos = [0.01, 0.86, 0.54], pitch = 22 }
+chest = { yaw = 2, pitch = 20 }
+head = { pitch = 18 }
 foot_r = { pos = [-0.24, 0.04, 0.7934], yaw = -10, pitch = -35, toe = 35 }
-hand_l = { swing = -10, abduct = 25, bend = 65 }
-hand_r = { swing = 20, abduct = 25, bend = 65 }
+hand_l = { swing = -30, abduct = 20, bend = 80 }
+hand_r = { swing = 40, abduct = 20, bend = 80 }
 ball = { pos = [-0.05, 0.11, 1.34], ease = [1, 1, 0] }
 
 [[key]]
@@ -148,11 +148,11 @@ foot_r = { pos = [-0.13, 0.13, 0.554], yaw = -6, pitch = -20, toe = 5, knee = [-
 t = 1
 ease = 0
 label = "end: driving forward after it, the trunk leaning into the burst"
-pelvis = { pos = [0, 0.89, 0.658], yaw = 0, pitch = 18 }
-chest = { yaw = 2, pitch = 9 }
-head = { pitch = 15 }
+pelvis = { pos = [0, 0.88, 0.658], yaw = 0, pitch = 22 }
+chest = { yaw = 2, pitch = 18 }
+head = { pitch = 12 }
 foot_l = { pos = [0.09, 0.002, 0.86], yaw = 10, pitch = 0, ease = 1 }
 foot_r = { pos = [-0.12, 0.12, 0.838], yaw = -6, pitch = -5, toe = 0 }
-hand_l = { swing = -25, abduct = 15, bend = 80 }
-hand_r = { swing = 25, abduct = 15, bend = 80 }
+hand_l = { swing = -50, abduct = 12, bend = 90 }
+hand_r = { swing = 50, abduct = 12, bend = 90 }
 ball = { pos = [-0.05, 0.11, 1.708], ease = [1, 1, 0] }

@@ -33,12 +33,17 @@ public partial class Match
     public World World { get; private set; } = null!;
     bool ReportReached => World.State == RoundState.Report;
 
+    /// <summary>A skill move as the attacker's figure starts drawing it: which clips (and their blend) or the procedural drawing.</summary>
+    void LogSkill(SkillStart m) => _log?.Write("skill", ("round", _round), ("tick", World.Tick), ("move", m.Move), ("foot", m.Right ? "R" : "L"),
+        ("side", m.Side < 0 ? "left" : m.Side > 0 ? "right" : "none"), ("stand_clip", m.StandClip), ("run_clip", m.RunClip),
+        ("w_run", Math.Round(m.WRun, 2)), ("entry_speed", Math.Round(m.EntrySpeed, 2)), ("drawing", m.Clips ? "clips" : "procedural"));
+
     bool StartSession()
     {
         string game = ProjectSettings.GlobalizePath("res://");
         _data = new GameData(Path.GetFullPath(_args.DataDir ?? Path.Combine(game, "..", "data")));
         _data.Reload();
-        if (_args.ReplayPath == null && _args.GalleryDir == null && _args.ClipGalleryDir == null) _log = SessionLog.Create(Path.GetFullPath(Path.Combine(game, "..")));
+        if (_args.LogSession || _args.ReplayPath == null && _args.GalleryDir == null && _args.ClipGalleryDir == null) _log = SessionLog.Create(Path.GetFullPath(Path.Combine(game, "..")));
         _buildCommit = BuildInfo.Commit;
         _headCommit = BuildInfo.ReadHead(game);
         bool stale = BuildInfo.IsStale(_buildCommit, _headCommit);

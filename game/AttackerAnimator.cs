@@ -246,6 +246,8 @@ public partial class PlayerFigure
     public string AttackerAnimMode { get; set; } = "procedural";
     /// <summary>--skill-anim: "clips" (a move with authored clips is drawn from them; needs mocap mode) or "procedural" (<see cref="PlanSkill"/> draws every move).</summary>
     public string SkillAnimMode { get; set; } = "clips";
+    /// <summary>A skill move starts being drawn (see <see cref="SkillClipLayer.Started"/>; only with --attacker-anim mocap).</summary>
+    public event Action<SkillStart>? SkillStarted;
     // this tick's touch weights and planted feet, for the skill layer
     float[] _layTw = new float[2];
     bool[] _layPlanted = new bool[2];
@@ -275,6 +277,7 @@ public partial class PlayerFigure
         {
             _atkAnim = AttackerAnimator.TryCreate(_body, out string err);
             if (_atkAnim == null) { _atkFailed = true; GD.PushWarning($"--attacker-anim mocap unavailable, using procedural: {err}"); return; }
+            if (_atkAnim.Skills != null) _atkAnim.Skills.Started += m => SkillStarted?.Invoke(m);
         }
         if (_atkAnim == null) return;
         if (_atkAnim.Skills != null) _atkAnim.Skills.Mode = SkillAnimMode;

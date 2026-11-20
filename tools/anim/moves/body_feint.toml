@@ -9,7 +9,7 @@ side = "left"
 foot = "left"
 entry = "stand"
 entry_speed = 0.0
-notes = "body feint from standing: hard plant and lunge to the left, shoulder drop, push off the left foot to the right"
+notes = "body feint from standing: hard wide plant and deep lunge to the left, shoulder and hip drop with the right arm across, push off the left foot to the right"
 
 [sim]
 feint_s = 0.25                    # body_feint_seconds, ExecuteTick to EndTick; ContactTick halfway (no contact: the plant)
@@ -47,44 +47,50 @@ ball = { pos = [0.0, 0.11, 0.30] }
 [[key]]
 t = 0.15
 label = "the left foot steps out, the body starting over"
-pelvis = { pos = [0.06, 0.905, 0.04], yaw = 4, pitch = 11, roll = 3 }
-chest = { yaw = 4, pitch = 8, roll = 6 }
-head = { yaw = 8, pitch = 22 }
-foot_l = { pos = [0.30, 0.07, 0.15], yaw = 12, pitch = 8, knee = [0.4, 0.1, 1] }
+pelvis = { pos = [0.07, 0.895, 0.04], yaw = 5, pitch = 12, roll = 4 }
+chest = { yaw = 6, pitch = 10, roll = 10 }
+head = { yaw = 10, pitch = 22 }
+foot_l = { pos = [0.34, 0.08, 0.15], yaw = 12, pitch = 8, knee = [0.5, 0.1, 1] }
+hand_l = { swing = 0, abduct = 35, bend = 40, trail = 90 }
+hand_r = { swing = 30, abduct = 5, bend = 55 }
 
 [[key]]
 t = 0.35
 label = "contact: the left foot plants hard, the lunge left, the left shoulder dropping, eyes left"
-pelvis = { pos = [0.17, 0.86, 0.08], yaw = 12, pitch = 12, roll = 8 }
-chest = { yaw = 10, pitch = 10, roll = 18 }
-head = { yaw = 22, pitch = 18, roll = 8 }
-foot_l = { pos = [0.42, 0.002, 0.18], yaw = 15, pitch = 0, knee = [0.5, 0, 1], ease = 1 }
+pelvis = { pos = [0.22, 0.835, 0.08], yaw = 14, pitch = 13, roll = 11 }
+chest = { yaw = 12, pitch = 13, roll = 26 }
+head = { yaw = 26, pitch = 20, roll = 10 }
+foot_l = { pos = [0.50, 0.002, 0.18], yaw = 18, pitch = 0, knee = [0.6, 0, 1], ease = 1 }
 foot_r = { pos = [-0.13, 0.002, 0.06], yaw = 0, knee = [-0.1, 0, 1], ease = 1 }
-hand_l = { swing = -5, abduct = 38, bend = 35, trail = 100 }
-hand_r = { swing = 30, abduct = 8, bend = 55 }
+hand_l = { swing = -15, abduct = 62, bend = 30, trail = 100 }
+hand_r = { swing = 55, abduct = -15, bend = 65 }
 
 [[key]]
 t = 0.5
 label = "loaded on the left leg, deepest"
-pelvis = { pos = [0.20, 0.845, 0.10], yaw = 12, pitch = 12, roll = 9 }
-chest = { yaw = 10, pitch = 11, roll = 22 }
-head = { yaw = 24, pitch = 18, roll = 9 }
+pelvis = { pos = [0.26, 0.81, 0.10], yaw = 15, pitch = 14, roll = 13 }
+chest = { yaw = 14, pitch = 15, roll = 31 }
+head = { yaw = 28, pitch = 20, roll = 12 }
+hand_l = { swing = -20, abduct = 68, bend = 28, trail = 100 }
+hand_r = { swing = 60, abduct = -20, bend = 65 }
 
 [[key]]
 t = 0.65
 label = "release: the push off the left foot carries him right"
-pelvis = { pos = [0.06, 0.87, 0.16], yaw = -6, pitch = 13, roll = -4 }
-chest = { yaw = -6, pitch = 10, roll = -6 }
-head = { yaw = -6, pitch = 22, roll = 0 }
-foot_l = { pos = [0.42, 0.002, 0.18], yaw = 15, pitch = -12, toe = 15, ease = 1 }
+pelvis = { pos = [0.05, 0.86, 0.16], yaw = -10, pitch = 14, roll = -8 }
+chest = { yaw = -12, pitch = 12, roll = -14 }
+head = { yaw = -10, pitch = 22, roll = -4 }
+foot_l = { pos = [0.50, 0.002, 0.18], yaw = 18, pitch = -12, toe = 15, ease = 1 }
 foot_r = { pos = [-0.13, 0.002, 0.06], yaw = -6, ease = 1 }
-hand_l = { swing = 20, abduct = 15, bend = 60 }
-hand_r = { swing = -10, abduct = 25, bend = 55 }
+hand_l = { swing = 10, abduct = 35, bend = 55 }
+hand_r = { swing = 20, abduct = 20, bend = 55 }
 
 [[key]]
 t = 0.8
 label = "the right foot steps out"
 foot_r = { pos = [-0.20, 0.07, 0.20], yaw = -20, pitch = 0, knee = [-0.4, 0.1, 1] }
+hand_l = { swing = 35, abduct = 8, bend = 70 }
+hand_r = { swing = -20, abduct = 42, bend = 45 }
 
 [[key]]
 t = 1.0
@@ -93,7 +99,7 @@ label = "end: away to the right, the right foot striking right-forward, the left
 pelvis = { pos = [-0.12, 0.90, 0.26], yaw = -28, pitch = 14, roll = -6 }
 chest = { yaw = -6, pitch = 8, roll = -4 }
 head = { yaw = -8, pitch = 14 }
-foot_l = { pos = [0.36, 0.06, 0.16], yaw = 20, pitch = -25, toe = 25 }
+foot_l = { pos = [0.42, 0.06, 0.16], yaw = 20, pitch = -25, toe = 25 }
 foot_r = { pos = [-0.34, 0.01, 0.42], yaw = -35, pitch = 6, knee = [-0.5, 0.1, 1] }
 hand_l = { swing = 25, abduct = 12, bend = 80 }
 hand_r = { swing = -20, abduct = 18, bend = 80 }

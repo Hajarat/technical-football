@@ -809,11 +809,11 @@
    "checks": {
     "lowest_joint_m": 0.038,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1174,
+    "max_bone_deg_per_s": 1199,
     "max_turn_at": "RightLeg@2",
     "sole_off_ball_max_m": 0.0005,
     "lowest_foot_m": -0.008,
-    "boot_in_ball_max_m": 0.0077,
+    "boot_in_ball_max_m": 0.0076,
     "boot_in_ball_at": "R boot@2",
     "touch_gap_m": {}
    }
@@ -1330,11 +1330,11 @@
    "checks": {
     "lowest_joint_m": 0.038,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1174,
+    "max_bone_deg_per_s": 1199,
     "max_turn_at": "LeftLeg@2",
     "sole_off_ball_max_m": 0.0005,
     "lowest_foot_m": -0.008,
-    "boot_in_ball_max_m": 0.0077,
+    "boot_in_ball_max_m": 0.0076,
     "boot_in_ball_at": "L boot@2",
     "touch_gap_m": {}
    }
@@ -1856,8 +1856,8 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1038,
-    "max_turn_at": "RightFoot@6",
+    "max_bone_deg_per_s": 1091,
+    "max_turn_at": "LeftArm@6",
     "sole_off_ball_max_m": 0.0009,
     "lowest_foot_m": 0.0,
     "boot_in_ball_max_m": 0.0,
@@ -2404,11 +2404,11 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1037,
-    "max_turn_at": "LeftFoot@6",
+    "max_bone_deg_per_s": 1092,
+    "max_turn_at": "RightArm@6",
     "sole_off_ball_max_m": 0.0009,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0001,
+    "boot_in_ball_max_m": 0.0,
     "boot_in_ball_at": "L boot@28",
     "touch_gap_m": {}
    },
@@ -2951,13 +2951,13 @@
    },
    "checks": {
     "lowest_joint_m": 0.047,
-    "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1345,
+    "lowest_joint": "RightToeBase",
+    "max_bone_deg_per_s": 1368,
     "max_turn_at": "RightUpLeg@34",
     "sole_off_ball_max_m": 0.0009,
     "lowest_foot_m": 0.0,
     "boot_in_ball_max_m": 0.0,
-    "boot_in_ball_at": "R boot@17",
+    "boot_in_ball_at": "R boot@20",
     "touch_gap_m": {}
    },
    "ending": "swap",
@@ -3501,12 +3501,12 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1345,
+    "max_bone_deg_per_s": 1368,
     "max_turn_at": "LeftUpLeg@34",
     "sole_off_ball_max_m": 0.0009,
     "lowest_foot_m": 0.0,
     "boot_in_ball_max_m": 0.0,
-    "boot_in_ball_at": "L boot@27",
+    "boot_in_ball_at": "L boot@21",
     "touch_gap_m": {}
    },
    "ending": "swap",
@@ -3560,8 +3560,8 @@
    "contacts": {
     "left": [
      [
-      11,
-      26
+      12,
+      25
      ]
     ],
     "right": [
@@ -3571,7 +3571,7 @@
      ]
     ]
    },
-   "notes": "body feint from standing: hard plant and lunge to the left, shoulder drop, push off the left foot to the right",
+   "notes": "body feint from standing: hard wide plant and deep lunge to the left, shoulder and hip drop with the right arm across, push off the left foot to the right",
    "timing": {
     "spans": [
      0.18,
@@ -3947,8 +3947,8 @@
    "checks": {
     "lowest_joint_m": 0.041,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 575,
-    "max_turn_at": "LeftForeArm@13",
+    "max_bone_deg_per_s": 850,
+    "max_turn_at": "LeftArm@20",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.006,
     "boot_in_ball_max_m": 0.0,
@@ -3989,12 +3989,12 @@
     ],
     "right": [
      [
-      11,
-      26
+      12,
+      25
      ]
     ]
    },
-   "notes": "body feint from standing: hard plant and lunge to the left, shoulder drop, push off the left foot to the right",
+   "notes": "body feint from standing: hard wide plant and deep lunge to the left, shoulder and hip drop with the right arm across, push off the left foot to the right",
    "timing": {
     "spans": [
      0.18,
@@ -4370,8 +4370,8 @@
    "checks": {
     "lowest_joint_m": 0.041,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 576,
-    "max_turn_at": "RightForeArm@13",
+    "max_bone_deg_per_s": 850,
+    "max_turn_at": "RightArm@20",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.006,
     "boot_in_ball_max_m": 0.0,
@@ -6703,9 +6703,9 @@
    "checks": {
     "lowest_joint_m": 0.043,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1206,
+    "max_bone_deg_per_s": 1201,
     "max_turn_at": "RightLeg@2",
-    "sole_off_ball_max_m": 0.0005,
+    "sole_off_ball_max_m": 0.0004,
     "lowest_foot_m": -0.003,
     "boot_in_ball_max_m": 0.006,
     "boot_in_ball_at": "R boot@8",
@@ -7194,11 +7194,11 @@
    "checks": {
     "lowest_joint_m": 0.043,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1206,
+    "max_bone_deg_per_s": 1201,
     "max_turn_at": "LeftLeg@2",
     "sole_off_ball_max_m": 0.0004,
     "lowest_foot_m": -0.003,
-    "boot_in_ball_max_m": 0.006,
+    "boot_in_ball_max_m": 0.0061,
     "boot_in_ball_at": "L boot@8",
     "touch_gap_m": {}
    }
@@ -7692,8 +7692,8 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1220,
-    "max_turn_at": "RightUpLeg@1",
+    "max_bone_deg_per_s": 1445,
+    "max_turn_at": "LeftArm@11",
     "sole_off_ball_max_m": 0.0011,
     "lowest_foot_m": 0.0,
     "boot_in_ball_max_m": 0.0057,
@@ -8212,8 +8212,8 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1221,
-    "max_turn_at": "LeftUpLeg@1",
+    "max_bone_deg_per_s": 1444,
+    "max_turn_at": "RightArm@11",
     "sole_off_ball_max_m": 0.0011,
     "lowest_foot_m": 0.0,
     "boot_in_ball_max_m": 0.0057,
@@ -8606,17 +8606,17 @@
    },
    "checks": {
     "lowest_joint_m": 0.047,
-    "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 887,
+    "lowest_joint": "RightToeBase",
+    "max_bone_deg_per_s": 1100,
     "max_turn_at": "RightFoot@25",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.004,
+    "boot_in_ball_max_m": 0.0041,
     "boot_in_ball_at": "R boot@14",
     "touch_gap_m": {
      "contact": 0.0045,
-     "contact2": 0.0084,
-     "release": 0.0136
+     "contact2": 0.0083,
+     "release": 0.0135
     }
    }
   },
@@ -8984,15 +8984,15 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 886,
+    "max_bone_deg_per_s": 1100,
     "max_turn_at": "LeftFoot@25",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": 0.0,
     "boot_in_ball_max_m": 0.004,
     "boot_in_ball_at": "L boot@14",
     "touch_gap_m": {
-     "contact": 0.0044,
-     "contact2": 0.0084,
+     "contact": 0.0045,
+     "contact2": 0.0083,
      "release": 0.0136
     }
    }
@@ -10302,11 +10302,11 @@
    "checks": {
     "lowest_joint_m": 0.041,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 941,
-    "max_turn_at": "RightLeg@9",
+    "max_bone_deg_per_s": 1355,
+    "max_turn_at": "RightArm@17",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.006,
-    "boot_in_ball_max_m": 0.0054,
+    "boot_in_ball_max_m": 0.0053,
     "boot_in_ball_at": "R boot@25",
     "touch_gap_m": {
      "contact": 0.0001,
@@ -10781,15 +10781,15 @@
    "checks": {
     "lowest_joint_m": 0.041,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 941,
-    "max_turn_at": "LeftLeg@9",
+    "max_bone_deg_per_s": 1354,
+    "max_turn_at": "LeftArm@17",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.006,
-    "boot_in_ball_max_m": 0.0054,
+    "boot_in_ball_max_m": 0.0053,
     "boot_in_ball_at": "L boot@25",
     "touch_gap_m": {
      "contact": 0.0,
-     "release": -0.0024
+     "release": -0.0025
     }
    }
   },
@@ -13182,8 +13182,8 @@
    "checks": {
     "lowest_joint_m": 0.04,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 968,
-    "max_turn_at": "RightLeg@10",
+    "max_bone_deg_per_s": 1355,
+    "max_turn_at": "RightArm@17",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.007,
     "boot_in_ball_max_m": 0.0024,
@@ -13657,8 +13657,8 @@
    "checks": {
     "lowest_joint_m": 0.04,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 968,
-    "max_turn_at": "LeftLeg@10",
+    "max_bone_deg_per_s": 1354,
+    "max_turn_at": "LeftArm@17",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.007,
     "boot_in_ball_max_m": 0.0024,
@@ -14148,7 +14148,7 @@
    "checks": {
     "lowest_joint_m": 0.041,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 939,
+    "max_bone_deg_per_s": 930,
     "max_turn_at": "RightLeg@9",
     "sole_off_ball_max_m": 0.001,
     "lowest_foot_m": -0.006,
@@ -14636,7 +14636,7 @@
    "checks": {
     "lowest_joint_m": 0.041,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 939,
+    "max_bone_deg_per_s": 930,
     "max_turn_at": "LeftLeg@9",
     "sole_off_ball_max_m": 0.001,
     "lowest_foot_m": -0.006,
@@ -15117,7 +15117,7 @@
    "checks": {
     "lowest_joint_m": 0.04,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 969,
+    "max_bone_deg_per_s": 963,
     "max_turn_at": "RightLeg@10",
     "sole_off_ball_max_m": 0.001,
     "lowest_foot_m": -0.007,
@@ -15598,7 +15598,7 @@
    "checks": {
     "lowest_joint_m": 0.04,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 969,
+    "max_bone_deg_per_s": 963,
     "max_turn_at": "LeftLeg@10",
     "sole_off_ball_max_m": 0.001,
     "lowest_foot_m": -0.007,
@@ -15958,8 +15958,8 @@
    "checks": {
     "lowest_joint_m": 0.045,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1218,
-    "max_turn_at": "RightLeg@2",
+    "max_bone_deg_per_s": 1348,
+    "max_turn_at": "RightLeg@8",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.006,
     "boot_in_ball_max_m": 0.0037,
@@ -16321,14 +16321,14 @@
    "checks": {
     "lowest_joint_m": 0.045,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1218,
-    "max_turn_at": "LeftLeg@2",
+    "max_bone_deg_per_s": 1348,
+    "max_turn_at": "LeftLeg@8",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.006,
-    "boot_in_ball_max_m": 0.0037,
+    "boot_in_ball_max_m": 0.0036,
     "boot_in_ball_at": "L boot@7",
     "touch_gap_m": {
-     "contact": -0.0037,
+     "contact": -0.0036,
      "contact2": -0.0036
     }
    }
@@ -16679,15 +16679,15 @@
    "checks": {
     "lowest_joint_m": 0.046,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1241,
-    "max_turn_at": "RightLeg@5",
+    "max_bone_deg_per_s": 1327,
+    "max_turn_at": "RightFoot@5",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.001,
-    "boot_in_ball_max_m": 0.0041,
-    "boot_in_ball_at": "R boot@4",
+    "boot_in_ball_max_m": 0.0037,
+    "boot_in_ball_at": "R boot@7",
     "touch_gap_m": {
      "contact": -0.0037,
-     "contact2": -0.0035
+     "contact2": -0.0034
     }
    }
   },
@@ -17037,12 +17037,12 @@
    "checks": {
     "lowest_joint_m": 0.046,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1241,
-    "max_turn_at": "LeftLeg@5",
+    "max_bone_deg_per_s": 1328,
+    "max_turn_at": "LeftFoot@5",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.001,
-    "boot_in_ball_max_m": 0.0042,
-    "boot_in_ball_at": "L boot@4",
+    "boot_in_ball_max_m": 0.0036,
+    "boot_in_ball_at": "L boot@7",
     "touch_gap_m": {
      "contact": -0.0036,
      "contact2": -0.0034
@@ -17649,11 +17649,11 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1139,
+    "max_bone_deg_per_s": 1130,
     "max_turn_at": "RightLeg@2",
-    "sole_off_ball_max_m": 0.0003,
+    "sole_off_ball_max_m": 0.0002,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0056,
+    "boot_in_ball_max_m": 0.0057,
     "boot_in_ball_at": "R boot@2",
     "touch_gap_m": {}
    }
@@ -18258,11 +18258,11 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1139,
+    "max_bone_deg_per_s": 1130,
     "max_turn_at": "LeftLeg@2",
-    "sole_off_ball_max_m": 0.0003,
+    "sole_off_ball_max_m": 0.0002,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0057,
+    "boot_in_ball_max_m": 0.0056,
     "boot_in_ball_at": "L boot@2",
     "touch_gap_m": {}
    }
@@ -19523,7 +19523,7 @@
      ]
     ]
    },
-   "notes": "step-over from standing: left foot circles over the front of the still ball, shoulder drop and hip swivel left, push off right",
+   "notes": "step-over from standing: left foot circles wide and high over the front of the still ball, deep shoulder and hip drop left with the right arm swinging across, push off right",
    "timing": {
     "spans": [
      0.22,
@@ -19938,8 +19938,8 @@
    "checks": {
     "lowest_joint_m": 0.041,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 714,
-    "max_turn_at": "LeftLeg@3",
+    "max_bone_deg_per_s": 1204,
+    "max_turn_at": "LeftArm@30",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.006,
     "boot_in_ball_max_m": 0.0,
@@ -19985,7 +19985,7 @@
      ]
     ]
    },
-   "notes": "step-over from standing: left foot circles over the front of the still ball, shoulder drop and hip swivel left, push off right",
+   "notes": "step-over from standing: left foot circles wide and high over the front of the still ball, deep shoulder and hip drop left with the right arm swinging across, push off right",
    "timing": {
     "spans": [
      0.22,
@@ -20400,8 +20400,8 @@
    "checks": {
     "lowest_joint_m": 0.041,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 714,
-    "max_turn_at": "RightLeg@3",
+    "max_bone_deg_per_s": 1203,
+    "max_turn_at": "RightArm@30",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": -0.006,
     "boot_in_ball_max_m": 0.0,
