@@ -809,6 +809,55 @@ public class SkillMoveTests
         Assert.Equal(tr.Move.StartTick, p.SkillMove!.StartTick);
     }
 
+    // ---- drag-back over the turn at the feet ----
+
+    /// <summary>
+    /// Close control along +X, then the left stick reversed (the controller's turn at the feet starts) and, <paramref name="after"/>
+    /// ticks after that turn began, both shoulder buttons with the stick held back. Returns the turn's start tick and the move under
+    /// way 0.1 s after the shoulders.
+    /// </summary>
+    static (int TurnStart, BallAction? Move, bool Kept) DragOverFeetTurn(ulong seed, int after)
+    {
+        var w = Field(seed);
+        var p = w.Attacker;
+        var buf = new TickIntent[w.PlayerCount];
+        int turn = -1, shoulders = -1;
+        BallAction? move = null;
+        for (int tick = 1; tick <= 900; tick++)
+        {
+            var it = new TickIntent { MoveX = 1f, CloseControl = true };
+            if (tick > 240) it = new TickIntent { MoveX = -1f, CloseControl = true };
+            if (shoulders >= 0 && tick >= shoulders) { it.Finesse = true; it.Chip = true; }
+            buf[0] = it;
+            w.Step(buf);
+            if (turn < 0 && p.SkillMove is { FeetTurn: true } ft) { turn = ft.StartTick; shoulders = turn + after; }
+            if (shoulders >= 0 && w.Tick == shoulders + 12) move = p.SkillMove;
+            if (turn < 0 && tick > 300) break;
+        }
+        return (turn, move, p.InPossession);
+    }
+
+    [Fact]
+    public void ADragBackJustAfterTheTurnAtTheFeetReplacesIt()
+    {
+        for (ulong seed = 1; seed <= 5; seed++)
+        {
+            var (turn, move, kept) = DragOverFeetTurn(seed, 6);
+            Assert.True(turn > 0, $"seed {seed}: no turn at the feet");
+            Assert.True(move is { Kind: ActionKind.DragBack, FeetTurn: false }, $"seed {seed}: the drag-back did not replace the turn ({move?.Kind}, feet turn {move?.FeetTurn})");
+            Assert.Equal(turn + 6, move!.StartTick);
+            Assert.True(kept);
+        }
+    }
+
+    [Fact]
+    public void ADragBackLateInTheTurnAtTheFeetWaitsForIt()
+    {
+        var (turn, move, _) = DragOverFeetTurn(1, 20);
+        Assert.True(turn > 0);
+        Assert.True(move == null || move.StartTick != turn + 20, "a drag-back 0.17 s into the turn at the feet replaced it");
+    }
+
     // ---- fake shot ----
 
     static Outcome PlayShot(Entry e, int cancelAt, Vector2 left, int shootTicks = 30)

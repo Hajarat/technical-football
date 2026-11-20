@@ -276,6 +276,8 @@ either side (the attacker draws them from authored clips, see "Character models"
   back first, and a flick released to rest waits until a spin or heel-to-heel can no longer follow (0.125 s after the release).
 - Heel-to-heel and spin: from rest a forward flick of at most 0.125 s, rest, then back (heel-to-heel) or a side (spin), within
   0.125 s of the release (`combo_step_window`). Elastico: back, then a side as for the step-over.
+- Drag-back: the left stick `drag_back_stick_deg` (120) or more from forward with both bumpers held, on the tick the three come
+  together; it replaces the touch controller's own turn at the feet if that began within `drag_back_over_feet_turn` (0.1 s).
 - Low shot: hold B for the power wanted, release, and press B again any time after the release and before the strike (the
   strike comes no sooner than 0.45 s after the first press and 0.12 s after the release; see Shooting). The charge is the first press's,
   so a low shot can have full power; bumpers held on either press count. There is no minimum gap between the release and

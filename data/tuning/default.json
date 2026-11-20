@@ -554,6 +554,8 @@
     "knock_on_actuation": 0.85,
     "knock_on_wait": 0.15,
     "fake_shot_cutoff": 0.05,
+    "drag_back_stick_deg": 120,
+    "drag_back_over_feet_turn": 0.1,
     "combo_step_window": 0.125,
     "frame_min_speed": 1,
     "key_side_threshold": 0.2,

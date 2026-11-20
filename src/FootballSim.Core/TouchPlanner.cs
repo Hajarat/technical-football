@@ -396,6 +396,18 @@ public static class TouchPlanner
         return true;
     }
 
+    /// <summary>
+    /// A drag-back asked for (the gesture or its key) within drag_back_over_feet_turn of the controller's own turn at the feet
+    /// starting replaces it: the turn is dropped, so the drag-back starts in its place.
+    /// </summary>
+    internal static void YieldFeetTurn(PlayerState p, int tick, Tuning t)
+    {
+        if (p.SkillAction is not { FeetTurn: true } turn) return;
+        if (tick - turn.StartTick > (int)MathF.Round(t.Skill.DragBackOverFeetTurn * t.TickRate)) return;
+        turn.Phase = ActionPhase.Done;
+        p.SkillAction = null;
+    }
+
     // ---- the controller ----
 
     /// <summary>A swing the controller can play the ball on.</summary>

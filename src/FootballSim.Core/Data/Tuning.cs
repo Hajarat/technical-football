@@ -996,6 +996,10 @@ public sealed class SkillTuning
     /// seconds.
     /// </summary>
     public float FakeShotCutoff { get; set; } = 0.05f;
+    /// <summary>The drag-back's left stick: at least this far from forward (degrees), with both shoulder buttons held.</summary>
+    public float DragBackStickDeg { get; set; } = 120f;
+    /// <summary>A drag-back asked for within this long of the touch controller's own turn at the feet starting replaces it, seconds.</summary>
+    public float DragBackOverFeetTurn { get; set; } = 0.1f;
     /// <summary>
     /// Each step of a heel-to-heel or a spin (a flick held, the stick back at neutral, the next flick) comes within this long
     /// of the one before. A sprinting forward flick released to neutral holds its knock-on while the next step may still come.

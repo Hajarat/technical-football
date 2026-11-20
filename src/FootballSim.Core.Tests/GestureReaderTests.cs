@@ -123,6 +123,10 @@ public class GestureReaderTests
     {
         AssertOnly(Read(e, Drag(8, Back())), Gesture.DragBack, SkillSide.None);
         AssertOnly(Read(e, Drag(8, Rot(Back(), 40f))), Gesture.DragBack, SkillSide.None);
+        // 125 degrees from forward is back enough (drag_back_stick_deg 120); 115 is not.
+        AssertOnly(Read(e, Drag(8, Rot(Back(), 55f))), Gesture.DragBack, SkillSide.None);
+        AssertOnly(Read(e, Drag(8, Rot(Back(), -55f))), Gesture.DragBack, SkillSide.None);
+        Assert.Empty(Read(e, Drag(8, Rot(Back(), 65f))));
         // Shoulders first, then the stick back: fires when the stick arrives; held on, still one.
         AssertOnly(Read(e, Drag(5, Vector2.Zero).Concat(Drag(60, Back()))), Gesture.DragBack, SkillSide.None);
         // One shoulder only, the stick back without shoulders, or both shoulders with the stick sideways: nothing.

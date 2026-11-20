@@ -22,8 +22,9 @@ public readonly record struct GestureRead(Gesture Kind, SkillSide Side, Vector2 
 /// <item>Body feint: from neutral, a side flick held at least a tick and back at neutral within feint_max_hold (and before
 /// it became a roll).</item>
 /// <item>Ball roll: a side held roll_min_hold (so a quick flick is a feint and a hold is a roll).</item>
-/// <item>Drag-back: the left stick back with both shoulder buttons held (<see cref="TickIntent.Finesse"/> and
-/// <see cref="TickIntent.Chip"/>), on the tick the three come together. The right stick back alone does nothing.</item>
+/// <item>Drag-back: the left stick drag_back_stick_deg or more from forward with both shoulder buttons held
+/// (<see cref="TickIntent.Finesse"/> and <see cref="TickIntent.Chip"/>), on the tick the three come together; it replaces a turn at
+/// the feet the touch controller began within drag_back_over_feet_turn. The right stick back alone does nothing.</item>
 /// <item>Knock-on: a forward flick past knock_on_actuation while sprinting, fired knock_on_wait later unless the stick went to
 /// a side or back (a step-over, spin or heel-to-heel) or another gesture came first; a flick released to neutral also waits
 /// while a spin or heel-to-heel could still follow (combo_step_window). Not sprinting, a forward flick does nothing.</item>
@@ -170,11 +171,12 @@ public static class GestureReader
             else if (tick - p.GZoneStart + 1 >= Ticks(k.RollMinHold, t)) { found = Gesture.BallRoll; side = zs; }
         }
 
-        // The drag-back: the left stick back with both shoulder buttons held, on the tick they first are all three.
+        // The drag-back: the left stick back (drag_back_stick_deg or more from forward) with both shoulder buttons held, on the
+        // tick they first are all three.
         bool drag = false;
         float lmag = it.Move.Length();
         if (it.Finesse && it.Chip && lmag >= k.MinActuation)
-            drag = MathF.Abs(MathF.Atan2(Vector2.Dot(it.Move, right), Vector2.Dot(it.Move, fwd))) * 180f / MathF.PI >= 135f;
+            drag = MathF.Abs(MathF.Atan2(Vector2.Dot(it.Move, right), Vector2.Dot(it.Move, fwd))) * 180f / MathF.PI >= k.DragBackStickDeg;
         if (drag && !p.GDragHeld && found == Gesture.None) found = Gesture.DragBack;
         p.GDragHeld = drag;
 
