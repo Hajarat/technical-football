@@ -745,6 +745,7 @@ public sealed class ShotClipLayer
 
     readonly NVec3[] _legOff = new NVec3[2], _legOffVel = new NVec3[2];
     readonly bool[] _hbStep = new bool[2];
+    readonly float[] _hbLift = new float[2];
     /// <summary>Whether foot <paramref name="i"/> is stepping back in at the hand-back (it is not planted, whatever the figure's own pose has).</summary>
     public bool HandBackStepping(int i) => _handBack && _hbStep[i];
 
@@ -793,7 +794,9 @@ public sealed class ShotClipLayer
             if (_hbStep[i] && x.Length() < 0.01f * _legLen) _hbStep[i] = false;
             _legOff[i] = x; _legOffVel[i] = v;
             var target = baseAnk[i] + x * tk;
-            if (_hbStep[i]) target.Y += Math.Min(0.05f * _legLen, 0.3f * new NVec2(x.X, x.Z).Length());
+            // (the step back in clears the ground, its lift eased in and out so the knee does not bend in a tick)
+            _hbLift[i] = _hbStep[i] ? Math.Min(1f, _hbLift[i] + dt / 0.08f) : Math.Max(0f, _hbLift[i] - dt / 0.08f);
+            if (_hbLift[i] > 0f) target.Y += Math.Min(0.05f * _legLen, 0.3f * new NVec2(x.X, x.Z).Length()) * Smooth(_hbLift[i]);
             float twc = Math.Clamp(tw[i], 0f, 1f);
             var gFoot = twc > 0f ? NQuat.Normalize(NQuat.Slerp(_gr[_sk.Foot[i]], _baseG[_sk.Foot[i]], twc)) : _gr[_sk.Foot[i]];
             SolveLeg(i, target, gFoot, 0.97f);
