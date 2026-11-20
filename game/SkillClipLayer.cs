@@ -203,9 +203,15 @@ public sealed class SkillClipLayer
                 _pending = false;
                 // a held-back move made with other timing than forecast (a sole's reach, planned only now): the clip goes on from
                 // where it is to the move's own contact and end
+                // (and its pins from the move as made: a two-contact move's second contact, foot and surface are the core's only now)
                 var r = f.Skill;
                 float rc = r.Elapsed - r.ContactElapsed;
-                if (Math.Abs(rc - _mapContact) > 0.5f * dt || Math.Abs(r.Duration - _mapEnd) > 0.5f * dt) BuildMap(r, _ct, r.Elapsed - dt);
+                bool second = !float.IsNaN(r.Contact2Elapsed) || !float.IsNaN(r.LiftElapsed);
+                if (second || Math.Abs(rc - _mapContact) > 0.5f * dt || Math.Abs(r.Duration - _mapEnd) > 0.5f * dt)
+                {
+                    BuildMap(r, _ct, r.Elapsed - dt);
+                    BuildPins(r); Array.Clear(_pinHave);
+                }
             }
             _t = s.Valid && s.Id == _moveId ? s.Elapsed : _t + dt;
             // the clip has played out, or a shot or another move it cannot draw takes over, or a fake read was not made
@@ -296,7 +302,7 @@ public sealed class SkillClipLayer
         _moveId = s.Id; _t = s.Elapsed; _playing = true; _handBack = false; _transition = true;
         foreach (var l in _lock) l.Reset();
         _shotElapsed = float.NaN; Array.Clear(_pinHave); Array.Clear(_legU); Array.Clear(_flagWas); Array.Clear(_anchor); Array.Clear(_anchor0);
-        BuildPins(s);
+        _pinRamp0 = _map!.ClipStart; BuildPins(s);
         // a foot the run has planted as a running clip with declared stances takes over is held on its spot (see _handIn)
         bool declared = _wRun > 0.5f && _declared.Contains(_run.Clip.Name);
         // (planted: the figure has it so, or its foot is on the ground and has all but stopped, a landing still settling)
@@ -329,6 +335,8 @@ public sealed class SkillClipLayer
         _map = new SkillTimeMap(clipFrom, knots, c.EventSeconds("end"), origin);
     }
     float _mapContact, _mapEnd;
+    /// <summary>The clip time the move's first pin ramps in from: where its clip began (kept when the pins are rebuilt as a held-back move is made).</summary>
+    float _pinRamp0;
 
     /// <summary>
     /// The running clip's ending for the exit touch the core forecasts (made at once on the move's end tick): its second ending when
@@ -446,7 +454,7 @@ public sealed class SkillClipLayer
         {
             var q = _pins[i];
             // the first ramps in from where the clip starts, a later one over at most 0.12 s after the one before it ends
-            q.RampFrom = i == 0 ? Math.Min(_map!.ClipStart, q.From) : Math.Min(q.From, Math.Max(prevTo, q.From - 0.12f));
+            q.RampFrom = i == 0 ? Math.Min(_pinRamp0, q.From) : Math.Min(q.From, Math.Max(prevTo, q.From - 0.12f));
             prevTo = Math.Max(prevTo, q.To);
             _pins[i] = q;
         }
@@ -574,7 +582,12 @@ public sealed class SkillClipLayer
             // (no faster than over AwaitFade, but all of it once the pin has the foot to itself)
             if (_twAwait[i] && _twAwaitMade[i])
             {
-                _twAwaitCap[i] = _pinRaw[i] >= 1f ? 0f : Math.Max(1f - _pinRaw[i], _twAwaitCap[i] - dt / AwaitFade);
+                // (a pin on its span before the move's own contact, a held-back clip waiting at its contact pose through a reach the
+                // forecast left out, still takes the foot over AwaitFade)
+                // (and with the move's contact ahead, an even share of what is left each tick until then)
+                bool contactNow = f.Skill.Valid && f.Skill.ContactElapsed >= -1e-4f;
+                float fade = f.Skill.Valid && !contactNow ? _twAwaitCap[i] * dt / (dt - f.Skill.ContactElapsed) : dt / AwaitFade;
+                _twAwaitCap[i] = _pinRaw[i] >= 1f && contactNow ? 0f : Math.Max(1f - _pinRaw[i], _twAwaitCap[i] - fade);
                 _twx[i] = Math.Min(_twx[i], _twAwaitCap[i]);
             }
             if (_twAwait[i] && raw >= 0.999f) { _twAwaitMade[i] = true; _twAwaitCap[i] = 1f; }
