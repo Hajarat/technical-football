@@ -30,6 +30,7 @@ public partial class Match : Node3D
     {
         _args = ToolArgs.Parse();
         if (_args.Background) MacBackground.Apply();
+        else FitWindowToScreen();
 
         var env = new Godot.Environment
         {
@@ -280,5 +281,21 @@ public partial class Match : Node3D
         System.GC.Collect();
         System.GC.WaitForPendingFinalizers();
         System.GC.Collect();
+    }
+
+    /// <summary>
+    /// Opens the window at 70% of the screen it is on (16:9, as large as fits in 70% of both the screen's width and height),
+    /// centred. Background tool runs keep the project's fixed size so their screenshots stay the same size.
+    /// </summary>
+    static void FitWindowToScreen()
+    {
+        if (DisplayServer.GetName() == "headless") return;
+        const float Share = 0.7f;
+        int screen = DisplayServer.WindowGetCurrentScreen();
+        Vector2I size = DisplayServer.ScreenGetSize(screen), origin = DisplayServer.ScreenGetPosition(screen);
+        int w = (int)Mathf.Min(size.X * Share, size.Y * Share * 16f / 9f);
+        var win = new Vector2I(w, w * 9 / 16);
+        DisplayServer.WindowSetSize(win);
+        DisplayServer.WindowSetPosition(origin + (size - win) / 2);
     }
 }
