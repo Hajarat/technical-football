@@ -219,7 +219,7 @@ planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its
 | `fake_cut_out_run.toml` | `fake_cut_out_right_run`, `fake_cut_out_left_run` | the same at 3 m/s |
 | `fake_stop.toml` | `fake_stop_right`, `fake_stop_left` | fake shot from standing: the same wind-up, the leg comes through short and the sole stops the ball under him (named by the shooting foot) |
 | `fake_stop_run.toml` | `fake_stop_right_run`, `fake_stop_left_run` | the same at 3 m/s, the run dying over the stop |
-| `elastico.toml` | `elastico_left`, `elastico_right` | from standing, the outside pushes the ball away from the exit side, the foot wraps round the back of the ball, the inside snaps it back at 45 deg |
+| `elastico.toml` | `elastico_left`, `elastico_right` | from standing, the outside pushes the ball away from the exit side, the foot wraps round the back of the ball, the inside snaps it back at 45 deg; the knee and hip go out with the push and back with the snap, the upper body selling the first push with the arm out |
 | `elastico_run.toml` | `elastico_left_run`, `elastico_right_run` | the same at 2 m/s |
 | `spin.toml` | `spin_left`, `spin_right` | from standing, a 360 roulette: one sole drags the ball round through 180 deg, the feet swap, the other completes the turn |
 | `spin_run.toml` | `spin_left_run`, `spin_right_run` | the same entered at 2 m/s |

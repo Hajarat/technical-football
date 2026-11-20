@@ -8606,17 +8606,17 @@
    },
    "checks": {
     "lowest_joint_m": 0.047,
-    "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 887,
+    "lowest_joint": "RightToeBase",
+    "max_bone_deg_per_s": 1100,
     "max_turn_at": "RightFoot@25",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.004,
+    "boot_in_ball_max_m": 0.0041,
     "boot_in_ball_at": "R boot@14",
     "touch_gap_m": {
      "contact": 0.0045,
-     "contact2": 0.0084,
-     "release": 0.0136
+     "contact2": 0.0083,
+     "release": 0.0135
     }
    }
   },
@@ -8984,15 +8984,15 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 886,
+    "max_bone_deg_per_s": 1100,
     "max_turn_at": "LeftFoot@25",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": 0.0,
     "boot_in_ball_max_m": 0.004,
     "boot_in_ball_at": "L boot@14",
     "touch_gap_m": {
-     "contact": 0.0044,
-     "contact2": 0.0084,
+     "contact": 0.0045,
+     "contact2": 0.0083,
      "release": 0.0136
     }
    }
