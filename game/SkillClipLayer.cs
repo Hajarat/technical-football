@@ -294,7 +294,10 @@ public sealed class SkillClipLayer
             bool still = _haveShown && a.Y < _restAnkleY + PlantAbove && new System.Numerics.Vector2(a.X - shownAnk[i].X, a.Z - shownAnk[i].Z).Length() * sc / f.Dt < HandInStill;
             _handIn[i] = declared && (basePlanted[i] || still); _handInSpot[i] = a; _flagWas2[i] = false; _relS[i] = AnchorRelease; _pathOff[i] = false; _early[i] = false; _arc[i] = 0f; _turnU[i] = 1f;
         }
-        _handInRun = 0f;
+        _handInRun = 0f; _startT = s.Elapsed;
+        // (the lift's look-ahead from the first tick: the feet as shown on the tick before, the ball where it was then)
+        for (int i = 0; i < 2; i++) { _liftTgt[i] = shownAnk[i]; _liftHave[i] = _haveShown; }
+        _liftBall = M(f.BallPos - f.BallVel * f.Dt, sc);
         if (Dbg) GD.Print($"SKILL_DBG hand-in L={_handIn[0]} R={_handIn[1]}");
         GD.Print($"SKILL_CLIP start move={_move} foot={(foot == 1 ? "R" : "L")} clip={_stand.Clip.Name}/{_run.Clip.Name} w_run={_wRun:F2} speed={speed:F2} clip_from={_map.ClipStart:F3} contact_s={simContact:F3} end_s={simEnd:F3} origin_s={origin:F3}");
     }
@@ -683,8 +686,20 @@ public sealed class SkillClipLayer
             }
             // a step-over's circling boot is lifted over the ball when it would pass through it, at most BallLiftRate: the hand-in
             // from the stride can carry the swinging foot through a ball close ahead (a step-over begun at a sprint)
-            float needLift = twi <= 0f && _pinIdx[i] >= 0 && _pins[_pinIdx[i]].Path && !_pathOff[i] ? LiftOverBall(i, target, gFoot, live, (f.BallRadius + BallClear) / sc) : 0f;
-            _ballLift[i] = needLift > _ballLift[i] ? Math.Min(needLift, _ballLift[i] + BallLiftRate / sc * dt) : Math.Max(needLift, _ballLift[i] - BallLiftRate / sc * dt);
+            // (over the hand-in the stride's swing, carried on by the hand-over, can reach the ball within a tick or two: the lift
+            // works from the first tick, before the path's pin has any weight, looks a tick ahead, the foot and the ball moving on
+            // as they did, and rises at up to HandInLiftRate, so the boot clears the ball instead of passing through it while the
+            // lift catches up)
+            bool handInLift = _t - _startT < HandInLiftSeconds && _liftHave[i];
+            bool pathFoot = _pinIdx[i] >= 0 ? _pins[_pinIdx[i]].Path : handInLift && PathPinOn(i);
+            bool liftOn = twi <= 0f && pathFoot && !_pathOff[i];
+            float needLift = liftOn ? LiftOverBall(i, target, gFoot, live, (f.BallRadius + BallClear) / sc) : 0f;
+            if (liftOn && handInLift)
+                needLift = Math.Max(needLift, LiftOverBall(i, 2f * target - _liftTgt[i], gFoot, 2f * live - _liftBall, (f.BallRadius + BallClear) / sc));
+            float rise = handInLift ? HandInLiftRate : BallLiftRate;
+            _ballLift[i] = needLift > _ballLift[i] ? Math.Min(needLift, _ballLift[i] + rise / sc * dt) : Math.Max(needLift, _ballLift[i] - BallLiftRate / sc * dt);
+            _liftTgt[i] = target; _liftHave[i] = true;
+            if (i == 1) _liftBall = live;
             target.Y += _ballLift[i];
             target = KeepAboveGround(i, target, gFoot);
             if (Dbg) GD.Print($"SKILL_DBG ct={_ct:F3} foot={i} ank=({ankle.X:F3},{ankle.Y:F3},{ankle.Z:F3}) tgt=({target.X:F3},{target.Y:F3},{target.Z:F3}) pin={_pinW[i]:F2} st={(stance ? 1 : 0)} lock={(lk.Locked ? 1 : 0)} tw={tw[i]:F2} far={(far ? 1 : 0)} legw={_legU[i]:F2}");
@@ -830,6 +845,13 @@ public sealed class SkillClipLayer
         return false;
     }
 
+    /// <summary>Whether foot <paramref name="i"/> has a step-over's path pin.</summary>
+    bool PathPinOn(int i)
+    {
+        foreach (var q in _pins) if (q.Foot == i && q.Path) return true;
+        return false;
+    }
+
     /// <summary>How far the ankle target must rise for the boot's surfaces to be at least <paramref name="clear"/> from the ball's centre <paramref name="ball"/> (0 when they are).</summary>
     float LiftOverBall(int i, NVec3 target, NQuat gFoot, NVec3 ball, float clear)
     {
@@ -845,6 +867,13 @@ public sealed class SkillClipLayer
     readonly float[] _ballLift = new float[2];
     /// <summary>A step-over's boot lifted over the ball stays this far (metres) off its surface; the lift changes at most this fast (m/s).</summary>
     const float BallClear = 0.01f, BallLiftRate = 1.5f;
+    /// <summary>Over this long (s) from the clip's start the lift looks a tick ahead and rises at up to HandInLiftRate (m/s).</summary>
+    const float HandInLiftSeconds = 0.05f, HandInLiftRate = 9f;
+    /// <summary>Per foot, the ankle target before the lift on the tick before (model space), whether there is one; the live ball then.</summary>
+    readonly NVec3[] _liftTgt = new NVec3[2];
+    readonly bool[] _liftHave = new bool[2];
+    NVec3 _liftBall;
+    float _startT;
 
     /// <summary>Raises the ankle target so the boot (toe joint, toe tip, sole) stays above the ground.</summary>
     NVec3 KeepAboveGround(int i, NVec3 target, NQuat gFoot)
