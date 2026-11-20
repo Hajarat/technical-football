@@ -12,7 +12,7 @@ The pitch (`src/FootballSim.Core/Pitch.cs`) is a walled arena whose lengths come
 
 | What | Command |
 | --- | --- |
-| Play (needs a gamepad) | `godot-mono --path game` |
+| Play (needs a gamepad); builds the C# first, since `godot-mono --path game` alone runs the last compiled build, which a pull does not update | `./play.sh` |
 | Build the game project | `dotnet build game/FootballSim.Game.csproj` |
 | Tests | `dotnet test FootballSim.slnx` |
 | Batch run, 10 000 scripted rounds | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario penalty --n 10000 --seed 1` |
@@ -38,6 +38,8 @@ player apart, in `wall`, not as steps); a pooled summary follows the table. `--d
 | A replay with the skill moves drawn procedurally instead of from the authored full-body clips, the default (see "Character models"); measurements as below | `godot-mono --headless --path game -- --replay tests/dribble_replay.json --quit-after-round --skill-anim procedural` |
 | The authored skill clips' gallery (each clip with its authored ball, side, front and game-camera views, a sheet every 0.05 s, a per-tick strip around the contact; `--video` adds MP4 frames) | `game/tests/run-bg.sh -- --clip-gallery ../out/skills --clip-folder res://assets/anim/attacker/skills --clip-model res://assets/characters/player.glb --video` then `uv run --with imageio-ffmpeg python3 tools/anim/encode_video.py out/skills` |
 | Regenerate the attacker's stride cycles (after `retarget.py` has written the attacker clips) and their gallery sheets | `uv run --with numpy python3 tools/anim/cycles.py` then `game/tests/run-bg.sh -- --clip-gallery ../out/cycles --clip-folder res://assets/anim/attacker/cycles --clip-model res://assets/characters/player.glb` |
+
+The game stamps the commit it was built from: it prints `BUILD commit=... head=... stale=...` at start, warns on screen in interactive play when its build is behind the checkout, and records `build_commit`, `head_commit` and `build_stale` in the session log's `start` line.
 
 The smoke run prints the round report on one line prefixed `REPORT ` and exits 0. `smoke.sh` checks it is identical to the batch tool's report.
 Screenshots go to `game/out/` (ignored by git).

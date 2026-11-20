@@ -50,6 +50,11 @@ public sealed class ToolArgs
     /// <summary>--bake-keeper-pose &lt;dir&gt;: play the keeper gallery's dive, smother and slide scripts procedurally and write their bone rotations there (tools/anim/bake_procedural.py).</summary>
     public string? BakeDir;
 
+    /// <summary>A person playing: a window, and no replay, screenshot, gallery, bake or quit option.</summary>
+    public bool Interactive => DisplayServer.GetName() != "headless" && ReplayPath == null && ShotDir == null && ShotTicks.Count == 0 && ShotOn.Count == 0
+        && BurstCount == 0 && GalleryDir == null && ClipGalleryDir == null && BakeDir == null && QuitAfterTicks == 0 && !QuitAfterRound
+        && ControlsPanel == null && !Background;
+
     /// <summary>The options of this run (the latest <see cref="Parse"/>), for views created after it.</summary>
     public static ToolArgs? Current { get; private set; }
 

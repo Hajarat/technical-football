@@ -213,14 +213,16 @@ planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its
 | `body_feint_run.toml` | `body_feint_left_run`, `body_feint_right_run` | the same at 2 m/s |
 | `fake_cut.toml` | `fake_cut_left`, `fake_cut_right` | fake shot from standing: a full shooting wind-up, then the inside of the shooting foot hooks the ball 60 deg across and he turns with it |
 | `fake_cut_run.toml` | `fake_cut_left_run`, `fake_cut_right_run` | the same at 3 m/s |
+| `fake_cut_out.toml` | `fake_cut_out_right`, `fake_cut_out_left` | the fake shot's cut toward the shooting foot's own side: the same wind-up with the plant foot wide, the leg comes through on the ball's inner side, foot turned in, and its outside hooks the ball 60 deg across; he turns with it |
+| `fake_cut_out_run.toml` | `fake_cut_out_right_run`, `fake_cut_out_left_run` | the same at 3 m/s |
 | `fake_stop.toml` | `fake_stop_right`, `fake_stop_left` | fake shot from standing: the same wind-up, the leg comes through short and the sole stops the ball under him (named by the shooting foot) |
 | `fake_stop_run.toml` | `fake_stop_right_run`, `fake_stop_left_run` | the same at 3 m/s, the run dying over the stop |
 | `elastico.toml` | `elastico_left`, `elastico_right` | from standing, the outside pushes the ball away from the exit side, the foot wraps round the back of the ball, the inside snaps it back at 45 deg |
 | `elastico_run.toml` | `elastico_left_run`, `elastico_right_run` | the same at 2 m/s |
 | `spin.toml` | `spin_left`, `spin_right` | from standing, a 360 roulette: one sole drags the ball round through 180 deg, the feet swap, the other completes the turn |
 | `spin_run.toml` | `spin_left_run`, `spin_right_run` | the same entered at 2 m/s |
-| `heel_to_heel.toml` | `heel_to_heel_right`, `heel_to_heel_left` | from standing, the leading heel knocks the ball back, the trailing inside flicks it forward (named by the leading foot) |
-| `heel_to_heel_run.toml` | `heel_to_heel_right_run`, `heel_to_heel_left_run` | the same at 3 m/s |
+| `heel_to_heel.toml` | `heel_to_heel_right`, `heel_to_heel_left` | from a walk, the leading foot swings past the ball on its outer side and its heel knocks it back and across between the feet, the foot steps out beside it, and the trailing foot, turned out behind the ball, pushes it on with its inside (named by the leading foot; spans at the core's 0.117 / 0.217 / 0.35 s) |
+| `heel_to_heel_run.toml` | `heel_to_heel_right_run`, `heel_to_heel_left_run` | the same at a run |
 
 A move's standing and running files share their events at the same normalised times, so the two can be blended by entry speed.
 

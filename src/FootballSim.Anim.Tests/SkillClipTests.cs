@@ -163,4 +163,21 @@ public class SkillClipTests
                 Assert.True(MathF.Abs(stand.RootYaw) < 0.2f, $"{stand.Clip.Name} root yaw {stand.RootYaw}");
             }
     }
+
+    [Theory]
+    [InlineData(1, -1, "fake_cut_left")]       // the right foot's cut to the left: the inside hook
+    [InlineData(1, 1, "fake_cut_out_right")]   // to its own side: the outside hook
+    [InlineData(0, 1, "fake_cut_right")]
+    [InlineData(0, -1, "fake_cut_out_left")]
+    public void AFakeCutTowardTheFootsOwnSideGetsTheOutsideHook(int foot, int side, string clip)
+    {
+        var dir = SkillClipDir();
+        Assert.NotNull(dir);
+        var lib = SkillClipLibrary.Parse(File.ReadAllText(Path.Combine(dir!, "clips.json")), f => File.ReadAllBytes(Path.Combine(dir!, f)));
+        var pair = lib.Pair("fake_cut", foot, side);
+        Assert.True(pair.HasValue);
+        Assert.Equal(clip, pair!.Value.Stand.Clip.Name);
+        Assert.Equal(clip + "_run", pair.Value.Run.Clip.Name);
+        Assert.Equal(foot, pair.Value.Stand.Foot);
+    }
 }

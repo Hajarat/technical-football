@@ -11,6 +11,7 @@ public partial class Hud : CanvasLayer
     Label _shotType = null!;
     float _shotTypeLeft;
     const float PowerBarWidth = 400f;
+    Label _stale = null!;
     Label _clock = null!, _spot = null!, _notice = null!, _warning = null!, _title = null!, _body = null!, _toast = null!;
     float _toastLeft;
     PanelContainer _report = null!;
@@ -57,6 +58,14 @@ public partial class Hud : CanvasLayer
         _warning.LabelSettings!.FontColor = new Color(1f, 0.55f, 0.3f);
         _warning.Visible = false;
 
+        _stale = MakeLabel(root, 26, HorizontalAlignment.Center);
+        _stale.AnchorLeft = 0; _stale.AnchorRight = 1; _stale.AnchorTop = _stale.AnchorBottom = 0.5f;
+        _stale.OffsetLeft = 60; _stale.OffsetRight = -60; _stale.OffsetTop = -90; _stale.OffsetBottom = 90;
+        _stale.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _stale.VerticalAlignment = VerticalAlignment.Center;
+        _stale.LabelSettings!.FontColor = new Color(1f, 0.45f, 0.2f);
+        _stale.Visible = false;
+
         _toast = MakeLabel(root, 20, HorizontalAlignment.Right);
         _toast.AnchorLeft = _toast.AnchorRight = 1; _toast.AnchorTop = _toast.AnchorBottom = 1;
         _toast.OffsetLeft = -700; _toast.OffsetRight = -20; _toast.OffsetTop = -36; _toast.OffsetBottom = -10;
@@ -91,6 +100,19 @@ public partial class Hud : CanvasLayer
     {
         if (_toastLeft > 0f && (_toastLeft -= (float)delta) <= 0f) _toast.Visible = false;
         if (_shotTypeLeft > 0f && (_shotTypeLeft -= (float)delta) <= 0f) _shotType.Visible = false;
+    }
+
+    public override void _Input(InputEvent e)
+    {
+        if (!_stale.Visible) return;
+        if ((e is InputEventKey { Pressed: true, Echo: false }) || e is InputEventJoypadButton { Pressed: true }) SetStaleBuild("");
+    }
+
+    /// <summary>The "built from an old commit" warning over the middle of the screen; any key or pad button dismisses it. Empty string hides it.</summary>
+    public void SetStaleBuild(string text)
+    {
+        _stale.Text = text.Length > 0 ? text + "\n(press any button to dismiss)" : "";
+        _stale.Visible = text.Length > 0;
     }
 
     /// <summary>A short confirmation in the bottom-right corner, hidden after the given seconds.</summary>
