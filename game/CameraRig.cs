@@ -13,7 +13,7 @@ namespace FootballSim.Game;
 /// </summary>
 public partial class CameraRig : Camera3D
 {
-    public float Height = 6.2f, Distance = 15.5f, SmoothSeconds = 0.35f;
+    public float Height = 12.2f, Distance = 26.1f, SmoothSeconds = 0.35f;
     // Arena of 30 m: the lead starts 22.5 m from the goal and is full 14.5 m out (as on the old full-size half pitch). The
     // end clamps below decide how far toward either end the focus can go.
     public float MinFocusX = 0f, MaxFocusX = 30f, ZFollow = 0.85f, LookZOffset = 0f;

@@ -322,6 +322,177 @@ public class SkillMoveTests
         Assert.True(p.InPossession);
     }
 
+    [Theory]
+    [InlineData(Entry.Jog, -1, 45f)]
+    [InlineData(Entry.Jog, 1, 45f)]
+    [InlineData(Entry.Sprint, -1, 45f)]
+    [InlineData(Entry.Sprint, 1, 60f)]
+    [InlineData(Entry.Jog, 1, -45f)]
+    [InlineData(Entry.Sprint, -1, 0f)]
+    public void BallRollAtARunReleasesTheBallTowardTheStickOnItsSide(Entry e, int side, float deg)
+    {
+        // The left stick turns toward the roll's side (deg > 0) 0.1 s before its end: the ball is released that way, so the exit
+        // touch is an ordinary dribble touch (not a turn), he is running along the stick within 0.25 s and never brakes in a
+        // step. Straight on or toward the other side the ball is released along the run as before.
+        for (ulong seed = 1; seed <= 3; seed++)
+        {
+            var w = Field(seed);
+            var p = w.Attacker;
+            var t = w.Tuning;
+            var buf = new TickIntent[w.PlayerCount];
+            BallAction? a = null;
+            float a0 = deg * side * MathF.PI / 180f;
+            var stick = new Vector2(MathF.Cos(a0), MathF.Sin(a0));
+            Vector2 release = default;
+            ActionKind? exit = null;
+            int onStickAt = -1, steps = 0;
+            float prev = float.NaN;
+            bool lost = false;
+            for (int tick = 1; tick <= 480 && (a == null || w.Tick < a.EndTick + 60); tick++)
+            {
+                int i = tick - 241;
+                var it = i >= 0 && i < 40 ? Roll(i, Run(e, tick), side) : Run(e, tick);
+                if (a != null && tick >= a.EndTick - 12) { it.MoveX = stick.X; it.MoveZ = stick.Y; }
+                buf[0] = it;
+                w.Step(buf);
+                if (a == null && w.Events.Any(ev => ev.Kind == EventKind.SkillMove)) a = p.SkillMove!;
+                lost |= w.Events.Any(ev => ev.Kind == EventKind.PossessionLost);
+                if (a == null) continue;
+                var v = new Vector2(p.Velocity.X, p.Velocity.Z);
+                if (w.Tick >= a.StartTick + 1 && w.Tick <= a.EndTick + 30 && !float.IsNaN(prev) && MathF.Abs(v.Length() - prev) > 15f * t.Dt) steps++;
+                prev = v.Length();
+                if (w.Tick == a.EndTick)
+                {
+                    // The exit touch is made at once on the end tick: the ball's travel just before it is the release.
+                    exit = w.Events.Any(ev => ev.Kind == EventKind.Touch) ? p.TouchAction?.Kind : null;
+                }
+                if (w.Tick >= a.EndTick - 1 && onStickAt < 0
+                    && MathF.Abs(MathF.Atan2(stick.X * v.Y - stick.Y * v.X, Vector2.Dot(stick, v))) * 180f / MathF.PI <= 15f)
+                    onStickAt = w.Tick;
+            }
+            string at = $"{e} side {side} {deg} deg seed {seed}";
+            Assert.NotNull(a);
+            Assert.Equal(ActionKind.BallRoll, a!.Kind);
+            if (deg > 0f)
+            {
+                Assert.True(exit is ActionKind.Jog or ActionKind.Sprint, $"{at}: exit touch {exit}");
+                Assert.True(onStickAt >= 0 && (onStickAt - (a.EndTick - 1)) * t.Dt <= 0.25f + 1e-4f, $"{at}: on the stick at tick {onStickAt}, end {a.EndTick}");
+                Assert.Equal(0, steps);
+            }
+            Assert.False(lost, $"{at}: lost the ball");
+            Assert.True(p.InPossession, $"{at}: not in possession");
+        }
+    }
+
+    [Fact]
+    public void BallRollReleaseFollowsTheStickOnlyTowardItsSide()
+    {
+        var a = new BallAction { Kind = ActionKind.BallRoll, Side = SkillSide.Right, HoldDirection = new Vector2(1f, 0f), SkillEntry = 5f };
+        var t = TestData.Tuning();
+        float Deg(Vector2 d) => MathF.Atan2(d.Y, d.X) * 180f / MathF.PI;
+        // His right is +Z: 45 degrees toward it is followed, 80 is held to 60, the other way and straight on keep the run.
+        Assert.Equal(45f, Deg(SkillMoves.RollReleaseDir(a, new Vector2(MathF.Cos(MathF.PI / 4f), MathF.Sin(MathF.PI / 4f)), t)), 2);
+        Assert.Equal(60f, Deg(SkillMoves.RollReleaseDir(a, new Vector2(MathF.Cos(1.4f), MathF.Sin(1.4f)), t)), 2);
+        Assert.Equal(0f, Deg(SkillMoves.RollReleaseDir(a, new Vector2(1f, -1f), t)), 2);
+        Assert.Equal(0f, Deg(SkillMoves.RollReleaseDir(a, new Vector2(1f, 0f), t)), 2);
+        // From standing the run's line is kept.
+        a.SkillEntry = 0.5f;
+        Assert.Equal(0f, Deg(SkillMoves.RollReleaseDir(a, new Vector2(1f, 1f), t)), 2);
+    }
+
+    public static IEnumerable<object[]> FlowingMoves()
+    {
+        foreach (string move in new[] { "step_over", "body_feint", "elastico", "spin" })
+        foreach (var e in new[] { Entry.Jog, Entry.Sprint })
+        foreach (int side in new[] { -1, 1 })
+            yield return new object[] { move, e, side };
+    }
+
+    /// <summary>The share of his entry pace a flowing move keeps at least: the step-over and body feint 85% at a jog (4 m/s) to 75% at a sprint (7.5 m/s).</summary>
+    static float Keep(string move, float entry) => move switch
+    {
+        "elastico" => 0.7f,
+        "spin" => 0.6f,
+        _ => 0.85f - 0.10f * Math.Clamp((entry - 4f) / 3.5f, 0f, 1f),
+    };
+
+    [Theory]
+    [MemberData(nameof(FlowingMoves))]
+    public void FlowingMovesAtARunKeepHimMovingWithTheBallRollingOn(string move, Entry e, int side)
+    {
+        // The left stick stays forward throughout: he never drops below the move's share of his entry pace (the step-over and
+        // body feint easing no harder than step_over_run_brake), the ball ends ahead of him along his travel rolling at least
+        // as fast as he runs, and he is back to the share and running along the stick within 0.25 s of the end.
+        var (trace, kind) = TraceFor(move, side);
+        for (ulong seed = 1; seed <= 3; seed++)
+        {
+            var w = Field(seed);
+            var p = w.Attacker;
+            var t = w.Tuning;
+            var buf = new TickIntent[w.PlayerCount];
+            BallAction? a = null;
+            float minSpeed = float.MaxValue, maxBrake = 0f, run0 = float.NaN, along = float.NaN, perp = float.NaN, ballSpeed = float.NaN, speed = float.NaN;
+            int backAt = -1, onStickAt = -1;
+            bool lost = false;
+            for (int tick = 1; tick <= 480 && (a == null || w.Tick < a.EndTick + 40); tick++)
+            {
+                int i = tick - 241;
+                buf[0] = i >= 0 && i < 40 ? trace(i, Run(e, tick)) : Run(e, tick);
+                w.Step(buf);
+                if (a == null && w.Events.Any(ev => ev.Kind == EventKind.SkillMove)) { a = p.SkillMove!; run0 = p.RunSpeed; }
+                lost |= w.Events.Any(ev => ev.Kind == EventKind.PossessionLost);
+                if (a == null) continue;
+                var v = new Vector2(p.Velocity.X, p.Velocity.Z);
+                float share = Keep(move, a.SkillEntry);
+                if (w.Tick < a.EndTick)
+                {
+                    minSpeed = MathF.Min(minSpeed, v.Length() / a.SkillEntry);
+                    maxBrake = MathF.Max(maxBrake, (run0 - p.RunSpeed) / t.Dt);
+                    run0 = p.RunSpeed;
+                }
+                if (w.Tick == a.EndTick - 1)
+                {
+                    var dir = Vector2.Normalize(v);
+                    var rel = new Vector2(w.Ball.Position.X - p.Position.X, w.Ball.Position.Z - p.Position.Z);
+                    along = Vector2.Dot(rel, dir);
+                    perp = MathF.Abs(dir.X * rel.Y - dir.Y * rel.X);
+                    speed = v.Length();
+                }
+                // Released on the end tick.
+                if (w.Tick == a.EndTick) ballSpeed = new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z).Length();
+                if (w.Tick >= a.EndTick - 1)
+                {
+                    if (backAt < 0 && v.Length() >= share * a.SkillEntry) backAt = w.Tick;
+                    if (onStickAt < 0 && MathF.Abs(MathF.Atan2(v.Y, v.X)) * 180f / MathF.PI <= 15f) onStickAt = w.Tick;
+                }
+            }
+            string at = $"{move} {e} side {side} seed {seed}";
+            Assert.NotNull(a);
+            Assert.Equal(kind, a!.Kind);
+            float keep = Keep(move, a.SkillEntry);
+            Assert.True(a.SkillEntry >= 2.5f, $"{at}: entry {a.SkillEntry} m/s");
+            Assert.True(minSpeed >= keep, $"{at}: ground speed fell to {minSpeed:F2} of the entry {a.SkillEntry:F2} m/s");
+            if (move is "step_over" or "body_feint")
+                Assert.True(maxBrake <= t.Skill.StepOverRunBrake + 0.01f, $"{at}: braked at {maxBrake:F1} m/s^2");
+            if (move is "step_over" or "body_feint")
+            {
+                Assert.InRange(along, 0.35f, 0.6f);
+                Assert.True(perp <= 0.25f, $"{at}: ball {perp:F2} m to the side of his travel");
+                Assert.True(onStickAt >= 0 && (onStickAt - (a.EndTick - 1)) * t.Dt <= 0.25f + 1e-4f, $"{at}: on the stick at tick {onStickAt}, end {a.EndTick}");
+            }
+            else
+            {
+                // The elastico's inside plays the ball across in front of him toward its side (its exit touch), the spin leaves
+                // it in front of his facing: ahead of him.
+                Assert.True(along > 0f, $"{at}: the ball {along:F2} m ahead of him");
+            }
+            Assert.True(ballSpeed >= speed, $"{at}: ball {ballSpeed:F2} m/s, player {speed:F2} m/s");
+            Assert.True(backAt >= 0 && (backAt - (a.EndTick - 1)) * t.Dt <= 0.25f + 1e-4f, $"{at}: back to {keep} of the entry at tick {backAt}, end {a.EndTick}");
+            Assert.False(lost, $"{at}: lost the ball");
+            Assert.True(p.InPossession, $"{at}: not in possession");
+        }
+    }
+
     [Fact]
     public void AGestureWithTheBallOutOfReachWaitsThenIsDropped()
     {
@@ -520,8 +691,8 @@ public class SkillMoveTests
             {
                 int i = tick - 241;
                 var it = Run(Entry.Standing, tick);
-                // A body feint to the right from a standstill, then off straight ahead.
-                if (i >= 0) it = Right(new TickIntent { MoveX = 1f }, i < 4 ? new Vector2(0f, 1f) : Vector2.Zero);
+                // A body feint to the right from a standstill (the left stick pushed once it is under way), then off straight ahead.
+                if (i >= 0) it = Right(new TickIntent { MoveX = end > 0 ? 1f : 0f }, i < 4 ? new Vector2(0f, 1f) : Vector2.Zero);
                 buf[0] = it;
                 w.Step(buf);
                 if (w.Events.Any(e => e.Kind == EventKind.SkillMove)) end = p.SkillMove!.EndTick;
@@ -684,6 +855,24 @@ public class SkillMoveTests
                     Assert.InRange(s.Run, tr.Entry - 0.2f, tr.Entry + 0.2f);
                     continue;
                 }
+                if (move == "spin" && e != Entry.Standing)
+                {
+                    // At a run the spin's pace along the run eases from the entry pace no faster than spin_run_brake to
+                    // spin_run_keep of it (from the start, the reach included): never below 60% of the entry.
+                    float keepS = t.Skill.SpinRunKeep * tr.Entry;
+                    Assert.True(fwd >= MathF.Max(keepS, tr.Entry - t.Skill.SpinRunBrake * t.Dt * (tick - m.StartTick + 1)) - 0.1f, $"{move} {e} tick +{tick - m.StartTick}: forward {fwd:F2} from {tr.Entry:F2}");
+                    Assert.True(fwd >= 0.6f * tr.Entry, $"{move} {e} tick +{tick - m.StartTick}: forward {fwd:F2} from {tr.Entry:F2}");
+                    continue;
+                }
+                if (move == "elastico" && e != Entry.Standing)
+                {
+                    // At a run the elastico's run eases from the entry pace no faster than elastico_run_brake to
+                    // elastico_run_keep of it (from the start, the reach included): never below 70% of the entry.
+                    float keep = t.Skill.ElasticoRunKeep * tr.Entry;
+                    Assert.InRange(s.Run, MathF.Max(keep, tr.Entry - t.Skill.ElasticoRunBrake * t.Dt * (tick - m.StartTick + 1)) - 0.05f, tr.Entry + 0.05f);
+                    Assert.True(s.Run >= 0.7f * tr.Entry, $"{move} {e} tick +{tick - m.StartTick}: run {s.Run:F2} from {tr.Entry:F2}");
+                    continue;
+                }
                 // The elastico's and spin's run eases down to 2.0 m/s no faster than balance_deceleration (from the start, the
                 // reach included), and from the first contact on their forward speed (the run and the step along it) never rises
                 // above 2.0 m/s and falls toward it as fast as the budget allows.
@@ -773,12 +962,63 @@ public class SkillMoveTests
         float Ahead(int tick) => (tr.At[tick].B.X - tr.At[tick].P.X) * f.X + (tr.At[tick].B.Z - tr.At[tick].P.Z) * f.Y;
         // Back about 0.15 m against the trailing foot (relative to him) by the flick.
         Assert.InRange(Ahead(m.Contact2Tick - 1) - Ahead(m.ContactTick), -0.2f, -0.1f);
-        // The flick: straight on at about 1.3 times his speed (5 m/s from standing), never more than he can catch.
         var v = tr.At[m.Contact2Tick + 1].B - tr.At[m.Contact2Tick].B;
         float speed = new Vector2(v.X, v.Z).Length() / t.Dt;
-        float want = MathF.Max(5f, 1.3f * tr.At[m.Contact2Tick].Run);
-        Assert.InRange(speed, MathF.Min(want, 7f) - 0.3f, want + 0.3f);
+        if (e == Entry.Standing)
+        {
+            // The flick: straight on at about 1.3 times his speed (5 m/s from standing), never more than he can catch.
+            float want = MathF.Max(5f, 1.3f * tr.At[m.Contact2Tick].Run);
+            Assert.InRange(speed, MathF.Min(want, 7f) - 0.3f, want + 0.3f);
+        }
+        else
+        {
+            // At a run a short flick he runs onto: a little faster than he runs (see the next test).
+            float run = tr.At[m.Contact2Tick].Run;
+            Assert.InRange(speed, run, run + 1.5f);
+        }
         Assert.True(Ahead(m.EndTick) > Ahead(m.Contact2Tick), "the ball did not run on ahead of him");
+    }
+
+    [Theory]
+    [InlineData(Entry.Jog)]
+    [InlineData(Entry.Sprint)]
+    public void AtARunTheHeelToHeelIsAShortFlickHeRunsOnto(Entry e)
+    {
+        // The ball is never more than 0.8 m ahead of him until the next touch, which comes within 0.5 s of the move's end, and
+        // he leaves the move at no less than his entry pace.
+        var (trace, _) = TraceFor("heel_to_heel", 0);
+        for (ulong seed = 1; seed <= 4; seed++)
+        {
+            var w = Field(seed);
+            var p = w.Attacker;
+            var t = w.Tuning;
+            var buf = new TickIntent[w.PlayerCount];
+            BallAction? a = null;
+            float aheadMax = float.MinValue, endSpeed = float.NaN;
+            int next = -1;
+            bool lost = false;
+            for (int tick = 1; tick <= 600 && (a == null || (next < 0 && w.Tick < a.EndTick + 240)); tick++)
+            {
+                int i = tick - 241;
+                buf[0] = i >= 0 && i < 40 ? trace(i, Run(e, tick)) : Run(e, tick);
+                w.Step(buf);
+                if (a == null && w.Events.Any(ev => ev.Kind == EventKind.SkillMove)) a = p.SkillMove!;
+                lost |= w.Events.Any(ev => ev.Kind == EventKind.PossessionLost);
+                if (a == null) continue;
+                var f = a.RunDirection;
+                aheadMax = MathF.Max(aheadMax, (w.Ball.Position.X - p.Position.X) * f.X + (w.Ball.Position.Z - p.Position.Z) * f.Y);
+                if (w.Tick == a.EndTick - 1) endSpeed = new Vector2(p.Velocity.X, p.Velocity.Z).Length();
+                if (w.Tick >= a.EndTick && w.Events.Any(ev => ev.Kind == EventKind.Touch)) next = w.Tick;
+            }
+            string at = $"{e} seed {seed}";
+            Assert.NotNull(a);
+            Assert.Equal(ActionKind.HeelToHeel, a!.Kind);
+            Assert.True(aheadMax <= 0.8f, $"{at}: the ball went {aheadMax:F2} m ahead");
+            Assert.True(next >= 0 && (next - a.EndTick) * t.Dt <= 0.5f + 1e-4f, $"{at}: next touch at tick {next}, end {a.EndTick}");
+            Assert.True(endSpeed >= a.SkillEntry - 0.01f, $"{at}: left the move at {endSpeed:F2} m/s from {a.SkillEntry:F2}");
+            Assert.False(lost, $"{at}: lost the ball");
+            Assert.True(p.InPossession, $"{at}: not in possession");
+        }
     }
 
     [Fact]
