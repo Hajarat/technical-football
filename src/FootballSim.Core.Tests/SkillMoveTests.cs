@@ -322,6 +322,84 @@ public class SkillMoveTests
         Assert.True(p.InPossession);
     }
 
+    [Theory]
+    [InlineData(Entry.Jog, -1, 45f)]
+    [InlineData(Entry.Jog, 1, 45f)]
+    [InlineData(Entry.Sprint, -1, 45f)]
+    [InlineData(Entry.Sprint, 1, 60f)]
+    [InlineData(Entry.Jog, 1, -45f)]
+    [InlineData(Entry.Sprint, -1, 0f)]
+    public void BallRollAtARunReleasesTheBallTowardTheStickOnItsSide(Entry e, int side, float deg)
+    {
+        // The left stick turns toward the roll's side (deg > 0) 0.1 s before its end: the ball is released that way, so the exit
+        // touch is an ordinary dribble touch (not a turn), he is running along the stick within 0.25 s and never brakes in a
+        // step. Straight on or toward the other side the ball is released along the run as before.
+        for (ulong seed = 1; seed <= 3; seed++)
+        {
+            var w = Field(seed);
+            var p = w.Attacker;
+            var t = w.Tuning;
+            var buf = new TickIntent[w.PlayerCount];
+            BallAction? a = null;
+            float a0 = deg * side * MathF.PI / 180f;
+            var stick = new Vector2(MathF.Cos(a0), MathF.Sin(a0));
+            Vector2 release = default;
+            ActionKind? exit = null;
+            int onStickAt = -1, steps = 0;
+            float prev = float.NaN;
+            bool lost = false;
+            for (int tick = 1; tick <= 480 && (a == null || w.Tick < a.EndTick + 60); tick++)
+            {
+                int i = tick - 241;
+                var it = i >= 0 && i < 40 ? Roll(i, Run(e, tick), side) : Run(e, tick);
+                if (a != null && tick >= a.EndTick - 12) { it.MoveX = stick.X; it.MoveZ = stick.Y; }
+                buf[0] = it;
+                w.Step(buf);
+                if (a == null && w.Events.Any(ev => ev.Kind == EventKind.SkillMove)) a = p.SkillMove!;
+                lost |= w.Events.Any(ev => ev.Kind == EventKind.PossessionLost);
+                if (a == null) continue;
+                var v = new Vector2(p.Velocity.X, p.Velocity.Z);
+                if (w.Tick >= a.StartTick + 1 && w.Tick <= a.EndTick + 30 && !float.IsNaN(prev) && MathF.Abs(v.Length() - prev) > 15f * t.Dt) steps++;
+                prev = v.Length();
+                if (w.Tick == a.EndTick)
+                {
+                    // The exit touch is made at once on the end tick: the ball's travel just before it is the release.
+                    exit = w.Events.Any(ev => ev.Kind == EventKind.Touch) ? p.TouchAction?.Kind : null;
+                }
+                if (w.Tick >= a.EndTick - 1 && onStickAt < 0
+                    && MathF.Abs(MathF.Atan2(stick.X * v.Y - stick.Y * v.X, Vector2.Dot(stick, v))) * 180f / MathF.PI <= 15f)
+                    onStickAt = w.Tick;
+            }
+            string at = $"{e} side {side} {deg} deg seed {seed}";
+            Assert.NotNull(a);
+            Assert.Equal(ActionKind.BallRoll, a!.Kind);
+            if (deg > 0f)
+            {
+                Assert.True(exit is ActionKind.Jog or ActionKind.Sprint, $"{at}: exit touch {exit}");
+                Assert.True(onStickAt >= 0 && (onStickAt - (a.EndTick - 1)) * t.Dt <= 0.25f + 1e-4f, $"{at}: on the stick at tick {onStickAt}, end {a.EndTick}");
+                Assert.Equal(0, steps);
+            }
+            Assert.False(lost, $"{at}: lost the ball");
+            Assert.True(p.InPossession, $"{at}: not in possession");
+        }
+    }
+
+    [Fact]
+    public void BallRollReleaseFollowsTheStickOnlyTowardItsSide()
+    {
+        var a = new BallAction { Kind = ActionKind.BallRoll, Side = SkillSide.Right, HoldDirection = new Vector2(1f, 0f), SkillEntry = 5f };
+        var t = TestData.Tuning();
+        float Deg(Vector2 d) => MathF.Atan2(d.Y, d.X) * 180f / MathF.PI;
+        // His right is +Z: 45 degrees toward it is followed, 80 is held to 60, the other way and straight on keep the run.
+        Assert.Equal(45f, Deg(SkillMoves.RollReleaseDir(a, new Vector2(MathF.Cos(MathF.PI / 4f), MathF.Sin(MathF.PI / 4f)), t)), 2);
+        Assert.Equal(60f, Deg(SkillMoves.RollReleaseDir(a, new Vector2(MathF.Cos(1.4f), MathF.Sin(1.4f)), t)), 2);
+        Assert.Equal(0f, Deg(SkillMoves.RollReleaseDir(a, new Vector2(1f, -1f), t)), 2);
+        Assert.Equal(0f, Deg(SkillMoves.RollReleaseDir(a, new Vector2(1f, 0f), t)), 2);
+        // From standing the run's line is kept.
+        a.SkillEntry = 0.5f;
+        Assert.Equal(0f, Deg(SkillMoves.RollReleaseDir(a, new Vector2(1f, 1f), t)), 2);
+    }
+
     public static IEnumerable<object[]> FlowingMoves()
     {
         foreach (string move in new[] { "step_over", "body_feint" })

@@ -759,6 +759,24 @@ public static class SkillMoves
         return along + (pv.Length() - along) * RollRunShare(a.SkillEntry, t);
     }
 
+    /// <summary>At a run the ball roll's release follows the left stick turned at most this far toward the roll's side, degrees.</summary>
+    const float RollReleaseStickMaxDeg = 60f;
+
+    /// <summary>
+    /// The way the ball roll releases the ball (unit, X, Z): along the run, or at a run (ball_roll_run_blend) toward the left
+    /// stick when it points toward the roll's side, at most <see cref="RollReleaseStickMaxDeg"/> off the run, so the exit touch
+    /// that way is an ordinary one instead of a braking turn; a stick straight on or toward the other side keeps the run's line.
+    /// </summary>
+    internal static Vector2 RollReleaseDir(BallAction a, Vector2 stick, Tuning t)
+    {
+        Vector2 fwd = a.HoldDirection, side = SideOf(a);
+        if (stick.Length() < t.Touch.StickThreshold || a.Side == SkillSide.None) return fwd;
+        float ang = MathF.Atan2(Vector2.Dot(stick, side), Vector2.Dot(stick, fwd));
+        if (ang <= 0f) return fwd;
+        ang = MathF.Min(ang, RollReleaseStickMaxDeg * MathF.PI / 180f) * RollRunShare(a.SkillEntry, t);
+        return fwd * MathF.Cos(ang) + side * MathF.Sin(ang);
+    }
+
     /// <summary>How much of the run version of the ball roll a roll entered at <paramref name="entry"/> m/s takes, 0..1.</summary>
     static float RollRunShare(float entry, Tuning t) => Math.Clamp(t.Skill.BallRollRunBlend.Evaluate(entry), 0f, 1f);
 
@@ -992,7 +1010,7 @@ public static class SkillMoves
         Vector2 fwd = a.HoldDirection;
         Vector3 bv = a.Kind switch
         {
-            ActionKind.BallRoll => new Vector3(fwd.X, 0f, fwd.Y) * RollReleasePace(a, new Vector2(pv.X, pv.Z), t),
+            ActionKind.BallRoll => RollReleaseDir(a, intent.Move, t) is var rd ? new Vector3(rd.X, 0f, rd.Y) * RollReleasePace(a, new Vector2(pv.X, pv.Z), t) : default,
             ActionKind.DragBack or ActionKind.FakeStop => Vector3.Zero,
             ActionKind.Spin => FacedPace(p),
             ActionKind.StepOver or ActionKind.BodyFeint => DummyRelease(p, a, ball, t) with { Y = 0f },
@@ -1205,12 +1223,14 @@ public static class SkillMoves
         {
             case ActionKind.BallRoll:
             {
-                // Released along the run: at his pace along it from standing, at his ground speed at a run (his step toward the
-                // side eases out after the move, so the ball is not left behind).
-                // ... and never slower than the sole was taking it along the run.
+                // Released along the run, or at a run toward the left stick turned toward the roll's side (see RollReleaseDir): at
+                // his pace along the run from standing, at his ground speed at a run (his step toward the side eases out after the
+                // move, so the ball is not left behind) ...
+                // ... and never slower than the sole was taking it that way.
+                var dir = RollReleaseDir(a, intent.Move, t);
                 float pace = MathF.Max(RollReleasePace(a, new Vector2(p.Velocity.X, p.Velocity.Z), t),
-                    Vector2.Dot(new Vector2(ball.Velocity.X, ball.Velocity.Z), fwd));
-                var v = new Vector3(fwd.X * pace, ball.Velocity.Y, fwd.Y * pace);
+                    Vector2.Dot(new Vector2(ball.Velocity.X, ball.Velocity.Z), dir));
+                var v = new Vector3(dir.X * pace, ball.Velocity.Y, dir.Y * pace);
                 ball.Velocity = v;
                 ball.Spin = ball.RollingSpin(v);
                 break;
