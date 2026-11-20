@@ -1050,9 +1050,9 @@ public static class SkillMoves
         Vector2 fwd = a.HoldDirection;
         Vector3 bv = a.Kind switch
         {
-            ActionKind.BallRoll => RollReleaseDir(a, intent.Move, t) is var rd ? new Vector3(rd.X, 0f, rd.Y) * RollReleasePace(a, new Vector2(pv.X, pv.Z), t) : default,
+            ActionKind.BallRoll => RollReleaseVelocity(a, intent.Move, new Vector2(pv.X, pv.Z), t),
             ActionKind.DragBack or ActionKind.FakeStop => Vector3.Zero,
-            ActionKind.Spin => FacedPace(p) is var fp && fp.Length() > 0f ? fp * ((fp.Length() + DummyReleaseMargin * SpinRunShare(a.SkillEntry, t)) / fp.Length()) : fp,
+            ActionKind.Spin => SpinRelease(p, a, t),
             ActionKind.StepOver or ActionKind.BodyFeint => DummyRelease(p, a, ball, t) with { Y = 0f },
             _ => new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z),
         };
@@ -1087,6 +1087,21 @@ public static class SkillMoves
             NextMeetPoint = cp + wanted * 2f,
             NextMeetFoot = foot,
         };
+    }
+
+    /// <summary>The spin's ball as it is released: along his facing at his pace that way (at a run a little faster, so it keeps rolling ahead of him).</summary>
+    static Vector3 SpinRelease(PlayerState p, BallAction a, Tuning t)
+    {
+        var v = FacedPace(p);
+        float pace = v.Length();
+        return pace > 0f ? v * ((pace + DummyReleaseMargin * SpinRunShare(a.SkillEntry, t)) / pace) : v;
+    }
+
+    /// <summary>The ball roll's ball as it is released for a player moving at <paramref name="pv"/> (before the sole's own pace is taken into account, see Finish).</summary>
+    static Vector3 RollReleaseVelocity(BallAction a, Vector2 stick, Vector2 pv, Tuning t)
+    {
+        var dir = RollReleaseDir(a, stick, t);
+        return new Vector3(dir.X, 0f, dir.Y) * RollReleasePace(a, pv, t);
     }
 
     /// <summary>The spin's ball velocity out of the turn: along his facing at his pace that way.</summary>
@@ -1340,15 +1355,13 @@ public static class SkillMoves
             case ActionKind.Spin:
             {
                 // Out of the turn facing his original way: his step becomes his run again (no change of his ground velocity), and
-                // the ball, ahead of him, rolls on at his pace.
+                // the ball, ahead of him, rolls on at his pace (see SpinRelease).
                 var face = new Vector2(MathF.Cos(p.Facing), MathF.Sin(p.Facing));
                 float pace = MathF.Max(0f, Vector2.Dot(new Vector2(p.Velocity.X, p.Velocity.Z), face));
+                var v = SpinRelease(p, a, t) with { Y = ball.Velocity.Y };
                 p.RunSpeed = pace;
                 p.SteerCarry = Vector2.Zero;
                 p.SteerVelocity = Vector3.Zero;
-                // (At a run a little faster, so it keeps rolling ahead of him.)
-                float bp = pace + DummyReleaseMargin * SpinRunShare(a.SkillEntry, t);
-                var v = new Vector3(face.X * bp, ball.Velocity.Y, face.Y * bp);
                 ball.Velocity = v;
                 ball.Spin = ball.RollingSpin(v);
                 break;
