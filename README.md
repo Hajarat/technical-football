@@ -211,7 +211,10 @@ the clip's own foot from then on, its hops and landings as authored (at the take
 clip's root, carried from the spot it stood on, dies away over 0.14 s). A running clip with a second ending (the clip of the same name
 with `_swap`: the ball roll's support foot swinging into the exit touch instead of standing under it) is crossed over to it in 0.05 s
 while the exit touch the core forecasts is the support foot's, and back when it is not. A touch the figure draws after
-the move began (the exit touch) takes its leg by the touch's weight, so its boot meets the ball on the contact tick as any touch. A fake cut
+the move began (the exit touch) takes its leg by the touch's weight, so its boot meets the ball on the contact tick as any touch; made by
+the foot that made a touch of the move's own (a fake cut's exit touch, 0.1 s after the hook), its leg moves at most 0.06 m a tick against the
+hips while it winds up and reaches at most 0.96 of its length, its foot turns toward the touch's at most 0.24 rad a tick, and the hips come
+toward the figure's foot when it is out of reach. A fake cut
 whose hook is the outside of the foot (the cut toward the shooting foot's side) has no clip and is drawn procedurally, as everything is with
 `--skill-anim procedural` or `--attacker-anim procedural`. Build steps, asset list and licences: `game/assets/characters/SOURCES.md`.
 A fresh checkout needs `godot-mono --headless --path game --import` once.

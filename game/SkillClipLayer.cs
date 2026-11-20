@@ -145,7 +145,7 @@ public sealed class SkillClipLayer
         _haveShown = _haveShownPrev = _haveBase = _haveBasePrev = false; _prevSpeed = float.NaN;
         _in.Reset(); foreach (var l in _lock) l.Reset();
         for (int i = 0; i < 2; i++) { _legOff[i] = _legOffVel[i] = NVec3.Zero; _pinW[i] = 0f; _planted[i] = false; _hbStep[i] = false; }
-        _reachOff = NVec3.Zero; Array.Clear(_pinHave); Array.Clear(_legU); Array.Clear(_flagWas); Array.Clear(_anchor); Array.Clear(_anchor0);
+        _reachOff = NVec3.Zero; Array.Clear(_pinHave); Array.Clear(_legU); Array.Clear(_flagWas); Array.Clear(_anchor); Array.Clear(_anchor0); Array.Clear(_twLim);
     }
 
     static NVec3 M(Vector3 world, float sc) => ModelSpace.FromWorld(new NVec3(world.X, world.Y, world.Z)) / sc;
@@ -491,14 +491,6 @@ public sealed class SkillClipLayer
                 if (len > most) { var wi = d * ((len - most) / len); wi.Y = Math.Min(0f, wi.Y); if (wi.LengthSquared() > want.LengthSquared()) want = wi; }
             }
         }
-        if (want.Length() > ReachShiftMax / sc) want *= ReachShiftMax / sc / want.Length();
-        float k = 1f - MathF.Exp(-dt / ReachShiftTau);
-        _reachOff = NVec3.Lerp(_reachOff, want, k);
-        if (_reachOff.LengthSquared() > 1e-10f)
-        {
-            _outP[0] += _reachOff;
-            _sk.Forward(_out, _outP[0], _gr, _gp, _outP);
-        }
         // the figure's own pose, for a touch it draws now (the exit touch)
         // a touch the figure draws (the exit touch) takes its leg by its weight; one still recovering as the clip began is left to
         // the hand-over's offset until it has faded out
@@ -514,6 +506,24 @@ public sealed class SkillClipLayer
         bool anyTouch = tw[0] > 0f || tw[1] > 0f;
         var baseGp = anyTouch ? new NVec3[_n] : null;
         if (anyTouch) _sk.Forward(_baseR, _baseP[0], _baseG, baseGp!, _baseP);
+        // so does the figure's foot for a touch it draws with a foot that made a touch of the move's own, by the touch's weight (the
+        // clip's body is not where the figure's is: a fake cut's exit touch, 0.1 s after the hook, reaches past the leg)
+        for (int i = 0; i < 2 && anyTouch; i++)
+        {
+            float twi = tw[i] * (1f - _pinOwn[i]);
+            if (twi <= 0f || !OwnTouchFoot(i)) continue;
+            var d = baseGp![_sk.Foot[i]] - _gp[_sk.UpLeg[i]];
+            float len = d.Length(), most = ReachFrom * _legLen;
+            if (len > most) { var wi = d * ((len - most) / len * twi); wi.Y = Math.Min(0f, wi.Y); if (wi.LengthSquared() > want.LengthSquared()) want = wi; }
+        }
+        if (want.Length() > ReachShiftMax / sc) want *= ReachShiftMax / sc / want.Length();
+        float k = 1f - MathF.Exp(-dt / ReachShiftTau);
+        _reachOff = NVec3.Lerp(_reachOff, want, k);
+        if (_reachOff.LengthSquared() > 1e-10f)
+        {
+            _outP[0] += _reachOff;
+            _sk.Forward(_out, _outP[0], _gr, _gp, _outP);
+        }
         // the clip's own pose (before the hand-over's offset), for the feet of its declared stances: moved with the hips' reach
         // toward the ball along the ground, not down with them (a foot in the air keeps its height over the pitch)
         _sk.Forward(_src, _srcP[0] + new NVec3(_reachOff.X, 0f, _reachOff.Z), _clipG, _clipP, _srcP);
@@ -565,11 +575,42 @@ public sealed class SkillClipLayer
             var got = lk.Apply(stance, target, far, dt);
             target = got;
             _planted[i] = lk.Settled;
-            if (twi <= 0f) _turnAxis[i] = NVec3.Zero;
+            if (twi <= 0f) { _turnAxis[i] = NVec3.Zero; _twLim[i] = false; }
             if (twi > 0f)
             {
+                var pre = target; var preRot = gFoot;
                 target = NVec3.Lerp(target, baseGp![foot], twi);
                 gFoot = TurnFoot(i, gFoot, _baseG[foot], twi);
+                // the exit touch winding up for its contact on the move's end tick, made by a foot that made a touch of the move's own
+                // (a fake cut's hook 0.1 s before, an elastico's push): its leg moves at most TouchStepMax a tick against the
+                // hips (or evenly faster when the contact is due sooner than that would arrive) and reaches at most TouchReach of its
+                // length, and its foot turns toward the touch's own turn ahead of the touch's weight (all of it by TouchTurnLead) at most
+                // TouchTurnMax a tick: the figure's own wind-up can whip the boot back and round faster than the clip's body allows. The
+                // contact is drawn where the touch has it.
+                bool due = twi < 0.999f && f.Skill.Valid && f.Skill.Id == _moveId && OwnTouchFoot(i);
+                if (due)
+                {
+                    if (!_twLim[i]) { _twLimP[i] = pre - _outP[0]; _twLimR[i] = preRot; _twLim[i] = true; }
+                    float left = Math.Max(0f, f.Skill.Duration - f.Skill.Elapsed) / dt;
+                    var d = target - _outP[0] - _twLimP[i];
+                    float len = d.Length(), step = Math.Max(TouchStepMax / sc, len / (left + 1f));
+                    if (len > step) target = _outP[0] + _twLimP[i] + d * (step / len);
+                    var h = target - _gp[up];
+                    if (h.Length() > TouchReach * _legLen) target = _gp[up] + h * (TouchReach * _legLen / h.Length());
+                    var goal = NQuat.Normalize(NQuat.Slerp(preRot, _baseG[foot], Smooth(twi / TouchTurnLead)));
+                    var r = NQuat.Normalize(goal * NQuat.Inverse(_twLimR[i]));
+                    float ang = 2f * MathF.Acos(Math.Min(1f, Math.Abs(r.W)));
+                    gFoot = ang > TouchTurnMax ? NQuat.Normalize(NQuat.Slerp(_twLimR[i], goal, TouchTurnMax / ang)) : goal;
+                    _twLimP[i] = target - _outP[0]; _twLimR[i] = gFoot;
+                }
+                else if (_twLim[i])
+                {
+                    // (on the contact tick the foot turns the rest of the way, at most TouchTurnMax)
+                    var r = NQuat.Normalize(gFoot * NQuat.Inverse(_twLimR[i]));
+                    float ang = 2f * MathF.Acos(Math.Min(1f, Math.Abs(r.W)));
+                    if (ang > TouchTurnMax) gFoot = NQuat.Normalize(NQuat.Slerp(_twLimR[i], gFoot, TouchTurnMax / ang));
+                    _twLim[i] = false;
+                }
                 _planted[i] = false;
             }
             target = KeepAboveGround(i, target, gFoot);
@@ -632,6 +673,15 @@ public sealed class SkillClipLayer
     readonly float[] _twS = new float[2];
     /// <summary>Seconds over which a touch's hold on a leg fades when the touch is dropped.</summary>
     const float TouchFade = 0.10f;
+    /// <summary>Per foot, whether an exit touch winds up, and its leg as shown last tick (its ankle target against the hips, its foot's turn).</summary>
+    readonly bool[] _twLim = new bool[2];
+    readonly NVec3[] _twLimP = new NVec3[2];
+    readonly NQuat[] _twLimR = new NQuat[2];
+    /// <summary>
+    /// An exit touch winding up moves its leg at most TouchStepMax (metres, against the hips) a tick, reaches at most TouchReach of
+    /// its length, and turns its foot at most TouchTurnMax (radians) a tick, toward the touch's own turn by its weight over TouchTurnLead.
+    /// </summary>
+    const float TouchStepMax = 0.06f, TouchReach = 0.96f, TouchTurnMax = 0.24f, TouchTurnLead = 0.4f;
     /// <summary>The playing leg reaches its pinned target up to this share of its length; beyond, the hips come toward it (at most ReachShiftMax metres, eased over ReachShiftTau seconds).</summary>
     const float ReachFrom = 0.95f, ReachShiftMax = 0.18f, ReachShiftTau = 0.04f;
 
@@ -662,6 +712,13 @@ public sealed class SkillClipLayer
         if (ang > 0.6f * MathF.PI && _turnAxis[i].LengthSquared() > 0.5f && NVec3.Dot(axis, _turnAxis[i]) < 0f) { axis = -axis; ang = 2f * MathF.PI - ang; }
         _turnAxis[i] = axis;
         return NQuat.Normalize(NQuat.CreateFromAxisAngle(axis, ang * w) * a);
+    }
+
+    /// <summary>Whether foot <paramref name="i"/> makes a touch of the move's own (a pin of one tick).</summary>
+    bool OwnTouchFoot(int i)
+    {
+        foreach (var q in _pins) if (q.Foot == i && q.From == q.To) return true;
+        return false;
     }
 
     /// <summary>Raises the ankle target so the boot (toe joint, toe tip, sole) stays above the ground.</summary>
