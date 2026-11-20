@@ -1415,7 +1415,7 @@ public partial class PlayerFigure : Node3D
         float upW = 0f; int upId = int.MinValue;
         (int Id, float Tau) handover = (int.MinValue, 0f);   // a touch that takes over from the early hint this tick
         int windId = int.MinValue; float windTau = 0f;        // the unmade touch drawn this tick
-        int drawnId = int.MinValue; float drawnS = -1f; bool drawnNew = false;   // the touch drawn this tick, its time since the contact, first drawn made
+        int drawnId = int.MinValue; float drawnS = -1f; bool drawnNew = false; Vector3 bestC0 = Vector3.Zero;   // the touch drawn this tick, its time since the contact, first drawn made
         for (int n = 0; n < 3; n++)
         {
             // the pending or latest touch, the one before it still following through, and the immediate touch the core is about to make
@@ -1510,7 +1510,7 @@ public partial class PlayerFigure : Node3D
                 wgt = Math.Min(wgt, _upW[i] + rise); if (wgt > upW) { upW = wgt; upId = a.Id; }
             }
             if (wgt <= best) continue;
-            best = wgt; surf = a.Surface;
+            best = wgt; surf = a.Surface; bestC0 = c0;
             _blTouchD[i] = d; _blTouchS[i] = touchS; _blTouchSurf[i] = sf;
             _ovWind[i] = !a.Made;
             if (!a.Made && tau > 0f) { windId = a.Id; windTau = tau; } else windId = int.MinValue;
@@ -1587,6 +1587,8 @@ public partial class PlayerFigure : Node3D
             }
         }
         if (best <= 0f) { _ovTurn[i] = 0f; _blTouchS[i] = -1f; }
+        // (the ankle a windup drawn now puts the boot at on its contact: a skill clip winding the leg up for the exit touch aims there)
+        _atkAnim?.Skills?.SetTouchContact(i, windId != int.MinValue && !hint, bestC0);
         _ovAnk[i, 1] = _ovAnk[i, 0]; _ovAnk[i, 0] = ank; _ovYaw[i] = Mathf.Atan2(dirv.Z, dirv.X);
         _hintPrev[i] = hint; _hintW[i] = hint ? best : 0f; _upW[i] = upW; _upIdPrev[i] = upW > 0f ? upId : int.MinValue;
         return best;

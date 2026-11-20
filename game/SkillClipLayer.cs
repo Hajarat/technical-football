@@ -677,6 +677,15 @@ public sealed class SkillClipLayer
                     var d = target - _outP[0] - _twLimP[i];
                     float len = d.Length(), step = Math.Max(TouchStepMax / sc, len / (left + 1f));
                     if (len > step) target = _outP[0] + _twLimP[i] + d * (step / len);
+                    // over the last TouchCatchTicks the leg goes straight for where the figure's windup has the ankle at the contact, an
+                    // even share of the way each tick: the windup's own weights speed up at their end (standing, the hook's pose fading as
+                    // the touch's comes in), which would leave the leg the last two ticks' worth of way to cover in one
+                    if (left <= TouchCatchTicks && _tcHave[i])
+                    {
+                        var aim = M(_tcAnk[i], sc);
+                        var cur = _outP[0] + _twLimP[i];
+                        target = cur + (aim - cur) / (left + 1f);
+                    }
                     var h = target - _gp[up];
                     if (h.Length() > TouchReach * _legLen) target = _gp[up] + h * (TouchReach * _legLen / h.Length());
                     var goal = NQuat.Normalize(NQuat.Slerp(preRot, _baseG[foot], Smooth(twi / TouchTurnLead)));
@@ -820,6 +829,12 @@ public sealed class SkillClipLayer
     /// its length, and turns its foot at most TouchTurnMax (radians) a tick, toward the touch's own turn by its weight over TouchTurnLead.
     /// </summary>
     const float TouchStepMax = 0.06f, TouchReach = 0.96f, TouchTurnMax = 0.24f, TouchTurnLead = 0.4f;
+    /// <summary>Over its last this many ticks the exit touch's windup goes evenly for the ankle at its contact (see <see cref="SetTouchContact"/>).</summary>
+    const float TouchCatchTicks = 3f;
+    readonly bool[] _tcHave = new bool[2];
+    readonly Vector3[] _tcAnk = new Vector3[2];
+    /// <summary>Foot <paramref name="i"/>'s ankle (world) at the contact of the touch the figure winds up for now, or none.</summary>
+    public void SetTouchContact(int i, bool have, Vector3 ankle) { _tcHave[i] = have; _tcAnk[i] = ankle; }
     /// <summary>The playing leg reaches its pinned target up to this share of its length; beyond, the hips come toward it (at most ReachShiftMax metres, eased over ReachShiftTau seconds).</summary>
     const float ReachFrom = 0.95f, ReachShiftMax = 0.18f, ReachShiftTau = 0.04f;
 
