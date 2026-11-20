@@ -162,15 +162,18 @@ public class ShotActionTests
         Step(w, new TickIntent { ShootHeld = true });
         var shot = w.Attacker.Action!;
         for (int i = 0; i < 4; i++) Step(w, new TickIntent { ShootHeld = true });
+        int planned = shot.ContactTick;
         Step(w, new TickIntent { ShootHeld = true, Cancel = true });
-        // The shot winds up on as a real one until the fake's contact, 0.30 s (36 ticks) after the press (2026-11-19: the fake
-        // used to abort it on the cancel).
-        for (int i = 0; i < 31; i++)
+        // The shot winds up on as a real one until the fake's contact, on the tick its strike was planned for (2026-11-19: the
+        // fake used to abort it on the cancel; 2026-11-20: its contact was fixed 0.30 s after the press).
+        while (w.Tick < planned - 1)
         {
             Assert.Same(shot, w.Attacker.Action);
             Assert.NotEqual(ActionPhase.Done, shot.Phase);
             Step(w, new TickIntent { ShootHeld = true });
         }
+        Step(w, new TickIntent { ShootHeld = true });
+        Assert.Equal(planned, w.Tick);
         Assert.Equal(ActionPhase.Done, shot.Phase);
         Assert.False(shot.Made);
         Assert.NotSame(shot, w.Attacker.Action);
@@ -338,7 +341,7 @@ public class ShotActionTests
     [Fact]
     public void ShootThenCancelIsStillAFakeShot()
     {
-        // B then A (cancel) inside 0.1 s: a fake, no strike, whatever comes after inside the low-shot window.
+        // B then A (cancel) before the strike: a fake, no strike, whatever comes after inside the low-shot window.
         var w = TestData.Live("penalty");
         for (int i = 0; i < 4; i++) Step(w, new TickIntent { ShootHeld = true });
         for (int i = 0; i < 4; i++) Step(w, new TickIntent { ShootHeld = true, Cancel = true });

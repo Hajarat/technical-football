@@ -97,6 +97,43 @@ public class DribbleFixTests
         }
     }
 
+    [Theory]
+    [InlineData(1, 0f)]
+    [InlineData(50, 0f)]
+    [InlineData(99, 0f)]
+    [InlineData(1, 1f)]
+    [InlineData(50, 1f)]
+    [InlineData(99, 1f)]
+    public void ASharpTurnAtARunIsABrakingArcNotASoleStop(int dribbling, float sprint)
+    {
+        // A jog or sprint with the ball, the stick turned 150 degrees back and held: no turn at the feet; he slows to no less than
+        // 40% of his speed (2.4 m/s at least), keeps the ball and comes out along the stick.
+        for (ulong seed = 1; seed <= 6; seed++)
+        {
+            var w = Lab(seed, dribbling);
+            var p = w.Attacker;
+            int pre = 360 + 7 * (int)seed;
+            for (int i = 0; i < pre; i++) Step(w, Dir(0f) with { Sprint = sprint });
+            Assert.True(p.InPossession);
+            float entry = new Vector2(p.Velocity.X, p.Velocity.Z).Length();
+            float floor = MathF.Max(0.4f * entry, 2.4f), vmin = float.MaxValue;
+            int aligned = -1;
+            var stick = new Vector2(MathF.Cos(150f * MathF.PI / 180f), MathF.Sin(150f * MathF.PI / 180f));
+            for (int i = 0; i < 180; i++)
+            {
+                Step(w, Dir(150f) with { Sprint = sprint });
+                Assert.False(p.SkillMove is { FeetTurn: true }, $"seed {seed}: a turn at the feet at {entry:F1} m/s");
+                var v = new Vector2(p.Velocity.X, p.Velocity.Z);
+                vmin = MathF.Min(vmin, v.Length());
+                if (aligned < 0 && v.Length() > 0.3f && Vector2.Dot(v / v.Length(), stick) >= MathF.Cos(15f * MathF.PI / 180f)) aligned = i + 1;
+                Assert.True(p.InPossession, $"seed {seed}: the ball lost in the turn");
+            }
+            _out.WriteLine($"rating {dribbling} sprint {sprint} seed {seed}: entry {entry:F2} vmin {vmin:F2} (floor {floor:F2}) along the stick after {aligned} ticks");
+            Assert.True(vmin >= floor - 0.05f, $"seed {seed}: down to {vmin:F2} m/s from {entry:F2}");
+            Assert.InRange(aligned, 1, (int)(1.3f * w.Tuning.TickRate));
+        }
+    }
+
     /// <summary>
     /// The play-test penalty rounds kept under TestData/playtest (the first session, and every round of the three recorded
     /// 2026-11-19 sessions), replayed with the current code (they play out differently from the recording): every committed
