@@ -809,11 +809,11 @@
    "checks": {
     "lowest_joint_m": 0.038,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1174,
+    "max_bone_deg_per_s": 1199,
     "max_turn_at": "RightLeg@2",
     "sole_off_ball_max_m": 0.0005,
     "lowest_foot_m": -0.008,
-    "boot_in_ball_max_m": 0.0077,
+    "boot_in_ball_max_m": 0.0076,
     "boot_in_ball_at": "R boot@2",
     "touch_gap_m": {}
    }
@@ -1330,11 +1330,11 @@
    "checks": {
     "lowest_joint_m": 0.038,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1174,
+    "max_bone_deg_per_s": 1199,
     "max_turn_at": "LeftLeg@2",
     "sole_off_ball_max_m": 0.0005,
     "lowest_foot_m": -0.008,
-    "boot_in_ball_max_m": 0.0077,
+    "boot_in_ball_max_m": 0.0076,
     "boot_in_ball_at": "L boot@2",
     "touch_gap_m": {}
    }
@@ -1856,8 +1856,8 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1038,
-    "max_turn_at": "RightFoot@6",
+    "max_bone_deg_per_s": 1091,
+    "max_turn_at": "LeftArm@6",
     "sole_off_ball_max_m": 0.0009,
     "lowest_foot_m": 0.0,
     "boot_in_ball_max_m": 0.0,
@@ -2404,11 +2404,11 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1037,
-    "max_turn_at": "LeftFoot@6",
+    "max_bone_deg_per_s": 1092,
+    "max_turn_at": "RightArm@6",
     "sole_off_ball_max_m": 0.0009,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0001,
+    "boot_in_ball_max_m": 0.0,
     "boot_in_ball_at": "L boot@28",
     "touch_gap_m": {}
    },
@@ -2951,13 +2951,13 @@
    },
    "checks": {
     "lowest_joint_m": 0.047,
-    "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1345,
+    "lowest_joint": "RightToeBase",
+    "max_bone_deg_per_s": 1368,
     "max_turn_at": "RightUpLeg@34",
     "sole_off_ball_max_m": 0.0009,
     "lowest_foot_m": 0.0,
     "boot_in_ball_max_m": 0.0,
-    "boot_in_ball_at": "R boot@17",
+    "boot_in_ball_at": "R boot@20",
     "touch_gap_m": {}
    },
    "ending": "swap",
@@ -3501,12 +3501,12 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1345,
+    "max_bone_deg_per_s": 1368,
     "max_turn_at": "LeftUpLeg@34",
     "sole_off_ball_max_m": 0.0009,
     "lowest_foot_m": 0.0,
     "boot_in_ball_max_m": 0.0,
-    "boot_in_ball_at": "L boot@27",
+    "boot_in_ball_at": "L boot@21",
     "touch_gap_m": {}
    },
    "ending": "swap",
