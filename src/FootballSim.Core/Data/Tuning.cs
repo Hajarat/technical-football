@@ -1036,18 +1036,30 @@ public sealed class SkillTuning
     /// </summary>
     public float PaceMatchAhead { get; set; } = 0.25f;
     public float BodyFeintSeconds { get; set; } = 0.35f;
-    /// <summary>The ball roll when it is the first move of a chain.</summary>
+    /// <summary>The ball roll from standing when it is the first move of a chain (the sole on the ball, the reach before it apart).</summary>
     public float BallRollFirstSeconds { get; set; } = 0.4f;
+    /// <summary>The same entered at a run (see <see cref="BallRollRunBlend"/>).</summary>
+    public float BallRollRunSeconds { get; set; } = 0.3f;
     /// <summary>The ball roll later in a chain.</summary>
     public float BallRollChainSeconds { get; set; } = 0.27f;
     /// <summary>
-    /// During a ball roll the running speed eases down (no faster than balance_deceleration) to at most this, m/s, while the
-    /// player travels sideways with the ball; the exit burst gives the speed back.
+    /// How much of the run version of the ball roll (its time, its run kept, its step with the ball) a roll entered at this
+    /// running speed takes, m/s to 0..1; the rest is the standing version.
     /// </summary>
-    public float BallRollForwardSpeed { get; set; } = 1.5f;
+    public Curve BallRollRunBlend { get; set; } = new((1f, 0f), (2.5f, 1f));
+    /// <summary>
+    /// During a ball roll the running speed eases down from the move's start (the reach included), no faster than
+    /// ball_roll_brake, to this share of the entry running speed, by entry speed m/s.
+    /// </summary>
+    public Curve BallRollKeep { get; set; } = new((4f, 0.85f), (7.5f, 0.75f));
+    /// <summary>The ball roll's running speed eases down no faster than this, m/s^2.</summary>
+    public float BallRollBrake { get; set; } = 6f;
     /// <summary>How far the ball is rolled sideways against the player's speed, m/s to metres.</summary>
     public Curve BallRollDistance { get; set; } = new((0f, 0.6f), (4f, 1.0f));
-    /// <summary>The player moves sideways this fraction of the roll distance with the ball.</summary>
+    /// <summary>
+    /// From standing the player moves sideways this fraction of the roll distance with the ball; at a run his step is planned so
+    /// the ball ends ahead of him along his travel (see SkillMoves).
+    /// </summary>
     public float BallRollFollow { get; set; } = 0.5f;
     public float DragBackSeconds { get; set; } = 0.4f;
     /// <summary>No other move starts until this long after a drag-back.</summary>

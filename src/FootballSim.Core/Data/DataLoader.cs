@@ -200,6 +200,7 @@ public static class DataLoader
             if (t.Shot == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: shot: must be an object (default tuning in use)" };
             foreach (var (field, curve) in new[] { ("ball.drag_curve", t.Ball.DragCurve), ("ball.lift_curve", t.Ball.LiftCurve), ("ball.restitution_curve", t.Ball.RestitutionCurve),
                 ("touch.early_execution", t.Touch.EarlyExecution), ("skill.ball_roll_distance", t.Skill.BallRollDistance),
+                ("skill.ball_roll_run_blend", t.Skill.BallRollRunBlend), ("skill.ball_roll_keep", t.Skill.BallRollKeep),
                 ("skill.sided_exit_burst", t.Skill.SidedExitBurst), ("skill.straight_exit_burst", t.Skill.StraightExitBurst),
                 ("shot.ideal_charge", t.Shot.IdealCharge), ("keeper.arc_depth", t.Keeper?.ArcDepth), ("keeper.arc_depth_bearing", t.Keeper?.ArcDepthBearing), ("keeper.near_post_bias", t.Keeper?.NearPostBias),
                 ("keeper.rush_margin", t.Keeper?.RushMargin), ("keeper.difficulty_low", t.Keeper?.DifficultyLow),

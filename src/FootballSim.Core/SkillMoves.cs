@@ -10,7 +10,7 @@ namespace FootballSim.Core;
 /// ball's path. When it ends the touch planner plans at once toward the left stick, so a move never loses the ball.
 /// <list type="bullet">
 /// <item>Step-over and body feint: no contact; the player eases to the ball's pace so it ends pace_match_ahead in front.</item>
-/// <item>Ball roll: the sole rolls the ball sideways toward the side (ball_roll_distance by speed) and the player follows.</item>
+/// <item>Ball roll: the sole rolls the ball sideways toward the side (ball_roll_distance by speed) and the player steps with it.</item>
 /// <item>Drag-back: the sole pulls the ball back drag_back_distance; the player stops and steps back drag_back_step_back.</item>
 /// <item>Fake stop: the ball is stopped under the sole and the player stops. Fake cut: the ball is hooked toward the left stick.</item>
 /// </list>
@@ -183,11 +183,10 @@ public static class SkillMoves
 
     /// <summary>
     /// The running speed the move eases down to from its start (the reach included), no faster than balance_deceleration, m/s;
-    /// +infinity for the moves that keep the entry speed through their reach.
+    /// +infinity for the moves that keep the entry speed through their reach (the ball roll has its own, <see cref="RollRun"/>).
     /// </summary>
     static float EasedForwardSpeed(ActionKind kind, Tuning t) => kind switch
     {
-        ActionKind.BallRoll => t.Skill.BallRollForwardSpeed,
         ActionKind.Elastico => t.Skill.ElasticoForwardSpeed,
         ActionKind.Spin => t.Skill.SpinForwardSpeed,
         _ => float.PositiveInfinity,
@@ -289,7 +288,8 @@ public static class SkillMoves
         {
             ActionKind.StepOver => ballSpeed < k.StillBallSpeed ? k.StepOverStillSeconds : k.StepOverSeconds,
             ActionKind.BodyFeint => k.BodyFeintSeconds,
-            ActionKind.BallRoll => p.SkillChainCount == 0 ? k.BallRollFirstSeconds : k.BallRollChainSeconds,
+            ActionKind.BallRoll => p.SkillChainCount > 0 ? k.BallRollChainSeconds
+                : k.BallRollFirstSeconds + (k.BallRollRunSeconds - k.BallRollFirstSeconds) * RollRunShare(entry, t),
             ActionKind.DragBack => feetTurn ? k.FeetTurnSeconds : k.DragBackSeconds,
             ActionKind.FakeStop => k.FakeStopSeconds,
             // The two-contact moves from their first contact.
@@ -415,14 +415,14 @@ public static class SkillMoves
             }
             case ActionKind.BallRoll:
             {
-                // The run eases down to ball_roll_forward_speed (never faster than balance_deceleration, from the move's start)
-                // while the player travels sideways with the ball; from standing nothing changes.
-                float hold = MathF.Min(entry, cap);
-                run = MathF.Min(hold, MathF.Max(MathF.Min(hold, k.BallRollForwardSpeed), p.RunSpeed - t.Movement.BalanceDeceleration * t.Dt));
-                var d = a.SkillBallTo - a.SkillBallFrom;
-                Vector2 right = GestureReader.RightOf(fwd);
-                float lateral = d.X * right.X + d.Z * right.Y;
-                steer = right * (lateral * k.BallRollFollow / durSec);
+                // The run eases down a little (see RollRun) while the player steps toward the side with the ball: a quick step
+                // that rises over the first part of the roll and eases off toward the release (see PlanRoll).
+                run = RollRun(a, tick, t);
+                float lat0 = a.SideOffset0;
+                // On the sole's landing tick the ball's place against him is not taken yet (the step is still nil then).
+                if (tick == a.ContactTick) lat0 = Vector2.Dot(new Vector2(ball.Position.X - p.Position.X, ball.Position.Z - p.Position.Z), SideOf(a));
+                var plan = PlanRoll(a, lat0, t);
+                steer = SideOf(a) * (plan.Peak * RollStepShape((tick + 0.5f - from) / dur));
                 break;
             }
             case ActionKind.DragBack:
@@ -563,10 +563,11 @@ public static class SkillMoves
         // A ball roll's, elastico's or spin's run eases toward its forward speed from the move's start, the reach included.
         float hold = MathF.Min(a.SkillEntry, cap);
         float eased = EasedForwardSpeed(a.Kind, t);
-        bool roll = float.IsFinite(eased);
+        bool roll = float.IsFinite(eased), ballRoll = a.Kind == ActionKind.BallRoll;
         float floor = MathF.Min(hold, eased), budget = t.Movement.BalanceDeceleration * t.Dt;
-        float Next(float r) => roll ? MathF.Min(hold, MathF.Max(floor, r - budget)) : hold;
-        float run = Next(MathF.Min(hold, p.RunSpeed));
+        int at = tick;
+        float Next(float r) => ballRoll ? RollRun(a, ++at, t) : roll ? MathF.Min(hold, MathF.Max(floor, r - budget)) : hold;
+        float run = ballRoll ? RollRun(a, tick, t) : Next(MathF.Min(hold, p.RunSpeed));
         Vector2 fwd = a.HoldDirection;
         var legs = new TickIntent { MoveX = fwd.X, MoveZ = fwd.Y, Sprint = 1f };
         int moves = a.ContactTick - tick + 1;
@@ -588,24 +589,89 @@ public static class SkillMoves
         return new MoveAssist(cap, 1f, steer, run);
     }
 
-    /// <summary>Ball roll: the ball ends this far ahead of the player along the run at the release, metres.</summary>
+    /// <summary>Ball roll from standing: the ball ends this far ahead of the player along the run at the release, metres.</summary>
     const float BallRollEndAhead = 0.3f;
+    /// <summary>Ball roll at a run: the ball ends this far ahead of the player along his direction of travel at the release ...</summary>
+    const float RollRunAhead = 0.45f;
+    /// <summary>... and this far to the move's side of that line (he drifts on that way as his step eases out after it), metres.</summary>
+    const float RollRunAside = 0.05f;
+    /// <summary>The ball roll's step rises to its peak over this share of the roll ...</summary>
+    const float RollStepRise = 0.5f;
+    /// <summary>... and eases off to this share of the peak by the release (the rest eases out after it, see TouchPlanner).</summary>
+    const float RollStepKeep = 0.65f;
+    /// <summary>The ball roll's step is at most this fast, m/s.</summary>
+    const float RollStepMax = 3.2f;
+    /// <summary>At a run the ball closes on the release this much faster than his planned ground speed (it is never slower than him), m/s.</summary>
+    const float RollReleaseMargin = 0.15f;
+
+    /// <summary>How much of the run version of the ball roll a roll entered at <paramref name="entry"/> m/s takes, 0..1.</summary>
+    static float RollRunShare(float entry, Tuning t) => Math.Clamp(t.Skill.BallRollRunBlend.Evaluate(entry), 0f, 1f);
+
+    /// <summary>How far the ball roll's planned step has moved the player toward the side over its first <paramref name="ticks"/> ticks, per m/s of peak, metres.</summary>
+    static float RollStepTravel(BallAction a, int ticks, Tuning t)
+    {
+        int dur = Math.Max(1, a.EndTick - a.ContactTick);
+        float d = 0f;
+        for (int i = 0; i < Math.Min(ticks, dur); i++) d += RollStepShape((i + 0.5f) / dur) * t.Dt;
+        return d;
+    }
 
     /// <summary>
-    /// How far the player runs on from the sole's landing to the ball roll's end, the run easing down to ball_roll_forward_speed
-    /// as <see cref="BeginTick"/> does: the ball's forward travel, so it stays at his foot.
+    /// The ball roll's running speed on <paramref name="tick"/>: the entry pace through the reach (as the reach is planned), then
+    /// from the sole's landing it eases down no faster than ball_roll_brake to ball_roll_keep of the entry running speed, m/s.
     /// </summary>
-    static float RollForwardTravel(PlayerState p, BallAction a, Tuning t)
+    static float RollRun(BallAction a, int tick, Tuning t)
     {
-        float cap = Possession.SpeedCap(p, true, false, t);
-        float hold = MathF.Min(a.SkillEntry, cap), floor = MathF.Min(hold, t.Skill.BallRollForwardSpeed);
-        float run = MathF.Min(hold, p.RunSpeed), d = 0f, budget = t.Movement.BalanceDeceleration * t.Dt;
-        for (int i = a.ContactTick + 1; i < a.EndTick; i++)
+        var k = t.Skill;
+        // From the entry pace itself, so a roll entered above the cap (on a touch's boost) does not drop to it in a tick.
+        float hold = a.SkillEntry;
+        float floor = hold * k.BallRollKeep.Evaluate(a.SkillEntry);
+        return MathF.Min(hold, MathF.Max(floor, hold - k.BallRollBrake * (tick + 1 - a.ContactTick) * t.Dt));
+    }
+
+    /// <summary>The ball roll's step at progress <paramref name="x"/> (0..1) of the roll, as a share of its peak.</summary>
+    static float RollStepShape(float x) =>
+        x < RollStepRise ? Smooth(x / RollStepRise) : 1f - (1f - RollStepKeep) * Smooth((x - RollStepRise) / (1f - RollStepRise));
+
+    /// <summary>
+    /// The ball roll's plan from the sole's landing (<paramref name="lat0"/>: the ball toward the move's side of the player then,
+    /// metres): the step's peak, m/s, the ball's distance ahead of the player along the run at the release, metres, and the
+    /// player's planned ground velocity then along the run and toward the side, m/s. From standing he steps ball_roll_follow of
+    /// the roll's distance and the ball ends BallRollEndAhead in front of him; at a run his step is sized so that at the release
+    /// the ball is RollRunAhead ahead of him along his travel (and RollRunAside toward the side), so he has gone sideways with
+    /// it instead of letting it cross under him; a roll in between blends the two (ball_roll_run_blend).
+    /// </summary>
+    static (float Peak, float AheadEnd, float RunEnd, float StepEnd) PlanRoll(BallAction a, float lat0, Tuning t)
+    {
+        var k = t.Skill;
+        int dur = Math.Max(1, a.EndTick - a.ContactTick);
+        float dist = k.BallRollDistance.Evaluate(a.SkillEntry);
+        float travel = RollStepTravel(a, dur, t);
+        float share = RollRunShare(a.SkillEntry, t);
+        float uE = RollRun(a, a.EndTick - 1, t);
+        // Positive while the ball would still end further toward the side than wanted.
+        float Excess(float peak)
         {
-            run = MathF.Min(hold, MathF.Max(floor, run - budget));
-            d += run * t.Dt;
+            float vs = RollStepKeep * peak, n = MathF.Max(1e-3f, MathF.Sqrt(uE * uE + vs * vs));
+            return dist + lat0 - peak * travel - (RollRunAhead * vs + RollRunAside * uE) / n;
         }
-        return d;
+        float lo = 0f, hi = RollStepMax, run;
+        if (Excess(lo) <= 0f) run = lo;
+        else if (Excess(hi) >= 0f) run = hi;
+        else
+        {
+            for (int i = 0; i < 24; i++)
+            {
+                float mid = 0.5f * (lo + hi);
+                if (Excess(mid) > 0f) lo = mid; else hi = mid;
+            }
+            run = 0.5f * (lo + hi);
+        }
+        float stand = travel > 0f ? MathF.Min(RollStepMax, k.BallRollFollow * dist / travel) : 0f;
+        float peakOut = stand + (run - stand) * share;
+        float vsE = RollStepKeep * run, nE = MathF.Max(1e-3f, MathF.Sqrt(uE * uE + vsE * vsE));
+        float aheadRun = (RollRunAhead * uE - RollRunAside * vsE) / nE;
+        return (peakOut, BallRollEndAhead + (aheadRun - BallRollEndAhead) * share, uE, RollStepKeep * peakOut);
     }
 
     /// <summary>
@@ -625,7 +691,8 @@ public static class SkillMoves
         switch (a.Kind)
         {
             case ActionKind.BallRoll:
-                to = b0 + r3 * ((a.Side == SkillSide.Left ? -1f : 1f) * k.BallRollDistance.Evaluate(entry)) + f3 * RollForwardTravel(p, a, t);
+                // Across the run (along it the ball is kept at his foot as he travels, see CarriedBall).
+                to = b0 + r3 * ((a.Side == SkillSide.Left ? -1f : 1f) * k.BallRollDistance.Evaluate(entry));
                 break;
             case ActionKind.DragBack:
                 // A turn at the feet pulls the ball onto the stick's line rather than straight back.
@@ -661,7 +728,7 @@ public static class SkillMoves
             LaySolePath(p, a, ball, t);
             var rel = new Vector2(ball.Position.X - p.Position.X, ball.Position.Z - p.Position.Z);
             a.RollAhead0 = Vector2.Dot(rel, a.HoldDirection);
-            if (TwoContacts(a.Kind) && a.Side != SkillSide.None) a.SideOffset0 = Vector2.Dot(rel, SideOf(a));
+            if ((TwoContacts(a.Kind) || a.Kind == ActionKind.BallRoll) && a.Side != SkillSide.None) a.SideOffset0 = Vector2.Dot(rel, SideOf(a));
             var face = new Vector2(MathF.Cos(p.Facing), MathF.Sin(p.Facing));
             a.SpinBall0 = new Vector2(Vector2.Dot(rel, face), Vector2.Dot(rel, GestureReader.RightOf(face)));
         }
@@ -804,8 +871,20 @@ public static class SkillMoves
         if (a.Kind == ActionKind.BallRoll)
         {
             // Along the run the ball is kept at the player's foot as he actually travels: from where it was ahead of him when
-            // the sole landed to ball_roll_end_ahead at the release, so the exit touch is a normal one.
-            float ahead = a.RollAhead0 + (BallRollEndAhead - a.RollAhead0) * u1;
+            // the sole landed to the plan's distance at the release, closing at the end on his planned ground speed (the pace it
+            // is released at, see Finish), so the exit touch is a normal one.
+            var plan = PlanRoll(a, a.SideOffset0, t);
+            float share = RollRunShare(a.SkillEntry, t);
+            // Across it the sole takes the ball over the roll's distance; where his step has fallen behind (or got ahead of) the
+            // plan, the ball goes with him, so it still ends where the plan puts it against him.
+            var s2 = SideOf(a);
+            var s3 = new Vector3(s2.X, 0f, s2.Y);
+            float stepped = Vector3.Dot(p.Position - a.SkillBallFrom, s3) + a.SideOffset0;
+            target += s3 * (stepped - plan.Peak * RollStepTravel(a, tick - a.ContactTick, t));
+            float m0 = plan.AheadEnd - a.RollAhead0;
+            float m1 = share * (MathF.Sqrt(plan.RunEnd * plan.RunEnd + plan.StepEnd * plan.StepEnd) - plan.RunEnd + RollReleaseMargin) * dur * t.Dt;
+            float x = u1, x2 = x * x, x3 = x2 * x;
+            float ahead = (2f * x3 - 3f * x2 + 1f) * a.RollAhead0 + (x3 - 2f * x2 + x) * m0 + (-2f * x3 + 3f * x2) * plan.AheadEnd + (x3 - x2) * m1;
             target = target - f3 * Vector3.Dot(target, f3) + f3 * (along + ahead);
         }
         return target;
@@ -857,7 +936,13 @@ public static class SkillMoves
         {
             case ActionKind.BallRoll:
             {
-                float pace = MathF.Max(0f, Vector2.Dot(new Vector2(p.Velocity.X, p.Velocity.Z), fwd));
+                // Released along the run: at his pace along it from standing, at his ground speed at a run (his step toward the
+                // side eases out after the move, so the ball is not left behind).
+                var pv = new Vector2(p.Velocity.X, p.Velocity.Z);
+                float along = MathF.Max(0f, Vector2.Dot(pv, fwd));
+                float pace = along + (pv.Length() - along) * RollRunShare(a.SkillEntry, t);
+                // ... and never slower than the sole was taking it along the run.
+                pace = MathF.Max(pace, Vector2.Dot(new Vector2(ball.Velocity.X, ball.Velocity.Z), fwd));
                 var v = new Vector3(fwd.X * pace, ball.Velocity.Y, fwd.Y * pace);
                 ball.Velocity = v;
                 ball.Spin = ball.RollingSpin(v);

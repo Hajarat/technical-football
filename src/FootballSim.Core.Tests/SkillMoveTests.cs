@@ -267,6 +267,61 @@ public class SkillMoveTests
         Assert.True(p.InPossession);
     }
 
+    [Theory]
+    [InlineData(Entry.Jog, -1)]
+    [InlineData(Entry.Jog, 1)]
+    [InlineData(Entry.Sprint, -1)]
+    [InlineData(Entry.Sprint, 1)]
+    public void BallRollAtARunIsABriskRollHeKeepsRunningThrough(Entry e, int side)
+    {
+        var w = Field();
+        var p = w.Attacker;
+        var t = TestData.Tuning();
+        var buf = new TickIntent[w.PlayerCount];
+        BallAction? a = null;
+        float minRun = float.MaxValue, maxBrake = 0f, run0 = float.NaN, along = float.NaN, perp = float.NaN, ballSpeed = float.NaN, speed = float.NaN;
+        float sideStart = float.NaN, sideEnd = float.NaN;
+        bool lost = false;
+        for (int tick = 1; tick <= 480 && (a == null || w.Tick < a.EndTick + 30); tick++)
+        {
+            int i = tick - 241;
+            // The left stick stays forward throughout.
+            buf[0] = i < 0 ? Run(e, tick) : Roll(i, Run(e, tick), side);
+            w.Step(buf);
+            if (a == null && w.Events.Any(ev => ev.Kind == EventKind.SkillMove)) { a = p.SkillMove!; run0 = p.RunSpeed; }
+            lost |= w.Events.Any(ev => ev.Kind == EventKind.PossessionLost);
+            if (a == null || w.Tick >= a.EndTick) continue;
+            minRun = MathF.Min(minRun, p.RunSpeed);
+            maxBrake = MathF.Max(maxBrake, (run0 - p.RunSpeed) / t.Dt);
+            run0 = p.RunSpeed;
+            if (w.Tick == a.ContactTick - 1) sideStart = w.Ball.Position.Z;
+            if (w.Tick == a.EndTick - 1)
+            {
+                // The ball against him along his direction of travel as the move ends.
+                var v = new Vector2(p.Velocity.X, p.Velocity.Z);
+                var dir = Vector2.Normalize(v);
+                var rel = new Vector2(w.Ball.Position.X - p.Position.X, w.Ball.Position.Z - p.Position.Z);
+                along = Vector2.Dot(rel, dir);
+                perp = MathF.Abs(dir.X * rel.Y - dir.Y * rel.X);
+                ballSpeed = new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z).Length();
+                speed = v.Length();
+                sideEnd = w.Ball.Position.Z;
+            }
+        }
+        Assert.NotNull(a);
+        Assert.Equal(ActionKind.BallRoll, a!.Kind);
+        Assert.True(a.SkillEntry >= 2.5f, $"entry {a.SkillEntry} m/s");
+        Assert.Equal(t.Skill.BallRollRunSeconds, (a.EndTick - a.ContactTick) * t.Dt, 3);
+        Assert.True(minRun >= (e == Entry.Jog ? 0.7f : 0.6f) * a.SkillEntry, $"run fell to {minRun} m/s from {a.SkillEntry}");
+        Assert.True(maxBrake <= t.Skill.BallRollBrake + 0.01f, $"braked at {maxBrake} m/s^2");
+        Assert.InRange(along, 0.35f, 0.6f);
+        Assert.True(perp <= 0.25f, $"ball {perp} m to the side of his travel");
+        Assert.True(ballSpeed >= speed, $"ball {ballSpeed} m/s, player {speed} m/s");
+        Assert.InRange((sideEnd - sideStart) * side, 0.6f, 1.1f);
+        Assert.False(lost);
+        Assert.True(p.InPossession);
+    }
+
     [Fact]
     public void AGestureWithTheBallOutOfReachWaitsThenIsDropped()
     {

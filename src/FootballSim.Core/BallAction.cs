@@ -223,7 +223,7 @@ public sealed class BallAction
     internal Vector3 SkillBallFrom, SkillBallTo;
     /// <summary>Ball roll, elastico, heel-to-heel: the ball's distance ahead of the player along the run when the sole landed, metres.</summary>
     internal float RollAhead0;
-    /// <summary>Elastico: the ball's distance toward the move's side from the player when it was first played, metres.</summary>
+    /// <summary>Elastico, ball roll: the ball's distance toward the move's side from the player when it was first played, metres.</summary>
     internal float SideOffset0;
     /// <summary>Spin: the ball against the player in his body frame (ahead, to his right) at the first contact, metres.</summary>
     internal Vector2 SpinBall0;
