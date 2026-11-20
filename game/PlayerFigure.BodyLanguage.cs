@@ -148,13 +148,17 @@ public partial class PlayerFigure
     }
     const float TouchTurnFrom = 0.2f, TouchTurnShare = 0.3f, TouchTurnMax = 0.17f;
 
+    /// <summary>The head turns ahead of the shoulders by the facing's turn rate times this (seconds), capped (radians): it leads as the body starts to turn, before the run curves.</summary>
+    const float HeadFaceLeadS = 0.05f, HeadFaceLeadMax = 0.3f;
+
     /// <summary>The ball's distance within which the dribbling posture is whole, and beyond which there is none.</summary>
     const float NearFullM = 1.2f, NearToM = 1.5f;
 
     /// <summary>The layers the animator lays over the cycles' trunk, head and arms this tick.</summary>
     BodyLayers BodyLayersNow() => new()
     {
-        TrunkYaw = _bl.ShoulderLead + TouchTrunkYaw() * _bl.FreeShare, HeadYaw = _bl.HeadLead,
+        TrunkYaw = _bl.ShoulderLead + TouchTrunkYaw() * _bl.FreeShare,
+        HeadYaw = _bl.HeadLead + Math.Clamp(_faceRateS * HeadFaceLeadS, -HeadFaceLeadMax, HeadFaceLeadMax) * _bl.FreeShare,
         ArmOutL = _bl.ArmOut(0) + _bl.ArmWide, ArmOutR = _bl.ArmOut(1) + _bl.ArmWide, HeadDown = _bl.HeadDown, ElbowOpen = _bl.ElbowOpen,
     };
 

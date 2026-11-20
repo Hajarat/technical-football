@@ -189,8 +189,8 @@ Body language is laid over the cycles as layers (`src/FootballSim.Anim/BodyLangu
 critically damped spring and faded out while a skill move or a shot owns the body. Turning: the body banks toward the inside by
 atan(sideways acceleration / g) x 1.15, from 0 below 0.6 m/s^2 of it to all of it from 1.6 (so the stride's own sway and a steering wobble stay
 upright), capped at 17 degrees at a jog and 24 at a sprint; the pelvis drops 0.12 m per radian of bank and shifts inside; the shoulders turn
-ahead of the hips by the turn rate (sideways acceleration over speed) x 0.11 s (at most 22 degrees) and the head ahead of the shoulders by
-x 0.15 s (at most 24 degrees); the figure's look follows the facing, which turns ahead of the run, aimed ahead by the turn rate x 0.16 s plus the
+ahead of the hips by the turn rate (sideways acceleration over speed) x 0.13 s (at most 22 degrees) and the head ahead of the shoulders by
+x 0.15 s (at most 24 degrees) plus the facing's own turn rate x 0.05 s (at most 17 degrees: it leads as the body starts to turn); the figure's look follows the facing, which turns ahead of the run, aimed ahead by the turn rate x 0.16 s plus the
 facing's own turn over the look's easing, and leaves the ball for it; the outside arm swings out 1.1 radians per radian of bank.
 Visible touches (with the cycles in, by their weight; a touch from standing keeps the procedural swing): the windup's foot arrives moving
 through the ball, from 0.18 m behind the contact along the ball's launch direction on an x(2 - x) curve (flat at its start, steepest at the

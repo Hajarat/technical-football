@@ -34,7 +34,7 @@ public sealed class BodyLanguage
     /// The shoulders turn ahead of the hips by the turn rate (sideways acceleration over speed) times this look-ahead time, the head ahead of
     /// the shoulders by its own; each capped (radians).
     /// </summary>
-    public float ShoulderLeadS = 0.11f, HeadLeadS = 0.15f, ShoulderLeadMax = 0.38f, HeadLeadMax = 0.42f;
+    public float ShoulderLeadS = 0.13f, HeadLeadS = 0.15f, ShoulderLeadMax = 0.38f, HeadLeadMax = 0.42f;
     /// <summary>
     /// The figure's look (where its procedural head is aimed, eased behind its target) is aimed this far ahead along the turn (turn rate times
     /// this time, radians, capped), so the eyes go where he is going instead of trailing the run.
