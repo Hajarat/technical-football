@@ -104,16 +104,16 @@ ball = { pos = [0.54, 0.11, 1.49] }
 
 [[key]]
 t = 0.575
-label = "the ball still under the right sole ahead-left, the left foot coming down out to the left"
+label = "the ball still under the right sole ahead-left, the left foot over its landing place out to the left, coming straight down (it lands without sliding)"
 pelvis = { pos = [0.44, 0.885, 1.43], yaw = 5, pitch = 14, roll = -1 }
-foot_l = { pos = [0.80, 0.04, 1.52], yaw = 15, pitch = 0, knee = [0.3, 0.05, 1] }
+foot_l = { pos = [0.86, 0.045, 1.58], yaw = 15, pitch = 0, knee = [0.3, 0.05, 1] }
 foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 10, pitch = 11, knee = [0.3, 0.25, 1] }
 ball = { pos = [0.75, 0.11, 1.77] }
 
 [[key]]
 t = 0.61
 label = "the left foot lands out to the left, just behind the ball's path"
-foot_l = { pos = [0.84, 0.002, 1.62], yaw = 15, pitch = 0, knee = [0.3, 0, 1], ease = 1 }
+foot_l = { pos = [0.86, 0.002, 1.60], yaw = 15, pitch = 0, knee = [0.3, 0, 1], ease = 1 }
 
 # ------------------------------------------------------------------------------------------------ release and exit
 [[key]]
@@ -122,7 +122,7 @@ label = "release: the sole leaves the ball ahead of the left foot's instep (the 
 pelvis = { pos = [0.53, 0.885, 1.77], yaw = 2, pitch = 14, roll = 0 }
 chest = { yaw = 0, pitch = 7, roll = -3 }
 head = { yaw = 0, pitch = 28 }
-foot_l = { pos = [0.84, 0.002, 1.62], yaw = 15, ease = 1 }
+foot_l = { pos = [0.86, 0.002, 1.60], yaw = 15, ease = 1 }
 foot_r = { pos = [-0.01, 0.11, 0.0], frame = "ball", yaw = 6, pitch = 10, knee = [0.3, 0.2, 1], ease = 0 }
 hand_l = { swing = -5, abduct = 35, bend = 45, trail = 80 }
 hand_r = { swing = 22, abduct = 16, bend = 60 }
@@ -136,7 +136,7 @@ foot_r = { pos = [-0.07, 0.15, -0.14], frame = "ball", yaw = 4, pitch = 6 }
 [[key]]
 t = 0.755
 label = "the left foot pushes off"
-foot_l = { pos = [0.84, 0.02, 1.62], yaw = 15, pitch = -20, toe = 25, ease = 1 }
+foot_l = { pos = [0.86, 0.02, 1.60], yaw = 15, pitch = -20, toe = 25, ease = 1 }
 
 [[key]]
 t = 0.82
