@@ -300,7 +300,7 @@ public sealed class SkillClipLayer
         {
             var a = _gp[_sk.Foot[i]];
             bool still = _haveShown && a.Y < _restAnkleY + PlantAbove && new System.Numerics.Vector2(a.X - shownAnk[i].X, a.Z - shownAnk[i].Z).Length() * sc / f.Dt < HandInStill;
-            _handIn[i] = declared && (basePlanted[i] || still); _handInSpot[i] = a; _flagWas2[i] = false; _relS[i] = AnchorRelease; _pathOff[i] = false; _early[i] = false; _arc[i] = 0f; _turnU[i] = 1f;
+            _handIn[i] = declared && (basePlanted[i] || still); _handInSpot[i] = a; _flagWas2[i] = false; _relS[i] = AnchorRelease; _pathOff[i] = false; _pathOffU[i] = 0f; _early[i] = false; _arc[i] = 0f; _turnU[i] = 1f;
         }
         _handInRun = 0f; _startT = s.Elapsed;
         // (the lift's look-ahead from the first tick: the feet as shown on the tick before, the ball where it was then)
@@ -590,10 +590,13 @@ public sealed class SkillClipLayer
             bool declared = _wRun > 0.5f && _declared.Contains(runClip.Clip.Name);
             // (a step-over's circling foot that a declared stance plants, as it lands out of the circle, is the stance's from then
             // on: its path round the ball is not a touch to hold it to)
+            // (the path's hold on it lets go over PathOffFade, not in a tick: entered in the stand/run blend band, the path has the
+            // foot well away from the running clip's own as the stance begins)
             if (declared && contact && pinI > 0f && _pins[_pinIdx[i]].Path) _pathOff[i] = true;
-            if (_pathOff[i]) pinI = 0f;
+            float pathKeep = 1f;
+            if (_pathOff[i]) { _pathOffU[i] = Math.Min(1f, _pathOffU[i] + dt / PathOffFade); pathKeep = 1f - Smooth(_pathOffU[i]); pinI *= pathKeep; }
             if (pinI > 0f) _pinW[i] = pinI;
-            bool flagged = contact && _pinW[i] <= 1e-3f && twi <= 1e-3f;
+            bool flagged = contact && (_pathOff[i] || _pinW[i] <= 1e-3f) && twi <= 1e-3f;
             // a stance its move file declares (a running clip's few-tick stances): the foot is taken from the hand-over's offset to
             // the clip's own foot (stepping into place, lifted when it has some way to go), held there through the stance, and
             // follows the clip's own foot from then on (its hops and landings as authored). Waiting for the offset to die away would
@@ -635,8 +638,8 @@ public sealed class SkillClipLayer
                 gFoot = NQuat.Normalize(NQuat.Slerp(gFoot, _clipG[foot], lw * Smooth(_turnU[i])));
             }
             // the ball pin from there (by the exit touch's share): for a foot on its declared stances, from where they have it
-            if (pinI > 0f && lw > 0f) target += (_pinAbs[i] + (_pinShift[i] / _pinRaw[i] - _pinShift[i]) - target) * _pinRaw[i] * (1f - twi);
-            else if (pinI > 0f) target += (_pinAbs[i] - target) * (1f - twi);
+            if (pinI > 0f && lw > 0f) target += (_pinAbs[i] + (_pinShift[i] / _pinRaw[i] - _pinShift[i]) - target) * _pinRaw[i] * (1f - twi) * pathKeep;
+            else if (pinI > 0f) target += (_pinAbs[i] - target) * (1f - twi) * pathKeep;
             bool stance = flagged && (declared ? lw >= 1f : target.Y < _restAnkleY + PlantAbove);
             var lk = _lock[i];
             lk.SettleSeconds = declared ? StanceSettle : PlantSettle;
@@ -766,6 +769,9 @@ public sealed class SkillClipLayer
     readonly float[] _arc = new float[2];
     /// <summary>Per foot, whether a declared stance has taken it from a step-over's path pin.</summary>
     readonly bool[] _pathOff = new bool[2];
+    readonly float[] _pathOffU = new float[2];
+    /// <summary>Seconds over which a declared stance takes a step-over's circling foot from its path pin (eased).</summary>
+    const float PathOffFade = 0.06f;
     /// <summary>A foot on the ground moving slower than this (m/s) as the clip takes over counts as planted (a landing settling; a swinging foot moves at twice the body's speed).</summary>
     const float HandInStill = 2.5f;
 
