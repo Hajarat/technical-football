@@ -102,6 +102,21 @@ public class BodyLanguageTests
     }
 
     [Fact]
+    public void TheBallNearGivesALowerForwardPostureThatEasesInAndOut()
+    {
+        var b = new BodyLanguage();
+        Run(b, 4f, 0f, 0.5f);
+        float lean0 = b.Lean, drop0 = b.PelvisDrop;
+        b.Step(new BodyLanguage.Input { Speed = 4f, Near = 1f, Free = 1f, Dt = Dt });
+        Assert.True(b.Lean - lean0 < 0.02f, "the posture popped in");
+        for (int i = 0; i < 120; i++) b.Step(new BodyLanguage.Input { Speed = 4f, Near = 1f, Free = 1f, Dt = Dt });
+        Assert.True(b.Lean - lean0 > 5f * MathF.PI / 180f && b.PelvisDrop - drop0 > 0.02f);
+        Assert.True(b.HeadDown > 0.1f && b.ElbowOpen > 0.3f && b.ArmWide > 0.1f);
+        Run(b, 4f, 0f, 0.6f);
+        Assert.InRange(b.Lean - lean0, -0.005f, 0.005f);
+    }
+
+    [Fact]
     public void TheFirstTickStartsAtItsTargetAndResetForgets()
     {
         var b = new BodyLanguage();

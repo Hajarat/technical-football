@@ -204,6 +204,10 @@ Speeding up and slowing down: on top of the acceleration lean the pelvis already
 further 0.035 rad per m/s^2 of forward acceleration (at most 0.22 rad) and back 0.03 rad per m/s^2 of braking (at most 0.24 rad), faded in
 from 0.4 to 0.8 m/s^2 so a steady run's jitter stays upright, eased with a 0.06 s half-life; braking also drops the pelvis 1 cm per m/s^2
 (at most 6 cm: deeper knees).
+Dribbling posture: with the ball in his possession and within 1.2 m (fading out by 1.5 m, eased with a 0.12 s half-life) the trunk leans
+0.11 rad further forward and the pelvis sits 3.5 cm lower, the head pitches 0.12 rad further down (plus 0.6 of any braking lean back, so the
+eyes stay on the ball) and looks down at a ball right at his feet as at one 0.15 m away, both elbows open by up to 0.45 rad (keeping at
+least 0.35 rad of bend: the hands carried lower) and both arms go 0.12 rad wider.
 Touches stay the figure's: its touch pose is the swinging leg's target, so the boot's surface meets the ball on the contact tick as before.
 Standing and idle steps, starts from rest and stops below a walking pace and kicks stay procedural: the procedural pose is
 still solved every tick, the cycles' share of it rises to 1 while stepping above a walking pace with no skill or kick, eased over 0.1 s,

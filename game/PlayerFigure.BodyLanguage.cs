@@ -32,7 +32,10 @@ public partial class PlayerFigure
         FacingRate(f, dt);
         _blFacing = f.Facing;
         _blFree = BodyOwned(f) ? 0f : 1f;
-        _bl.Step(new BodyLanguage.Input { Speed = _speedS, Lateral = _latS, Forward = _accFS, Free = _blFree, Dt = dt });
+        // the ball near: in possession and within a dribble's reach (eased off between 1.2 and 1.5 m)
+        float bd = new Vector2(f.BallPos.X - f.Position.X, f.BallPos.Z - f.Position.Z).Length();
+        float near = f.InPossession ? Math.Clamp((NearToM - bd) / (NearToM - NearFullM), 0f, 1f) : 0f;
+        _bl.Step(new BodyLanguage.Input { Speed = _speedS, Lateral = _latS, Forward = _accFS, Free = _blFree, Near = near, Dt = dt });
     }
 
     float _faceRateS, _facePrev = float.NaN;
@@ -145,10 +148,14 @@ public partial class PlayerFigure
     }
     const float TouchTurnFrom = 0.2f, TouchTurnShare = 0.3f, TouchTurnMax = 0.17f;
 
+    /// <summary>The ball's distance within which the dribbling posture is whole, and beyond which there is none.</summary>
+    const float NearFullM = 1.2f, NearToM = 1.5f;
+
     /// <summary>The layers the animator lays over the cycles' trunk, head and arms this tick.</summary>
     BodyLayers BodyLayersNow() => new()
     {
-        TrunkYaw = _bl.ShoulderLead + TouchTrunkYaw() * _bl.FreeShare, HeadYaw = _bl.HeadLead, ArmOutL = _bl.ArmOut(0), ArmOutR = _bl.ArmOut(1),
+        TrunkYaw = _bl.ShoulderLead + TouchTrunkYaw() * _bl.FreeShare, HeadYaw = _bl.HeadLead,
+        ArmOutL = _bl.ArmOut(0) + _bl.ArmWide, ArmOutR = _bl.ArmOut(1) + _bl.ArmWide, HeadDown = _bl.HeadDown, ElbowOpen = _bl.ElbowOpen,
     };
 
     // ---- measurement (BODY_LANG): read from the shown body ----
@@ -181,7 +188,7 @@ public partial class PlayerFigure
         bool free = _blFree >= 1f && _mW >= 0.99f && _speedS > 2f;
         const float D = 180f / Mathf.Pi;
 
-        if (BodyLangLog) GD.Print($"BODY_LANG_TICK tick={tick} v={_speedS:F2} lat={_latS:F2} acc={_accFS:F2} free={_blFree:F0} w={_mW:F2} bank={bank * D:F1} net={net * D:F1} sh={shLead * D:F1} sh_net={shNet * D:F1} head={hdLead * D:F1} head_down={headDown * D:F1} lean={lean * D:F1} ref={_atkAnim.SteadyLean(_speedS) * D:F1} l_bank={_bl.Bank * D:F1} l_sh={_bl.ShoulderLead * D:F1} l_head={_bl.HeadLead * D:F1} l_look={_bl.LookAhead * D:F1} hy={_headYaw * D:F0} face={f.Facing * D:F0}");
+        if (BodyLangLog) GD.Print($"BODY_LANG_TICK tick={tick} v={_speedS:F2} lat={_latS:F2} acc={_accFS:F2} free={_blFree:F0} w={_mW:F2} bank={bank * D:F1} net={net * D:F1} sh={shLead * D:F1} sh_net={shNet * D:F1} head={hdLead * D:F1} head_down={headDown * D:F1} lean={lean * D:F1} bd={new Vector2(f.BallPos.X - f.Position.X, f.BallPos.Z - f.Position.Z).Length():F2} poss={(f.InPossession ? 1 : 0)} ref={_atkAnim.SteadyLean(_speedS) * D:F1} l_bank={_bl.Bank * D:F1} l_sh={_bl.ShoulderLead * D:F1} l_head={_bl.HeadLead * D:F1} l_look={_bl.LookAhead * D:F1} hy={_headYaw * D:F0} face={f.Facing * D:F0}");
         // turns: |sideways acceleration| over 1.5 m/s^2 while running freely
         bool turning = free && Math.Abs(_latS) >= 1.5f;
         if (turning && _blTurnStart < 0) { _blTurnStart = tick; _blTurnSign = Math.Sign(_latS); _blTurn = new BodyLangStats.Turn { StartTick = tick }; }

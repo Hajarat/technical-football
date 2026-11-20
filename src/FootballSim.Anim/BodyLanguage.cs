@@ -5,7 +5,8 @@ namespace FootballSim.Anim;
 /// function of the simulation's motion (smoothed speed, sideways and forward acceleration) and the ball, eased by critically damped
 /// springs so nothing pops. Turning: a bank into the turn from the sideways acceleration (speed times turn rate), the pelvis lower in it,
 /// the shoulders ahead of the hips and the head ahead of the shoulders toward where he is going, the outside arm wider. Speeding up and
-/// slowing down: a lean forward or back by the forward acceleration, the knees deeper under braking. All of it fades
+/// slowing down: a lean forward or back by the forward acceleration, the knees deeper under braking. With the ball near: a lower, more forward
+/// posture, the head down toward the ball, the arms lower and wider. All of it fades
 /// with <see cref="Input.Free"/> (0 while a skill or shot clip owns the body). No clock and no randomness.
 /// </summary>
 public sealed class BodyLanguage
@@ -17,6 +18,8 @@ public sealed class BodyLanguage
         public float Speed, Lateral, Forward;
         /// <summary>0..1: the layers' share of the body (1 running freely, 0 while a skill move or shot owns it).</summary>
         public float Free;
+        /// <summary>0..1: the ball in his possession and within reach of a dribble (the figure says how near; the posture eases in and out by it).</summary>
+        public float Near;
         public float Dt;
     }
 
@@ -49,14 +52,27 @@ public sealed class BodyLanguage
     public float AccLeanPerMs2 = 0.035f, AccLeanMax = 0.22f, BrakeLeanPerMs2 = 0.03f, BrakeLeanMax = 0.24f, AccDead = 0.4f, BrakeDropPerMs2 = 0.010f, BrakeDropMax = 0.06f;
     public float AccHalfLife = 0.06f;
 
+    // ---- dribbling posture ----
+    /// <summary>With the ball near: the trunk further forward (radians), the pelvis lower (metres), the head pitched further down (radians), the
+    /// elbows opened (radians: the hands carried lower) and the arms out (radians); eased in and out over <see cref="NearHalfLife"/>.</summary>
+    public float PostureLeanRad = 0.11f, PostureDropM = 0.035f, PostureHeadRad = 0.12f, PostureElbowOpenRad = 0.45f, PostureArmOutRad = 0.12f;
+    public float NearHalfLife = 0.12f;
+
     /// <summary>The bank (radians, positive rolled toward his right), the pelvis drop (metres at 1.8 m), the shoulders' yaw ahead of the
     /// hips and the head's ahead of the shoulders (radians, positive toward his right), the extra abduction of each arm (0 left, 1 right).</summary>
     public float Bank => _bank;
-    public float PelvisDrop => PelvisDropPerRad * MathF.Abs(_bank) + MathF.Min(BrakeDropMax, BrakeDropPerMs2 * MathF.Max(0f, -_acc));
-    /// <summary>The trunk's added lean (radians, forward positive): the acceleration's.</summary>
-    public float Lean => AccLean(_acc);
-    /// <summary>The eased forward acceleration the lean follows (m/s^2).</summary>
+    public float PelvisDrop => PelvisDropPerRad * MathF.Abs(_bank) + MathF.Min(BrakeDropMax, BrakeDropPerMs2 * MathF.Max(0f, -_acc)) + PostureDropM * _near;
+    /// <summary>The trunk's added lean (radians, forward positive): the acceleration's and the dribbling posture's.</summary>
+    public float Lean => AccLean(_acc) + PostureLeanRad * _near;
+    /// <summary>The head's extra pitch down (radians), the elbows' opening and the arms' extra abduction (both arms, radians) of the dribbling posture.</summary>
+    public float HeadDown => (PostureHeadRad + HeadBackShare * MathF.Max(0f, -AccLean(_acc))) * _near;
+    /// <summary>The share of a braking lean back the head takes back down with the ball near (the eyes stay on the ball as the trunk leans back).</summary>
+    public float HeadBackShare = 0.6f;
+    public float ElbowOpen => PostureElbowOpenRad * _near;
+    public float ArmWide => PostureArmOutRad * _near;
+    /// <summary>The eased forward acceleration the lean follows (m/s^2) and the eased nearness of the ball (0..1).</summary>
     public float Acceleration => _acc;
+    public float NearShare => _near;
 
     /// <summary>The lean for an acceleration (radians, forward positive): forward by <see cref="AccLeanPerMs2"/>, back by <see cref="BrakeLeanPerMs2"/>, past the dead band.</summary>
     public float AccLean(float acc)
@@ -77,11 +93,11 @@ public sealed class BodyLanguage
 
     /// <summary>The free share eased (half-life <see cref="LeadHalfLife"/>), for amounts the figure lays on itself.</summary>
     public float FreeShare => _free;
-    float _free, _freeV, _acc, _accV;
+    float _free, _freeV, _acc, _accV, _near, _nearV;
     float _bank, _bankV, _shLead, _shLeadV, _hdLead, _hdLeadV, _look, _lookV;
     bool _have;
 
-    public void Reset() { _have = false; _bank = _bankV = _shLead = _shLeadV = _hdLead = _hdLeadV = _look = _lookV = 0f; _free = _freeV = _acc = _accV = 0f; }
+    public void Reset() { _have = false; _bank = _bankV = _shLead = _shLeadV = _hdLead = _hdLeadV = _look = _lookV = 0f; _free = _freeV = _acc = _accV = _near = _nearV = 0f; }
 
     /// <summary>The bank's target for a speed and sideways acceleration, before the free share (radians).</summary>
     public float BankTarget(float speed, float lateral)
@@ -115,8 +131,8 @@ public sealed class BodyLanguage
         float bT = BankTarget(x.Speed, x.Lateral) * free;
         var (sT, hT, lT) = LeadTarget(x.Speed, x.Lateral);
         sT *= free; hT *= free; lT *= free;
-        if (!_have) { _bank = bT; _shLead = sT; _hdLead = hT; _look = lT; _free = free; _acc = x.Forward * free;
-            _bankV = _shLeadV = _hdLeadV = _lookV = _freeV = _accV = 0f; _have = true; return; }
+        if (!_have) { _bank = bT; _shLead = sT; _hdLead = hT; _look = lT; _free = free; _acc = x.Forward * free; _near = Math.Clamp(x.Near, 0f, 1f) * free;
+            _bankV = _shLeadV = _hdLeadV = _lookV = _freeV = _accV = _nearV = 0f; _have = true; return; }
         float dt = x.Dt > 0f ? x.Dt : 1f / 120f;
         Follow(ref _bank, ref _bankV, bT, BankHalfLife, dt);
         Follow(ref _shLead, ref _shLeadV, sT, LeadHalfLife, dt);
@@ -124,6 +140,7 @@ public sealed class BodyLanguage
         Follow(ref _look, ref _lookV, lT, LeadHalfLife, dt);
         Follow(ref _free, ref _freeV, free, LeadHalfLife, dt);
         Follow(ref _acc, ref _accV, x.Forward * free, AccHalfLife, dt);
+        Follow(ref _near, ref _nearV, Math.Clamp(x.Near, 0f, 1f) * free, NearHalfLife, dt);
     }
 
     /// <summary>A critically damped approach of <paramref name="x"/> (velocity <paramref name="v"/>) to <paramref name="target"/>, exact for any step.</summary>

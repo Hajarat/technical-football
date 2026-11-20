@@ -303,6 +303,31 @@ public sealed class AttackerAnimator
             TurnGlobal(_neck, new Quaternion(Vector3.Up, -0.4f * bl.HeadYaw * w));
             TurnGlobal(_head, new Quaternion(Vector3.Up, -0.6f * bl.HeadYaw * w));
         }
+        if (bl.HeadDown > 1e-5f)
+        {
+            // about the head's own left-right line (level): the forward's turn from rest crossed with the vertical
+            Globals(_rot, _gF);
+            var hm = (_gF[_head] * _restG[_head].Inverse()) * new Vector3(0, 0, 1);
+            var axis = Vector3.Up.Cross(hm);
+            if (axis.LengthSquared() > 1e-4f)
+            {
+                axis = axis.Normalized();
+                TurnGlobal(_neck, new Quaternion(axis, 0.4f * bl.HeadDown * w));
+                TurnGlobal(_head, new Quaternion(axis, 0.6f * bl.HeadDown * w));
+            }
+        }
+        if (bl.ElbowOpen > 1e-5f)
+            for (int i = 0; i < 2; i++)
+            {
+                // the forearm turned toward the upper arm's line (bones point along their +Y), keeping a bend of at least ElbowKeep
+                Globals(_rot, _gF);
+                Vector3 u = _gF[_arm[i]] * Vector3.Up, fo = _gF[_fore[i]] * Vector3.Up;
+                var axis = u.Cross(fo);
+                float bend = u.AngleTo(fo);
+                if (axis.LengthSquared() < 1e-6f) continue;
+                float open = Math.Min(bl.ElbowOpen * w, Math.Max(0f, bend - ElbowKeep));
+                if (open > 1e-5f) TurnGlobal(_fore[i], new Quaternion(axis.Normalized(), -open));
+            }
         for (int i = 0; i < 2; i++)
         {
             float a = i == 0 ? bl.ArmOutL : bl.ArmOutR;
@@ -312,6 +337,9 @@ public sealed class AttackerAnimator
             TurnGlobal(_arm[i], new Quaternion(fwdM, (i == 0 ? 1f : -1f) * a * w));
         }
     }
+
+    /// <summary>The least elbow bend (radians) the posture's opening leaves.</summary>
+    const float ElbowKeep = 0.35f;
 
     /// <summary>Turns bone <paramref name="k"/> by <paramref name="q"/> in body space (its children with it).</summary>
     void TurnGlobal(int k, Quaternion q)
@@ -343,6 +371,8 @@ public sealed class AttackerAnimator
 public struct BodyLayers
 {
     public float TrunkYaw, HeadYaw, ArmOutL, ArmOutR;
+    /// <summary>The head's extra pitch down (shared with the neck) and both elbows' opening (radians).</summary>
+    public float HeadDown, ElbowOpen;
 }
 
 /// <summary>The figure's side of --attacker-anim mocap (see <see cref="AttackerAnimator"/>): its weight, the held feet and the measurements of the shown pose.</summary>
@@ -615,7 +645,7 @@ public partial class PlayerFigure
         if (_atkAnim == null || _mW <= 0f) return P;
         // the acceleration lean only (the figure's lean less its speed lean): the cycles carry their own lean with speed
         float lean = _lean - SpeedLean;
-        if (!BodyLangOff) lean += _bl.Lean;   // (the body-language layers: the acceleration's lean)
+        if (!BodyLangOff) lean += _bl.Lean;   // (the body-language layers: the acceleration's and the dribbling posture's lean)
         Basis pm = new Basis(right, -lean) * new Basis(fwd, BodyLangOff ? _bank : _bl.Bank) * _atkAnim.PelvisBasis;
         return P.Orthonormalized().Slerp(pm.Orthonormalized(), _mW);
     }

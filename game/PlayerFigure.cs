@@ -1118,12 +1118,13 @@ public partial class PlayerFigure : Node3D
             float pitchT = HeadPitchBase;
             Vector3 toBall = new(f.BallPos.X - pos.X, 0, f.BallPos.Z - pos.Z);
             float bd = toBall.Length();
-            if (f.InPossession && bd > 0.15f)
+            // (mocap: a ball right at his feet is looked down at too, as one 0.15 m away; see BodyLanguage's posture)
+            if (f.InPossession && (bd > 0.15f || blOn))
             {
                 // (mocap: in a turn the look leaves the ball for where he is going, see BodyLanguage.TurnWeight)
                 float ballYaw = blOn ? HeadBallYaw * (1f - BodyTurnWeight * _mW) : HeadBallYaw;
-                yawT = Mathf.LerpAngle(yawT, Mathf.Atan2(toBall.Z, toBall.X), ballYaw);
-                pitchT = Mathf.Clamp(Mathf.Atan2(0.93f * H - f.BallPos.Y, bd) * HeadBallPitch, HeadPitchBase, HeadPitchMaxRad);
+                if (bd > 0.15f) yawT = Mathf.LerpAngle(yawT, Mathf.Atan2(toBall.Z, toBall.X), ballYaw);
+                pitchT = Mathf.Clamp(Mathf.Atan2(0.93f * H - f.BallPos.Y, Math.Max(bd, 0.15f)) * HeadBallPitch, HeadPitchBase, HeadPitchMaxRad);
             }
             if (blOn) yawT += BodyLookAhead(HeadTau) * _mW;   // (mocap: the look aimed ahead along a turn, see BodyLanguage)
             float chestYaw = f.Facing - _pelYaw * counter;
