@@ -180,6 +180,34 @@ public class RegainTests
         Assert.Equal(RegainMode.Free, v.Attacker.Regain);
     }
 
+    [Theory]
+    [InlineData("loose_heavy_touch", true)]
+    [InlineData("loose_fifty_fifty", true)]
+    [InlineData("loose_parry", true)]
+    [InlineData("loose_across", true)]
+    [InlineData("loose_keepers_ball", false)]
+    public void LooseBallStartSpotsBeginWithALostBall(string id, bool attackerFirst)
+    {
+        // The stick released throughout: who gets there first is the regain (and the keeper) alone.
+        var w = Live(id);
+        Assert.True(w.BallPlayed);
+        var buf = new TickIntent[w.PlayerCount];
+        PlayerState? first = null;
+        for (int i = 0; i < 600 && first == null && w.State == RoundState.Live; i++) { w.Step(buf); first = w.BallController; }
+        Assert.Same(attackerFirst ? w.Attacker : w.Keeper, first);
+    }
+
+    [Fact]
+    public void ABallSpeedRollsTheBallFromTheStart()
+    {
+        var sc = Scenario("loose_parry");
+        var w = Live("loose_parry");
+        float h = sc.BallHeadingDeg * MathF.PI / 180f;
+        Assert.Equal(sc.BallSpeed * MathF.Cos(h), w.Ball.Velocity.X, 3);
+        Assert.Equal(sc.BallSpeed * MathF.Sin(h), w.Ball.Velocity.Z, 3);
+        Assert.False(Live("penalty").BallPlayed);
+    }
+
     [Fact]
     public void TheRegainIsDeterministic()
     {

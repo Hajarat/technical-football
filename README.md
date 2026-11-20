@@ -138,6 +138,12 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   `regain_reach` (1.2 m) of his body, a toe-poke at 1.5 times the rated errors. Right bumper (the finesse modifier) held
   with the left stick pushed more than 90 degrees away from the ball lets it run (FC's Let Ball Run). The trace's legs column
   shows `Race` or `Regain`.
+- Loose-ball start spots (`data/scenarios/loose_*.json`, D-pad left / right in the game) begin with the ball already lost
+  between the attacker and the keeper: a scenario's `ball_loose` makes the ball count as lost from the first tick, and
+  `ball_speed` / `ball_heading_deg` (degrees, 0 toward the goal, positive toward +Z) start it rolling. Heavy touch (rolling on
+  ahead of him, uncontested), 50-50 (a still ball halfway to the keeper, 5 m off his line), the keeper's ball (nearer the
+  keeper), parry rebound (coming back off the keeper at 9 m/s across the attacker) and rolling across (crossing in front of
+  him at 45 degrees).
 
 Scripted rounds: the batch tool's scripted attacker runs at the goal and, in a scenario with `shoot_distance`, presses shoot
 inside it once the ball is strikable or its next touch comes early enough in the wind-up; with `strike_distance` (breakaway

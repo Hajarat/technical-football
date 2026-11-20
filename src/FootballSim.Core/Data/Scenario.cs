@@ -35,8 +35,17 @@ public sealed class Scenario
     public PitchSpec Pitch { get; set; } = new();
     /// <summary>Players per side. Only the first player of each side has behaviour; the rest stand still.</summary>
     public int TeamSize { get; set; } = 1;
-    /// <summary>Where the ball starts, at rest.</summary>
+    /// <summary>Where the ball starts (at rest unless <see cref="BallSpeed"/> is set).</summary>
     public StartSpot Ball { get; set; } = new() { X = 41.5f, Z = 0f };
+    /// <summary>The ball's rolling speed when play starts, m/s, along <see cref="BallHeadingDeg"/>.</summary>
+    public float BallSpeed { get; set; }
+    /// <summary>The direction the ball rolls at the start, degrees (0 = +X toward the goal, positive turning toward +Z).</summary>
+    public float BallHeadingDeg { get; set; }
+    /// <summary>
+    /// The ball starts as a lost ball (as after a heavy touch or a parry) instead of a ball on the spot: the attacker goes for it
+    /// eagerly from the first tick (see <see cref="Regain"/>).
+    /// </summary>
+    public bool BallLoose { get; set; }
     /// <summary>Where the attacker starts.</summary>
     public StartSpot Attacker { get; set; } = new() { X = 40.9f, Z = 0f, FacingDeg = 0f };
     /// <summary>The keeper starts on his goal line instead of on his arc. He then plays as usual unless <see cref="KeeperHoldLine"/>.</summary>

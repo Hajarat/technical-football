@@ -190,13 +190,14 @@ public sealed class World
         _lastPushedStick = default; _lastPushedTick = int.MinValue / 2;
         _pending = default; _outcomeLeft = 0f;
         _liveSeconds = 0f; _endTick = 0; _endClock = 0f; _lastShot = null;
-        _controller = null; _awayFor = 0f; _softPending = false; _ballPlayed = false; _shotAtFoot = false; _strikeFoot = Foot.Right;
+        _controller = null; _awayFor = 0f; _softPending = false; _ballPlayed = Scenario.BallLoose; _shotAtFoot = false; _strikeFoot = Foot.Right;
         _shotStartTick = -1; _shotCancelled = false; _strikeEstMax = -1; _fakeTick = -1; _fake = default;
 
         float r = Tuning.Ball.Radius;
         Ball.Position = new Vector3(Scenario.Ball.X, r, Scenario.Ball.Z);
-        Ball.Velocity = Vector3.Zero;
-        Ball.Spin = Vector3.Zero;
+        float heading = Scenario.BallHeadingDeg * MathF.PI / 180f;
+        Ball.Velocity = new Vector3(MathF.Cos(heading), 0f, MathF.Sin(heading)) * Scenario.BallSpeed;
+        Ball.Spin = Scenario.BallSpeed > 0f ? Ball.RollingSpin(Ball.Velocity) : Vector3.Zero;
 
         var team0 = Teams[0];
         var team1 = Teams[1];

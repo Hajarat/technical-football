@@ -1,0 +1,31 @@
+{
+  "id": "loose_fifty_fifty",
+  "name": "Loose ball: 50-50 with the keeper",
+  "default_attacker": "striker_a",
+  "default_keeper": "the_wall",
+  "team_size": 1,
+  "ball": {
+    "x": 19.5,
+    "z": 0
+  },
+  "ball_speed": 0,
+  "ball_heading_deg": 0,
+  "ball_loose": true,
+  "attacker": {
+    "x": 14.0,
+    "z": 0,
+    "facing_deg": 0
+  },
+  "keeper_on_line": false,
+  "keeper_off_line": 5,
+  "clock_limit": 20,
+  "shoot_distance": 12,
+  "pitch": {
+    "length": 30.0,
+    "width": 20.0,
+    "goal_width": 7.32,
+    "goal_height": 2.44,
+    "penalty_area_depth": 16.5,
+    "penalty_area_width": 40.32
+  }
+}
