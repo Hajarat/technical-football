@@ -107,8 +107,11 @@ public static class Movement
         if (law) speed = MathF.Max(speed + (target - speed) / tau * dt, speed0 - budget);
         else speed = assist.RunSpeed;
         // The stun after a strike brings the running speed down to its cap, no faster than the deceleration budget (the strike
-        // plants the shooter without a step in his speed).
+        // plants the shooter without a step in his speed); so does a braking arc (a sharp turn with the ball at a run) to its speed.
         speed = MathF.Min(speed, MathF.Max(assist.HardCap, speed0 - budget));
+        // (The arc's braking is the turn's balance loss: no other is taken while it lasts.)
+        bool arc = p.TurnArcBraking && p.TurnArcSpeed > 0f;
+        if (arc) { speed = MathF.Min(speed, MathF.Max(p.TurnArcSpeed, speed0 - budget)); p.SpeedDebt = 0f; }
 
         float facing = p.Facing;
         // A spin sets the facing itself.
@@ -156,6 +159,9 @@ public static class Movement
             p.SpeedDebt -= shed;
             if (speed <= 0f) p.SpeedDebt = 0f;
         }
+        // The braking arc holds its speed: the balance loss does not take the run lower.
+        if (arc && speed < MathF.Min(p.TurnArcSpeed, speed0)) speed = MathF.Min(p.TurnArcSpeed, speed0);
+        if (arc) { p.SpeedDebt = 0f; p.TurnRefHeading = facing; p.TurnRefTime = now; }
 
         speed = MathF.Max(speed, 0f);
         // The sideways correction turns with the body: as the facing turns this tick it keeps its angle to the run instead of
@@ -183,6 +189,17 @@ public static class Movement
                 p.SteerCarry = c;
                 steer = steered + c;
             }
+        }
+        // The arc ends once he faces within turn_arc_done_deg of the stick that asked for it, or, braking and come round to
+        // within 45 degrees of it, of where his legs take him (the ball's line), so he never stays slow on a line he already runs.
+        float offStick = MathF.Abs(WrapAngle(MathF.Atan2(p.TurnArcStick.Y, p.TurnArcStick.X) - facing)) * 180f / MathF.PI;
+        float offLegs = mag > 0f ? MathF.Abs(WrapAngle(MathF.Atan2(stick.Y, stick.X) - facing)) * 180f / MathF.PI : 0f;
+        if (p.TurnArcSpeed > 0f && (offStick <= t.Touch.TurnArcDoneDeg || arc && offStick <= 45f && offLegs <= t.Touch.TurnArcDoneDeg))
+        {
+            // (the turn it made is paid for: no sharp-turn loss for it after the arc either)
+            if (p.TurnArcBraking) { p.SpeedDebt = 0f; p.TurnRefHeading = facing; p.TurnRefTime = now; }
+            p.TurnArcSpeed = 0f;
+            p.TurnArcBraking = false;
         }
         p.MoveTime = now;
         p.Facing = facing;

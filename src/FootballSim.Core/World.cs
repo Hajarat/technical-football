@@ -46,7 +46,7 @@ public sealed class World
     int _shotStartTick = -1;   // tick shoot was pressed for the shot under way (for the fake shot), or -1
     bool _shotCancelled;       // the shot was turned into a fake: the rest of this press of shoot is ignored
     GestureRead _fake;         // a fake shot recognised: the shot winds up as a real one until the fake's contact ...
-    int _fakeTick = -1;        // ... on this tick (fake_contact_after_press after the press), or -1
+    int _fakeTick = -1;        // ... on this tick (the shot's planned strike, at least fake_contact_after_cancel after the cancel), or -1
 
     const ulong KeeperSeedSalt = 0x6B65657065723144UL;
 
@@ -339,8 +339,8 @@ public sealed class World
         // 1. Attacker: movement, shoot input, touches.
         StepAttacker(atk);
 
-        // 2. The released shot (see TryStrike).
-        if (State == RoundState.Strike && _pending.Active) TryStrike();
+        // 2. The released shot (see TryStrike); a shot turned into a fake is never struck.
+        if (State == RoundState.Strike && _pending.Active && _fakeTick < 0) TryStrike();
 
         // 3. Keeper.
         _brain.Update(_dt, Ball, _keeperRng, KeeperSituation());
@@ -482,15 +482,17 @@ public sealed class World
 
         // Skill gestures are read every tick so their timing runs on through every state. A fake shot is recognised on the
         // cancel, but the shot winds up on as a real one (the same legs, the same shot action the keeper reads) until the fake's
-        // contact, fake_contact_after_press after the press: only then is the shot aborted and the fake move made, its contact
-        // on that tick. A knock-on flick asks for a knock-on like the knock-on button.
+        // contact, on the tick the strike was planned for when the cancel came (at least fake_contact_after_cancel after it):
+        // only then is the shot aborted and the fake move made, its contact on that tick. A knock-on flick asks for a knock-on
+        // like the knock-on button.
         var gesture = GestureReader.Read(p, it, Tick, tuning);
         bool shotUnderWay = State == RoundState.Strike && _pending.Active || State == RoundState.Live && _shootWasHeld;
-        var fake = GestureReader.ReadFakeShot(p, it, Tick, _shotStartTick, shotUnderWay, tuning);
+        int strikeTick = _shotStartTick >= 0 && p.ShotAction is { Made: false } planned ? planned.ContactTick : -1;
+        var fake = GestureReader.ReadFakeShot(p, it, Tick, _fakeTick < 0 ? strikeTick : -1, shotUnderWay, tuning);
         if (fake.Kind != Gesture.None && _fakeTick < 0)
         {
             _fake = fake;
-            _fakeTick = _shotStartTick + Ticks(tuning.Skill.FakeContactAfterPress);
+            _fakeTick = Math.Max(strikeTick, Tick + Ticks(tuning.Skill.FakeContactAfterCancel));
         }
         int fakeFrom = -1;
         if (_fakeTick >= 0 && Tick >= _fakeTick)
@@ -507,6 +509,7 @@ public sealed class World
         bool shootHeld = it.ShootHeld && !_shotCancelled;
         bool knockGesture = gesture.Kind == Gesture.KnockOn;
         if (gesture.Kind is not (Gesture.None or Gesture.KnockOn)) SkillMoves.Request(p, gesture, Tick, fakeFrom);
+        if (gesture.Kind == Gesture.DragBack && inPossession) TouchPlanner.YieldFeetTurn(p, Tick, tuning);
         if (State == RoundState.Strike && _pending.Active && shootHeld && !_shootWasHeld) PressShootAgain(p, it);
         if (State == RoundState.Live && !shootHeld
             && SkillMoves.TryStart(p, Ball, inPossession, Tick, SimTime, tuning) is SimEvent started)
@@ -604,7 +607,8 @@ public sealed class World
         // Published, the estimate may move later (while the run cannot reach the ball) but never more than a tick earlier.
         if (a.StrikeContactTick < 0) est = Math.Max(est, _strikeEstMax - 1);
         _strikeEstMax = Math.Max(_strikeEstMax, est);
-        shot.ContactTick = est;
+        // A shot turned into a fake winds up to the fake's contact (the strike it was planned for, or later for a late cancel).
+        shot.ContactTick = _fakeTick >= 0 ? _fakeTick : est;
         shot.Foot = foot;
         a.StrikeFoot = foot;
     }

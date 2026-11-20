@@ -24,6 +24,9 @@ namespace FootballSim.Game;
 /// inertialisation, the feet by an ankle offset that dies away while the foot swings and is held while it is planted, so nothing
 /// pops and nothing slides. Works in the body's model space (the model's own size, ground at y = 0). No clock and no randomness.
 /// </summary>
+/// <summary>A skill move as the figure starts drawing it (for the session log): its clips and their blend, or the procedural drawing.</summary>
+public readonly record struct SkillStart(string Move, bool Right, float Side, string? StandClip, string? RunClip, float WRun, float EntrySpeed, bool Clips);
+
 public sealed class SkillClipLayer
 {
     const string Folder = "res://assets/anim/attacker/skills";
@@ -59,6 +62,8 @@ public sealed class SkillClipLayer
     float _wAlt, _altU, _altWant;
     /// <summary>Seconds a crossover between the two endings takes.</summary>
     public const float EndingBlend = 0.05f;
+    /// <summary>A fake shot is drawn as the real shot's wind-up until this long before its contact; its clip checks the swing from there.</summary>
+    public const float FakeCheckSeconds = 0.10f;
     float _wRun, _t, _ct, _shotElapsed = float.NaN, _prevSpeed = float.NaN;
     SkillTimeMap? _map;
     BootSurface _surface;
@@ -69,6 +74,10 @@ public sealed class SkillClipLayer
 
     /// <summary>"clips" (this layer plays the authored clips) or "procedural" (the figure's own drawing of every move).</summary>
     public string Mode = "clips";
+    /// <summary>Raised when a move starts being drawn: by its clips (again if a fake restarts on its new foot), or once by the procedural drawing.</summary>
+    public event Action<SkillStart>? Started;
+    float _entrySpeed;
+    int _procId = int.MinValue;
 
     SkillClipLayer(SkinnedBody body, Skeleton sk)
     {
@@ -163,12 +172,22 @@ public sealed class SkillClipLayer
         _planted[0] = _planted[1] = false;
         if (teleport) Reset();
 
-        // the move under way, or a fake shot the core has read but not made yet: its clip takes over from the shot's wind-up on the
-        // tick the cancel is read (the shot draws the leg until then, the clip from then on)
-        var s = f.Skill.Valid ? f.Skill : f.PendingSkill;
+        // the move under way, or a fake shot the core has read but not made yet: the shot's wind-up (run-up, plant, backswing) is
+        // drawn until FakeCheckSeconds before the fake's contact, then its clip checks the swing into the stop or the hook
+        var s = f.Skill.Valid ? f.Skill : f.PendingSkill.Valid && f.PendingSkill.ContactElapsed >= -FakeCheckSeconds - 1e-4f ? f.PendingSkill : default;
         bool covers = Covers(s);
         // (a fake whose strike foot changes before its contact starts again on the new foot, from the pose shown)
-        if (covers && (s.Id != _moveId || _playing && (s.Right ? 1 : 0) != _foot)) { Start(f, s, sc); for (int i = 0; i < 2; i++) { _twBlocked[i] = tw[i] > 0f; _twS[i] = 0f; } }
+        if (covers && (s.Id != _moveId || _playing && (s.Right ? 1 : 0) != _foot))
+        {
+            Start(f, s, sc); for (int i = 0; i < 2; i++) { _twBlocked[i] = tw[i] > 0f; _twS[i] = 0f; }
+            Started?.Invoke(new SkillStart(_move, _foot == 1, s.Side, _stand!.Clip.Name, _run!.Clip.Name, _wRun, _entrySpeed, true));
+        }
+        if (!covers && f.Skill.Valid && f.Skill.Id != _moveId && f.Skill.Id != _procId)
+        {
+            _procId = f.Skill.Id;
+            float v = float.IsNaN(_prevSpeed) ? new Vector2(f.Velocity.X, f.Velocity.Z).Length() : _prevSpeed;
+            Started?.Invoke(new SkillStart(MoveName(f.Skill.Kind), f.Skill.Right, f.Skill.Side, null, null, 0f, v, false));
+        }
         else if (!s.Valid && !_playing) _shotElapsed = f.Shot.Valid ? f.Shot.Elapsed : float.NaN;
         if (_playing)
         {
@@ -244,10 +263,10 @@ public sealed class SkillClipLayer
                 if (c2.Clip.Name == _run.Clip.Name + "_swap") { _runAlt = c2; break; }
         // the speed he came in at: the last tick before the move (on its first tick the move already moves him)
         float speed = float.IsNaN(_prevSpeed) ? new Vector2(f.Velocity.X, f.Velocity.Z).Length() : _prevSpeed;
-        _wRun = SkillEntryBlend.RunWeight(speed, _stand.EntrySpeed, _run.EntrySpeed);
+        _wRun = SkillEntryBlend.RunWeight(speed, _stand.EntrySpeed, _run.EntrySpeed); _entrySpeed = speed;
         float simContact = s.Elapsed - s.ContactElapsed, simEnd = s.Duration;
-        // a fake shot's wind-up began at the shot's press: the time since then counts as gone (read before its contact, the clip
-        // begins on this tick and reaches its contact on the core's contact tick)
+        // a fake shot's wind-up began at the shot's press: the time since then counts as gone (still pending, the clip begins on
+        // this tick, FakeCheckSeconds before the contact, part way into its own wind-up, and reaches its contact on the core's)
         _pending = !f.Skill.Valid;
         float origin = _pending ? Math.Max(0f, s.Elapsed - f.Dt) : float.IsNaN(_shotElapsed) ? 0f : -Math.Max(0f, _shotElapsed + f.Dt - s.Elapsed);
         var c = _stand;
