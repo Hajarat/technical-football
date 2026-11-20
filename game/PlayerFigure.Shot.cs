@@ -214,10 +214,11 @@ public partial class PlayerFigure
     {
         if (Stats == null) return;
         Stats.ShotBoneTicks++;
-        int legFrom = _kFoot == 0 ? 10 : 18;   // driven order per side from 6 / 14: shoulder, arm, forearm, hand, thigh, shin, foot, toe
+        bool clip = _atkAnim?.Shots is { Active: true };   // (--shot-anim mocap: the clip draws the striking leg)
+        int legFrom = (clip ? _atkAnim!.Shots!.Foot : _kFoot) == 0 ? 10 : 18;   // driven order per side from 6 / 14: shoulder, arm, forearm, hand, thigh, shin, foot, toe
         for (int k = 0; k < n; k++)
         {
-            if (_kW > 0f && k >= legFrom && k < legFrom + 4) continue;
+            if ((_kW > 0f || clip) && k >= legFrom && k < legFrom + 4) continue;
             float deg = _bonePrev[k].AngleTo(b.DrivenLocalRotation(k)) * 180f / Mathf.Pi / dt;
             if (deg > 1500f) { Stats.ShotBoneFast++; if (ShotLog) GD.Print($"SHOT_FAST tick={Stats.Tick} bone={b.DrivenBoneNames[k]} deg_s={deg:F0} kW={_kW:F2} plW={_plW:F2} mW={_mW:F2}"); }
             if (deg > Stats.ShotBoneMaxDegS) { Stats.ShotBoneMaxDegS = deg; Stats.ShotBoneAt = $"{b.DrivenBoneNames[k]}@{Stats.Tick}"; }

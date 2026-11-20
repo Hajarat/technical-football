@@ -1131,6 +1131,10 @@ public partial class PlayerFigure : Node3D
             // a skill clip holds its own planted feet
             if (_atkAnim?.Skills is { Playing: true } sl) for (int i = 0; i < 2; i++) planted[i] = sl.Planted(i);
             else if (_atkAnim?.Skills is { Active: true } hb) for (int i = 0; i < 2; i++) planted[i] &= !hb.HandBackStepping(i);
+            // so does a shot clip (--shot-anim mocap); its strike is measured with the striking foot's heading as it drew it
+            if (_atkAnim?.Shots is { Playing: true } sl2) for (int i = 0; i < 2; i++) planted[i] = sl2.Planted(i);
+            else if (_atkAnim?.Shots is { Active: true } hb2) for (int i = 0; i < 2; i++) planted[i] &= !hb2.HandBackStepping(i);
+            if (_atkAnim?.Shots is { StrikeDrawn: true } sd2) dir[sd2.Foot] = sd2.StrikeDir;
             int layNow = _atkAnim?.Skills is { } sk2 ? (sk2.Playing ? 2 : sk2.Active ? 1 : 0) : 0;
             if (MocapLogOn && Stats != null && (layNow != _layWas || f.Skill.Valid != _laySkillWas))
                 GD.Print($"SKILL_LAYER tick={Stats.Tick} state={(layNow == 2 ? "clip" : layNow == 1 ? "hand-back" : "off")} skill={(f.Skill.Valid ? f.Skill.Kind.ToString() : "-")} {_atkAnim?.Skills?.Describe()}");

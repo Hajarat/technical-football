@@ -43,6 +43,8 @@ public sealed class AttackerAnimator
 
     /// <summary>The skill moves' authored clips (--skill-anim clips, see <see cref="SkillClipLayer"/>); null when they cannot load.</summary>
     public SkillClipLayer? Skills { get; }
+    /// <summary>The struck shot from motion capture (--shot-anim mocap, see <see cref="ShotClipLayer"/>); null when its clips cannot load.</summary>
+    public ShotClipLayer? Shots { get; }
     FigureFrame _frame;
 
     AttackerAnimator(SkinnedBody body, Skeleton sk, List<StrideCycle> cycles)
@@ -64,6 +66,8 @@ public sealed class AttackerAnimator
         for (int i = 0; i < 2; i++) { _clav[i] = sk.Find(s[i] + "Shoulder"); _arm[i] = sk.Find(s[i] + "Arm"); _fore[i] = sk.Find(s[i] + "ForeArm"); _hand[i] = sk.Find(s[i] + "Hand"); }
         Skills = SkillClipLayer.TryCreate(body, sk, out string err);
         if (Skills == null) GD.PushWarning($"--skill-anim clips unavailable, the moves are drawn procedurally: {err}");
+        Shots = ShotClipLayer.TryCreate(body, sk, out string serr);
+        if (Shots == null) GD.PushWarning($"--shot-anim mocap unavailable, the shot is drawn procedurally: {serr}");
     }
 
     public SkinnedBody Body => _body;
@@ -185,7 +189,8 @@ public sealed class AttackerAnimator
     /// Shows the body for this tick: the figure's joints are solved (legs to its ankles, the pelvis where it put it), then spine,
     /// neck, head and arms take the cycle's rotations by <paramref name="w"/>, the head turns toward the procedural look
     /// (<see cref="HeadLook"/>) and the upper arms out by <paramref name="armOut"/> radians; then the skill layer replaces the pose while a
-    /// clip plays (<paramref name="tw"/> each foot's touch weight, <paramref name="planted"/> the figure's planted feet).
+    /// clip plays (<paramref name="tw"/> each foot's touch weight, <paramref name="planted"/> the figure's planted feet), and the shot
+    /// layer while a struck shot is drawn from motion capture.
     /// </summary>
     public void Present(FigureJoints j, float w, float armOut, ReadOnlySpan<float> tw, ReadOnlySpan<bool> planted, bool teleport)
     {
@@ -220,6 +225,7 @@ public sealed class AttackerAnimator
             }
         }
         Skills?.Apply(_frame, j.Height, tw, planted, teleport, _rot, _pos);
+        Shots?.Apply(_frame, j.Height, j.AnkleHeight, tw, planted, teleport, _rot, _pos);
         _body.PoseBones(_rot, _pos[0], _pos);
     }
 
@@ -246,6 +252,8 @@ public partial class PlayerFigure
     public string AttackerAnimMode { get; set; } = "procedural";
     /// <summary>--skill-anim: "clips" (a move with authored clips is drawn from them; needs mocap mode) or "procedural" (<see cref="PlanSkill"/> draws every move).</summary>
     public string SkillAnimMode { get; set; } = "clips";
+    /// <summary>--shot-anim: "mocap" (a struck shot is drawn from the motion-captured kicks over the figure's pose; needs mocap mode) or "procedural" (<see cref="PlanShot"/> draws it).</summary>
+    public string ShotAnimMode { get; set; } = "procedural";
     // this tick's touch weights and planted feet, for the skill layer
     float[] _layTw = new float[2];
     bool[] _layPlanted = new bool[2];
@@ -278,6 +286,7 @@ public partial class PlayerFigure
         }
         if (_atkAnim == null) return;
         if (_atkAnim.Skills != null) _atkAnim.Skills.Mode = SkillAnimMode;
+        if (_atkAnim.Shots != null) _atkAnim.Shots.Mode = ShotAnimMode;
         if (_teleporting) { _atkAnim.Teleport(); foreach (var l in _mLock) l.Reset(); }
         // (a shot action runs on the cycles: its striking leg and plant are drawn over them, see PlanShot)
         bool free = stepping && !_skActive && (f.Shot.Valid || _kW <= 0f && _strikeT < 0f && !_seq && f.ShotCharge <= 0.001f && !_pinOn);
