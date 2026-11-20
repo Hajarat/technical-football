@@ -115,6 +115,10 @@ public partial class Match
         var pv = new System.Numerics.Vector3(p.Velocity.X, 0f, p.Velocity.Z);
         var bv = new System.Numerics.Vector3(ball.Velocity.X, 0f, ball.Velocity.Z);
         float reach = TouchModel.FootReach(p.Sheet, t);
+        // a free regain takes the first touch from as far as regain_reach (a toe-poke): forecast it from there, or the touch comes at
+        // once while the drawn approach still expects it some ticks later
+        bool freeRegain = !p.InPossession && p.Regain == RegainMode.Free;
+        if (freeRegain) reach = Math.Max(reach, t.Possession.RegainReach);
         bool InReachAt(int j, float margin = 0f)
         {
             var pp = p.Position + pv * (j * dt);
@@ -166,7 +170,8 @@ public partial class Match
             }
             else
             {
-                if (!stickOn && still) return default;
+                // (a player going for the ball takes a still one too)
+                if (!stickOn && still && p.Regain == RegainMode.None) return default;
                 // no touch until the stun after a strike is over
                 for (int k = 1; k <= Horizon && j < 0; k++) if (InReachAt(k) && w.SimTime + k * dt >= p.StunEndTime) j = k;
                 if (j < 0) return default;

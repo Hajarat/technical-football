@@ -571,7 +571,7 @@ public partial class PlayerFigure : Node3D
         _strikeT = -1f; _windT = 0; _lastCharge = 0; _lean = 0; _leanExtraS = 0; _stActive = false; _pinWas = false; _skId = int.MinValue; _skJumpValid = false; _jN = 0; _jWasSkill = _jExit = false;
         _accFS = 0; _runPrev = float.NaN; _ratioS = 0.9945f; _bobStep = -1; _kInit = false;
         _stepW = 0; _closeW = 0; _latS = 0; _bank = 0; _pelYaw = 0; _headYaw = float.NaN; _headPitch = 0;
-        for (int i = 0; i < 2; i++) { _cycPitch[i] = 0f; _cycToe[i] = 0f; _hintPrev[i] = false; _hoId[i] = int.MinValue; }
+        for (int i = 0; i < 2; i++) { _cycPitch[i] = 0f; _cycToe[i] = 0f; _hintPrev[i] = false; _hoId[i] = int.MinValue; _ccId[i] = int.MinValue; }
         foreach (var t in _tf) { t.Id = t.ContactId = t.SurfId = int.MinValue; }
         foreach (var t in _tfUp) { t.Id = t.ContactId = t.SurfId = int.MinValue; }
         for (int i = 0; i < 2; i++) { _twPrev[i] = 0f; _kwPrev[i] = 0f; _dropT[i] = 0f; _ovWindPrev[i] = false; }
@@ -1415,6 +1415,7 @@ public partial class PlayerFigure : Node3D
         float upW = 0f; int upId = int.MinValue;
         (int Id, float Tau) handover = (int.MinValue, 0f);   // a touch that takes over from the early hint this tick
         int windId = int.MinValue; float windTau = 0f;        // the unmade touch drawn this tick
+        int drawnId = int.MinValue; float drawnS = -1f; bool drawnNew = false;   // the touch drawn this tick, its time since the contact, first drawn made
         for (int n = 0; n < 3; n++)
         {
             // the pending or latest touch, the one before it still following through, and the immediate touch the core is about to make
@@ -1427,7 +1428,7 @@ public partial class PlayerFigure : Node3D
             // swing to the contact zone in the windup alone
             if (a.Phase is TouchPhase.Planned or TouchPhase.Done || (a.Phase == TouchPhase.PreWindup && !(n == 0 && !a.Made && a.ContactEta <= TouchLead))) continue;
             bool ready = n == 2 && f.UpcomingReady;
-            float touchS = -1f;
+            float touchS = -1f; bool newContact = false;
             var tf = n == 2 ? _tfUp[i] : _tf[i];
             float tau = a.ContactEta;
             Vector3 centre = a.ContactPoint;
@@ -1490,6 +1491,7 @@ public partial class PlayerFigure : Node3D
                 {
                     tf.ContactId = a.Id; tf.ContactTick = a.ContactTick;
                     tf.RelC = c0 - pelXZ; tf.Psi = Mathf.Atan2(fd.Z, fd.X);
+                    newContact = true;
                 }
                 float s = Math.Max(0f, -tau);
                 float rec = Math.Max(a.RecoverySeconds, 0.06f);
@@ -1512,6 +1514,7 @@ public partial class PlayerFigure : Node3D
             _blTouchD[i] = d; _blTouchS[i] = touchS; _blTouchSurf[i] = sf;
             _ovWind[i] = !a.Made;
             if (!a.Made && tau > 0f) { windId = a.Id; windTau = tau; } else windId = int.MinValue;
+            drawnId = a.Id; drawnS = touchS; drawnNew = newContact;
             Vector3 cur = dirv;
             float yaw = TurnToward(i, Mathf.Atan2(cur.Z, cur.X), Mathf.Atan2(fdUse.Z, fdUse.X), wgt);
             ank = ank.Lerp(target, wgt);
@@ -1555,6 +1558,31 @@ public partial class PlayerFigure : Node3D
                 float u = Smooth(windTau / _hoTau0[i]);
                 ank += _hoOff[i] * u;
                 float yaw = Mathf.Atan2(dirv.Z, dirv.X) + _hoYaw[i] * u;
+                dirv = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
+            }
+        }
+        // A touch made at once with no windup drawn up to it (the stick pushed with a still ball at the feet, a forecast that missed): what
+        // was drawn last tick (carried on at its velocity) and the contact pose differ by more than a foot moves in a tick. That difference
+        // is kept and taken out over TouchCatchUp after the contact, so the boot reaches the ball a few ticks late instead of popping onto it.
+        if (drawnNew && drawnS == 0f && !_teleporting && best >= 0.999f)
+        {
+            Vector3 jump = _ovAnk[i, 0] + (_ovAnk[i, 0] - _ovAnk[i, 1]) - ank;
+            float dyaw = Mathf.Wrap(_ovYaw[i] - Mathf.Atan2(dirv.Z, dirv.X), -Mathf.Pi, Mathf.Pi);
+            // (the larger of the ankle's and the boot tip's move; only the part over TouchCatchM is carried, so the contact is drawn as
+            // near the ball as a tick's move allows)
+            Vector3 fdNow = new(dirv.X, 0, dirv.Z), fdWas = new(Mathf.Cos(_ovYaw[i]), 0, Mathf.Sin(_ovYaw[i]));
+            float m = Math.Max(jump.Length(), (jump + (fdWas - fdNow) * (0.8f * FootLen)).Length());
+            if (m > TouchCatchM) { float sh = 1f - TouchCatchM / m; _ccId[i] = drawnId; _ccOff[i] = jump * sh; _ccYaw[i] = dyaw * sh; }
+            else _ccId[i] = int.MinValue;
+        }
+        if (_ccId[i] != int.MinValue)
+        {
+            if (drawnId != _ccId[i] || drawnS < 0f || drawnS >= TouchCatchUp) _ccId[i] = int.MinValue;
+            else
+            {
+                float u = 1f - Smooth(drawnS / TouchCatchUp);
+                ank += _ccOff[i] * u;
+                float yaw = Mathf.Atan2(dirv.Z, dirv.X) + _ccYaw[i] * u;
                 dirv = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
             }
         }
@@ -1612,6 +1640,10 @@ public partial class PlayerFigure : Node3D
         return from + d * w;
     }
     readonly Vector3[] _hoOff = new Vector3[2]; readonly Vector3[,] _ovAnk = new Vector3[2, 2];
+    /// <summary>Per foot: the made touch whose contact pose is being caught up to (see TouchOverlay), the place and yaw difference left at its contact.</summary>
+    readonly int[] _ccId = { int.MinValue, int.MinValue }; readonly Vector3[] _ccOff = new Vector3[2]; readonly float[] _ccYaw = new float[2];
+    /// <summary>A contact pose further than this (metres, the ankle's or boot tip's move) from the foot's last drawn path: the rest of the way is caught up over <see cref="TouchCatchUp"/> seconds.</summary>
+    const float TouchCatchM = 0.08f, TouchCatchUp = 0.06f;
 
     /// <summary>Distance from the touching foot's instep point to the ball surface at the latest contact event (for logging).</summary>
     public float LastContactError { get; private set; } = float.NaN;
