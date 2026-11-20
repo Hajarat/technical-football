@@ -120,6 +120,12 @@ public struct FigureFrame
     /// start (the same <see cref="FigureSkill.Id"/> the move has once it is made) and its contact still to come. Not valid when none.
     /// </summary>
     public FigureSkill PendingSkill;
+    /// <summary>
+    /// A skill gesture the core holds back for a touch it has committed: the move expected after that touch, timed from the tick it was
+    /// first published (its <see cref="FigureSkill.Id"/>, which the move keeps once made, as does its start: the warning is drawn as
+    /// its reach). Not valid when none.
+    /// </summary>
+    public FigureSkill HeldSkill;
     /// <summary>The shot under way (a touch event it raises is the strike event).</summary>
     public FigureShot Shot;
     public bool SkillTouch;

@@ -1098,6 +1098,69 @@ public class SkillMoveTests
         Assert.True(move == null || move.StartTick != turn + 20, "a drag-back 0.17 s into the turn at the feet replaced it");
     }
 
+    [Theory]
+    [InlineData("drag_back", Entry.Jog, 0)]
+    [InlineData("drag_back", Entry.Sprint, 0)]
+    [InlineData("ball_roll", Entry.Jog, 1)]
+    [InlineData("step_over", Entry.Jog, -1)]
+    public void AGestureHeldBackForACommittedTouchIsPublishedAsTheMoveItWillStart(string move, Entry e, int side)
+    {
+        // The gesture comes while a touch is committed (its contact at least 4 ticks off): from the tick it is read until the tick
+        // before the move starts the core publishes the move it will start, and the move then made starts on the published tick
+        // with the published kind, foot, surface and side, the ball where the forecast had it as the move began (the forecast of the
+        // tick before; a sole's reach then moves the contact on, which the forecast leaves out).
+        var (trace, kind) = TraceFor(move, side);
+        var w = Field();
+        var p = w.Attacker;
+        var buf = new TickIntent[w.PlayerCount];
+        int g0 = -1, read = -1;
+        BallAction? last = null;
+        Vector3 ballBefore = default;
+        for (int tick = 1; tick <= 900; tick++)
+        {
+            ballBefore = w.Ball.Position;
+            if (g0 < 0 && tick > 240 && p.InPossession && p.TouchAction is { Pending: true } pt && pt.ContactTick - w.Tick >= 6) g0 = tick;
+            var it = Run(e, tick);
+            if (g0 >= 0 && tick - g0 < 20) it = trace(tick - g0, it);
+            buf[0] = it;
+            w.Step(buf);
+            var pending = w.Attacker.PendingSkill;
+            if (w.Events.Any(x => x.Kind == EventKind.SkillMove))
+            {
+                Assert.True(read >= 0, "the move started on the tick its gesture was read: nothing was held back");
+                Assert.Null(pending);
+                var m = p.SkillMove!;
+                Assert.NotNull(last);
+                Assert.Equal(kind, m.Kind);
+                Assert.Equal(last!.Kind, m.Kind);
+                Assert.Equal(last.StartTick, m.StartTick);
+                Assert.Equal(w.Tick, m.StartTick);
+                Assert.Equal(last.Foot, m.Foot);
+                Assert.Equal(last.Surface, m.Surface);
+                Assert.Equal(last.Side, m.Side);
+                Assert.Equal(ballBefore.X, last.ContactPoint.X, 4);
+                Assert.Equal(ballBefore.Z, last.ContactPoint.Z, 4);
+                if (m.ContactTick == m.StartTick) { Assert.Equal(m.ContactPoint.X, last.ContactPoint.X, 4); Assert.Equal(m.ContactPoint.Z, last.ContactPoint.Z, 4); }
+                return;
+            }
+            if (read < 0 && p.SkillBufTick >= 0)
+            {
+                read = p.SkillBufTick;
+                Assert.Equal(w.Tick, read);
+                Assert.True(p.TouchAction is { Pending: true }, "the gesture was read with no touch committed");
+            }
+            if (read >= 0)
+            {
+                Assert.NotNull(pending);
+                Assert.Equal(kind, pending!.Kind);
+                Assert.True(pending.StartTick > w.Tick);
+                last = pending;
+            }
+            else Assert.Null(pending);
+        }
+        Assert.Fail("no move made");
+    }
+
     // ---- fake shot ----
 
     static Outcome PlayShot(Entry e, int cancelAt, Vector2 left, int shootTicks = 30)

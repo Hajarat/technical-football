@@ -154,7 +154,7 @@ public sealed class SkillClipLayer
         _playing = _handBack = _transition = _pending = false; _moveId = int.MinValue;
         _haveShown = _haveShownPrev = _haveBase = _haveBasePrev = false; _prevSpeed = float.NaN;
         _in.Reset(); foreach (var l in _lock) l.Reset();
-        for (int i = 0; i < 2; i++) { _legOff[i] = _legOffVel[i] = NVec3.Zero; _pinW[i] = 0f; _planted[i] = false; _hbStep[i] = false; }
+        for (int i = 0; i < 2; i++) { _legOff[i] = _legOffVel[i] = NVec3.Zero; _pinW[i] = 0f; _planted[i] = false; _hbStep[i] = false; _twAwait[i] = _twAwaitMade[i] = false; }
         _reachOff = NVec3.Zero; Array.Clear(_pinHave); Array.Clear(_legU); Array.Clear(_flagWas); Array.Clear(_anchor); Array.Clear(_anchor0); Array.Clear(_twLim); Array.Clear(_ballLift);
         Array.Clear(_handIn);
     }
@@ -176,12 +176,17 @@ public sealed class SkillClipLayer
 
         // the move under way, or a fake shot the core has read but not made yet: the shot's wind-up (run-up, plant, backswing) is
         // drawn until FakeCheckSeconds before the fake's contact, then its clip checks the swing into the stop or the hook
-        var s = f.Skill.Valid ? f.Skill : f.PendingSkill.Valid && f.PendingSkill.ContactElapsed >= -FakeCheckSeconds - 1e-4f ? f.PendingSkill : default;
+        // (so is a gesture the core holds back for a touch: its clip plays its reach over the warning, so the move's first contact,
+        // which can come on its first tick, finds the foot already on its way)
+        var s = f.Skill.Valid ? f.Skill : f.PendingSkill.Valid && f.PendingSkill.ContactElapsed >= -FakeCheckSeconds - 1e-4f ? f.PendingSkill
+            : f.HeldSkill.Valid ? f.HeldSkill : default;
         bool covers = Covers(s);
         // (a fake whose strike foot changes before its contact starts again on the new foot, from the pose shown)
         if (covers && (s.Id != _moveId || _playing && (s.Right ? 1 : 0) != _foot))
         {
-            Start(f, s, sc, basePlanted); for (int i = 0; i < 2; i++) { _twBlocked[i] = tw[i] > 0f; _twS[i] = 0f; }
+            // (a held-back move's clip begins while the touch it waits for winds up: that touch is drawn, it is not one recovering)
+            bool heldIn = !f.Skill.Valid && !f.PendingSkill.Valid;
+            Start(f, s, sc, basePlanted); for (int i = 0; i < 2; i++) { _twBlocked[i] = tw[i] > 0f && !heldIn; _twAwait[i] = tw[i] > 0f && heldIn; _twAwaitMade[i] = false; _twS[i] = 0f; }
             Started?.Invoke(new SkillStart(_move, _foot == 1, s.Side, _stand!.Clip.Name, _run!.Clip.Name, _wRun, _entrySpeed, true));
         }
         if (!covers && f.Skill.Valid && f.Skill.Id != _moveId && f.Skill.Id != _procId)
@@ -193,7 +198,15 @@ public sealed class SkillClipLayer
         else if (!s.Valid && !_playing) _shotElapsed = f.Shot.Valid ? f.Shot.Elapsed : float.NaN;
         if (_playing)
         {
-            if (f.Skill.Valid && f.Skill.Id == _moveId) _pending = false;
+            if (f.Skill.Valid && f.Skill.Id == _moveId && _pending)
+            {
+                _pending = false;
+                // a held-back move made with other timing than forecast (a sole's reach, planned only now): the clip goes on from
+                // where it is to the move's own contact and end
+                var r = f.Skill;
+                float rc = r.Elapsed - r.ContactElapsed;
+                if (Math.Abs(rc - _mapContact) > 0.5f * dt || Math.Abs(r.Duration - _mapEnd) > 0.5f * dt) BuildMap(r, _ct, r.Elapsed - dt);
+            }
             _t = s.Valid && s.Id == _moveId ? s.Elapsed : _t + dt;
             // the clip has played out, or a shot or another move it cannot draw takes over, or a fake read was not made
             bool cut = !s.Valid && f.Shot.Valid || s.Valid && s.Id != _moveId || _pending && !s.Valid;
@@ -279,13 +292,7 @@ public sealed class SkillClipLayer
         // this tick, FakeCheckSeconds before the contact, part way into its own wind-up, and reaches its contact on the core's)
         _pending = !f.Skill.Valid;
         float origin = _pending ? Math.Max(0f, s.Elapsed - f.Dt) : float.IsNaN(_shotElapsed) ? 0f : -Math.Max(0f, _shotElapsed + f.Dt - s.Elapsed);
-        var c = _stand;
-        // the clip's events onto the core's ticks: contact, the spin's lift, the second contact, release on the end tick
-        var knots = new System.Collections.Generic.List<(float, float)> { (simContact, c.EventSeconds("contact")) };
-        if (c.HasEvent("lift") && !float.IsNaN(s.LiftElapsed)) knots.Add((s.Elapsed - s.LiftElapsed, c.EventSeconds("lift")));
-        if (c.HasEvent("contact2") && !float.IsNaN(s.Contact2Elapsed)) knots.Add((s.Elapsed - s.Contact2Elapsed, c.EventSeconds("contact2")));
-        knots.Add((simEnd, c.EventSeconds("release")));
-        _map = new SkillTimeMap(c.EventSeconds("start"), knots, c.EventSeconds("end"), origin);
+        BuildMap(s, _stand.EventSeconds("start"), origin);
         _moveId = s.Id; _t = s.Elapsed; _playing = true; _handBack = false; _transition = true;
         foreach (var l in _lock) l.Reset();
         _shotElapsed = float.NaN; Array.Clear(_pinHave); Array.Clear(_legU); Array.Clear(_flagWas); Array.Clear(_anchor); Array.Clear(_anchor0);
@@ -309,6 +316,19 @@ public sealed class SkillClipLayer
         if (Dbg) GD.Print($"SKILL_DBG hand-in L={_handIn[0]} R={_handIn[1]}");
         GD.Print($"SKILL_CLIP start move={_move} foot={(foot == 1 ? "R" : "L")} clip={_stand.Clip.Name}/{_run.Clip.Name} w_run={_wRun:F2} speed={speed:F2} clip_from={_map.ClipStart:F3} contact_s={simContact:F3} end_s={simEnd:F3} origin_s={origin:F3}");
     }
+
+    /// <summary>The clip's events onto the core's ticks of <paramref name="s"/>: contact, the spin's lift, the second contact, release on the end tick; from <paramref name="clipFrom"/> at <paramref name="origin"/>.</summary>
+    void BuildMap(in FigureSkill s, float clipFrom, float origin)
+    {
+        var c = _stand!;
+        _mapContact = s.Elapsed - s.ContactElapsed; _mapEnd = s.Duration;
+        var knots = new System.Collections.Generic.List<(float, float)> { (_mapContact, c.EventSeconds("contact")) };
+        if (c.HasEvent("lift") && !float.IsNaN(s.LiftElapsed)) knots.Add((s.Elapsed - s.LiftElapsed, c.EventSeconds("lift")));
+        if (c.HasEvent("contact2") && !float.IsNaN(s.Contact2Elapsed)) knots.Add((s.Elapsed - s.Contact2Elapsed, c.EventSeconds("contact2")));
+        knots.Add((_mapEnd, c.EventSeconds("release")));
+        _map = new SkillTimeMap(clipFrom, knots, c.EventSeconds("end"), origin);
+    }
+    float _mapContact, _mapEnd;
 
     /// <summary>
     /// The running clip's ending for the exit touch the core forecasts (made at once on the move's end tick): its second ending when
@@ -548,6 +568,16 @@ public sealed class SkillClipLayer
             float raw = _twBlocked[i] ? 0f : Math.Clamp(tw[i], 0f, 1f);
             _twS[i] = Math.Max(raw, _twS[i] - dt / TouchFade);
             _twx[i] = _twS[i];
+            // (the touch a held-back move waited for, once its contact is drawn, gives its foot up to the move's pins as they come
+            // in: its recovery would otherwise keep the foot off the ball at the move's own contact)
+            if (_twAwait[i] && raw <= 0f) _twAwait[i] = _twAwaitMade[i] = false;
+            // (no faster than over AwaitFade, but all of it once the pin has the foot to itself)
+            if (_twAwait[i] && _twAwaitMade[i])
+            {
+                _twAwaitCap[i] = _pinRaw[i] >= 1f ? 0f : Math.Max(1f - _pinRaw[i], _twAwaitCap[i] - dt / AwaitFade);
+                _twx[i] = Math.Min(_twx[i], _twAwaitCap[i]);
+            }
+            if (_twAwait[i] && raw >= 0.999f) { _twAwaitMade[i] = true; _twAwaitCap[i] = 1f; }
         }
         tw = _twx;
         bool anyTouch = tw[0] > 0f || tw[1] > 0f;
@@ -817,6 +847,11 @@ public sealed class SkillClipLayer
     readonly NVec3[] _pinAbs = new NVec3[2];
     readonly float[] _twx = new float[2];
     readonly bool[] _twBlocked = new bool[2];
+    /// <summary>Per foot, the touch a held-back move's clip began during (the one it waited for), until its weight is gone.</summary>
+    readonly bool[] _twAwait = new bool[2], _twAwaitMade = new bool[2];
+    readonly float[] _twAwaitCap = new float[2];
+    /// <summary>Seconds over which the awaited touch's recovery gives its foot up to the move's pins, at the slowest.</summary>
+    const float AwaitFade = 0.05f;
     readonly float[] _twS = new float[2];
     /// <summary>Seconds over which a touch's hold on a leg fades when the touch is dropped.</summary>
     const float TouchFade = 0.10f;

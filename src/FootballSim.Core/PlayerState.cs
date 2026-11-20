@@ -147,7 +147,9 @@ public sealed class PlayerState
     /// A fake shot read but not made yet: from the tick the cancel is read until the fake's contact the shot winds up on as a real one
     /// (it is still <see cref="Action"/>), and this is the move the fake will be, as the core expects it now (kind, side, foot,
     /// surface, its <see cref="BallAction.StartTick"/> the shoot press, its contact and end ticks; phase Windup, not made). On the
-    /// contact tick the move itself starts with the same StartTick and this goes back to null. For the view only.
+    /// contact tick the move itself starts with the same StartTick and this goes back to null. Also, while no shot is under way, a
+    /// skill gesture held back for a touch the controller has committed: the move expected to start on the tick after that touch's
+    /// contact (its StartTick), as the core forecasts it then (see SkillMoves.PendingHeld). For the view only.
     /// </summary>
     public BallAction? PendingSkill { get; internal set; }
     /// <summary>
