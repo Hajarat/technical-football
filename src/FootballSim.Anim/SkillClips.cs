@@ -70,8 +70,8 @@ public sealed class SkillClip
     public float LastSeconds => (Clip.FrameCount - 1) / (float)Clip.Fps;
 
     /// <summary>This clip's own time map: its events onto the simulation's (see <see cref="SkillTimeMap.ForEvents"/>).</summary>
-    public SkillTimeMap TimeMap(IReadOnlyList<(string Event, float Sim)> simEvents, float simOrigin) =>
-        SkillTimeMap.ForEvents(Clip.Events, Clip.Fps, simEvents, simOrigin);
+    public SkillTimeMap TimeMap(IReadOnlyList<(string Event, float Sim)> simEvents, float simOrigin, float? clipFrom = null) =>
+        SkillTimeMap.ForEvents(Clip.Events, Clip.Fps, simEvents, simOrigin, clipFrom: clipFrom);
 
     /// <summary>The root on the ground at <paramref name="seconds"/> (model x, z).</summary>
     public Vector2 Root(float seconds) => Vector2.Lerp(_root0, _root1, Math.Clamp(seconds / Math.Max(LastSeconds, 1e-4f), 0f, 1f));
@@ -232,15 +232,16 @@ public sealed class SkillTimeMap
     /// <c>end</c>): each of <paramref name="simEvents"/> (the contact first, the release last, a move's other events between, in
     /// order) the clip has lands on its simulation time. Each clip of a move gets its own map from the same simulation events, so
     /// a standing and a running clip whose spans differ (a running spin's swap at the core's length) are blended in event time:
-    /// both are at the same event on the same tick. Clips with the same event frames get the same map.
+    /// both are at the same event on the same tick. Clips with the same event frames get the same map. <paramref name="clipFrom"/>
+    /// starts it later than the clip's start (a map rebuilt part way through a move, from the clip's time then).
     /// </summary>
     public static SkillTimeMap ForEvents(IReadOnlyDictionary<string, int> clipEvents, int fps, IReadOnlyList<(string Event, float Sim)> simEvents,
-        float simOrigin, float maxRate = MaxRate)
+        float simOrigin, float maxRate = MaxRate, float? clipFrom = null)
     {
         var knots = new List<(float, float)>();
         foreach (var (e, sim) in simEvents)
             if (clipEvents.TryGetValue(e, out int fr)) knots.Add((sim, fr / (float)fps));
-        return new SkillTimeMap(clipEvents["start"] / (float)fps, knots, clipEvents["end"] / (float)fps, simOrigin, maxRate);
+        return new SkillTimeMap(clipFrom ?? clipEvents["start"] / (float)fps, knots, clipEvents["end"] / (float)fps, simOrigin, maxRate);
     }
 
     /// <summary>The clip time (seconds) at simulation time <paramref name="t"/> (seconds from the move's start tick).</summary>

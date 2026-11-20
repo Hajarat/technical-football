@@ -120,6 +120,12 @@ public struct FigureFrame
     /// start (the same <see cref="FigureSkill.Id"/> the move has once it is made) and its contact still to come. Not valid when none.
     /// </summary>
     public FigureSkill PendingSkill;
+    /// <summary>
+    /// A skill gesture the core holds back for a touch it has committed: the move expected after that touch, timed from the tick it was
+    /// first published (its <see cref="FigureSkill.Id"/>, which the move keeps once made, as does its start: the warning is drawn as
+    /// its reach). Not valid when none.
+    /// </summary>
+    public FigureSkill HeldSkill;
     /// <summary>The shot under way (a touch event it raises is the strike event).</summary>
     public FigureShot Shot;
     public bool SkillTouch;
@@ -508,7 +514,7 @@ public partial class PlayerFigure : Node3D
     float _kW; int _kFoot; Vector3 _kAnkle, _kDir; bool _pinOn; int _pinFoot; Vector3 _pinTarget; float _leanExtra; bool _seq;
     float _leanExtraS; bool _pinWas; Vector3 _pinLock;
     // skill moves: the move being drawn, where the foot was when it started (relative to the body), body offsets for this tick, last frame's final ankles
-    int _skId = int.MinValue; Vector3 _skFromRel; bool _skActive, _skSoleLogged, _skInLogged; int _skFoot, _skTail; bool _skJumpValid; readonly Vector3[] _prevAnkWorld = new Vector3[2];
+    int _skId = int.MinValue; Vector3 _skFromRel; float _skFromYaw; bool _skActive, _skSoleLogged, _skInLogged; int _skFoot, _skTail; bool _skJumpValid; readonly Vector3[] _prevAnkWorld = new Vector3[2];
     Vector3 _skPelOff, _skShoulderOff;
     readonly Vector3[] _prevAnkRel = new Vector3[2];
     // bob measurement: extremes of the pelvis height above its commanded height within one step
@@ -571,7 +577,7 @@ public partial class PlayerFigure : Node3D
         _strikeT = -1f; _windT = 0; _lastCharge = 0; _lean = 0; _leanExtraS = 0; _stActive = false; _pinWas = false; _skId = int.MinValue; _skJumpValid = false; _jN = 0; _jWasSkill = _jExit = false;
         _accFS = 0; _runPrev = float.NaN; _ratioS = 0.9945f; _bobStep = -1; _kInit = false;
         _stepW = 0; _closeW = 0; _latS = 0; _bank = 0; _pelYaw = 0; _headYaw = float.NaN; _headPitch = 0;
-        for (int i = 0; i < 2; i++) { _cycPitch[i] = 0f; _cycToe[i] = 0f; _hintPrev[i] = false; _hoId[i] = int.MinValue; }
+        for (int i = 0; i < 2; i++) { _cycPitch[i] = 0f; _cycToe[i] = 0f; _hintPrev[i] = false; _hoId[i] = int.MinValue; _ccOn[i] = _ovDrew[i] = false; }
         foreach (var t in _tf) { t.Id = t.ContactId = t.SurfId = int.MinValue; }
         foreach (var t in _tfUp) { t.Id = t.ContactId = t.SurfId = int.MinValue; }
         for (int i = 0; i < 2; i++) { _twPrev[i] = 0f; _kwPrev[i] = 0f; _dropT[i] = 0f; _ovWindPrev[i] = false; }
@@ -1415,6 +1421,7 @@ public partial class PlayerFigure : Node3D
         float upW = 0f; int upId = int.MinValue;
         (int Id, float Tau) handover = (int.MinValue, 0f);   // a touch that takes over from the early hint this tick
         int windId = int.MinValue; float windTau = 0f;        // the unmade touch drawn this tick
+        Vector3 bestC0 = Vector3.Zero;   // the ankle the touch drawn this tick has at its contact
         for (int n = 0; n < 3; n++)
         {
             // the pending or latest touch, the one before it still following through, and the immediate touch the core is about to make
@@ -1508,7 +1515,7 @@ public partial class PlayerFigure : Node3D
                 wgt = Math.Min(wgt, _upW[i] + rise); if (wgt > upW) { upW = wgt; upId = a.Id; }
             }
             if (wgt <= best) continue;
-            best = wgt; surf = a.Surface;
+            best = wgt; surf = a.Surface; bestC0 = c0;
             _blTouchD[i] = d; _blTouchS[i] = touchS; _blTouchSurf[i] = sf;
             _ovWind[i] = !a.Made;
             if (!a.Made && tau > 0f) { windId = a.Id; windTau = tau; } else windId = int.MinValue;
@@ -1558,8 +1565,49 @@ public partial class PlayerFigure : Node3D
                 dirv = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
             }
         }
+        // A touch pose that moves the foot further in a tick than a foot moves (a touch made at once with no windup drawn up to it, the
+        // stick pushed with a still ball at the feet; a forecast first seen a tick before its contact; the hand-back from a first touch
+        // reached far out to the stride): the part of the move over TouchCatchM (plus the body's own move) is kept as an offset and
+        // taken out over TouchCatchUp, so the boot reaches the ball, or the stride, a few ticks late instead of popping there.
+        if (_teleporting || _ovN[i] < 2) _ccOn[i] = false;
+        else
+        {
+            if (_ccOn[i])
+            {
+                _ccT[i] += f.Dt;
+                if (_ccT[i] >= TouchCatchUp) _ccOn[i] = false;
+                else
+                {
+                    float u = 1f - Smooth(_ccT[i] / TouchCatchUp);
+                    ank += _ccOff[i] * u;
+                    float yaw = Mathf.Atan2(dirv.Z, dirv.X) + _ccYaw[i] * u;
+                    dirv = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
+                }
+            }
+            if (best > 0f || _ovDrew[i])
+            {
+                Vector3 jump = _ovAnk[i, 0] + (_ovAnk[i, 0] - _ovAnk[i, 1]) - ank;
+                float dyaw = Mathf.Wrap(_ovYaw[i] - Mathf.Atan2(dirv.Z, dirv.X), -Mathf.Pi, Mathf.Pi);
+                // (the larger of the ankle's and the boot tip's move)
+                Vector3 fdNow = new(dirv.X, 0, dirv.Z), fdWas = new(Mathf.Cos(_ovYaw[i]), 0, Mathf.Sin(_ovYaw[i]));
+                float m = Math.Max(jump.Length(), (jump + (fdWas - fdNow) * (0.8f * FootLen)).Length());
+                float lim = TouchCatchM + 1.2f * hv.Length() * f.Dt;
+                if (m > lim)
+                {
+                    float sh = 1f - lim / m;
+                    float u = _ccOn[i] ? 1f - Smooth(_ccT[i] / TouchCatchUp) : 0f;
+                    _ccOff[i] = _ccOff[i] * u + jump * sh; _ccYaw[i] = _ccYaw[i] * u + dyaw * sh; _ccT[i] = 0f; _ccOn[i] = true;
+                    ank += jump * sh;
+                    float yaw = Mathf.Atan2(dirv.Z, dirv.X) + dyaw * sh;
+                    dirv = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
+                }
+            }
+        }
+        _ovDrew[i] = best > 0f || _ccOn[i];
         if (best <= 0f) { _ovTurn[i] = 0f; _blTouchS[i] = -1f; }
-        _ovAnk[i, 1] = _ovAnk[i, 0]; _ovAnk[i, 0] = ank; _ovYaw[i] = Mathf.Atan2(dirv.Z, dirv.X);
+        // (the ankle a windup drawn now puts the boot at on its contact: a skill clip winding the leg up for the exit touch aims there)
+        _atkAnim?.Skills?.SetTouchContact(i, windId != int.MinValue && !hint, bestC0);
+        _ovAnk[i, 1] = _ovAnk[i, 0]; _ovAnk[i, 0] = ank; _ovYaw[i] = Mathf.Atan2(dirv.Z, dirv.X); _ovN[i] = _teleporting ? 1 : Math.Min(_ovN[i] + 1, 2);
         _hintPrev[i] = hint; _hintW[i] = hint ? best : 0f; _upW[i] = upW; _upIdPrev[i] = upW > 0f ? upId : int.MinValue;
         return best;
     }
@@ -1612,6 +1660,10 @@ public partial class PlayerFigure : Node3D
         return from + d * w;
     }
     readonly Vector3[] _hoOff = new Vector3[2]; readonly Vector3[,] _ovAnk = new Vector3[2, 2];
+    /// <summary>Per foot: a touch pose's jump being caught up to (see TouchOverlay): whether, its place and yaw difference as last set, the time since; and whether the overlay drew the foot last tick.</summary>
+    readonly bool[] _ccOn = new bool[2], _ovDrew = new bool[2]; readonly Vector3[] _ccOff = new Vector3[2]; readonly float[] _ccYaw = new float[2], _ccT = new float[2]; readonly int[] _ovN = new int[2];
+    /// <summary>A touch pose further than this (metres, the ankle's or boot tip's move, plus the body's) from the foot's last drawn path: the rest of the way is caught up over <see cref="TouchCatchUp"/> seconds.</summary>
+    const float TouchCatchM = 0.08f, TouchCatchUp = 0.06f;
 
     /// <summary>Distance from the touching foot's instep point to the ball surface at the latest contact event (for logging).</summary>
     public float LastContactError { get; private set; } = float.NaN;
@@ -1952,7 +2004,7 @@ public partial class PlayerFigure : Node3D
         Vector3 posXZ = new(pos.X, 0, pos.Z);
         if (s.Id != _skId)
         {
-            _skId = s.Id; _skFromRel = _prevAnkRel[fi]; _skSoleLogged = _skInLogged = false;
+            _skId = s.Id; _skFromRel = _prevAnkRel[fi]; _skFromYaw = _yawPrev[fi]; _skSoleLogged = _skInLogged = false;
             SkillStartFromProcedural(fi, posXZ);
         }
         Vector3 from = posXZ + new Vector3(_skFromRel.X, 0, _skFromRel.Z); from.Y = _skFromRel.Y;
@@ -2040,7 +2092,10 @@ public partial class PlayerFigure : Node3D
             Vector3 p = from.Lerp(target, rs);
             p.Y += 0.12f * k * Mathf.Sin(Mathf.Pi * rs);
             target = p;
-            fd = (fwd * (1f - rs) + fd * rs).Normalized();
+            // (the toes turn from where they pointed as the move began, by the angle: a foot still turned sideways from a touch, or
+            // pointing back against a turn at the feet, would swing round in a tick on the way between the two directions)
+            float fy = Mathf.LerpAngle(_teleporting ? Mathf.Atan2(fwd.Z, fwd.X) : _skFromYaw, Mathf.Atan2(fd.Z, fd.X), rs);
+            fd = new Vector3(Mathf.Cos(fy), 0, Mathf.Sin(fy));
             _skPelOff = Vector3.Zero; _skShoulderOff = Vector3.Zero; _leanExtra = 0f;
             inW = 1f;
         }

@@ -801,8 +801,10 @@ public sealed class World
             }
         }
         // A fake shot read and waiting for its contact: the move it will be, for the view to draw from the cancel on.
+        // So is a gesture held back for a touch the controller has committed: the move it will start after that touch.
         a.PendingSkill = _fakeTick > Tick && a.ShotAction is { Made: false } && a.SkillAction == null
-            ? SkillMoves.PendingFake(a, _fake, _shotStartTick, _fakeTick, Tick, Ball, Tuning) : null;
+            ? SkillMoves.PendingFake(a, _fake, _shotStartTick, _fakeTick, Tick, Ball, Tuning)
+            : State == RoundState.Live && a.ShotAction == null ? SkillMoves.PendingHeld(a, Ball, Tick, SimTime, Tuning) : null;
         a.SkillExitTouch = State == RoundState.Live && _controller == a ? SkillMoves.ExitForecast(a, _lastIntent, Ball, Tick, Tuning) : null;
         IdealCharge = ShotModel.IdealCharge(ShotModel.GoalDistance(Ball.Position, Pitch), Tuning);
         if (State == RoundState.Live && _controller == a)

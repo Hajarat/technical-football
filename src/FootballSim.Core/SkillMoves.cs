@@ -306,6 +306,76 @@ public static class SkillMoves
         };
     }
 
+    /// <summary>The move's own length (its reach or close-in apart), seconds: from <see cref="Start"/>.</summary>
+    static float MoveSeconds(PlayerState p, ActionKind kind, float entry, float ballSpeed, bool feetTurn, Tuning t)
+    {
+        var k = t.Skill;
+        return kind switch
+        {
+            ActionKind.StepOver => ballSpeed < k.StillBallSpeed ? k.StepOverStillSeconds : k.StepOverSeconds,
+            ActionKind.BodyFeint => k.BodyFeintSeconds,
+            ActionKind.BallRoll => p.SkillChainCount > 0 ? k.BallRollChainSeconds
+                : k.BallRollFirstSeconds + (k.BallRollRunSeconds - k.BallRollFirstSeconds) * RollRunShare(entry, t),
+            ActionKind.DragBack => feetTurn ? k.FeetTurnSeconds : k.DragBackSeconds,
+            ActionKind.FakeStop or ActionKind.FakeCut => FakeSeconds(kind, t),
+            // The two-contact moves from their first contact.
+            ActionKind.Elastico => k.ElasticoSeconds,
+            ActionKind.Spin => k.SpinSeconds,
+            ActionKind.HeelToHeel => k.HeelToHeelSeconds - k.HeelToHeelContactSeconds,
+            _ => k.FakeSeconds,
+        };
+    }
+
+    /// <summary>
+    /// The move a recognised gesture will start, while it is held back for a touch the touch controller has committed (see
+    /// <see cref="TryStart"/>: the move waits for that touch, and starts on the tick after its contact), as <see cref="Start"/>
+    /// would make it then: its kind, side, foot and surface, the tick it starts on (<see cref="BallAction.StartTick"/> and
+    /// <see cref="BallAction.PlanTick"/>), its contact taken as at that start (a sole's reach, which is only planned then, as none)
+    /// and its end, and the ball where it lies as the move starts as its contact point (the touch's contact point until that touch
+    /// is made, then the ball as it lies; a sole's reach moves the move's own contact point on from there). Null when no gesture is
+    /// held back for a touch, the move will not wait that long, or a fake shot is read. A forecast: the move still starts only as
+    /// <see cref="TryStart"/> finds it then. Changes no state.
+    /// </summary>
+    internal static BallAction? PendingHeld(PlayerState p, Ball ball, int tick, float now, Tuning t)
+    {
+        var k = t.Skill;
+        if (p.SkillBufTick < 0 || p.SkillBufFakeFrom >= 0 || p.SkillAction != null || !p.InPossession) return null;
+        if (p.SkillBufKind is Gesture.None or Gesture.KnockOn) return null;
+        int start;
+        Vector3 at;
+        if (p.TouchAction is { Pending: true } waiting) { start = waiting.ContactTick + 1; at = waiting.ContactPoint; }
+        else if (p.TouchAction is { Made: true } made && made.ContactTick == tick) { start = tick + 1; at = ball.Position; }
+        else return null;
+        if (start - p.SkillBufTick > Ticks(k.MeetWaitSeconds, t) || now + (start - tick) * t.Dt < p.SkillCooldownUntil) return null;
+        var kind = KindOf(p.SkillBufKind);
+        // the player and the ball where they will be as the move starts (before he moves on that tick)
+        var c = p.Scratch();
+        c.Position = p.Position + new Vector3(p.Velocity.X, 0f, p.Velocity.Z) * ((start - 1 - tick) * t.Dt);
+        var b = ball.ScratchA();
+        b.Position = new Vector3(at.X, ball.Position.Y, at.Z);
+        Foot foot = FootFor(c, kind, p.SkillBufSide, b, t);
+        Vector2 fwd = GestureReader.FrameForward(p, t);
+        float entry = MathF.Max(0f, Vector2.Dot(new Vector2(p.Velocity.X, p.Velocity.Z), fwd));
+        int dur = Ticks(MoveSeconds(p, kind, entry, new Vector2(ball.Velocity.X, ball.Velocity.Z).Length(), false, t), t);
+        bool contactless = kind is ActionKind.StepOver or ActionKind.BodyFeint;
+        return new BallAction
+        {
+            Kind = kind,
+            Phase = ActionPhase.Windup,
+            Side = kind is ActionKind.DragBack or ActionKind.FakeStop ? SkillSide.None : p.SkillBufSide,
+            Foot = foot,
+            Surface = SurfaceFor(kind, p.SkillBufSide, foot),
+            StartTick = start,
+            PlanTick = start,
+            ExecuteTick = start,
+            ContactTick = contactless ? start + dur / 2 : start,
+            EndTick = start + dur,
+            ContactPoint = new Vector3(at.X, t.Ball.Radius, at.Z),
+            HoldDirection = fwd,
+            SkillCut = p.SkillBufCut,
+        };
+    }
+
     static BallAction Start(PlayerState p, ActionKind kind, SkillSide side, Vector2 cut, Ball ball, int tick, float now, Tuning t,
         bool feetTurn = false, int fakeFrom = -1)
     {
@@ -329,20 +399,7 @@ public static class SkillMoves
         Vector2 fwd = GestureReader.FrameForward(p, t);
         float entry = MathF.Max(0f, Vector2.Dot(new Vector2(p.Velocity.X, p.Velocity.Z), fwd));
         float ballSpeed = new Vector2(ball.Velocity.X, ball.Velocity.Z).Length();
-        float seconds = kind switch
-        {
-            ActionKind.StepOver => ballSpeed < k.StillBallSpeed ? k.StepOverStillSeconds : k.StepOverSeconds,
-            ActionKind.BodyFeint => k.BodyFeintSeconds,
-            ActionKind.BallRoll => p.SkillChainCount > 0 ? k.BallRollChainSeconds
-                : k.BallRollFirstSeconds + (k.BallRollRunSeconds - k.BallRollFirstSeconds) * RollRunShare(entry, t),
-            ActionKind.DragBack => feetTurn ? k.FeetTurnSeconds : k.DragBackSeconds,
-            ActionKind.FakeStop or ActionKind.FakeCut => FakeSeconds(kind, t),
-            // The two-contact moves from their first contact.
-            ActionKind.Elastico => k.ElasticoSeconds,
-            ActionKind.Spin => k.SpinSeconds,
-            ActionKind.HeelToHeel => k.HeelToHeelSeconds - k.HeelToHeelContactSeconds,
-            _ => k.FakeSeconds,
-        };
+        float seconds = MoveSeconds(p, kind, entry, ballSpeed, feetTurn, t);
         int dur = Ticks(seconds, t);
         Foot foot = FootFor(p, kind, side, ball, t);
         int reach = fakeFrom >= 0 ? 0

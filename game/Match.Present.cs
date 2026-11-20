@@ -35,8 +35,15 @@ public partial class Match
         f.CloseControl = _closeControl;
         f.BallPos = G(w.Ball.Position); f.BallVel = G(w.Ball.Velocity); f.BallRadius = w.Ball.Radius;
         f.Dt = w.Tuning.Dt;
-        if (p.Action is { IsSkill: true } sk && sk.Phase != ActionPhase.Done) f.Skill = SkillFrame(sk, p, f.Dt);
-        if (p.PendingSkill is { } pending) f.PendingSkill = SkillFrame(pending, p, f.Dt);
+        // a move whose gesture the core held back for a touch is timed from the tick it was first published, so the warning is its
+        // reach as the view draws it (the move itself keeps its own ticks; see HeldOrigin)
+        int held = HeldOrigin(p);
+        if (p.Action is { IsSkill: true } sk && sk.Phase != ActionPhase.Done) f.Skill = SkillFrame(sk, p, f.Dt, sk.StartTick == _heldMove ? _heldFrom : int.MinValue);
+        if (p.PendingSkill is { } pending)
+        {
+            if (p.Action is { IsShot: true }) f.PendingSkill = SkillFrame(pending, p, f.Dt);
+            else f.HeldSkill = SkillFrame(pending, p, f.Dt, held);
+        }
         foreach (var e in w.Events)
         {
             if (e.Team is not (-1 or 0) || e.PlayerIndex is not (-1 or 0)) continue;
@@ -115,6 +122,10 @@ public partial class Match
         var pv = new System.Numerics.Vector3(p.Velocity.X, 0f, p.Velocity.Z);
         var bv = new System.Numerics.Vector3(ball.Velocity.X, 0f, ball.Velocity.Z);
         float reach = TouchModel.FootReach(p.Sheet, t);
+        // a free regain takes the first touch from as far as regain_reach (a toe-poke): forecast it from there, or the touch comes at
+        // once while the drawn approach still expects it some ticks later
+        bool freeRegain = !p.InPossession && p.Regain == RegainMode.Free;
+        if (freeRegain) reach = Math.Max(reach, t.Possession.RegainReach);
         bool InReachAt(int j, float margin = 0f)
         {
             var pp = p.Position + pv * (j * dt);
@@ -166,7 +177,8 @@ public partial class Match
             }
             else
             {
-                if (!stickOn && still) return default;
+                // (a player going for the ball takes a still one too)
+                if (!stickOn && still && p.Regain == RegainMode.None) return default;
                 // no touch until the stun after a strike is over
                 for (int k = 1; k <= Horizon && j < 0; k++) if (InReachAt(k) && w.SimTime + k * dt >= p.StunEndTime) j = k;
                 if (j < 0) return default;
@@ -196,14 +208,45 @@ public partial class Match
         };
     }
 
-    static FigureSkill SkillFrame(BallAction sk, PlayerState p, float dt) => new()
+    // the gesture held back for a touch (the core's PendingSkill without a shot): the tick it was first published, its kind and the
+    // start tick last published; the start tick of the move made from it, once made
+    int _heldFrom = int.MinValue, _heldStart = int.MinValue, _heldMove = int.MinValue; ActionKind _heldKind;
+
+    /// <summary>
+    /// The tick a gesture held back for a touch was first published (int.MinValue when none is), kept on while it stays published as
+    /// the same move; the move made from it on the published start tick is remembered (<see cref="_heldMove"/>) so it is timed from
+    /// there too.
+    /// </summary>
+    int HeldOrigin(PlayerState p)
     {
-        Valid = true, Kind = SkillKindOf(sk.Kind), Id = sk.StartTick,
+        if (p.PendingSkill is { } h && p.Action is not { IsShot: true })
+        {
+            if (_heldFrom == int.MinValue || h.Kind != _heldKind) { _heldFrom = p.CurrentTick; _heldKind = h.Kind; }
+            _heldStart = h.StartTick;
+            return _heldFrom;
+        }
+        if (p.Action is { IsSkill: true } sk && sk.Phase != ActionPhase.Done)
+        {
+            if (_heldFrom != int.MinValue && _heldMove != sk.StartTick)
+                _heldMove = sk.StartTick == _heldStart && sk.Kind == _heldKind ? sk.StartTick : int.MinValue;
+            if (_heldMove == sk.StartTick) return _heldFrom;
+        }
+        _heldFrom = _heldStart = _heldMove = int.MinValue;
+        return int.MinValue;
+    }
+
+    /// <summary>The move as plain values; <paramref name="origin"/> (when set) is the tick its start is counted from instead of its own start tick.</summary>
+    static FigureSkill SkillFrame(BallAction sk, PlayerState p, float dt, int origin = int.MinValue) =>
+        SkillFrameFrom(sk, p, dt, origin == int.MinValue ? sk.StartTick : origin);
+
+    static FigureSkill SkillFrameFrom(BallAction sk, PlayerState p, float dt, int st) => new()
+    {
+        Valid = true, Kind = SkillKindOf(sk.Kind), Id = st,
         Side = sk.Side == SkillSide.Left ? -1f : sk.Side == SkillSide.Right ? 1f : 0f,
         Right = sk.Foot == Foot.Right, Surface = (BootSurface)(int)sk.Surface,
-        Elapsed = (p.CurrentTick - sk.StartTick) * dt, Duration = (sk.EndTick - sk.StartTick) * dt,
+        Elapsed = (p.CurrentTick - st) * dt, Duration = (sk.EndTick - st) * dt,
         ExecElapsed = (p.CurrentTick - sk.ExecuteTick) * dt, ExecDuration = (sk.EndTick - sk.ExecuteTick) * dt,
-        ContactElapsed = (p.CurrentTick - sk.ContactTick) * dt, ReachSpan = (sk.ContactTick - sk.StartTick) * dt,
+        ContactElapsed = (p.CurrentTick - sk.ContactTick) * dt, ReachSpan = (sk.ContactTick - st) * dt,
         ContactPoint = G(sk.ContactPoint), OutVelocity = G(sk.BallOutVelocity),
         Contact2Elapsed = sk.Contact2Tick >= 0 ? (p.CurrentTick - sk.Contact2Tick) * dt : float.NaN,
         LiftElapsed = sk.LiftTick >= 0 ? (p.CurrentTick - sk.LiftTick) * dt : float.NaN,
@@ -268,7 +311,7 @@ public partial class Match
             Hud.ShowShotType(shot.Kind switch { ActionKind.Finesse => "FINESSE", ActionKind.Chip => "CHIP", ActionKind.Driven => "DRIVEN", ActionKind.LowFinesse => "LOW FINESSE", _ => "POWER" });
         }
         // a fake shot: the shot's name goes from the tick the core publishes the pending fake (the cancel read)
-        if (w.Attacker.PendingSkill != null || w.Attacker.SkillMove is { Kind: ActionKind.FakeCut or ActionKind.FakeStop }) Hud.HideShotType();
+        if (w.Attacker.PendingSkill != null && w.Attacker.Action is { IsShot: true } || w.Attacker.SkillMove is { Kind: ActionKind.FakeCut or ActionKind.FakeStop }) Hud.HideShotType();
         Hud.SetClock(w.Clock);
         if (w.State == RoundState.Report && w.Report != null)
             Hud.ShowReport(ReportText.Title(w.Report), ReportText.Lines(w.Report));
