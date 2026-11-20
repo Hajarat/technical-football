@@ -322,6 +322,88 @@ public class SkillMoveTests
         Assert.True(p.InPossession);
     }
 
+    public static IEnumerable<object[]> FlowingMoves()
+    {
+        foreach (string move in new[] { "step_over", "body_feint" })
+        foreach (var e in new[] { Entry.Jog, Entry.Sprint })
+        foreach (int side in new[] { -1, 1 })
+            yield return new object[] { move, e, side };
+    }
+
+    /// <summary>The share of his entry pace a flowing move keeps at least: the step-over and body feint 85% at a jog (4 m/s) to 75% at a sprint (7.5 m/s).</summary>
+    static float Keep(string move, float entry) => move switch
+    {
+        _ => 0.85f - 0.10f * Math.Clamp((entry - 4f) / 3.5f, 0f, 1f),
+    };
+
+    [Theory]
+    [MemberData(nameof(FlowingMoves))]
+    public void FlowingMovesAtARunKeepHimMovingWithTheBallRollingOn(string move, Entry e, int side)
+    {
+        // The left stick stays forward throughout: he never drops below the move's share of his entry pace (the step-over and
+        // body feint easing no harder than step_over_run_brake), the ball ends ahead of him along his travel rolling at least
+        // as fast as he runs, and he is back to the share and running along the stick within 0.25 s of the end.
+        var (trace, kind) = TraceFor(move, side);
+        for (ulong seed = 1; seed <= 3; seed++)
+        {
+            var w = Field(seed);
+            var p = w.Attacker;
+            var t = w.Tuning;
+            var buf = new TickIntent[w.PlayerCount];
+            BallAction? a = null;
+            float minSpeed = float.MaxValue, maxBrake = 0f, run0 = float.NaN, along = float.NaN, perp = float.NaN, ballSpeed = float.NaN, speed = float.NaN;
+            int backAt = -1, onStickAt = -1;
+            bool lost = false;
+            for (int tick = 1; tick <= 480 && (a == null || w.Tick < a.EndTick + 40); tick++)
+            {
+                int i = tick - 241;
+                buf[0] = i >= 0 && i < 40 ? trace(i, Run(e, tick)) : Run(e, tick);
+                w.Step(buf);
+                if (a == null && w.Events.Any(ev => ev.Kind == EventKind.SkillMove)) { a = p.SkillMove!; run0 = p.RunSpeed; }
+                lost |= w.Events.Any(ev => ev.Kind == EventKind.PossessionLost);
+                if (a == null) continue;
+                var v = new Vector2(p.Velocity.X, p.Velocity.Z);
+                float share = Keep(move, a.SkillEntry);
+                if (w.Tick < a.EndTick)
+                {
+                    minSpeed = MathF.Min(minSpeed, v.Length() / a.SkillEntry);
+                    maxBrake = MathF.Max(maxBrake, (run0 - p.RunSpeed) / t.Dt);
+                    run0 = p.RunSpeed;
+                }
+                if (w.Tick == a.EndTick - 1)
+                {
+                    var dir = Vector2.Normalize(v);
+                    var rel = new Vector2(w.Ball.Position.X - p.Position.X, w.Ball.Position.Z - p.Position.Z);
+                    along = Vector2.Dot(rel, dir);
+                    perp = MathF.Abs(dir.X * rel.Y - dir.Y * rel.X);
+                    speed = v.Length();
+                }
+                // Released on the end tick.
+                if (w.Tick == a.EndTick) ballSpeed = new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z).Length();
+                if (w.Tick >= a.EndTick - 1)
+                {
+                    if (backAt < 0 && v.Length() >= share * a.SkillEntry) backAt = w.Tick;
+                    if (onStickAt < 0 && MathF.Abs(MathF.Atan2(v.Y, v.X)) * 180f / MathF.PI <= 15f) onStickAt = w.Tick;
+                }
+            }
+            string at = $"{move} {e} side {side} seed {seed}";
+            Assert.NotNull(a);
+            Assert.Equal(kind, a!.Kind);
+            float keep = Keep(move, a.SkillEntry);
+            Assert.True(a.SkillEntry >= 2.5f, $"{at}: entry {a.SkillEntry} m/s");
+            Assert.True(minSpeed >= keep, $"{at}: ground speed fell to {minSpeed:F2} of the entry {a.SkillEntry:F2} m/s");
+            if (move is "step_over" or "body_feint")
+                Assert.True(maxBrake <= t.Skill.StepOverRunBrake + 0.01f, $"{at}: braked at {maxBrake:F1} m/s^2");
+            Assert.InRange(along, 0.35f, 0.6f);
+            Assert.True(perp <= 0.25f, $"{at}: ball {perp:F2} m to the side of his travel");
+            Assert.True(ballSpeed >= speed, $"{at}: ball {ballSpeed:F2} m/s, player {speed:F2} m/s");
+            Assert.True(backAt >= 0 && (backAt - (a.EndTick - 1)) * t.Dt <= 0.25f + 1e-4f, $"{at}: back to {keep} of the entry at tick {backAt}, end {a.EndTick}");
+            Assert.True(onStickAt >= 0 && (onStickAt - (a.EndTick - 1)) * t.Dt <= 0.25f + 1e-4f, $"{at}: on the stick at tick {onStickAt}, end {a.EndTick}");
+            Assert.False(lost, $"{at}: lost the ball");
+            Assert.True(p.InPossession, $"{at}: not in possession");
+        }
+    }
+
     [Fact]
     public void AGestureWithTheBallOutOfReachWaitsThenIsDropped()
     {
@@ -520,8 +602,8 @@ public class SkillMoveTests
             {
                 int i = tick - 241;
                 var it = Run(Entry.Standing, tick);
-                // A body feint to the right from a standstill, then off straight ahead.
-                if (i >= 0) it = Right(new TickIntent { MoveX = 1f }, i < 4 ? new Vector2(0f, 1f) : Vector2.Zero);
+                // A body feint to the right from a standstill (the left stick pushed once it is under way), then off straight ahead.
+                if (i >= 0) it = Right(new TickIntent { MoveX = end > 0 ? 1f : 0f }, i < 4 ? new Vector2(0f, 1f) : Vector2.Zero);
                 buf[0] = it;
                 w.Step(buf);
                 if (w.Events.Any(e => e.Kind == EventKind.SkillMove)) end = p.SkillMove!.EndTick;

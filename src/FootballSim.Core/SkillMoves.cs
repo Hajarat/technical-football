@@ -9,7 +9,8 @@ namespace FootballSim.Core;
 /// move sets the running speed along the running direction it started on, a steering velocity, and for the sole moves the
 /// ball's path. When it ends the touch planner plans at once toward the left stick, so a move never loses the ball.
 /// <list type="bullet">
-/// <item>Step-over and body feint: no contact; the player eases to the ball's pace so it ends pace_match_ahead in front.</item>
+/// <item>Step-over and body feint: no contact; from standing the player eases to the ball's pace so it ends pace_match_ahead in
+/// front, at a run he runs on and the ball rolls on with him (see CarryDummyBall).</item>
 /// <item>Ball roll: the sole rolls the ball sideways toward the side (ball_roll_distance by speed) and the player steps with it.</item>
 /// <item>Drag-back: the sole pulls the ball back drag_back_distance; the player stops and steps back drag_back_step_back.</item>
 /// <item>Fake stop: the ball is stopped under the sole and the player stops. Fake cut: the ball is hooked toward the left stick.</item>
@@ -347,7 +348,8 @@ public static class SkillMoves
         int reach = fakeFrom >= 0 ? 0
             : kind == ActionKind.HeelToHeel ? Ticks(k.HeelToHeelContactSeconds, t)
             : Reaches(kind) ? PlanReach(p, foot, fwd, ball, now, t, feetTurn ? k.FeetTurnReachMax : ReachMax(kind, t), eased: !feetTurn).Ticks
-            : contactless ? CloseInTicks(p, ball, fwd, entry, t) : 0;
+            // (At a run the ball is brought to him as he runs on instead, see CarryDummyBall.)
+            : contactless ? (int)MathF.Round(CloseInTicks(p, ball, fwd, entry, t) * (1f - DummyRunShare(entry, t))) : 0;
         // A two-contact move's contacts are fixed from its start (the heel-to-heel's from the start, the others' from the first).
         if (kind == ActionKind.HeelToHeel) dur = Ticks(k.HeelToHeelSeconds, t) - reach;
         FootSurface surface = SurfaceFor(kind, side, foot);
@@ -446,6 +448,28 @@ public static class SkillMoves
                 float want = Math.Clamp(vb + (along - ahead) / left, 0f, MathF.Min(cap, limit));
                 float now = p.RunSpeed, step = PaceAccel * t.Dt;
                 run = Math.Clamp(want, now - step, now + step);
+                // At a run he runs on instead (the ball is kept rolling with him, see CarryDummyBall), his run turning toward the
+                // left stick (at most step_over_run_turn_deg off the move's line); a move entered in between blends the two.
+                float share = DummyRunShare(entry, t);
+                if (share > 0f)
+                {
+                    // (From the running speed he has: the entry pace may include the controller's steering, which eases out.)
+                    float dummy = Math.Clamp(DummyRun(a, tick, t), now - k.StepOverRunBrake * t.Dt, now + step);
+                    // A step under way (the steering before the move, a ball roll's step) eases out as the skill tick eases it
+                    // (SkillSteerAccel); the run takes up what it would cost his ground speed beyond step_over_run_brake.
+                    Vector2 s0 = p.PlannerSteer + p.SteerCarry;
+                    float fl = s0.Length(), fade = DummySteerFade * t.Dt;
+                    Vector2 s1 = fl > fade ? s0 * (1f - fade / fl) : Vector2.Zero;
+                    var fc = new Vector2(MathF.Cos(p.Facing), MathF.Sin(p.Facing));
+                    float floorV = new Vector2(p.Velocity.X, p.Velocity.Z).Length() - k.StepOverRunBrake * t.Dt;
+                    float fs = Vector2.Dot(fc, s1), disc = floorV * floorV - s1.LengthSquared() + fs * fs;
+                    if (floorV > 0f && disc > 0f) dummy = MathF.Max(dummy, MathF.Min(MathF.Max(entry, now), -fs + MathF.Sqrt(disc)));
+                    steer = s1;
+                    run += (dummy - run) * share;
+                    var dir = DummyRunDirection(p, a, t);
+                    var lf = Vector2.Normalize(fwd * (1f - share) + dir * share);
+                    legs = new TickIntent { MoveX = lf.X, MoveZ = lf.Y, Sprint = 1f };
+                }
                 break;
             }
             case ActionKind.BallRoll:
@@ -586,6 +610,95 @@ public static class SkillMoves
             if (along <= target) return n;
         }
         return max;
+    }
+
+    /// <summary>Step-over and body feint at a run: the ball ends this far ahead of the player along his travel at the release, metres ...</summary>
+    const float DummyRunAhead = 0.45f;
+    /// <summary>... rolling this much faster than he runs then, m/s (released at that pace for the ordinary dribble touch).</summary>
+    const float DummyReleaseMargin = 0.15f;
+    /// <summary>The steering under way as a run step-over or body feint starts eases out at this, m/s^2 (the skill tick's own ease, TouchPlanner.SkillSteerAccel).</summary>
+    const float DummySteerFade = 30f;
+
+    /// <summary>How much of the run version of the step-over and body feint a move entered at <paramref name="entry"/> m/s takes, 0..1.</summary>
+    static float DummyRunShare(float entry, Tuning t) => Math.Clamp(t.Skill.StepOverRunBlend.Evaluate(entry), 0f, 1f);
+
+    /// <summary>
+    /// The run step-over's and body feint's running speed on <paramref name="tick"/>: from the entry pace (a move entered above
+    /// the cap on a touch's boost does not drop to it in a tick) it eases down no faster than step_over_run_brake to
+    /// step_over_run_keep of it, m/s.
+    /// </summary>
+    static float DummyRun(BallAction a, int tick, Tuning t)
+    {
+        var k = t.Skill;
+        float hold = a.SkillEntry, floor = hold * k.StepOverRunKeep.Evaluate(hold);
+        return MathF.Min(hold, MathF.Max(floor, hold - k.StepOverRunBrake * (tick + 1 - a.StartTick) * t.Dt));
+    }
+
+    /// <summary>
+    /// The way the run step-over and body feint run: the left stick held (debounced as the controller reads it), turned at most
+    /// step_over_run_turn_deg off the move's line; the move's line with the stick released.
+    /// </summary>
+    static Vector2 DummyRunDirection(PlayerState p, BallAction a, Tuning t)
+    {
+        Vector2 fwd = a.HoldDirection, stick = p.LastStickMove;
+        if (p.StickReleasedTicks > Math.Max(0, (int)MathF.Round(t.Touch.ReleaseDebounce * t.TickRate)) || stick.Length() < t.Touch.StickThreshold)
+            return fwd;
+        Vector2 right = GestureReader.RightOf(fwd);
+        float max = t.Skill.StepOverRunTurnDeg * MathF.PI / 180f;
+        float ang = Math.Clamp(MathF.Atan2(Vector2.Dot(stick, right), Vector2.Dot(stick, fwd)), -max, max);
+        return fwd * MathF.Cos(ang) + right * MathF.Sin(ang);
+    }
+
+    /// <summary>The player's direction of travel on the ground, the move's line when he is (nearly) still.</summary>
+    static Vector2 TravelOf(PlayerState p, BallAction a)
+    {
+        var v = new Vector2(p.Velocity.X, p.Velocity.Z);
+        return v.Length() > 0.3f ? Vector2.Normalize(v) : a.HoldDirection;
+    }
+
+    /// <summary>
+    /// Step-over and body feint at a run, after the player has moved this tick: the ball (not touched: the dummy's leg goes
+    /// round it) keeps rolling with him, brought smoothly from where it is against him (along his travel and across it, and
+    /// its pace against his) to <see cref="DummyRunAhead"/> straight ahead of him at the release, rolling
+    /// <see cref="DummyReleaseMargin"/> faster than he runs, so the next touch is an ordinary dribble touch. Planned afresh each
+    /// tick from where it is (a cubic over the ticks left). A move entered between a walk and a run blends this with the free
+    /// ball (step_over_run_blend).
+    /// </summary>
+    static void CarryDummyBall(PlayerState p, BallAction a, Ball ball, int tick, Tuning t)
+    {
+        float share = DummyRunShare(a.SkillEntry, t);
+        if (share <= 0f) return;
+        Vector2 d = TravelOf(p, a), s = GestureReader.RightOf(d);
+        var pv = new Vector2(p.Velocity.X, p.Velocity.Z);
+        // (Against him as the last tick ended: he has moved this tick, the ball moves after him.)
+        var rel = new Vector2(ball.Position.X - p.Position.X, ball.Position.Z - p.Position.Z) + pv * t.Dt;
+        var rv = new Vector2(ball.Velocity.X, ball.Velocity.Z) - pv;
+        // Before the middle (the leg passing round it) it is brought within reach of the leg there, at his pace; then on to the
+        // release.
+        bool first = tick < a.ContactTick;
+        float aheadTo = first ? MathF.Min(DummyRunAhead, t.Skill.StepOverMaxAhead - CloseInMargin) : DummyRunAhead;
+        int n = Math.Max(1, (first ? a.ContactTick : a.EndTick) - tick);
+        float T = n * t.Dt, x = 1f / n, x2 = x * x, x3 = x2 * x;
+        float h00 = 2f * x3 - 3f * x2 + 1f, h10 = x3 - 2f * x2 + x, h01 = -2f * x3 + 3f * x2, h11 = x3 - x2;
+        float along = h00 * Vector2.Dot(rel, d) + h10 * T * Vector2.Dot(rv, d) + h01 * aheadTo + h11 * T * (first ? 0f : DummyReleaseMargin);
+        float across = h00 * Vector2.Dot(rel, s) + h10 * T * Vector2.Dot(rv, s);
+        var target = new Vector2(p.Position.X, p.Position.Z) + d * along + s * across;
+        var carry = (target - new Vector2(ball.Position.X, ball.Position.Z)) / t.Dt;
+        var free = new Vector2(ball.Velocity.X, ball.Velocity.Z);
+        var v = free + (carry - free) * share;
+        ball.Velocity = new Vector3(v.X, ball.Velocity.Y, v.Y);
+        ball.Spin = ball.RollingSpin(ball.Velocity);
+    }
+
+    /// <summary>The run step-over's and body feint's ball as it is released: along his travel at his ground speed plus the margin (blended as in <see cref="CarryDummyBall"/>).</summary>
+    static Vector3 DummyRelease(PlayerState p, BallAction a, Ball ball, Tuning t)
+    {
+        float share = DummyRunShare(a.SkillEntry, t);
+        var free = new Vector2(ball.Velocity.X, ball.Velocity.Z);
+        Vector2 d = TravelOf(p, a);
+        var rel = d * (new Vector2(p.Velocity.X, p.Velocity.Z).Length() + DummyReleaseMargin);
+        var v = free + (rel - free) * share;
+        return new Vector3(v.X, ball.Velocity.Y, v.Y);
     }
 
     /// <summary>
@@ -787,6 +900,7 @@ public static class SkillMoves
             ball.Velocity = v;
             ball.Spin = ball.RollingSpin(v);
         }
+        if (a.Kind is ActionKind.StepOver or ActionKind.BodyFeint) CarryDummyBall(p, a, ball, tick, t);
         if (a.Kind == ActionKind.HeelToHeel && tick == a.Contact2Tick)
         {
             // The trailing foot's flick: straight on at heel_to_heel_flick_ratio times his running speed (at least the minimum),
@@ -881,6 +995,7 @@ public static class SkillMoves
             ActionKind.BallRoll => new Vector3(fwd.X, 0f, fwd.Y) * RollReleasePace(a, new Vector2(pv.X, pv.Z), t),
             ActionKind.DragBack or ActionKind.FakeStop => Vector3.Zero,
             ActionKind.Spin => FacedPace(p),
+            ActionKind.StepOver or ActionKind.BodyFeint => DummyRelease(p, a, ball, t) with { Y = 0f },
             _ => new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z),
         };
         float run = a.Kind == ActionKind.Spin ? FacedPace(p).Length() : p.RunSpeed;
@@ -1100,6 +1215,15 @@ public static class SkillMoves
                 ball.Spin = ball.RollingSpin(v);
                 break;
             }
+            case ActionKind.StepOver:
+            case ActionKind.BodyFeint:
+                // At a run the ball rolls on ahead of him a little faster than he runs (see CarryDummyBall).
+                if (DummyRunShare(a.SkillEntry, t) > 0f)
+                {
+                    ball.Velocity = DummyRelease(p, a, ball, t);
+                    ball.Spin = ball.RollingSpin(ball.Velocity);
+                }
+                break;
             case ActionKind.DragBack:
             case ActionKind.FakeStop:
                 ball.Velocity = new Vector3(0f, ball.Velocity.Y, 0f);

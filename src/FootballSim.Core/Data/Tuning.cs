@@ -1046,6 +1046,20 @@ public sealed class SkillTuning
     /// </summary>
     public float PaceMatchAhead { get; set; } = 0.25f;
     public float BodyFeintSeconds { get; set; } = 0.35f;
+    /// <summary>
+    /// How much of the run version of the step-over and body feint (the run kept, the ball rolling on with him) a move entered at
+    /// this running speed takes, m/s to 0..1; the rest is the standing version (paced to the ball).
+    /// </summary>
+    public Curve StepOverRunBlend { get; set; } = new((1f, 0f), (2.5f, 1f));
+    /// <summary>
+    /// At a run the step-over's and body feint's running speed eases down from the move's start, no faster than
+    /// step_over_run_brake, to this share of the entry running speed, by entry speed m/s.
+    /// </summary>
+    public Curve StepOverRunKeep { get; set; } = new((4f, 0.9f), (7.5f, 0.82f));
+    /// <summary>The run step-over's and body feint's running speed eases down no faster than this, m/s^2.</summary>
+    public float StepOverRunBrake { get; set; } = 6f;
+    /// <summary>At a run the step-over and body feint turn the run toward the left stick by at most this off the move's line, degrees.</summary>
+    public float StepOverRunTurnDeg { get; set; } = 45f;
     /// <summary>The ball roll from standing when it is the first move of a chain (the sole on the ball, the reach before it apart).</summary>
     public float BallRollFirstSeconds { get; set; } = 0.4f;
     /// <summary>The same entered at a run (see <see cref="BallRollRunBlend"/>).</summary>
