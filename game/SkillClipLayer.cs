@@ -588,10 +588,8 @@ public sealed class SkillClipLayer
             var x = _legOff[i]; var v = _legOffVel[i];
             if (basePlanted[i] && tw[i] <= 0f)
             {
-                // planted: held where it is (its height still settles)
-                float y = x.Y, vy = v.Y;
-                Spring.Decay(ref y, ref vy, FootHandBackHalfLife, dt);
-                x.Y = y; v = new NVec3(0f, vy, 0f);
+                // planted: held where it is, offset and all (it dies away once the foot swings again)
+                v = NVec3.Zero;
             }
             else Spring.Decay(ref x, ref v, FootHandBackHalfLife, dt);
             _legOff[i] = x; _legOffVel[i] = v;
