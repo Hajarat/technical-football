@@ -176,6 +176,11 @@ public sealed class MovementTuning
     /// </summary>
     public float BalanceDeceleration { get; set; } = 12f;
     /// <summary>
+    /// Running at the boards a player brakes by himself, at balance_deceleration, so that he comes to them no faster than this
+    /// (his velocity into them, m/s): the boards never stop him from a run in one tick.
+    /// </summary>
+    public float WallArriveSpeed { get; set; } = 1.2f;
+    /// <summary>
     /// Without the ball, the stick more than this from the facing while running is a turn about (GOALS' moving capsule rotation
     /// threshold, 135 degrees): the player plants and brakes, losing <see cref="ReverseSpeedLoss"/> of his speed at
     /// balance_deceleration while he turns (GOALS plays a speed-dependent 180 turn instead of turning on the spot).
