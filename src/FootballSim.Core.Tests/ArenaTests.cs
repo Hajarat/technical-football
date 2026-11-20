@@ -170,6 +170,46 @@ public class ArenaTests
     }
 
     [Fact]
+    public void APlayerRunningAtABoardBrakesByHimselfBeforeIt()
+    {
+        // Sprinting from 8 m out straight at the side wall, at 45 degrees to it, into the back corner and at the end wall: he
+        // reaches it moving into it (along the board's normal) at 1.5 m/s or less and his speed never falls by more than 2 m/s in
+        // a tick.
+        var s = TestData.Sheet(99);
+        float r = MathF.Sqrt(0.5f);
+        foreach (var (start, stick, normal) in new[]
+        {
+            (new Vector2(15f, -2f), new Vector2(0f, 1f), new Vector2(0f, 1f)),
+            (new Vector2(15f, -2f), new Vector2(r, r), new Vector2(0f, 1f)),
+            (new Vector2(8f, -2f), new Vector2(-r, r), new Vector2(-r, r)),
+            (new Vector2(20f, -4.5f), new Vector2(1f, 0f), new Vector2(1f, 0f)),
+        })
+        {
+            var p = TestData.Outfield(s, start.X, start.Y, MathF.Atan2(stick.Y, stick.X));
+            float now = 0f, prev = 0f, into = float.NaN;
+            for (int i = 0; i < 480; i++)
+            {
+                now += T.Dt;
+                var before = p.Velocity;
+                Movement.Step(p, new TickIntent { MoveX = stick.X, MoveZ = stick.Y, Sprint = 1 }, T.Dt, now, false, T, P);
+                float speed = new Vector2(p.Velocity.X, p.Velocity.Z).Length();
+                Assert.True(prev - speed <= 2f, $"from {start}: speed {prev:F2} -> {speed:F2} in one tick at {p.Position}");
+                // The first tick the boards hold him (a step along their normal would leave the outline): his velocity into
+                // them the tick before.
+                // (in a rounded back corner the normal is the arc's, out from its centre)
+                var at = new Vector2(p.Position.X, p.Position.Z);
+                var corner = new Vector2(P.CornerRadius, MathF.Sign(at.Y) * (P.HalfWidth - P.CornerRadius));
+                var n = at.X < corner.X && MathF.Abs(at.Y) > MathF.Abs(corner.Y) ? Vector2.Normalize(at - corner) : normal;
+                var probe = p.Position + new Vector3(n.X, 0f, n.Y) * 0.02f;
+                if (float.IsNaN(into) && !Inside(probe with { Y = 0f }, Pitch.PlayerRadius)) into = Vector2.Dot(new Vector2(before.X, before.Z), n);
+                prev = speed;
+            }
+            Assert.False(float.IsNaN(into), $"from {start}: never reached the boards");
+            Assert.True(into <= 1.5f, $"from {start}: reached the boards at {into:F2} m/s");
+        }
+    }
+
+    [Fact]
     public void PlayersStayInsideTheOutlineAndStopAtTheEndWall()
     {
         var s = TestData.Sheet(99);

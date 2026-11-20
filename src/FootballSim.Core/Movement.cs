@@ -56,6 +56,9 @@ public static class Movement
     /// <summary>Fraction of speed lost on a sharp turn or a cut (balance), shed at balance_deceleration.</summary>
     public static float BalanceLoss(PlayerSheet s, Tuning t) => t.Movement.BalanceLoss.ForRating(s.Balance);
 
+    /// <summary>The most a player's running speed falls in one tick braking for the boards, m/s.</summary>
+    const float WallBrakeStep = 1.5f;
+
     /// <summary>Wraps an angle to -pi..pi.</summary>
     public static float WrapAngle(float a)
     {
@@ -164,6 +167,18 @@ public static class Movement
         if (arc) { p.SpeedDebt = 0f; p.TurnRefHeading = facing; p.TurnRefTime = now; }
 
         speed = MathF.Max(speed, 0f);
+        // Running at the boards he brakes by himself, so he comes to them at wall_arrive_speed or less (never stopped by them from
+        // a run in one tick); a turn onto the boards close to them brakes harder than the budget, at most WallBrakeStep a tick.
+        if (pitch != null)
+        {
+            var fwd1 = new Vector2(MathF.Cos(facing), MathF.Sin(facing));
+            float tc0 = MathF.Cos(WrapAngle(facing - p.Facing)), ts0 = MathF.Sin(WrapAngle(facing - p.Facing));
+            var steer0 = new Vector2(assist.Steer.X * tc0 - assist.Steer.Y * ts0, assist.Steer.X * ts0 + assist.Steer.Y * tc0) + assist.Carry;
+            // (from where he will be after this tick's step, so he is at the speed allowed there when he gets there)
+            var at = new Vector2(p.Position.X, p.Position.Z) + (fwd1 * speed + steer0) * dt;
+            float wall = pitch.WallRunCap(at, fwd1, steer0, m.WallArriveSpeed, m.BalanceDeceleration);
+            if (speed > wall) speed = MathF.Max(wall, MathF.Min(speed, speed0) - WallBrakeStep);
+        }
         // The sideways correction turns with the body: as the facing turns this tick it keeps its angle to the run instead of
         // swinging into or against it. A skill move's step (the carry) keeps its direction on the ground.
         float turned = WrapAngle(facing - p.Facing), tc = MathF.Cos(turned), ts = MathF.Sin(turned);

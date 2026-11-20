@@ -62,6 +62,7 @@
       "at99": 0.15
     },
     "balance_deceleration": 12,
+    "wall_arrive_speed": 1.2,
     "reverse_turn_deg": 135,
     "reverse_speed_loss": 0.65,
     "reverse_min_speed": 2,

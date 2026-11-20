@@ -80,6 +80,9 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   small corrections between touches do not jerk the body round.
 - A sharp turn or a cut costs the balance percentage of speed, shed rather than at once: the running speed never falls faster
   than `balance_deceleration` (12 m/s^2), the legs easing off and the balance loss sharing that one budget.
+- Running at the boards a player brakes by himself (at `balance_deceleration`, at most 1.5 m/s in a tick when he turns onto
+  boards close by), so he comes to them moving into them at `wall_arrive_speed` (1.2 m/s) or less, with the ball or without;
+  along them he runs on.
 - Without the ball the turn rate tops out at GOALS' 360 deg/s (`possession.off_ball_turn_bonus` -0.2), and a stick more than
   `reverse_turn_deg` (135) from the facing above `reverse_min_speed` plants the runner: `reverse_speed_loss` (0.65) of his
   speed is shed while he turns about.
