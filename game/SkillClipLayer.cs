@@ -230,6 +230,14 @@ public sealed class SkillClipLayer
         else if (_handBack)
         {
             _in.Update(dt, _baseR, _baseP, _out, _outP);
+            // a move the figure draws itself (one no clip covers, chained onto the clip being handed back) has its playing foot
+            // on the ball by its contact: the leg's hand-back offset on that foot is gone by then
+            _hbOwn[0] = _hbOwn[1] = 1f;
+            if (f.Skill.Valid && !covers && f.Skill.Id != _moveId)
+            {
+                float tc = f.Skill.Elapsed - f.Skill.ContactElapsed;
+                _hbOwn[f.Skill.Right ? 1 : 0] = tc > 1e-4f ? 1f - Smooth(f.Skill.Elapsed / tc) : 0f;
+            }
             HandBackLegs(tw, basePlanted, dt);
             if (!_in.Active && _legOff[0].LengthSquared() < 1e-6f && _legOff[1].LengthSquared() < 1e-6f) _handBack = false;
         }
@@ -939,6 +947,8 @@ public sealed class SkillClipLayer
         }
     }
     readonly float[] _hbTw0 = new float[2];
+    /// <summary>Per foot, the share of its hand-back offset a move the figure draws itself leaves it (0 on the move's playing foot by its contact).</summary>
+    readonly float[] _hbOwn = { 1f, 1f };
     readonly bool[] _hbStep = new bool[2];
     /// <summary>Whether foot <paramref name="i"/> is stepping back in at the hand-back (it is not planted, whatever the figure's own pose has).</summary>
     public bool HandBackStepping(int i) => _handBack && _hbStep[i];
@@ -954,6 +964,7 @@ public sealed class SkillClipLayer
             var x = _legOff[i]; var v = _legOffVel[i];
             // (a touch takes the leg by its weight: the share it already had when the hand-back began is in the offset)
             float tk = _hbTw0[i] >= 0.999f ? 0f : Math.Clamp((1f - Math.Clamp(tw[i], 0f, 1f)) / (1f - _hbTw0[i]), 0f, 1f);
+            tk *= _hbOwn[i];
             // a planted foot held where it is would be dragged once the leg cannot reach it there: it steps back in instead
             if (basePlanted[i] && tw[i] <= 0f && !_hbStep[i] && (baseAnk[i] + x * tk - _gp[_sk.UpLeg[i]]).Length() > 0.99f * _legLen) _hbStep[i] = true;
             if (basePlanted[i] && tw[i] <= 0f && !_hbStep[i])
