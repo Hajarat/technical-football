@@ -1,0 +1,126 @@
+# Fake shot, cut with the outside of the foot (shoot pressed, cancelled within 0.1 s with the stick held toward the shooting foot's
+# own side): from standing, a full shooting wind-up with the plant foot set wide of the ball, then the right leg comes through on the
+# ball's left, the foot turned in, and the OUTSIDE of the foot hooks the ball across to his right (60 degrees off the run); the body
+# turns right with it into the exit. The simulation plays a cut toward the shooting foot's own side with the outside of that foot
+# (SkillMoves.cs: FakeCut, FootSurface.Outside); toward the other side it is the inside hook of fake_cut.toml. fake_cut_out_right
+# (right foot) and its mirror fake_cut_out_left (left foot). fake_cut_out_run.toml is the same at 3 m/s. Conventions as in
+# ball_roll.toml.
+
+name = "fake_cut_out"
+move = "fake_cut"
+side = "right"
+foot = "right"
+entry = "stand"
+entry_speed = 0.0
+notes = "fake shot, cut: shooting wind-up, the outside of the right foot hooks the ball 60 deg to his right, body turns into the exit"
+
+[sim]
+fake_shot_window_s = 0.1          # the cancel must come within 0.1 s of the shoot press (the shot's own wind-up is 0.45 s)
+fake_s = 0.1                      # fake_seconds: the move, from the cancel; the hook is at its first tick (no reach)
+cut_distance_m = 1.2              # fake_cut_distance: the push reaches 1.2 m from the player ...
+cut_time_s = 0.5                  # ... in fake_cut_time
+speed_kept = 0.5                  # FakeCutSpeedKept: the player keeps half his entry speed by the end of the move
+surface = "outside: the cut is toward the shooting foot's own side"
+authored_s = [0.30, 0.10, 0.28]   # press->contact (wind-up and swing), contact->release (the hook carries), release->end (turn)
+cut_deg_right = 60
+ball_start = [-0.06, 0.11, 0.58]
+ball_radius = 0.11
+
+[events]
+start = 0.0                       # shoot pressed
+contact = 0.5                     # the outside of the foot meets the ball
+release = 0.65                    # it leaves it
+end = 1.0
+
+[[variant]]
+suffix = ""
+spans = [0.30, 0.10, 0.28]
+
+[ball]
+radius = 0.11
+touch = { contact = "right", release = "right" }
+
+[[key]]
+t = 0.0
+ease = 1.0
+label = "start: ready stance, the ball a step ahead"
+pelvis = { pos = [0.0, 0.93, 0.0], pitch = 8 }
+chest = { pitch = 6 }
+head = { pitch = 25 }
+foot_l = { pos = [0.13, 0.002, 0.06], yaw = 6, knee = [0.15, 0, 1] }
+foot_r = { pos = [-0.13, 0.002, 0.06], yaw = -6, knee = [-0.15, 0, 1] }
+hand_l = { swing = 8, abduct = 14, bend = 40 }
+hand_r = { swing = 8, abduct = 14, bend = 40 }
+ball = { pos = [-0.06, 0.11, 0.58] }
+
+[[key]]
+t = 0.2
+label = "stepping in: the left foot striding wide of the ball, the right pushing"
+pelvis = { pos = [0.05, 0.91, 0.12], yaw = -6, pitch = 12, roll = 2 }
+chest = { yaw = 2, pitch = 12 }
+foot_l = { pos = [0.22, 0.08, 0.28], yaw = 6, pitch = 10, knee = [0.2, 0.1, 1] }
+foot_r = { pos = [-0.13, 0.002, 0.06], yaw = -6, pitch = -12, toe = 15, ease = 1 }
+hand_l = { swing = 20, abduct = 35, bend = 35 }
+hand_r = { swing = -15, abduct = 30, bend = 35 }
+
+[[key]]
+t = 0.36
+label = "top of the backswing: plant foot a stride wide of the ball, right leg drawn back, arms out, trunk over the ball"
+pelvis = { pos = [0.11, 0.875, 0.24], yaw = -15, pitch = 16, roll = 5 }
+chest = { yaw = 6, pitch = 16, roll = -2 }
+head = { yaw = -4, pitch = 38 }
+foot_l = { pos = [0.28, 0.002, 0.45], yaw = 6, pitch = 0, knee = [0.2, 0, 1], ease = 1 }
+foot_r = { pos = [-0.04, 0.36, -0.08], yaw = -6, pitch = -50, toe = 0, knee = [0, -0.6, 1] }
+hand_l = { swing = 30, abduct = 55, bend = 30, trail = 90 }
+hand_r = { swing = -30, abduct = 40, bend = 30, trail = 90 }
+
+[[key]]
+t = 0.44
+label = "the swing comes through on the ball's left, the foot turning in"
+pelvis = { yaw = 2 }
+foot_r = { pos = [0.12, 0.10, 0.36], yaw = 15, pitch = -5, knee = [0.1, 0.2, 1] }
+
+[[key]]
+t = 0.5
+label = "contact: not the laces but the outside, the foot turned in, hooking the ball across to the right"
+pelvis = { pos = [0.10, 0.87, 0.28], yaw = 12, pitch = 14, roll = 2 }
+chest = { yaw = -4, pitch = 14, roll = 0 }
+head = { yaw = -4, pitch = 38 }
+foot_r = { pos = [0.15, -0.08, -0.04], frame = "ball", yaw = 25, pitch = 0, knee = [0.2, 0.2, 1], ease = 0 }
+hand_l = { swing = 20, abduct = 45, bend = 35, trail = 90 }
+hand_r = { swing = 5, abduct = 35, bend = 40 }
+ball = { pos = [-0.06, 0.11, 0.58], ease = 1 }
+
+[[key]]
+t = 0.65
+label = "release: the outside carries the ball away, the hips turning with it"
+pelvis = { pos = [0.06, 0.87, 0.33], yaw = -5, pitch = 13, roll = -3 }
+chest = { yaw = -4, pitch = 12, roll = -3 }
+head = { yaw = -12, pitch = 32 }
+foot_r = { pos = [0.15, -0.08, -0.04], frame = "ball", yaw = 15, pitch = 0, ease = 0 }
+ball = { pos = [-0.24, 0.11, 0.69], ease = 0 }
+
+[[key]]
+t = 0.8
+label = "the right foot follows the ball out to the right"
+pelvis = { pos = [-0.02, 0.885, 0.38], yaw = -30 }
+foot_r = { pos = [-0.18, 0.06, 0.62], yaw = -20, pitch = 0, knee = [-0.3, 0.1, 1] }
+foot_l = { pos = [0.28, 0.002, 0.45], yaw = 0, pitch = -8, toe = 10, ease = 1 }
+
+[[key]]
+t = 0.88
+label = "and comes down, taking the weight"
+foot_r = { pos = [-0.22, 0.002, 0.64], yaw = -35, pitch = 0, knee = [-0.5, 0, 1], ease = 1 }
+
+[[key]]
+t = 1.0
+ease = 0.0
+label = "end: turned into the cut, away after the ball"
+pelvis = { pos = [-0.14, 0.90, 0.46], yaw = -50, pitch = 13, roll = -4 }
+chest = { yaw = -4, pitch = 10, roll = -2 }
+head = { yaw = -4, pitch = 16 }
+foot_r = { pos = [-0.22, 0.002, 0.64], yaw = -35, pitch = 0, ease = 1 }
+foot_l = { pos = [0.12, 0.06, 0.40], yaw = -25, pitch = -25, toe = 25, knee = [-0.3, 0, 1] }
+hand_l = { swing = 25, abduct = 12, bend = 80 }
+hand_r = { swing = -20, abduct = 18, bend = 80 }
+ball = { pos = [-0.80, 0.11, 0.92], ease = 0 }
