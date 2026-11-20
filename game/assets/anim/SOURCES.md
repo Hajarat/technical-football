@@ -196,7 +196,9 @@ a file of key poses in `tools/anim/moves/` (pelvis, chest and head angles, feet 
 ball, hands, knee and elbow directions, the ball's path, events and timings), which `tools/anim/author.py` solves onto the 22
 driven bones of `player.glb`, mirrors to the other side and checks (no joint under the ground, no leg past its length, no bone
 over 1,500 deg/s, the sole within 1 cm of the ball while it is on it, no boot more than 1 cm inside the ball, a named foot's
-boot on the ball at each touch event). The game plays all nine moves (`game/SkillClipLayer.cs`, `--skill-anim clips`, the
+boot on the ball at each touch event; each declared stance standing still on the ground). A move file may declare its feet's
+stances (`[stance]`, written to clips.json as `stance`, in clip seconds) instead of having them read off the solved motion, and a second
+ending (`[[ending]]`, its own clip named with the ending's suffix and `ending` in clips.json). The game plays all nine moves (`game/SkillClipLayer.cs`, `--skill-anim clips`, the
 default): it reads `entry_speed` to blend each move's standing and running clips, the events to time the clip onto the core's ticks, `ball.on`
 and `ball.touch` for where the playing foot is pinned to the live ball, `ball.track` for the contact direction on the ball, `contacts` for the
 planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its hips from the first frame to the last.
@@ -204,7 +206,7 @@ planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its
 | Move file | Clips | What it shows |
 | --- | --- | --- |
 | `ball_roll.toml` | `ball_roll_left`, `ball_roll_right` | from standing, the far foot's sole rolls the ball 0.6 m across the body (sole lands 0.12 s in, rolls 0.40 s), support-foot hop, exit to a run |
-| `ball_roll_run.toml` | `ball_roll_left_run`, `ball_roll_right_run` | the same at a run (3.9 m/s, the simulation's 0.30 s roll): the sole takes the ball across the body while he runs on and steps sideways with it, a side hop of the support foot that lands by the ball for the next touch, facing along the run |
+| `ball_roll_run.toml` | `ball_roll_left_run`, `ball_roll_right_run`, `ball_roll_left_run_swap`, `ball_roll_right_run_swap` | the same at a run (3.9 m/s, the simulation's 0.30 s roll): the sole takes the ball across the body while he runs on and steps sideways with it, facing along the run; the support foot skips under him (three declared stances of 0.05-0.1 s, two hops of about 0.1 m with the pelvis rising off the ground); in the own ending the support foot stands under him through the rolling foot's exit touch, in `_swap` it leaves at the second hop's take-off to make the exit touch and the rolling foot steps down off the ball as the new support |
 | `drag_back.toml` | `drag_back_right`, `drag_back_left` | from standing, the sole pulls the ball 0.65 m back to under the body over 0.40 s, rock back, hips open, neutral exit (named by the foot: the move has no side) |
 | `drag_back_run.toml` | `drag_back_right_run`, `drag_back_left_run` | the same braking from 3 m/s: hard plant, the sole stops the ball |
 | `step_over.toml` | `step_over_left`, `step_over_right` | from standing, the foot circles over the front of the ball without touching it, shoulder drop and hip swivel to the side, push off the other way |

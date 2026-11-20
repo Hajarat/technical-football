@@ -159,14 +159,15 @@ def test_ball_roll_passes_its_checks_and_keeps_the_sole_on_the_ball(rig, tmp_pat
     m = A.load_move(A.MOVES / "ball_roll.toml")
     run = A.load_move(A.MOVES / "ball_roll_run.toml")
     clips = A.build([m, run], rig)
-    assert [c.name for c in clips] == ["ball_roll_left", "ball_roll_right", "ball_roll_left_run", "ball_roll_right_run"]
+    assert [c.name for c in clips] == ["ball_roll_left", "ball_roll_right", "ball_roll_left_run", "ball_roll_right_run",
+                                       "ball_roll_left_run_swap", "ball_roll_right_run_swap"]
     assert clips[0].events == clips[2].events                       # the runtime blends standing and running by entry speed
     for c in clips:
         assert not c.problems, (c.name, c.problems)
         assert list(c.events) == ["start", "contact", "release", "end"]
         assert c.stats["sole_off_ball_max_m"] <= A.MAX_SOLE_OFF
         lateral = abs(c.ball[c.events["release"], 0] - c.ball[c.events["contact"], 0])
-        if c.name.endswith("_run"):
+        if "_run" in c.name:
             # at a run the sole takes it across the body against his root (the simulation's roll less his step with it)
             assert 0.7 <= lateral <= 0.85
         else:
@@ -185,6 +186,24 @@ def test_ball_roll_passes_its_checks_and_keeps_the_sole_on_the_ball(rig, tmp_pat
     k = R.read_kclip(tmp_path / entry["file"])
     assert k["events"] == real.events and np.allclose(k["hips"], real.hips, atol=1e-6)
     assert entry["set"] == "skill:ball_roll" and entry["side"] == "left" and len(entry["ball"]["track"]) == len(real.hips)
+
+
+def test_declared_stances_are_the_contacts_and_an_ending_shares_the_keys_before_it(rig):
+    run = A.load_move(A.MOVES / "ball_roll_run.toml")
+    own, swap = [c for c in A.build([run], rig) if c.name in ("ball_roll_left_run", "ball_roll_left_run_swap")]
+    for c in (own, swap):
+        for s, foot in enumerate(("left", "right")):
+            want = np.zeros(len(c.hips), bool)
+            for a, b in c.move["stance"][foot]:
+                want[math.ceil(c.tl.sec(a) * A.FPS - 1e-6): math.floor(c.tl.sec(b) * A.FPS + 1e-6) + 1] = True
+            assert np.array_equal(c.contacts[:, s], want), (c.name, foot)
+    # the swap ending carries the move's own body up to its from: the same hips and the same stances (a channel's last span
+    # before it bends toward the ending's next key)
+    cut = int(A.timeline(run, run["variant"][0]).sec(run["ending"][0]["from"]) * A.FPS)
+    assert np.allclose(own.hips[:cut - 4], swap.hips[:cut - 4], atol=0.005)
+    assert np.array_equal(own.contacts[:cut + 1, 0], swap.contacts[:cut + 1, 0])
+    mirrored = A.mirror_move(A.endings(run)[1])
+    assert mirrored["stance"]["right"] == run["ending"][0]["stance"]["left"] and mirrored["ending"] == "_swap"
 
 
 def test_every_move_file_passes_and_pairs_its_entries(rig):

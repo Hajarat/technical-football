@@ -53,6 +53,28 @@ public partial class CameraRig : Camera3D
     }
 
     /// <summary>
+    /// Debug framing for footwork (--side-cam): from now on a fixed camera side-on to <paramref name="run"/> (a ground direction),
+    /// looking at <paramref name="at"/> on the ground from the side of the run he does not move toward (<paramref name="away"/>: +1
+    /// his right, -1 his left, 0 the side that faces +Z), framing about 4 m of pitch; Follow no longer moves it, so a planted foot
+    /// stays on one spot of the frame while the body passes over it.
+    /// </summary>
+    public void FixSideOn(Vector3 at, Vector3 run, int away = 0)
+    {
+        run.Y = 0f;
+        run = run.LengthSquared() > 1e-6f ? run.Normalized() : Vector3.Right;
+        var side = new Vector3(-run.Z, 0f, run.X);   // his right
+        if (away < 0 || away == 0 && side.Z < 0f) side = -side;
+        Fov = 25f;
+        var look = new Vector3(at.X, 0.85f, at.Z);
+        Transform = new Transform3D(Basis.Identity, look + side * 5.0f + Vector3.Up * 0.75f).LookingAt(look, Vector3.Up);
+        ResetPhysicsInterpolation();
+        Fixed = true;
+    }
+
+    /// <summary>Set by <see cref="FixSideOn"/>: the camera stays where it is.</summary>
+    public bool Fixed { get; private set; }
+
+    /// <summary>
     /// Sets the limits of what the frame may show: its left edge stops at <paramref name="minX"/>, its right edge at
     /// <paramref name="maxX"/>, and its bottom edge at <paramref name="nearZ"/>.
     /// </summary>
@@ -105,6 +127,7 @@ public partial class CameraRig : Camera3D
     /// <summary>Smoothly follow the ball. Call from _PhysicsProcess with the physics delta, after the ball has been placed.</summary>
     public void Follow(Vector3 ball, double delta)
     {
+        if (Fixed) return;
         float a = 1f - Mathf.Exp(-(float)delta / SmoothSeconds);
         _focusZ += (ball.Z - _focusZ) * a;
         _focusX += (ClampToEnds(TargetX(ball.X)) - _focusX) * a;

@@ -13,6 +13,8 @@ public sealed class ToolArgs
     public readonly List<int> ShotTicks = new();
     public readonly List<string> ShotOn = new();
     public bool FrameTimes, CloseCam, CloseKeeper, CloseAttacker, TopCam;
+    /// <summary>--side-cam: the close camera on the attacker until his first skill move starts, then fixed side-on to his run there (CameraRig.FixSideOn).</summary>
+    public bool SideCam;
     public int BurstStart, BurstCount, BurstStep = 1;
     public string? DataDir;
     public string? ReplayPath;
@@ -75,6 +77,7 @@ public sealed class ToolArgs
                 case "--top-cam": a.TopCam = true; break;
                 case "--close-attacker": a.CloseCam = true; a.CloseAttacker = true; break;
                 case "--close-keeper": a.CloseCam = true; a.CloseKeeper = true; break;
+                case "--side-cam": a.CloseCam = true; a.CloseAttacker = true; a.SideCam = true; break;
                 case "--data": a.DataDir = Next(); break;
                 case "--replay": a.ReplayPath = Next(); break;
                 case "--keeper-gallery": a.GalleryDir = Next(); break;

@@ -1155,6 +1155,7 @@ public partial class PlayerFigure : Node3D
                 Vector3 relI = ankEff[i] - posFlat; relI.Y = ankEff[i].Y;
                 Stats.PlainFootJumpBody = Math.Max(Stats.PlainFootJumpBody, (relI - _prevAnkRel[i]).Length());
             }
+        _measPelY = pel.Y; _measPlanted[0] = planted[0]; _measPlanted[1] = planted[1];
         if (!IsKeeper && Stats != null) MeasureJump(f, ankEff, dir, tw);
         if (ShotLog && !IsKeeper && Stats != null && _kW > 0f) GD.Print($"SHOT_ANK tick={Stats.Tick} kA=({_kAnkle.X:F3},{_kAnkle.Y:F3},{_kAnkle.Z:F3}) ank=({ankEff[_kFoot].X:F3},{ankEff[_kFoot].Y:F3},{ankEff[_kFoot].Z:F3}) pel=({pel.X:F3},{pel.Y:F3},{pel.Z:F3}) kW={_kW:F2} plA=({_plAnkle.X:F3},{_plAnkle.Y:F3},{_plAnkle.Z:F3}) plShown=({ankEff[_plFoot].X:F3},{ankEff[_plFoot].Y:F3},{ankEff[_plFoot].Z:F3}) plW={_plW:F2} held={(_plHeld ? 1 : 0)}");
         _skJumpValid = true;
@@ -1268,6 +1269,10 @@ public partial class PlayerFigure : Node3D
     readonly Vector3[,] _jAnk = new Vector3[2, 2], _jToe = new Vector3[2, 2];
     int _jN, _jExitId; bool _jWasSkill, _jExit; float _jExitT;
 
+    /// <summary>The shown pelvis height and the planted feet this tick, for the MOCAP_SOLE line.</summary>
+    float _measPelY;
+    readonly bool[] _measPlanted = new bool[2];
+
     /// <summary>
     /// Records each foot's world move since the previous tick (and since two ticks before) under the context of this tick: a skill move, the exit
     /// after one (from the move's end until the first touch made after it has recovered), a shot, a plain touch, or anything else.
@@ -1311,8 +1316,8 @@ public partial class PlayerFigure : Node3D
                 float heelY = ank[i].Y - AnkleH;
                 bool toeDown = toe.Y <= FigureStats.SkateSoleM, heelDown = heelY <= FigureStats.SkateSoleM;
                 bool pinned = _atkAnim?.Skills is { Playing: true } sp && sp.PinWeight(i) > 0f;
-                if (MocapLogOn && f.Skill.Valid)
-                    GD.Print($"MOCAP_SOLE tick={Stats.Tick} foot={i} toe_y={toe.Y:F3} heel_y={heelY:F3} v_toe={new Vector2(toe.X - _jToe[i, 0].X, toe.Z - _jToe[i, 0].Z).Length() / dt:F2} v_heel={new Vector2(ank[i].X - _jAnk[i, 0].X, ank[i].Z - _jAnk[i, 0].Z).Length() / dt:F2} pinned={(pinned ? 1 : 0)} body_mps={new Vector2(f.Velocity.X, f.Velocity.Z).Length():F2}");
+                if (MocapLogOn && (f.Skill.Valid || _atkAnim?.Skills is { Active: true }))
+                    GD.Print($"MOCAP_SOLE tick={Stats.Tick} foot={i} ctx={c} toe_y={toe.Y:F3} heel_y={heelY:F3} v_toe={new Vector2(toe.X - _jToe[i, 0].X, toe.Z - _jToe[i, 0].Z).Length() / dt:F2} v_heel={new Vector2(ank[i].X - _jAnk[i, 0].X, ank[i].Z - _jAnk[i, 0].Z).Length() / dt:F2} pinned={(pinned ? 1 : 0)} body_mps={new Vector2(f.Velocity.X, f.Velocity.Z).Length():F2} pel_y={_measPelY:F3} planted={(_measPlanted[i] ? 1 : 0)}");
                 if ((toeDown || heelDown) && !pinned)
                 {
                     float vToe = new Vector2(toe.X - _jToe[i, 0].X, toe.Z - _jToe[i, 0].Z).Length() / dt;

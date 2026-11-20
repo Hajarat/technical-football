@@ -1370,18 +1370,22 @@
       5
      ],
      [
-      28,
-      32
+      14,
+      19
+     ],
+     [
+      25,
+      31
      ]
     ],
     "right": [
      [
-      41,
-      46
+      37,
+      42
      ]
     ]
    },
-   "notes": "ball roll at a run: right sole rolls the ball about 0.85 m to his left while he runs on at 85% of his pace and steps 0.5 m with it, support-foot side hop, facing along the run",
+   "notes": "ball roll at a run: right sole rolls the ball about 0.85 m to his left while he runs on at 85% of his pace and steps 0.5 m with it, the left foot skipping under him in two small hops, facing along the run; the left foot stands under him for the right foot's exit touch",
    "timing": {
     "spans": [
      0.12,
@@ -1850,15 +1854,37 @@
     "ball_radius": 0.11
    },
    "checks": {
-    "lowest_joint_m": 0.04,
+    "lowest_joint_m": 0.047,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1005,
+    "max_bone_deg_per_s": 1038,
     "max_turn_at": "RightFoot@6",
     "sole_off_ball_max_m": 0.0009,
-    "lowest_foot_m": -0.006,
+    "lowest_foot_m": 0.0,
     "boot_in_ball_max_m": 0.0,
-    "boot_in_ball_at": "R boot@16",
+    "boot_in_ball_at": "R boot@25",
     "touch_gap_m": {}
+   },
+   "stance": {
+    "left": [
+     [
+      0.0,
+      0.08333399999999999
+     ],
+     [
+      0.23332800000000004,
+      0.31667200000000006
+     ],
+     [
+      0.416664,
+      0.516672
+     ]
+    ],
+    "right": [
+     [
+      0.6166583333333333,
+      0.7000083333333333
+     ]
+    ]
    }
   },
   {
@@ -1888,8 +1914,8 @@
    "contacts": {
     "left": [
      [
-      41,
-      46
+      37,
+      42
      ]
     ],
     "right": [
@@ -1898,12 +1924,16 @@
       5
      ],
      [
-      28,
-      32
+      14,
+      19
+     ],
+     [
+      25,
+      31
      ]
     ]
    },
-   "notes": "ball roll at a run: right sole rolls the ball about 0.85 m to his left while he runs on at 85% of his pace and steps 0.5 m with it, support-foot side hop, facing along the run",
+   "notes": "ball roll at a run: right sole rolls the ball about 0.85 m to his left while he runs on at 85% of his pace and steps 0.5 m with it, the left foot skipping under him in two small hops, facing along the run; the left foot stands under him for the right foot's exit touch",
    "timing": {
     "spans": [
      0.12,
@@ -2372,15 +2402,1135 @@
     "ball_radius": 0.11
    },
    "checks": {
-    "lowest_joint_m": 0.04,
+    "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1005,
+    "max_bone_deg_per_s": 1037,
     "max_turn_at": "LeftFoot@6",
     "sole_off_ball_max_m": 0.0009,
-    "lowest_foot_m": -0.006,
-    "boot_in_ball_max_m": 0.0,
-    "boot_in_ball_at": "L boot@15",
+    "lowest_foot_m": 0.0,
+    "boot_in_ball_max_m": 0.0001,
+    "boot_in_ball_at": "L boot@28",
     "touch_gap_m": {}
+   },
+   "stance": {
+    "right": [
+     [
+      0.0,
+      0.08333399999999999
+     ],
+     [
+      0.23332800000000004,
+      0.31667200000000006
+     ],
+     [
+      0.416664,
+      0.516672
+     ]
+    ],
+    "left": [
+     [
+      0.6166583333333333,
+      0.7000083333333333
+     ]
+    ]
+   }
+  },
+  {
+   "name": "ball_roll_left_run_swap",
+   "file": "ball_roll_left_run_swap.kclip",
+   "source": "authored",
+   "move_file": "tools/anim/moves/ball_roll_run.toml",
+   "set": "skill:ball_roll",
+   "tags": [
+    "skill"
+   ],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "left",
+   "foot": "right",
+   "kind": "ball_roll",
+   "loop": false,
+   "events": {
+    "start": 0,
+    "contact": 7,
+    "release": 31,
+    "end": 46
+   },
+   "fps": 60,
+   "frame_count": 47,
+   "seconds": 0.783,
+   "contacts": {
+    "left": [
+     [
+      0,
+      5
+     ],
+     [
+      14,
+      19
+     ],
+     [
+      37,
+      42
+     ]
+    ],
+    "right": [
+     [
+      35,
+      39
+     ]
+    ]
+   },
+   "notes": "ball roll at a run, ending for an exit touch made by the support foot: the left foot leaves the ground at the second hop's take-off and swings into the touch; the right foot comes off the ball down onto the pitch as the new support",
+   "timing": {
+    "spans": [
+     0.12,
+     0.4,
+     0.25
+    ],
+    "event_seconds": {
+     "start": 0.0,
+     "contact": 0.12,
+     "release": 0.52,
+     "end": 0.77
+    }
+   },
+   "ball": {
+    "radius": 0.11,
+    "on": [
+     [
+      "contact",
+      "release",
+      "right"
+     ]
+    ],
+    "touch": {},
+    "track": [
+     [
+      -0.03,
+      0.11,
+      0.71
+     ],
+     [
+      -0.0189,
+      0.11,
+      0.7458
+     ],
+     [
+      -0.0078,
+      0.11,
+      0.7815
+     ],
+     [
+      0.0033,
+      0.11,
+      0.8178
+     ],
+     [
+      0.014,
+      0.11,
+      0.8551
+     ],
+     [
+      0.022,
+      0.11,
+      0.8932
+     ],
+     [
+      0.0309,
+      0.11,
+      0.9321
+     ],
+     [
+      0.0458,
+      0.11,
+      0.9719
+     ],
+     [
+      0.0711,
+      0.11,
+      1.0131
+     ],
+     [
+      0.1058,
+      0.11,
+      1.0559
+     ],
+     [
+      0.147,
+      0.11,
+      1.0997
+     ],
+     [
+      0.192,
+      0.11,
+      1.144
+     ],
+     [
+      0.2379,
+      0.11,
+      1.1881
+     ],
+     [
+      0.2817,
+      0.11,
+      1.2315
+     ],
+     [
+      0.3231,
+      0.11,
+      1.2736
+     ],
+     [
+      0.3655,
+      0.11,
+      1.3148
+     ],
+     [
+      0.4083,
+      0.11,
+      1.3556
+     ],
+     [
+      0.4508,
+      0.11,
+      1.3966
+     ],
+     [
+      0.4924,
+      0.11,
+      1.4382
+     ],
+     [
+      0.5323,
+      0.11,
+      1.4812
+     ],
+     [
+      0.5712,
+      0.11,
+      1.525
+     ],
+     [
+      0.6107,
+      0.11,
+      1.5683
+     ],
+     [
+      0.6494,
+      0.11,
+      1.6123
+     ],
+     [
+      0.6857,
+      0.11,
+      1.658
+     ],
+     [
+      0.7182,
+      0.11,
+      1.7065
+     ],
+     [
+      0.7454,
+      0.11,
+      1.7589
+     ],
+     [
+      0.7663,
+      0.11,
+      1.8163
+     ],
+     [
+      0.782,
+      0.11,
+      1.8783
+     ],
+     [
+      0.7935,
+      0.11,
+      1.9436
+     ],
+     [
+      0.8014,
+      0.11,
+      2.0109
+     ],
+     [
+      0.8065,
+      0.11,
+      2.079
+     ],
+     [
+      0.8096,
+      0.11,
+      2.1466
+     ],
+     [
+      0.8115,
+      0.11,
+      2.2136
+     ],
+     [
+      0.8131,
+      0.11,
+      2.2816
+     ],
+     [
+      0.8143,
+      0.11,
+      2.3504
+     ],
+     [
+      0.8154,
+      0.11,
+      2.42
+     ],
+     [
+      0.8162,
+      0.11,
+      2.4902
+     ],
+     [
+      0.8168,
+      0.11,
+      2.561
+     ],
+     [
+      0.8172,
+      0.11,
+      2.6323
+     ],
+     [
+      0.8176,
+      0.11,
+      2.7039
+     ],
+     [
+      0.8179,
+      0.11,
+      2.7758
+     ],
+     [
+      0.8181,
+      0.11,
+      2.8478
+     ],
+     [
+      0.8183,
+      0.11,
+      2.9198
+     ],
+     [
+      0.8186,
+      0.11,
+      2.9917
+     ],
+     [
+      0.8189,
+      0.11,
+      3.0634
+     ],
+     [
+      0.8193,
+      0.11,
+      3.1348
+     ],
+     [
+      0.8199,
+      0.11,
+      3.2059
+     ]
+    ]
+   },
+   "finger_curl": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "entry": "run",
+   "entry_speed": 3.5,
+   "sim": {
+    "reach_s": 0.12,
+    "roll_s": 0.3,
+    "entry_speed": 3.9,
+    "ball_lateral_m": 0.85,
+    "player_lateral_m": 0.51,
+    "player_forward_m": 1.13,
+    "ball_start": [
+     -0.07,
+     0.11,
+     0.57
+    ],
+    "ball_radius": 0.11
+   },
+   "checks": {
+    "lowest_joint_m": 0.047,
+    "lowest_joint": "LeftToeBase",
+    "max_bone_deg_per_s": 1345,
+    "max_turn_at": "RightUpLeg@34",
+    "sole_off_ball_max_m": 0.0009,
+    "lowest_foot_m": 0.0,
+    "boot_in_ball_max_m": 0.0,
+    "boot_in_ball_at": "R boot@17",
+    "touch_gap_m": {}
+   },
+   "ending": "swap",
+   "stance": {
+    "left": [
+     [
+      0.0,
+      0.08333399999999999
+     ],
+     [
+      0.23332800000000004,
+      0.31667200000000006
+     ],
+     [
+      0.6166583333333333,
+      0.7000083333333333
+     ]
+    ],
+    "right": [
+     [
+      0.583325,
+      0.6500083333333334
+     ]
+    ]
+   }
+  },
+  {
+   "name": "ball_roll_right_run_swap",
+   "file": "ball_roll_right_run_swap.kclip",
+   "source": "authored",
+   "move_file": "tools/anim/moves/ball_roll_run.toml",
+   "set": "skill:ball_roll",
+   "tags": [
+    "skill"
+   ],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "right",
+   "foot": "left",
+   "kind": "ball_roll",
+   "loop": false,
+   "events": {
+    "start": 0,
+    "contact": 7,
+    "release": 31,
+    "end": 46
+   },
+   "fps": 60,
+   "frame_count": 47,
+   "seconds": 0.783,
+   "contacts": {
+    "left": [
+     [
+      35,
+      39
+     ]
+    ],
+    "right": [
+     [
+      0,
+      5
+     ],
+     [
+      14,
+      19
+     ],
+     [
+      37,
+      42
+     ]
+    ]
+   },
+   "notes": "ball roll at a run, ending for an exit touch made by the support foot: the left foot leaves the ground at the second hop's take-off and swings into the touch; the right foot comes off the ball down onto the pitch as the new support",
+   "timing": {
+    "spans": [
+     0.12,
+     0.4,
+     0.25
+    ],
+    "event_seconds": {
+     "start": 0.0,
+     "contact": 0.12,
+     "release": 0.52,
+     "end": 0.77
+    }
+   },
+   "ball": {
+    "radius": 0.11,
+    "on": [
+     [
+      "contact",
+      "release",
+      "left"
+     ]
+    ],
+    "touch": {},
+    "track": [
+     [
+      0.03,
+      0.11,
+      0.71
+     ],
+     [
+      0.0189,
+      0.11,
+      0.7458
+     ],
+     [
+      0.0078,
+      0.11,
+      0.7815
+     ],
+     [
+      -0.0033,
+      0.11,
+      0.8178
+     ],
+     [
+      -0.014,
+      0.11,
+      0.8551
+     ],
+     [
+      -0.022,
+      0.11,
+      0.8932
+     ],
+     [
+      -0.0309,
+      0.11,
+      0.9321
+     ],
+     [
+      -0.0458,
+      0.11,
+      0.9719
+     ],
+     [
+      -0.0711,
+      0.11,
+      1.0131
+     ],
+     [
+      -0.1058,
+      0.11,
+      1.0559
+     ],
+     [
+      -0.147,
+      0.11,
+      1.0997
+     ],
+     [
+      -0.192,
+      0.11,
+      1.144
+     ],
+     [
+      -0.2379,
+      0.11,
+      1.1881
+     ],
+     [
+      -0.2817,
+      0.11,
+      1.2315
+     ],
+     [
+      -0.3231,
+      0.11,
+      1.2736
+     ],
+     [
+      -0.3655,
+      0.11,
+      1.3148
+     ],
+     [
+      -0.4083,
+      0.11,
+      1.3556
+     ],
+     [
+      -0.4508,
+      0.11,
+      1.3966
+     ],
+     [
+      -0.4924,
+      0.11,
+      1.4382
+     ],
+     [
+      -0.5323,
+      0.11,
+      1.4812
+     ],
+     [
+      -0.5712,
+      0.11,
+      1.525
+     ],
+     [
+      -0.6107,
+      0.11,
+      1.5683
+     ],
+     [
+      -0.6494,
+      0.11,
+      1.6123
+     ],
+     [
+      -0.6857,
+      0.11,
+      1.658
+     ],
+     [
+      -0.7182,
+      0.11,
+      1.7065
+     ],
+     [
+      -0.7454,
+      0.11,
+      1.7589
+     ],
+     [
+      -0.7663,
+      0.11,
+      1.8163
+     ],
+     [
+      -0.782,
+      0.11,
+      1.8783
+     ],
+     [
+      -0.7935,
+      0.11,
+      1.9436
+     ],
+     [
+      -0.8014,
+      0.11,
+      2.0109
+     ],
+     [
+      -0.8065,
+      0.11,
+      2.079
+     ],
+     [
+      -0.8096,
+      0.11,
+      2.1466
+     ],
+     [
+      -0.8115,
+      0.11,
+      2.2136
+     ],
+     [
+      -0.8131,
+      0.11,
+      2.2816
+     ],
+     [
+      -0.8143,
+      0.11,
+      2.3504
+     ],
+     [
+      -0.8154,
+      0.11,
+      2.42
+     ],
+     [
+      -0.8162,
+      0.11,
+      2.4902
+     ],
+     [
+      -0.8168,
+      0.11,
+      2.561
+     ],
+     [
+      -0.8172,
+      0.11,
+      2.6323
+     ],
+     [
+      -0.8176,
+      0.11,
+      2.7039
+     ],
+     [
+      -0.8179,
+      0.11,
+      2.7758
+     ],
+     [
+      -0.8181,
+      0.11,
+      2.8478
+     ],
+     [
+      -0.8183,
+      0.11,
+      2.9198
+     ],
+     [
+      -0.8186,
+      0.11,
+      2.9917
+     ],
+     [
+      -0.8189,
+      0.11,
+      3.0634
+     ],
+     [
+      -0.8193,
+      0.11,
+      3.1348
+     ],
+     [
+      -0.8199,
+      0.11,
+      3.2059
+     ]
+    ]
+   },
+   "finger_curl": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "entry": "run",
+   "entry_speed": 3.5,
+   "sim": {
+    "reach_s": 0.12,
+    "roll_s": 0.3,
+    "entry_speed": 3.9,
+    "ball_lateral_m": 0.85,
+    "player_lateral_m": 0.51,
+    "player_forward_m": 1.13,
+    "ball_start": [
+     -0.07,
+     0.11,
+     0.57
+    ],
+    "ball_radius": 0.11
+   },
+   "checks": {
+    "lowest_joint_m": 0.047,
+    "lowest_joint": "RightToeBase",
+    "max_bone_deg_per_s": 1345,
+    "max_turn_at": "LeftUpLeg@34",
+    "sole_off_ball_max_m": 0.0009,
+    "lowest_foot_m": 0.0,
+    "boot_in_ball_max_m": 0.0,
+    "boot_in_ball_at": "L boot@27",
+    "touch_gap_m": {}
+   },
+   "ending": "swap",
+   "stance": {
+    "right": [
+     [
+      0.0,
+      0.08333399999999999
+     ],
+     [
+      0.23332800000000004,
+      0.31667200000000006
+     ],
+     [
+      0.6166583333333333,
+      0.7000083333333333
+     ]
+    ],
+    "left": [
+     [
+      0.583325,
+      0.6500083333333334
+     ]
+    ]
    }
   },
   {

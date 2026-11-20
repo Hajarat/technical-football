@@ -127,6 +127,15 @@ public partial class Match : Node3D
         Tick(pad);
         Present();
         // The ball has been placed above; only now follow it.
+        // (--side-cam: fixed side-on at the first skill move, 1 m along its run from where it starts)
+        if (_args.SideCam && !Camera.Fixed && World.Attacker.SkillMove is { } sm)
+        {
+            var run = new Vector3(sm.RunDirection.X, 0, sm.RunDirection.Y);
+            if (run.LengthSquared() < 1e-6f) run = new Vector3(World.Attacker.Velocity.X, 0, World.Attacker.Velocity.Z);
+            // (from the side he does not move toward: his right for a move to his left)
+            int away = sm.Side == FootballSim.Core.SkillSide.Left ? 1 : sm.Side == FootballSim.Core.SkillSide.Right ? -1 : 0;
+            Camera.FixSideOn(new Vector3(World.Attacker.Position.X, 0, World.Attacker.Position.Z) + run.Normalized() * 1.0f, run, away);
+        }
         Camera.Follow(_args.CloseKeeper ? new Vector3(World.Keeper.Position.X, 0, World.Keeper.Position.Z)
             : _args.CloseAttacker ? new Vector3(World.Attacker.Position.X + 0.6f, 0, World.Attacker.Position.Z) : Ball.Position, delta);
         HandleTools();

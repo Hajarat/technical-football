@@ -34,6 +34,13 @@ Move file (see moves/ball_roll.toml for a full example):
             bend (elbow; the forearm bends forward, or with trail = 90 downward and 180 back); curl (finger curl 0..1: the clip has no finger bones, so it is written to clips.json for the runtime)
     ball    pos = [x, y, z] (the ball's centre, ground frame)
   Angles: yaw turns toward his left, pitch tips forward (a foot's pitch lifts the toes), roll tips the top toward his left.
+* [stance]: left = [[from, to], ...], right = [...] (normalised times): the spans each foot stands on the pitch, written as its
+  contact flags (the runtime holds a flagged foot where it landed) instead of the ones read off the solved motion, which miss a
+  stance of a few frames. Checked: over each span the foot is on the ground and its sole point still.
+* [[ending]]: another ending of the same move, written as its own clip: suffix (added to the clip's name, after the variant's),
+  from (a normalised time: the move's keys up to it are kept, its later ones replaced), notes, its own [[ending.key]] tables
+  (all after from) and optionally its own [ending.stance] (replacing the move's). clips.json names it in "ending" (the suffix without its underscore); the runtime picks it when the move's
+  exit calls for it (a ball roll whose exit touch is made by the support foot).
   ease (0..1) on the key, or inside a channel's table for that channel: 0 passes through the key smoothly, 1 comes to rest on it;
   a position's ease may be one per axis (ease = [1, 1, 0]: a ball that stops across the body but keeps rolling along the run).
   Between keys the curve is a monotone cubic (it never overshoots a key), its slope at a key scaled by 1 - ease.
@@ -50,7 +57,8 @@ Checks (after quantisation, as the game will see it); a clip that fails is not w
 * no bone turning faster than 1,500 deg/s between two frames;
 * while the ball span says the sole is on the ball, the playing foot's sole point within 1 cm of the ball's surface;
 * no boot vertex (every third, carried by the foot or toe bone) more than 1 cm inside the ball at any frame;
-* at each [ball] touch event, that foot's boot within 1.5 cm of the ball's surface.
+* at each [ball] touch event, that foot's boot within 1.5 cm of the ball's surface;
+* over each [stance] span, the foot's lowest point within 1 cm of the ground and its sole point within 5 mm of where it landed.
 """
 from __future__ import annotations
 
@@ -79,6 +87,8 @@ MAX_SOLE_OFF = 0.01
 MAX_FOOT_UNDER = 0.01
 MAX_BOOT_IN = 0.01
 MAX_TOUCH_GAP = 0.015
+MAX_STANCE_H = 0.01
+MAX_STANCE_SLIP = 0.005
 STRETCH_TOL = 1e-4
 BONES = rt.BONES
 SIDES = ("l", "r")
@@ -303,11 +313,31 @@ def load_move(path: Path) -> dict:
     for v in m.get("variant", [{}]):
         if len(v.get("spans", [])) != len(ev) - 1:
             raise ValueError(f"{path}: variant {v.get('suffix', '')!r} needs {len(ev) - 1} spans")
-    for k in m["key"]:
+    for k in m["key"] + [k for e in m.get("ending", []) for k in e.get("key", [])]:
         for g in k:
             if g not in GROUPS and g not in ("t", "ease", "label"):
                 raise ValueError(f"{path}: key at t={k.get('t')}: unknown channel group {g!r}")
+    for e in m.get("ending", []):
+        if not e.get("suffix") or any(float(k["t"]) <= float(e["from"]) for k in e.get("key", [])):
+            raise ValueError(f"{path}: an ending needs a suffix and keys after its from")
     return m
+
+
+def endings(m: dict) -> list[dict]:
+    """The move and each of its [[ending]]s as a move of its own: the keys up to the ending's from, then the ending's keys."""
+    base = {k: v for k, v in m.items() if k != "ending"}
+    out = [base]
+    for e in m.get("ending", []):
+        alt = json.loads(json.dumps(base))
+        cut = float(e["from"])
+        alt["key"] = [k for k in alt["key"] if float(k["t"]) <= cut + 1e-9] + json.loads(json.dumps(e["key"]))
+        alt["ending"] = e["suffix"]
+        if "stance" in e:
+            alt["stance"] = json.loads(json.dumps(e["stance"]))
+        if "notes" in e:
+            alt["notes"] = e["notes"]
+        out.append(alt)
+    return out
 
 
 def _flip_vec(v):
@@ -329,6 +359,8 @@ def mirror_move(m: dict) -> dict:
     other = {"left": "right", "right": "left"}
     out["side"] = other.get(m["side"], m["side"])
     out["foot"] = other[m["foot"]]
+    if "stance" in out:
+        out["stance"] = {other[f]: v for f, v in out["stance"].items()}
     bl = out.get("ball", {})
     if bl.get("on") and not isinstance(bl["on"][0], str):
         bl["on"] = [[a, b, other[f]] for a, b, f in bl["on"]]
@@ -570,7 +602,7 @@ def solve(m: dict, variant: dict, rig: Rig) -> Clip:
     qd = np.stack([rt.decode_quats(rt.encode_quats(q[:, b])) for b in range(22)], axis=1)
     events = {nm: int(round(s * FPS)) for nm, s in tl.events.items()}
     suffix = variant.get("suffix", "")
-    clip = Clip(f"{m['name']}_{m['side'] if m['side'] != 'none' else m['foot']}{suffix}", m, tl, hips, qd, np.zeros((n, 2), bool), events, ball, curl)
+    clip = Clip(f"{m['name']}_{m['side'] if m['side'] != 'none' else m['foot']}{suffix}{m.get('ending', '')}", m, tl, hips, qd, np.zeros((n, 2), bool), events, ball, curl)
     check(clip, rig, stretch)
     return clip
 
@@ -603,6 +635,20 @@ def check(c: Clip, rig: Rig, stretch: list) -> None:
         if h[:, s].min() < -MAX_FOOT_UNDER:
             p.append(f"{'LR'[s]} foot {-h[:, s].min() * 100:.1f} cm into the ground at frame {int(h[:, s].argmin())}")
     c.contacts = np.stack([rt.label_contacts(h[:, s], v[:, s]) for s in range(2)], axis=1)
+    # declared stances replace the labels read off the motion for that foot, and are checked
+    for s, foot in enumerate(("left", "right")):
+        spans_ = c.move.get("stance", {}).get(foot)
+        if spans_ is None:
+            continue
+        c.contacts[:, s] = False
+        sp = sole_points(rig, gr, gt, s)
+        for a_u, b_u in spans_:
+            # (the frames inside the span: a stance keyed between frames starts on the frame after its landing key)
+            a, b = math.ceil(c.tl.sec(float(a_u)) * FPS - 1e-6), math.floor(c.tl.sec(float(b_u)) * FPS + 1e-6)
+            c.contacts[a:b + 1, s] = True
+            hi = float(h[a:b + 1, s].max()); slip = float(np.linalg.norm(sp[a:b + 1] - sp[a], axis=1).max())
+            if hi > MAX_STANCE_H or slip > MAX_STANCE_SLIP:
+                p.append(f"{foot} stance {a_u}-{b_u} (frames {a}-{b}) not standing: {hi * 100:.1f} cm up, sole moves {slip * 100:.1f} cm")
     if stretch:
         i, side, over = max(stretch, key=lambda x: x[2])
         p.append(f"{side} leg stretched {over * 100:.1f} cm past its length at frame {i} ({len(stretch)} frames)")
@@ -674,15 +720,20 @@ def write(c: Clip, out: Path, names: list[str]) -> dict:
              "entry": m.get("entry", "stand"), "entry_speed": float(m.get("entry_speed", 0.0)),
              "sim": m.get("sim", {}),
              "checks": {k: v for k, v in c.stats.items() if k not in ("frames", "seconds")}}
+    if m.get("ending"):
+        entry["ending"] = m["ending"].lstrip("_")
+    if "stance" in m:
+        entry["stance"] = {f: [[c.tl.sec(float(a)), c.tl.sec(float(b))] for a, b in v] for f, v in m["stance"].items()}
     return entry
 
 
 def build(moves: list[dict], rig: Rig) -> list[Clip]:
     clips = []
-    for m in moves:
-        for side_m in (m, mirror_move(m)):
-            for v in m.get("variant", []):
-                clips.append(solve(side_m, v, rig))
+    for m0 in moves:
+        for m in endings(m0):
+            for side_m in (m, mirror_move(m)):
+                for v in m.get("variant", []):
+                    clips.append(solve(side_m, v, rig))
     return clips
 
 

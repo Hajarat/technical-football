@@ -16,7 +16,11 @@ namespace FootballSim.Game;
 /// surface is brought onto the live ball by leg IK over the clip's on-ball spans (ramping in through the reach and out after the
 /// release; a step-over's circling foot keeps its path relative to the live ball), a foot the clip plants is held where it landed
 /// (<see cref="PlantLock"/>), and a touch the core makes on the way out (the exit touch) takes its leg by the touch's weight as the
-/// figure draws it. When the clip has played out (or a shot or a reset cuts it) the body hands back to the figure's pose by
+/// figure draws it. A running clip with a second ending (the clip of the same name with "_swap": the ball roll's support foot
+/// swinging into the exit touch instead of standing under it) is crossed over to it while the exit touch the core forecasts is
+/// the support foot's (<see cref="FigureFrame.Upcoming"/>), and back when it is not. A clip whose move file declares its stances
+/// has its planted feet taken onto the clip's own feet and held from their first stance tick. When the clip has played out (or a
+/// shot or a reset cuts it) the body hands back to the figure's pose by
 /// inertialisation, the feet by an ankle offset that dies away while the foot swings and is held while it is planted, so nothing
 /// pops and nothing slides. Works in the body's model space (the model's own size, ground at y = 0). No clock and no randomness.
 /// </summary>
@@ -32,12 +36,14 @@ public sealed class SkillClipLayer
 
     static readonly bool Dbg = System.Environment.GetEnvironmentVariable("SKILL_CLIP_DBG") == "1";
     static SkillClipLibrary? _lib;
+    /// <summary>The clips whose stances are declared by their move file (clips.json "stance"), not read off their motion.</summary>
+    static readonly System.Collections.Generic.HashSet<string> _declared = new();
     static string? _loadError;
 
     readonly SkinnedBody _body;
     readonly Skeleton _sk;
     readonly int _n;
-    readonly NQuat[] _a, _b, _src, _out, _gr, _baseR, _baseRPrev, _shR, _shRPrev;
+    readonly NQuat[] _a, _b, _c, _src, _out, _gr, _baseR, _baseRPrev, _shR, _shRPrev;
     readonly NVec3[] _gp, _rest, _srcP, _outP, _baseP, _basePPrev, _shP, _shPPrev, _angV, _linV, _dstAngV, _dstLinV;
     readonly NQuat[] _baseG;
     readonly Inertializer _in;
@@ -48,7 +54,11 @@ public sealed class SkillClipLayer
     // the move being played
     bool _playing, _handBack, _transition, _pending;
     int _moveId = int.MinValue, _foot;
-    SkillClip? _stand, _run;
+    SkillClip? _stand, _run, _runAlt;
+    /// <summary>The second ending's weight against the running clip's own (0..1, eased), and its linear progress.</summary>
+    float _wAlt, _altU, _altWant;
+    /// <summary>Seconds a crossover between the two endings takes.</summary>
+    public const float EndingBlend = 0.05f;
     float _wRun, _t, _ct, _shotElapsed = float.NaN, _prevSpeed = float.NaN;
     SkillTimeMap? _map;
     BootSurface _surface;
@@ -63,7 +73,7 @@ public sealed class SkillClipLayer
     SkillClipLayer(SkinnedBody body, Skeleton sk)
     {
         _body = body; _sk = sk; _n = sk.Count;
-        _a = new NQuat[_n]; _b = new NQuat[_n]; _src = new NQuat[_n]; _out = new NQuat[_n]; _gr = new NQuat[_n];
+        _a = new NQuat[_n]; _b = new NQuat[_n]; _c = new NQuat[_n]; _src = new NQuat[_n]; _out = new NQuat[_n]; _gr = new NQuat[_n];
         _baseR = new NQuat[_n]; _baseRPrev = new NQuat[_n]; _shR = new NQuat[_n]; _shRPrev = new NQuat[_n];
         _gp = new NVec3[_n]; _rest = new NVec3[_n]; _srcP = new NVec3[_n]; _outP = new NVec3[_n]; _baseP = new NVec3[_n]; _basePPrev = new NVec3[_n];
         _shP = new NVec3[_n]; _shPPrev = new NVec3[_n]; _angV = new NVec3[_n]; _linV = new NVec3[_n]; _dstAngV = new NVec3[_n]; _dstLinV = new NVec3[_n];
@@ -92,6 +102,9 @@ public sealed class SkillClipLayer
                     if (bytes == null || bytes.Length == 0) throw new System.IO.FileNotFoundException($"{Folder}/{file} not found");
                     return bytes;
                 });
+                using (var doc = System.Text.Json.JsonDocument.Parse(json))
+                    foreach (var c in doc.RootElement.GetProperty("clips").EnumerateArray())
+                        if (c.TryGetProperty("stance", out _)) _declared.Add(c.GetProperty("name").GetString()!);
                 GD.Print($"SKILL_ANIM clips={_lib.Clips.Count}");
             }
             catch (Exception e) { _loadError = $"skill clips: {e.Message}"; error = _loadError; }
@@ -132,7 +145,7 @@ public sealed class SkillClipLayer
         _haveShown = _haveShownPrev = _haveBase = _haveBasePrev = false; _prevSpeed = float.NaN;
         _in.Reset(); foreach (var l in _lock) l.Reset();
         for (int i = 0; i < 2; i++) { _legOff[i] = _legOffVel[i] = NVec3.Zero; _pinW[i] = 0f; _planted[i] = false; _hbStep[i] = false; }
-        _reachOff = NVec3.Zero; Array.Clear(_pinHave);
+        _reachOff = NVec3.Zero; Array.Clear(_pinHave); Array.Clear(_legU); Array.Clear(_flagWas); Array.Clear(_anchor); Array.Clear(_anchor0);
     }
 
     static NVec3 M(Vector3 world, float sc) => ModelSpace.FromWorld(new NVec3(world.X, world.Y, world.Z)) / sc;
@@ -168,6 +181,7 @@ public sealed class SkillClipLayer
 
         if (_playing)
         {
+            ChooseEnding(f, dt);
             ClipPose(f, sc, _t, _src, out var hips);
             for (int k = 0; k < _n; k++) _srcP[k] = _rest[k];
             _srcP[0] = hips;
@@ -224,6 +238,10 @@ public sealed class SkillClipLayer
         int foot = s.Right ? 1 : 0;
         var pair = _lib!.Pair(MoveName(s.Kind), foot, Math.Sign((int)s.Side))!.Value;
         _stand = pair.Stand; _run = pair.Run; _foot = foot; _move = MoveName(s.Kind); _surface = s.Surface;
+        _runAlt = null; _wAlt = _altU = _altWant = 0f;
+        if (_run != _stand)
+            foreach (var c2 in _lib.Clips)
+                if (c2.Clip.Name == _run.Clip.Name + "_swap") { _runAlt = c2; break; }
         // the speed he came in at: the last tick before the move (on its first tick the move already moves him)
         float speed = float.IsNaN(_prevSpeed) ? new Vector2(f.Velocity.X, f.Velocity.Z).Length() : _prevSpeed;
         _wRun = SkillEntryBlend.RunWeight(speed, _stand.EntrySpeed, _run.EntrySpeed);
@@ -241,10 +259,42 @@ public sealed class SkillClipLayer
         _map = new SkillTimeMap(c.EventSeconds("start"), knots, c.EventSeconds("end"), origin);
         _moveId = s.Id; _t = s.Elapsed; _playing = true; _handBack = false; _transition = true;
         foreach (var l in _lock) l.Reset();
-        _shotElapsed = float.NaN; Array.Clear(_pinHave);
+        _shotElapsed = float.NaN; Array.Clear(_pinHave); Array.Clear(_legU); Array.Clear(_flagWas); Array.Clear(_anchor); Array.Clear(_anchor0);
         BuildPins(s);
         GD.Print($"SKILL_CLIP start move={_move} foot={(foot == 1 ? "R" : "L")} clip={_stand.Clip.Name}/{_run.Clip.Name} w_run={_wRun:F2} speed={speed:F2} clip_from={_map.ClipStart:F3} contact_s={simContact:F3} end_s={simEnd:F3} origin_s={origin:F3}");
     }
+
+    /// <summary>
+    /// The running clip's ending for the exit touch the core forecasts (made at once on the move's end tick): its second ending when
+    /// the touch is the support foot's, its own otherwise; kept as it is while no touch is forecast. The two cross over in
+    /// <see cref="EndingBlend"/> seconds.
+    /// </summary>
+    void ChooseEnding(in FigureFrame f, float dt)
+    {
+        if (_runAlt == null) return;
+        var up = f.Upcoming;
+        if (f.Skill.Valid && up.Valid && !up.IsSkill)
+        {
+            float want = (up.Right ? 1 : 0) != _foot ? 1f : 0f;
+            if (want != _altWant) GD.Print($"SKILL_CLIP ending={(want > 0.5f ? _runAlt.Clip.Name : _run!.Clip.Name)} exit_foot={(up.Right ? "R" : "L")} t={_t:F3}");
+            _altWant = want;
+            _altU = want > _altU ? Math.Min(want, _altU + dt / EndingBlend) : Math.Max(want, _altU - dt / EndingBlend);
+        }
+        _wAlt = Smooth(_altU);
+    }
+
+    /// <summary>The running clip (its second ending crossed in by <see cref="_wAlt"/>) at clip time <paramref name="ct"/> into <see cref="_b"/>; its hips.</summary>
+    NVec3 RunSample(float ct)
+    {
+        var hb = _run!.Clip.Sample(ct, _b);
+        if (_runAlt == null || _wAlt <= 0f) return hb;
+        var hc = _runAlt.Clip.Sample(ct, _c);
+        for (int k = 0; k < _n; k++) _b[k] = _wAlt >= 1f ? _c[k] : NQuat.Slerp(_b[k], _c[k], _wAlt);
+        return NVec3.Lerp(hb, hc, _wAlt);
+    }
+
+    /// <summary>The running clip's root at <paramref name="ct"/>, its second ending crossed in.</summary>
+    System.Numerics.Vector2 RunRoot(float ct) => _runAlt == null || _wAlt <= 0f ? _run!.Root(ct) : System.Numerics.Vector2.Lerp(_run!.Root(ct), _runAlt.Root(ct), _wAlt);
 
     /// <summary>The blended clip pose at simulation time <paramref name="t"/>, placed on the simulation's position and facing.</summary>
     void ClipPose(in FigureFrame f, float sc, float t, NQuat[] outRot, out NVec3 hips)
@@ -252,10 +302,10 @@ public sealed class SkillClipLayer
         float ct = _map!.ClipTime(t);
         if (outRot == _src) _ct = ct;
         var ha = _stand!.Clip.Sample(ct, _a);
-        var hb = _run!.Clip.Sample(ct, _b);
+        var hb = RunSample(ct);
         for (int k = 0; k < _n; k++) outRot[k] = _wRun <= 0f ? _a[k] : _wRun >= 1f ? _b[k] : NQuat.Slerp(_a[k], _b[k], _wRun);
         var h = NVec3.Lerp(ha, hb, _wRun);
-        var root = System.Numerics.Vector2.Lerp(_stand.Root(ct), _run.Root(ct), _wRun);
+        var root = System.Numerics.Vector2.Lerp(_stand.Root(ct), RunRoot(ct), _wRun);
         var q = Placement(f);
         var rm = M(f.Position, sc); rm.Y = 0f;
         hips = rm + NVec3.Transform(new NVec3(h.X - root.X, h.Y, h.Z - root.Y), q);
@@ -275,8 +325,9 @@ public sealed class SkillClipLayer
     /// <summary>The authored ball centre this tick, placed as the pose is.</summary>
     NVec3 ClipBall(in FigureFrame f, float sc)
     {
-        var b = NVec3.Lerp(_stand!.Ball(_ct), _run!.Ball(_ct), _wRun);
-        var root = System.Numerics.Vector2.Lerp(_stand.Root(_ct), _run.Root(_ct), _wRun);
+        var rb = _runAlt == null || _wAlt <= 0f ? _run!.Ball(_ct) : NVec3.Lerp(_run!.Ball(_ct), _runAlt.Ball(_ct), _wAlt);
+        var b = NVec3.Lerp(_stand!.Ball(_ct), rb, _wRun);
+        var root = System.Numerics.Vector2.Lerp(_stand.Root(_ct), RunRoot(_ct), _wRun);
         var rm = M(f.Position, sc); rm.Y = 0f;
         return rm + NVec3.Transform(new NVec3(b.X - root.X, b.Y, b.Z - root.Y), Placement(f));
     }
@@ -463,6 +514,9 @@ public sealed class SkillClipLayer
         bool anyTouch = tw[0] > 0f || tw[1] > 0f;
         var baseGp = anyTouch ? new NVec3[_n] : null;
         if (anyTouch) _sk.Forward(_baseR, _baseP[0], _baseG, baseGp!, _baseP);
+        // the clip's own pose (before the hand-over's offset), for the feet of its declared stances: moved with the hips' reach
+        // toward the ball along the ground, not down with them (a foot in the air keeps its height over the pitch)
+        _sk.Forward(_src, _srcP[0] + new NVec3(_reachOff.X, 0f, _reachOff.Z), _clipG, _clipP, _srcP);
         for (int i = 0; i < 2; i++)
         {
             int up = _sk.UpLeg[i], leg = _sk.Leg[i], foot = _sk.Foot[i];
@@ -472,12 +526,40 @@ public sealed class SkillClipLayer
             // a touch the core makes with this foot (the exit touch) takes it from the pin, except from a touch of the move's own
             float twi = tw[i] * (1f - _pinOwn[i]);
             float pinI = _pinIdx[i] < 0 ? 0f : _pinRaw[i] * (1f - twi);
-            if (pinI > 0f) { _pinW[i] = pinI; target = ankle + (_pinAbs[i] - ankle) * (1f - twi); }
+            if (pinI > 0f) _pinW[i] = pinI;
             // a foot the clip plants is held where it landed (not while it plays the ball or a touch)
             bool contact = (_stand!.Contacts(_ct) & (i == 0 ? Clip.LeftFoot : Clip.RightFoot)) != 0;
-            if (_wRun > 0.5f) contact = (_run!.Contacts(_ct) & (i == 0 ? Clip.LeftFoot : Clip.RightFoot)) != 0;
-            bool stance = contact && _pinW[i] <= 1e-3f && twi <= 1e-3f && target.Y < _restAnkleY + PlantAbove;
+            if (_wRun > 0.5f) contact = ((_wAlt > 0.5f ? _runAlt! : _run!).Contacts(_ct) & (i == 0 ? Clip.LeftFoot : Clip.RightFoot)) != 0;
+            bool flagged = contact && _pinW[i] <= 1e-3f && twi <= 1e-3f;
+            // a stance its move file declares (a running clip's few-tick stances): the foot is taken from the hand-over's offset to
+            // the clip's own foot (stepping into place, lifted when it has some way to go), held there through the stance, and
+            // follows the clip's own foot from then on (its hops and landings as authored). Waiting for the offset to die away would
+            // leave it gliding over the pitch, toes down, through most of a stance. It lands where the clip's foot is as the stance
+            // begins and stays there; at the take-off the clip's foot has moved on from that spot (the simulation outruns or trails
+            // the clip's root), and the difference is carried and dies away over AnchorRelease, so the foot leaves from where it stood.
+            bool declared = _wRun > 0.5f && _declared.Contains((_wAlt > 0.5f ? _runAlt! : _run!).Clip.Name);
+            var c = _clipP[foot];
+            float way = new System.Numerics.Vector2(c.X - ankle.X, c.Z - ankle.Z).Length();
+            if (declared && flagged && !_flagWas[i]) { _pullS[i] = Math.Clamp(way * sc / StepSpeed, _legU[i] < 1f ? StanceTakeMin : StancePullMin, StancePullMax); _land[i] = c + _anchor[i]; }
+            _flagWas[i] = declared && flagged;
+            if (declared && flagged) { _anchor0[i] = new NVec3(_land[i].X - c.X, 0f, _land[i].Z - c.Z); _relT[i] = 0f; }
+            else _relT[i] += dt;
+            _anchor[i] = _anchor0[i] * (1f - Smooth(_relT[i] / AnchorRelease));
+            c += _anchor[i];
+            _legU[i] = declared && flagged ? Math.Min(1f, _legU[i] + dt / _pullS[i]) : declared ? _legU[i] : 0f;
+            float lw = Smooth(_legU[i]);
+            if (lw > 0f)
+            {
+                var to = NVec3.Lerp(ankle, c, lw);
+                if (flagged && lw < 1f) to.Y += Math.Min(StepLift / sc, 0.5f * way) * 4f * lw * (1f - lw);
+                target = to;
+                gFoot = NQuat.Normalize(NQuat.Slerp(gFoot, _clipG[foot], lw));
+            }
+            // the ball pin from there (by the exit touch's share)
+            if (pinI > 0f) target += (_pinAbs[i] - target) * (1f - twi);
+            bool stance = flagged && (declared ? lw >= 1f : target.Y < _restAnkleY + PlantAbove);
             var lk = _lock[i];
+            lk.SettleSeconds = declared ? StanceSettle : PlantSettle;
             var held = new NVec3(lk.Lock.X, target.Y, lk.Lock.Z);
             bool far = lk.Locked && (held - _gp[up]).Length() > 0.99f * _legLen;
             var got = lk.Apply(stance, target, far, dt);
@@ -491,7 +573,7 @@ public sealed class SkillClipLayer
                 _planted[i] = false;
             }
             target = KeepAboveGround(i, target, gFoot);
-            if (Dbg) GD.Print($"SKILL_DBG ct={_ct:F3} foot={i} ank=({ankle.X:F3},{ankle.Y:F3},{ankle.Z:F3}) tgt=({target.X:F3},{target.Y:F3},{target.Z:F3}) pin={_pinW[i]:F2} st={(stance ? 1 : 0)} lock={(lk.Locked ? 1 : 0)} tw={tw[i]:F2}");
+            if (Dbg) GD.Print($"SKILL_DBG ct={_ct:F3} foot={i} ank=({ankle.X:F3},{ankle.Y:F3},{ankle.Z:F3}) tgt=({target.X:F3},{target.Y:F3},{target.Z:F3}) pin={_pinW[i]:F2} st={(stance ? 1 : 0)} lock={(lk.Locked ? 1 : 0)} tw={tw[i]:F2} far={(far ? 1 : 0)} legw={_legU[i]:F2}");
             SolveLeg(i, target, gFoot);
             if (Dbg && _pinIdx[i] >= 0)
             {
@@ -520,6 +602,24 @@ public sealed class SkillClipLayer
     }
 
     NVec3 _reachOff;
+    readonly NQuat[] _clipG = new NQuat[64];
+    readonly NVec3[] _clipP = new NVec3[64];
+    /// <summary>Per foot, how far a declared stance has taken the leg from the hand-over's offset to the clip's own foot (0..1, linear).</summary>
+    readonly float[] _legU = new float[2];
+    readonly float[] _pullS = { 0.03f, 0.03f };
+    readonly bool[] _flagWas = new bool[2];
+    readonly NVec3[] _land = new NVec3[2], _anchor = new NVec3[2], _anchor0 = new NVec3[2];
+    readonly float[] _relT = new float[2];
+    /// <summary>Seconds over which the offset of a foot that left its stance from the clip's foot dies away (eased).</summary>
+    const float AnchorRelease = 0.14f;
+    /// <summary>
+    /// A declared stance's foot is taken to the clip's own at StepSpeed (m/s), in StancePullMin to StancePullMax seconds (at least
+    /// StanceTakeMin from the hand-over's pose, where the foot turns from the figure's to the clip's as well), lifted on the way by
+    /// at most StepLift (metres).
+    /// </summary>
+    const float StepSpeed = 6f, StancePullMin = 1f / 120f, StanceTakeMin = 0.04f, StancePullMax = 0.08f, StepLift = 0.07f;
+    /// <summary>A declared stance's settle (its landing speed carried on, fading, before it stands still), and every other planted foot's.</summary>
+    const float StanceSettle = 0.017f, PlantSettle = 0.05f;
     readonly NVec3[] _pinShift = new NVec3[2], _pinBallK = new NVec3[8];
     readonly bool[] _pinHave = new bool[8];
     readonly int[] _pinIdx = { -1, -1 };
