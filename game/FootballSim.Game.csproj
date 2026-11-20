@@ -9,4 +9,31 @@
     <ProjectReference Include="../src/FootballSim.Core/FootballSim.Core.csproj" />
     <ProjectReference Include="../src/FootballSim.Anim/FootballSim.Anim.csproj" />
   </ItemGroup>
+  <!-- Stamps the repo's HEAD (short hash, "-dirty" when tracked files have uncommitted changes) into the build, so the game
+       can tell when it runs behind the checkout. Runs on every build; the file is rewritten only when its content changes,
+       so an unchanged HEAD does not recompile anything. Without git (or outside a repo) it stamps "unknown". -->
+  <Target Name="StampBuildCommit" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <StampFile>$(IntermediateOutputPath)BuildInfo.g.cs</StampFile>
+      <StampCommit>unknown</StampCommit>
+    </PropertyGroup>
+    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; rev-parse --short HEAD 2&gt;/dev/null" ConsoleToMSBuild="true" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" StandardOutputImportance="low" ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" ItemName="StampHeadLines" />
+      <Output TaskParameter="ExitCode" PropertyName="StampHeadExit" />
+    </Exec>
+    <PropertyGroup Condition="'$(StampHeadExit)' == '0' And '@(StampHeadLines)' != ''">
+      <StampCommit>@(StampHeadLines)</StampCommit>
+    </PropertyGroup>
+    <Exec Condition="'$(StampCommit)' != 'unknown'" Command="git -C &quot;$(MSBuildProjectDirectory)&quot; status --porcelain --untracked-files=no 2&gt;/dev/null" ConsoleToMSBuild="true" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" StandardOutputImportance="low" ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" ItemName="StampDirtyLines" />
+    </Exec>
+    <PropertyGroup Condition="'@(StampDirtyLines)' != ''">
+      <StampCommit>$(StampCommit)-dirty</StampCommit>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(StampFile)" Lines="namespace FootballSim.Game%3B;;internal static partial class BuildInfo { public const string Commit = &quot;$(StampCommit)&quot;%3B }" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Compile Remove="$(StampFile)" />
+      <Compile Include="$(StampFile)" />
+    </ItemGroup>
+  </Target>
 </Project>
