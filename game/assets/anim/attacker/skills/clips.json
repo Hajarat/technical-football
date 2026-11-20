@@ -7975,13 +7975,30 @@
    "contacts": {
     "left": [
      [
-      7,
-      21
+      0,
+      6
+     ],
+     [
+      11,
+      13
+     ],
+     [
+      18,
+      22
+     ],
+     [
+      29,
+      30
      ]
     ],
-    "right": []
+    "right": [
+     [
+      26,
+      29
+     ]
+    ]
    },
-   "notes": "elastico at 2 m/s: outside push 0.30 m away from the exit, the foot wraps round the ball, inside snaps it back 45 deg toward the exit",
+   "notes": "elastico at a run: outside push 0.30 m away from the exit, the foot wraps round the ball, inside snaps it back across toward the exit as the exit touch; the left foot skips under him in two small hops and stands for the snap, the right comes down off the ball and the left swings through",
    "timing": {
     "spans": [
      0.1,
@@ -8007,159 +8024,159 @@
     },
     "track": [
      [
-      -0.08,
+      -0.04,
       0.11,
-      0.32
+      0.48
      ],
      [
-      -0.08,
+      -0.0387,
       0.11,
-      0.3532
+      0.5667
      ],
      [
-      -0.08,
+      -0.0363,
       0.11,
-      0.3863
+      0.6533
      ],
      [
-      -0.08,
+      -0.035,
       0.11,
-      0.4195
+      0.73
      ],
      [
-      -0.08,
+      -0.0376,
       0.11,
-      0.4527
+      0.7881
      ],
      [
-      -0.08,
+      -0.0424,
       0.11,
-      0.4862
+      0.8363
      ],
      [
-      -0.08,
+      -0.045,
       0.11,
-      0.52
+      0.89
      ],
      [
-      -0.0974,
+      -0.0652,
       0.11,
-      0.5543
+      0.9568
      ],
      [
-      -0.1421,
+      -0.112,
       0.11,
-      0.5889
+      1.0297
      ],
      [
-      -0.2028,
+      -0.1643,
       0.11,
-      0.6238
+      1.1029
      ],
      [
-      -0.2683,
+      -0.2137,
       0.11,
-      0.6589
+      1.1721
      ],
      [
-      -0.3273,
+      -0.2724,
       0.11,
-      0.694
+      1.2398
      ],
      [
-      -0.3685,
+      -0.3169,
       0.11,
-      0.7291
+      1.3072
      ],
      [
-      -0.3834,
+      -0.3256,
       0.11,
-      0.7626
+      1.3752
      ],
      [
-      -0.3902,
+      -0.3221,
       0.11,
-      0.7855
+      1.4417
      ],
      [
-      -0.3948,
+      -0.3158,
       0.11,
-      0.802
+      1.5075
      ],
      [
-      -0.3977,
+      -0.3082,
       0.11,
-      0.8201
+      1.5739
      ],
      [
-      -0.3993,
+      -0.3008,
       0.11,
-      0.8477
+      1.6422
      ],
      [
-      -0.3999,
+      -0.295,
       0.11,
-      0.8924
+      1.7138
      ],
      [
-      -0.4,
+      -0.2921,
       0.11,
-      0.9623
-     ],
-     [
-      -0.3649,
-      0.11,
-      1.0624
+      1.7901
      ],
      [
       -0.2665,
       0.11,
-      1.1798
+      1.872
      ],
      [
-      -0.1781,
+      -0.1958,
       0.11,
-      1.2956
+      1.9572
      ],
      [
-      -0.098,
+      -0.1342,
       0.11,
-      1.4109
+      2.0415
      ],
      [
-      -0.0174,
+      -0.0816,
       0.11,
-      1.5278
+      2.1247
      ],
      [
-      0.0636,
+      -0.031,
       0.11,
-      1.6457
+      2.2074
      ],
      [
-      0.1448,
+      0.0179,
       0.11,
-      1.7644
+      2.2898
      ],
      [
-      0.2262,
+      0.0657,
       0.11,
-      1.8836
+      2.3719
      ],
      [
-      0.3076,
+      0.1129,
       0.11,
-      2.0028
+      2.4538
      ],
      [
-      0.3889,
+      0.1601,
       0.11,
-      2.1217
+      2.5357
      ],
      [
-      0.47,
+      0.2076,
       0.11,
-      2.24
+      2.6178
+     ],
+     [
+      0.256,
+      0.11,
+      2.7
      ]
     ]
    },
@@ -8292,36 +8309,61 @@
    "entry": "run",
    "entry_speed": 2.0,
    "sim": {
-    "status": "not built: authored to the numbers it will be built to",
     "reach_s": 0.1,
-    "move_s": 0.4,
+    "move_s": 0.26,
     "push_m": 0.3,
-    "push_s": 0.16,
-    "contact2_s": 0.2,
-    "end_offset_m": 0.55,
-    "max_forward_mps": 2.0,
-    "entry_speed": 2.0,
+    "push_s": 0.11,
+    "contact2_s": 0.22,
+    "exit_deg": 45,
+    "forward_mps": 2.0,
+    "entry_speed": 4.6,
     "ball_start": [
-     -0.08,
+     -0.04,
      0.11,
-     0.32
+     0.48
     ],
     "ball_radius": 0.11
    },
    "checks": {
     "lowest_joint_m": 0.047,
-    "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 884,
-    "max_turn_at": "RightFoot@3",
+    "lowest_joint": "LeftToeBase",
+    "max_bone_deg_per_s": 1157,
+    "max_turn_at": "LeftUpLeg@25",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0073,
-    "boot_in_ball_at": "R boot@2",
+    "boot_in_ball_max_m": 0.004,
+    "boot_in_ball_at": "R boot@14",
     "touch_gap_m": {
      "contact": 0.0045,
-     "contact2": 0.0084,
-     "release": 0.0136
+     "contact2": 0.0083,
+     "release": 0.0088
     }
+   },
+   "stance": {
+    "left": [
+     [
+      0.0,
+      0.1
+     ],
+     [
+      0.18333,
+      0.21667
+     ],
+     [
+      0.3,
+      0.36667
+     ],
+     [
+      0.48333,
+      0.5
+     ]
+    ],
+    "right": [
+     [
+      0.43333,
+      0.483335
+     ]
+    ]
    }
   },
   {
@@ -8350,15 +8392,32 @@
    "frame_count": 31,
    "seconds": 0.517,
    "contacts": {
-    "left": [],
+    "left": [
+     [
+      26,
+      29
+     ]
+    ],
     "right": [
      [
-      7,
-      21
+      0,
+      6
+     ],
+     [
+      11,
+      13
+     ],
+     [
+      18,
+      22
+     ],
+     [
+      29,
+      30
      ]
     ]
    },
-   "notes": "elastico at 2 m/s: outside push 0.30 m away from the exit, the foot wraps round the ball, inside snaps it back 45 deg toward the exit",
+   "notes": "elastico at a run: outside push 0.30 m away from the exit, the foot wraps round the ball, inside snaps it back across toward the exit as the exit touch; the left foot skips under him in two small hops and stands for the snap, the right comes down off the ball and the left swings through",
    "timing": {
     "spans": [
      0.1,
@@ -8384,159 +8443,159 @@
     },
     "track": [
      [
-      0.08,
+      0.04,
       0.11,
-      0.32
+      0.48
      ],
      [
-      0.08,
+      0.0387,
       0.11,
-      0.3532
+      0.5667
      ],
      [
-      0.08,
+      0.0363,
       0.11,
-      0.3863
+      0.6533
      ],
      [
-      0.08,
+      0.035,
       0.11,
-      0.4195
+      0.73
      ],
      [
-      0.08,
+      0.0376,
       0.11,
-      0.4527
+      0.7881
      ],
      [
-      0.08,
+      0.0424,
       0.11,
-      0.4862
+      0.8363
      ],
      [
-      0.08,
+      0.045,
       0.11,
-      0.52
+      0.89
      ],
      [
-      0.0974,
+      0.0652,
       0.11,
-      0.5543
+      0.9568
      ],
      [
-      0.1421,
+      0.112,
       0.11,
-      0.5889
+      1.0297
      ],
      [
-      0.2028,
+      0.1643,
       0.11,
-      0.6238
+      1.1029
      ],
      [
-      0.2683,
+      0.2137,
       0.11,
-      0.6589
+      1.1721
      ],
      [
-      0.3273,
+      0.2724,
       0.11,
-      0.694
+      1.2398
      ],
      [
-      0.3685,
+      0.3169,
       0.11,
-      0.7291
+      1.3072
      ],
      [
-      0.3834,
+      0.3256,
       0.11,
-      0.7626
+      1.3752
      ],
      [
-      0.3902,
+      0.3221,
       0.11,
-      0.7855
+      1.4417
      ],
      [
-      0.3948,
+      0.3158,
       0.11,
-      0.802
+      1.5075
      ],
      [
-      0.3977,
+      0.3082,
       0.11,
-      0.8201
+      1.5739
      ],
      [
-      0.3993,
+      0.3008,
       0.11,
-      0.8477
+      1.6422
      ],
      [
-      0.3999,
+      0.295,
       0.11,
-      0.8924
+      1.7138
      ],
      [
-      0.4,
+      0.2921,
       0.11,
-      0.9623
-     ],
-     [
-      0.3649,
-      0.11,
-      1.0624
+      1.7901
      ],
      [
       0.2665,
       0.11,
-      1.1798
+      1.872
      ],
      [
-      0.1781,
+      0.1958,
       0.11,
-      1.2956
+      1.9572
      ],
      [
-      0.098,
+      0.1342,
       0.11,
-      1.4109
+      2.0415
      ],
      [
-      0.0174,
+      0.0816,
       0.11,
-      1.5278
+      2.1247
      ],
      [
-      -0.0636,
+      0.031,
       0.11,
-      1.6457
+      2.2074
      ],
      [
-      -0.1448,
+      -0.0179,
       0.11,
-      1.7644
+      2.2898
      ],
      [
-      -0.2262,
+      -0.0657,
       0.11,
-      1.8836
+      2.3719
      ],
      [
-      -0.3076,
+      -0.1129,
       0.11,
-      2.0028
+      2.4538
      ],
      [
-      -0.3889,
+      -0.1601,
       0.11,
-      2.1217
+      2.5357
      ],
      [
-      -0.47,
+      -0.2076,
       0.11,
-      2.24
+      2.6178
+     ],
+     [
+      -0.256,
+      0.11,
+      2.7
      ]
     ]
    },
@@ -8669,36 +8728,61 @@
    "entry": "run",
    "entry_speed": 2.0,
    "sim": {
-    "status": "not built: authored to the numbers it will be built to",
     "reach_s": 0.1,
-    "move_s": 0.4,
+    "move_s": 0.26,
     "push_m": 0.3,
-    "push_s": 0.16,
-    "contact2_s": 0.2,
-    "end_offset_m": 0.55,
-    "max_forward_mps": 2.0,
-    "entry_speed": 2.0,
+    "push_s": 0.11,
+    "contact2_s": 0.22,
+    "exit_deg": 45,
+    "forward_mps": 2.0,
+    "entry_speed": 4.6,
     "ball_start": [
-     -0.08,
+     -0.04,
      0.11,
-     0.32
+     0.48
     ],
     "ball_radius": 0.11
    },
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 884,
-    "max_turn_at": "LeftFoot@3",
+    "max_bone_deg_per_s": 1157,
+    "max_turn_at": "RightUpLeg@25",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0073,
-    "boot_in_ball_at": "L boot@2",
+    "boot_in_ball_max_m": 0.004,
+    "boot_in_ball_at": "L boot@14",
     "touch_gap_m": {
      "contact": 0.0044,
      "contact2": 0.0084,
-     "release": 0.0136
+     "release": 0.0088
     }
+   },
+   "stance": {
+    "right": [
+     [
+      0.0,
+      0.1
+     ],
+     [
+      0.18333,
+      0.21667
+     ],
+     [
+      0.3,
+      0.36667
+     ],
+     [
+      0.48333,
+      0.5
+     ]
+    ],
+    "left": [
+     [
+      0.43333,
+      0.483335
+     ]
+    ]
    }
   },
   {
