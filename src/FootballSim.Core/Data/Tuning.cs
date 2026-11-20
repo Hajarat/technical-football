@@ -991,8 +991,11 @@ public sealed class SkillTuning
     public float KnockOnActuation { get; set; } = 0.85f;
     /// <summary>The knock-on waits this long before it fires, so a step-over can start with the same forward flick.</summary>
     public float KnockOnWait { get; set; } = 0.15f;
-    /// <summary>Cancel pressed within this long of the shot starting turns it into a fake shot.</summary>
-    public float FakeShotWindow { get; set; } = 0.1f;
+    /// <summary>
+    /// Cancel pressed any time from the shoot press until this long before the shot's planned strike turns it into a fake shot,
+    /// seconds.
+    /// </summary>
+    public float FakeShotCutoff { get; set; } = 0.05f;
     /// <summary>
     /// Each step of a heel-to-heel or a spin (a flick held, the stick back at neutral, the next flick) comes within this long
     /// of the one before. A sprinting forward flick released to neutral holds its knock-on while the next step may still come.
@@ -1089,10 +1092,11 @@ public sealed class SkillTuning
     public float FeetTurnStepBack { get; set; } = 0.3f;
     public float FeetTurnReachMax { get; set; } = 0.1f;
     /// <summary>
-    /// A fake shot's contact (the fake stop's sole landing, the fake cut's hook) comes this long after the shoot press, seconds:
-    /// until then the shot winds up as a real one (the cancel is not seen before the contact).
+    /// A fake shot's contact (the fake stop's sole landing, the fake cut's hook) comes on the tick the shot's strike was planned
+    /// for when the cancel was read, or this long after the cancel if that is later, seconds: until then the shot winds up as a
+    /// real one (the cancel is not seen before the contact).
     /// </summary>
-    public float FakeContactAfterPress { get; set; } = 0.3f;
+    public float FakeContactAfterCancel { get; set; } = 0.1f;
     /// <summary>The fake cut, from its contact to its end.</summary>
     public float FakeSeconds { get; set; } = 0.1f;
     /// <summary>The fake stop's sole on the ball, from its landing to its end.</summary>

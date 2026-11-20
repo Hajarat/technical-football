@@ -29,8 +29,8 @@ public readonly record struct GestureRead(Gesture Kind, SkillSide Side, Vector2 
 /// while a spin or heel-to-heel could still follow (combo_step_window). Not sprinting, a forward flick does nothing.</item>
 /// <item>Elastico: back, then straight on to a side as for the step-over. Heel-to-heel: from neutral a forward flick, neutral,
 /// then back. Spin: from neutral a forward flick, neutral, then a side. Each step of the last two within combo_step_window.</item>
-/// <item>Fake shot (<see cref="ReadFakeShot"/>): cancel pressed within fake_shot_window of the shot starting; the left stick
-/// released is a fake stop, pushed a fake cut that way.</item>
+/// <item>Fake shot (<see cref="ReadFakeShot"/>): cancel pressed any time from the shoot press until fake_shot_cutoff before the
+/// shot's planned strike; the left stick released is a fake stop, pushed a fake cut that way.</item>
 /// </list>
 /// A skill key skips the stick. Recognised gestures are at least gesture_gap apart. Reading draws no random numbers and changes
 /// nothing but the reader's own state, so a stick at rest leaves the simulation exactly as it was.
@@ -220,17 +220,17 @@ public static class GestureReader
     }
 
     /// <summary>
-    /// The fake shot: cancel pressed (this tick, not the one before) within fake_shot_window of the shot starting, while the
-    /// shot is still under way. The left stick released gives a fake stop; pushed, a fake cut toward it, its side measured
-    /// against the running direction. Call every tick (it tracks the cancel button).
+    /// The fake shot: cancel pressed (this tick, not the one before) while the shot is under way, from the shoot press until
+    /// fake_shot_cutoff before its planned strike. The left stick released gives a fake stop; pushed, a fake cut toward it, its
+    /// side measured against the running direction. Call every tick (it tracks the cancel button).
     /// </summary>
-    /// <param name="shotStartTick">World tick shoot was pressed for the shot under way, or -1.</param>
+    /// <param name="strikeTick">World tick the shot under way is planned to strike on (its published contact), or -1.</param>
     /// <param name="shotUnderWay">True while that shot can still be aborted (charging, or released and not yet struck).</param>
-    public static GestureRead ReadFakeShot(PlayerState p, in TickIntent it, int tick, int shotStartTick, bool shotUnderWay, Tuning t)
+    public static GestureRead ReadFakeShot(PlayerState p, in TickIntent it, int tick, int strikeTick, bool shotUnderWay, Tuning t)
     {
         bool press = it.Cancel && !p.GPrevCancel;
         p.GPrevCancel = it.Cancel;
-        if (!press || !shotUnderWay || shotStartTick < 0 || tick - shotStartTick > Ticks(t.Skill.FakeShotWindow, t)) return GestureRead.None;
+        if (!press || !shotUnderWay || strikeTick < 0 || tick > strikeTick - Ticks(t.Skill.FakeShotCutoff, t)) return GestureRead.None;
         if (tick - p.LastGestureTick < Ticks(t.Skill.GestureGap, t)) return GestureRead.None;
         Vector2 stick = it.Move;
         float len = stick.Length();

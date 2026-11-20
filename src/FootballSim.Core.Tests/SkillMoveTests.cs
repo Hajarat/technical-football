@@ -823,12 +823,19 @@ public class SkillMoveTests
         }, 60, world: w);
     }
 
+    /// <summary>The tick the same shot, never cancelled, is struck on (the trace starts on tick 241).</summary>
+    static int StrikeTick(Entry e, Vector2 left, int shootTicks = 30) =>
+        PlayShot(e, 1000, left, shootTicks).Events.First(x => x.E.Kind == EventKind.Strike).Tick;
+
     [Theory]
     [InlineData(Entry.Standing)]
     [InlineData(Entry.Jog)]
-    public void CancelJustAfterTheShotStartsIsAFakeStop(Entry e)
+    [InlineData(Entry.Sprint)]
+    public void CancelAnyTimeBeforeTheStrikeIsAFakeStop(Entry e)
     {
-        foreach (int at in new[] { 1, 6, 12 })
+        // From the press to 0.05 s (6 ticks) before the strike the shot would have made.
+        int last = StrikeTick(e, Vector2.Zero) - 241 - 6;
+        foreach (int at in new[] { 1, 6, 12, 18, 30, last })
         {
             var o = PlayShot(e, at, Vector2.Zero);
             Assert.Equal(ActionKind.FakeStop, o.Kind);
@@ -843,12 +850,15 @@ public class SkillMoveTests
     [InlineData(1)]
     public void CancelWithTheLeftStickHeldIsAFakeCutThatWay(int side)
     {
-        var o = PlayShot(Entry.Jog, 6, new Vector2(0.5f, side * 0.87f));
-        Assert.Equal(ActionKind.FakeCut, o.Kind);
-        Assert.Equal(side < 0 ? SkillSide.Left : SkillSide.Right, o.Move!.Side);
-        Assert.DoesNotContain(o.Events, x => x.E.Kind == EventKind.Strike);
-        Assert.True(o.Move.BallOutVelocity.Z * side > 0f, "the ball was not cut toward the stick");
-        Assert.True(o.InPossessionAtEnd);
+        foreach (int at in new[] { 6, 18 })
+        {
+            var o = PlayShot(Entry.Jog, at, new Vector2(0.5f, side * 0.87f));
+            Assert.Equal(ActionKind.FakeCut, o.Kind);
+            Assert.Equal(side < 0 ? SkillSide.Left : SkillSide.Right, o.Move!.Side);
+            Assert.DoesNotContain(o.Events, x => x.E.Kind == EventKind.Strike);
+            Assert.True(o.Move.BallOutVelocity.Z * side > 0f, "the ball was not cut toward the stick");
+            Assert.True(o.InPossessionAtEnd);
+        }
     }
 
     [Fact]
@@ -871,46 +881,48 @@ public class SkillMoveTests
         Assert.True(p.InPossession);
     }
 
-    [Fact]
-    public void CancelLaterThanTheWindowLeavesTheShotAlone()
+    [Theory]
+    [InlineData(Entry.Standing)]
+    [InlineData(Entry.Jog)]
+    public void CancelInTheLastTwentiethOfASecondLeavesTheShotAlone(Entry e)
     {
-        var o = PlayShot(Entry.Jog, 13, Vector2.Zero);
+        int strike = StrikeTick(e, Vector2.Zero);
+        var o = PlayShot(e, strike - 241 - 5, Vector2.Zero);
         Assert.Null(o.Kind);
-        Assert.Contains(o.Events, x => x.E.Kind == EventKind.Strike);
+        Assert.Equal(strike, o.Events.First(x => x.E.Kind == EventKind.Strike).Tick);
     }
 
     [Fact]
-    public void AReleasedShotCanStillBeFakedInsideTheWindow()
+    public void AReleasedShotCanStillBeFakedBeforeTheStrike()
     {
-        // Shoot tapped for 3 ticks (released, waiting out the strike delay), cancel at 8 ticks: no strike.
-        var o = PlayShot(Entry.Jog, 8, Vector2.Zero, shootTicks: 3);
-        Assert.Equal(ActionKind.FakeStop, o.Kind);
-        Assert.DoesNotContain(o.Events, x => x.E.Kind == EventKind.Strike);
+        // Shoot tapped for 3 ticks (released, waiting out the strike delay), cancel at 8 and at 30 ticks: no strike.
+        foreach (int at in new[] { 8, 30 })
+        {
+            var o = PlayShot(Entry.Jog, at, Vector2.Zero, shootTicks: 3);
+            Assert.Equal(ActionKind.FakeStop, o.Kind);
+            Assert.DoesNotContain(o.Events, x => x.E.Kind == EventKind.Strike);
+        }
     }
 
     [Theory]
-    [InlineData(Entry.Standing, 0)]
-    [InlineData(Entry.Jog, 0)]
-    [InlineData(Entry.Sprint, 0)]
-    [InlineData(Entry.Jog, 1)]
-    [InlineData(Entry.Jog, -1)]
-    public void AFakesContactComesThreeTenthsOfASecondAfterTheShootPress(Entry e, int side)
+    [InlineData(Entry.Standing, 0, 6)]
+    [InlineData(Entry.Jog, 0, 6)]
+    [InlineData(Entry.Sprint, 0, 6)]
+    [InlineData(Entry.Jog, 1, 6)]
+    [InlineData(Entry.Jog, -1, 6)]
+    [InlineData(Entry.Jog, 0, 18)]
+    [InlineData(Entry.Sprint, 1, 18)]
+    public void AFakesContactComesWhenTheStrikeWouldHave(Entry e, int side, int cancelAt)
     {
-        // Shoot pressed on tick 241 (the trace's first tick), cancel 6 ticks later: the fake's contact 0.30 s after the press,
-        // the fake stop's sole on the ball 0.15 s, the fake cut's 0.10 s, a touch raised at the contact.
+        // Shoot pressed on tick 241 (the trace's first tick): the fake's contact on the tick the same shot would have been struck
+        // on, the fake stop's sole on the ball 0.15 s, the fake cut's 0.10 s, a touch raised at the contact.
         var left = side == 0 ? Vector2.Zero : new Vector2(0.5f, side * 0.87f);
-        var w = Field();
-        var o = Play(e, (i, it) =>
-        {
-            if (i >= 1) { it.MoveX = left.X; it.MoveZ = left.Y; }
-            it.ShootHeld = i < 30;
-            it.Cancel = i is >= 6 and < 9;
-            return it;
-        }, 60, world: w);
+        int strike = StrikeTick(e, left);
+        var o = PlayShot(e, cancelAt, left);
         var m = o.Move!;
         Assert.Equal(side == 0 ? ActionKind.FakeStop : ActionKind.FakeCut, o.Kind);
         Assert.Equal(241, m.StartTick);
-        Assert.Equal(241 + 36, m.ContactTick);
+        Assert.Equal(strike, m.ContactTick);
         Assert.Equal(m.ContactTick, o.MoveStart);
         Assert.Equal(m.ContactTick, m.ExecuteTick);
         Assert.Equal(side == 0 ? 18 : 12, m.EndTick - m.ContactTick);
@@ -918,6 +930,21 @@ public class SkillMoveTests
         Assert.Contains(o.Events, x => x.E.Kind == EventKind.Touch && x.Tick == m.ContactTick);
         Assert.DoesNotContain(o.Events, x => x.E.Kind == EventKind.Strike);
         Assert.False(o.Lost);
+        Assert.True(o.InPossessionAtEnd);
+    }
+
+    [Theory]
+    [InlineData(Entry.Standing)]
+    [InlineData(Entry.Jog)]
+    public void ALateCancelsContactComesATenthOfASecondAfterIt(Entry e)
+    {
+        // Cancel 8 ticks before the strike: the fake's contact 12 ticks after the cancel, the shot never struck.
+        int strike = StrikeTick(e, Vector2.Zero);
+        int cancel = strike - 8;
+        var o = PlayShot(e, cancel - 241, Vector2.Zero);
+        Assert.Equal(ActionKind.FakeStop, o.Kind);
+        Assert.Equal(cancel + 12, o.Move!.ContactTick);
+        Assert.DoesNotContain(o.Events, x => x.E.Kind == EventKind.Strike);
         Assert.True(o.InPossessionAtEnd);
     }
 
@@ -961,10 +988,18 @@ public class SkillMoveTests
                 Assert.Equal(real.Ball.Position, fake.Ball.Position);
                 if (i >= 0) Assert.True(fake.Attacker.Action is { IsShot: true, Made: false }, $"tick {tick}: no shot wind-up shown");
             }
-            Assert.Equal(241 + 36, contact);
             // From the contact the fake is seen: the shot is gone.
             Assert.False(fake.Attacker.Action is { IsShot: true });
             Assert.True(real.Attacker.Action is { IsShot: true });
+            // The contact came on the tick the real shot is struck on.
+            int strike = real.Events.Any(x => x.Kind == EventKind.Strike) ? real.Tick : -1;
+            for (int tick = real.Tick + 1; tick <= 500 && strike < 0; tick++)
+            {
+                buf[0] = Run(e, tick);
+                real.Step(buf);
+                if (real.Events.Any(x => x.Kind == EventKind.Strike)) strike = real.Tick;
+            }
+            Assert.Equal(strike, contact);
         }
     }
 

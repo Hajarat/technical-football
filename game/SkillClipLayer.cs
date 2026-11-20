@@ -59,6 +59,8 @@ public sealed class SkillClipLayer
     float _wAlt, _altU, _altWant;
     /// <summary>Seconds a crossover between the two endings takes.</summary>
     public const float EndingBlend = 0.05f;
+    /// <summary>A fake shot is drawn as the real shot's wind-up until this long before its contact; its clip checks the swing from there.</summary>
+    public const float FakeCheckSeconds = 0.10f;
     float _wRun, _t, _ct, _shotElapsed = float.NaN, _prevSpeed = float.NaN;
     SkillTimeMap? _map;
     BootSurface _surface;
@@ -163,9 +165,9 @@ public sealed class SkillClipLayer
         _planted[0] = _planted[1] = false;
         if (teleport) Reset();
 
-        // the move under way, or a fake shot the core has read but not made yet: its clip takes over from the shot's wind-up on the
-        // tick the cancel is read (the shot draws the leg until then, the clip from then on)
-        var s = f.Skill.Valid ? f.Skill : f.PendingSkill;
+        // the move under way, or a fake shot the core has read but not made yet: the shot's wind-up (run-up, plant, backswing) is
+        // drawn until FakeCheckSeconds before the fake's contact, then its clip checks the swing into the stop or the hook
+        var s = f.Skill.Valid ? f.Skill : f.PendingSkill.Valid && f.PendingSkill.ContactElapsed >= -FakeCheckSeconds - 1e-4f ? f.PendingSkill : default;
         bool covers = Covers(s);
         // (a fake whose strike foot changes before its contact starts again on the new foot, from the pose shown)
         if (covers && (s.Id != _moveId || _playing && (s.Right ? 1 : 0) != _foot)) { Start(f, s, sc); for (int i = 0; i < 2; i++) { _twBlocked[i] = tw[i] > 0f; _twS[i] = 0f; } }
@@ -246,8 +248,8 @@ public sealed class SkillClipLayer
         float speed = float.IsNaN(_prevSpeed) ? new Vector2(f.Velocity.X, f.Velocity.Z).Length() : _prevSpeed;
         _wRun = SkillEntryBlend.RunWeight(speed, _stand.EntrySpeed, _run.EntrySpeed);
         float simContact = s.Elapsed - s.ContactElapsed, simEnd = s.Duration;
-        // a fake shot's wind-up began at the shot's press: the time since then counts as gone (read before its contact, the clip
-        // begins on this tick and reaches its contact on the core's contact tick)
+        // a fake shot's wind-up began at the shot's press: the time since then counts as gone (still pending, the clip begins on
+        // this tick, FakeCheckSeconds before the contact, part way into its own wind-up, and reaches its contact on the core's)
         _pending = !f.Skill.Valid;
         float origin = _pending ? Math.Max(0f, s.Elapsed - f.Dt) : float.IsNaN(_shotElapsed) ? 0f : -Math.Max(0f, _shotElapsed + f.Dt - s.Elapsed);
         var c = _stand;
