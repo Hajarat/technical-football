@@ -664,8 +664,9 @@ public static class TouchPlanner
     }
 
     /// <summary>The side a ball is turned to toward <paramref name="wanted"/> against its travel (it picks the foot's inside or outside).</summary>
-    static float TurnSign(Vector3 wanted, Ball ball) =>
-        MathF.Sign(Movement.WrapAngle(MathF.Atan2(wanted.Z, wanted.X) - MathF.Atan2(ball.Velocity.Z, ball.Velocity.X)));
+    static float TurnSign(Vector3 wanted, Ball ball) => TurnSign(wanted, ball.Velocity);
+    internal static float TurnSign(Vector3 wanted, Vector3 ballVelocity) =>
+        MathF.Sign(Movement.WrapAngle(MathF.Atan2(wanted.Z, wanted.X) - MathF.Atan2(ballVelocity.Z, ballVelocity.X)));
 
     /// <summary>The stick a committed touch is played with: the stick now, or the stick at the commit when it has been released since.</summary>
     static TickIntent CommittedStick(BallAction a, in TickIntent intent, Tuning t)
@@ -935,7 +936,7 @@ public static class TouchPlanner
         UpdatePhases(p, tick, t);
     }
 
-    static ActionKind ModeKind(TouchMode m) => m switch
+    internal static ActionKind ModeKind(TouchMode m) => m switch
     {
         TouchMode.CloseControl => ActionKind.Close,
         TouchMode.Jog => ActionKind.Jog,
@@ -943,7 +944,7 @@ public static class TouchPlanner
     };
 
     /// <summary>The foot surface for a kind; a turn is played with the outside of the foot on the side it turns to.</summary>
-    static FootSurface SurfaceFor(ActionKind kind, Foot foot, float turnSign) => kind switch
+    internal static FootSurface SurfaceFor(ActionKind kind, Foot foot, float turnSign) => kind switch
     {
         ActionKind.Stop or ActionKind.Soft => FootSurface.Sole,
         ActionKind.Sprint or ActionKind.KnockOn or ActionKind.Heavy => FootSurface.Laces,

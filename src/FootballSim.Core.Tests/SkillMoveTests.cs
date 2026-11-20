@@ -897,6 +897,111 @@ public class SkillMoveTests
         }
     }
 
+    [Theory]
+    [InlineData(Entry.Standing, 0)]
+    [InlineData(Entry.Jog, 0)]
+    [InlineData(Entry.Sprint, 0)]
+    [InlineData(Entry.Jog, 1)]
+    [InlineData(Entry.Sprint, -1)]
+    public void AFakeIsPublishedFromTheCancelAsTheMoveItWillBe(Entry e, int side)
+    {
+        // From the tick the cancel is read to the tick before the fake's contact the core publishes the pending move; on the contact
+        // tick the move made is that one (same start, foot, surface, side, contact and end) and the pending one is gone.
+        var left = side == 0 ? Vector2.Zero : new Vector2(0.5f, side * 0.87f);
+        var w = Field();
+        var buf = new TickIntent[w.PlayerCount];
+        BallAction? last = null;
+        int first = -1;
+        for (int tick = 1; tick <= 400; tick++)
+        {
+            int i = tick - 241;
+            var it = Run(e, tick);
+            if (i >= 0)
+            {
+                if (i >= 1 && side != 0) { it.MoveX = left.X; it.MoveZ = left.Y; }
+                it.ShootHeld = i < 15;
+                it.Cancel = i is >= 6 and < 9;
+            }
+            buf[0] = it;
+            w.Step(buf);
+            var pending = w.Attacker.PendingSkill;
+            if (w.Events.Any(x => x.Kind == EventKind.SkillMove))
+            {
+                Assert.Null(pending);
+                var m = w.Attacker.SkillMove!;
+                Assert.NotNull(last);
+                Assert.Equal(last!.Kind, m.Kind);
+                Assert.Equal(last.Foot, m.Foot);
+                Assert.Equal(last.Surface, m.Surface);
+                Assert.Equal(last.Side, m.Side);
+                Assert.Equal(last.StartTick, m.StartTick);
+                Assert.Equal(last.ContactTick, m.ContactTick);
+                Assert.Equal(last.EndTick, m.EndTick);
+                Assert.Equal(241 + 6, first);
+                return;
+            }
+            if (i < 6) Assert.Null(pending);
+            else
+            {
+                Assert.NotNull(pending);
+                Assert.True(w.Attacker.Action is { IsShot: true, Made: false });
+                if (first < 0) first = tick;
+                last = pending;
+            }
+        }
+        Assert.Fail("no fake made");
+    }
+
+    [Theory]
+    [InlineData("ball_roll", Entry.Jog, 1)]
+    [InlineData("ball_roll", Entry.Standing, -1)]
+    [InlineData("elastico", Entry.Jog, 1)]
+    [InlineData("elastico", Entry.Sprint, -1)]
+    [InlineData("elastico", Entry.Standing, 1)]
+    [InlineData("spin", Entry.Jog, 1)]
+    [InlineData("spin", Entry.Sprint, -1)]
+    [InlineData("drag_back", Entry.Jog, 0)]
+    public void TheExitTouchIsForecastAsItIsMade(string move, Entry e, int side)
+    {
+        // With the stick pushed on through the move's end: the exit touch forecast on the tick before the end is the touch the
+        // controller takes on the end tick (its plan tick and foot); made at once, it is the one forecast (kind, surface, contact
+        // tick) where the forecast put the ball. With none forecast then, no touch is made at once.
+        var (trace, kind) = TraceFor(move, side);
+        var w = Field();
+        var buf = new TickIntent[w.PlayerCount];
+        BallAction? forecast = null, move0 = null;
+        ActionKind? made = null;
+        for (int tick = 1; tick <= 240 + 80 + 120; tick++)
+        {
+            var it = Run(e, tick);
+            int i = tick - 1 - 240;
+            if (i >= 0 && i < 80) it = trace(i, it);
+            if (i >= 0 && it.MoveX == 0f && it.MoveZ == 0f) it.MoveX = 1f;
+            buf[0] = it;
+            w.Step(buf);
+            var a = w.Attacker;
+            foreach (var ev in w.Events) if (ev.Kind == EventKind.SkillMove && made == null) { made = ev.Skill; move0 = a.SkillMove; }
+            if (move0 == null) continue;
+            if (w.Tick == move0.EndTick - 1) forecast = a.SkillExitTouch;
+            if (w.Tick == move0.EndTick)
+            {
+                var t = a.TouchAction;
+                bool immediate = t is { Made: true } && t.PlanTick == w.Tick && t.ContactTick == w.Tick && !t.IsSkill;
+                if (forecast == null) { Assert.False(immediate, "an exit touch made at once with none forecast"); break; }
+                // (the controller may commit the exit touch with a windup on the end tick instead: the same plan tick and foot)
+                Assert.True(t is { PlanTick: var pt } && pt == forecast.PlanTick && !t.IsSkill, "no exit touch on the end tick where one was forecast");
+                Assert.Equal(forecast.Foot, t!.Foot);
+                if (!immediate) break;
+                Assert.Equal(forecast.Kind, t.Kind);
+                Assert.Equal(forecast.Surface, t.Surface);
+                Assert.Equal(forecast.ContactTick, t.ContactTick);
+                Assert.InRange(TouchModel.HorizontalDistance(forecast.ContactPoint, t.ContactPoint), 0f, 0.01f);
+                break;
+            }
+        }
+        Assert.Equal(kind, made);
+    }
+
     // ---- ordinary dribbling never triggers ----
 
     public static IEnumerable<object[]> OrdinaryTraces() => Enumerable.Range(0, 10).Select(i => new object[] { i });

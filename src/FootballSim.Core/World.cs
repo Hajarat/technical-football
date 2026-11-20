@@ -25,6 +25,7 @@ public sealed class World
     float _charge;
     bool _latchFinesse, _latchChip, _latchDriven;
     Vector2 _lastStick;
+    TickIntent _lastIntent;    // the attacker's intent on the latest tick (for the view's exit-touch forecast only)
     Vector2 _lastPushedStick;  // the latest left stick outside the dead zone, for the aim lock
     int _lastPushedTick;
     PendingShot _pending;      // a released shot waiting for its strike
@@ -183,7 +184,7 @@ public sealed class World
         Clock = 0f; ShotCharge = 0f; Tick = 0; SimTime = 0f;
         Report = null;
         _events.Clear(); _shots.Clear(); _diagnostics.Clear();
-        _shootWasHeld = false; _charge = 0f; _latchFinesse = _latchChip = _latchDriven = false; _lastStick = default;
+        _shootWasHeld = false; _charge = 0f; _latchFinesse = _latchChip = _latchDriven = false; _lastStick = default; _lastIntent = default;
         _lastPushedStick = default; _lastPushedTick = int.MinValue / 2;
         _pending = default; _outcomeLeft = 0f;
         _liveSeconds = 0f; _endTick = 0; _endClock = 0f; _lastShot = null;
@@ -257,6 +258,8 @@ public sealed class World
         p.NextTouchEta = float.NaN;
         p.NextTouchFoot = p.Sheet.PreferredFoot;
         p.NextTouchPoint = Vector3.Zero;
+        p.PendingSkill = null;
+        p.SkillExitTouch = null;
         p.StrikeEta = float.NaN;
         p.StrikeFoot = p.Sheet.PreferredFoot;
         p.LastTouchFoot = p.Sheet.PreferredFoot;
@@ -468,6 +471,7 @@ public sealed class World
         var p = Attacker;
         var tuning = Tuning;
         _lastStick = it.Move;
+        _lastIntent = it;
         if (it.Move.Length() >= tuning.Movement.StickDeadZone) { _lastPushedStick = it.Move; _lastPushedTick = Tick; }
         bool inPossession = _controller == p;
 
@@ -781,6 +785,10 @@ public sealed class World
                 shot.ContactPoint = new Vector3(at.X, Ball.Radius, at.Z);
             }
         }
+        // A fake shot read and waiting for its contact: the move it will be, for the view to draw from the cancel on.
+        a.PendingSkill = _fakeTick > Tick && a.ShotAction is { Made: false } && a.SkillAction == null
+            ? SkillMoves.PendingFake(a, _fake, _shotStartTick, _fakeTick, Tick, Ball, Tuning) : null;
+        a.SkillExitTouch = State == RoundState.Live && _controller == a ? SkillMoves.ExitForecast(a, _lastIntent, Ball, Tick, Tuning) : null;
         IdealCharge = ShotModel.IdealCharge(ShotModel.GoalDistance(Ball.Position, Pitch), Tuning);
         if (State == RoundState.Live && _controller == a)
         {

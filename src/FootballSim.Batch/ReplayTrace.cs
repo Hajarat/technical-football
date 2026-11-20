@@ -98,7 +98,7 @@ static class ReplayTrace
                 // steering against the run (|v| = |run*fwd + steer|).
                 string src = MathF.Abs(dRun) > SpeedSteps.Threshold ? (dRun < 0 ? "run-" : "run+") : dSt > SpeedSteps.Threshold ? "steer" : "mix";
                 string pend = a is { Pending: true } ? $"{kind}/{legs}/{phase}" : $"none(last {LastTouchKind.GetValue(p)})";
-                string key = $"{src} {(skill || skillBefore ? "skill " : "")}{pend}{(p.Chasing ? " chasing" : "")}{(debt > 0 ? " debt" : "")}{(skillBefore ? " skill-ended" : "")}{(touched ? " touch" : "")}";
+                string key = $"{src} {(p.SkillMove is { FeetTurn: true } ? "feet-turn " : skill || skillBefore ? "skill " : "")}{pend}{(p.Chasing ? " chasing" : "")}{(debt > 0 ? " debt" : "")}{(skillBefore ? " skill-ended" : "")}{(touched ? " touch" : "")}";
                 cause[key] = cause.GetValueOrDefault(key) + 1;
             }
             if (!quiet && tick >= from && (to < 0 || tick <= to))
@@ -111,7 +111,7 @@ static class ReplayTrace
                     F(dRun, 1).PadLeft(7), F(dSt, 1).PadLeft(6), F(dspd, 1).PadLeft(6), "|", F(new Vector2(p.SteerVelocity.X, p.SteerVelocity.Z).Length()).PadLeft(5), "|",
                     F(Vector2.Dot(rel, fwd)).PadLeft(5), F(TouchModel.Lateral(p.Position, p.Facing, w.Ball.Position)).PadLeft(5),
                     F(new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z).Length()).PadLeft(5), "|",
-                    (skill ? "SKILL:" + p.SkillMove?.Kind : kind).PadRight(9), phase.PadRight(9), legs.PadRight(8), F(p.NextTouchEta).PadLeft(5),
+                    (p.SkillMove is { FeetTurn: true } ? "FeetTurn" : skill ? "SKILL:" + p.SkillMove?.Kind : kind).PadRight(9), phase.PadRight(9), legs.PadRight(8), F(p.NextTouchEta).PadLeft(5),
                     F(debt).PadLeft(5), (post ? "P" : ".").PadLeft(3), F(tau).PadLeft(5), "|",
                     dropped ? "UNPLAYED" : "", touched ? "TOUCH " + w.Events.First(e => e.Kind == EventKind.Touch).ToString() : "", isStep ? "<STEP" : "", !measured ? "(unmeasured)" : "",
                 }));

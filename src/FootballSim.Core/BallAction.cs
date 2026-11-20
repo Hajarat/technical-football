@@ -202,12 +202,15 @@ public sealed class BallAction
 
     /// <summary>For a skill move, the unit ground direction (X, Z) the player was running in when it started; zero for touches.</summary>
     public Vector2 RunDirection => IsSkill ? HoldDirection : Vector2.Zero;
+    /// <summary>
+    /// A <see cref="ActionKind.DragBack"/> started by the touch controller as its own turn at the feet, not a skill gesture of the
+    /// player's (no chain, cooldown or exit burst of a skill move, and its own short timing).
+    /// </summary>
+    public bool FeetTurn { get; internal set; }
 
     // ---- touch controller state ----
     /// <summary>For a skill move, the unit ground direction (X, Z) the player was running in when it started.</summary>
     internal Vector2 HoldDirection;
-    /// <summary>A drag-back started by the touch controller as a turn at the feet (no chain, cooldown or exit burst of a skill move).</summary>
-    internal bool FeetTurn;
     /// <summary>The stick when the touch was committed (zero: released); at contact the ball is played within 30 degrees of it.</summary>
     internal Vector2 CommitMove;
     /// <summary>The stick at contact was more than 30 degrees from <see cref="CommitMove"/> and the touch was played at that limit.</summary>
