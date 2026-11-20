@@ -136,6 +136,8 @@ public sealed class PlayerState
     /// within reach at an eligible swing), false while they follow the stick.
     /// </summary>
     public bool Chasing { get; internal set; }
+    /// <summary>How eagerly he goes for a loose ball this tick (see <see cref="Core.Regain"/>); None in possession.</summary>
+    public RegainMode Regain { get; internal set; }
 
     // ---- Skill moves (phase B). ----
 

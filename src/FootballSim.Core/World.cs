@@ -39,6 +39,7 @@ public sealed class World
     PlayerState? _controller;  // who controls the ball, or null when it is loose
     float _awayFor;            // seconds the ball has been beyond the controller's lose distance
     bool _softPending;         // shoot pressed with the ball at the feet: the soft touch is still to be made
+    bool _ballPlayed;          // someone has controlled or struck the ball this round: a loose ball from now on was lost
     bool _shotAtFoot;          // shoot pressed with the ball at the feet: struck at the earliest strike tick if strikable then
     Foot _strikeFoot;          // foot decided at the press for a ball at the feet (else the swinging foot, once struck)
     int _strikeEstMax = -1;    // the latest strike tick published for the shot under way (the estimate never moves earlier)
@@ -139,6 +140,8 @@ public sealed class World
     public PlayerState Keeper => Teams[1][0];
     /// <summary>The player who controls the ball (dribbling it, or the keeper holding it), or null when the ball is loose.</summary>
     public PlayerState? BallController => _controller;
+    /// <summary>True once someone has controlled or struck the ball this round: a loose ball from then on was lost (see Regain).</summary>
+    public bool BallPlayed { get => _ballPlayed; internal set => _ballPlayed = value; }
     /// <summary>The keeper's numbers for the latest shot.</summary>
     public KeeperReport KeeperReport => _brain.Report;
     /// <summary>Why the keeper did what he did on the latest tick (a diagnostic for probes; changes nothing).</summary>
@@ -188,13 +191,14 @@ public sealed class World
         _lastPushedStick = default; _lastPushedTick = int.MinValue / 2;
         _pending = default; _outcomeLeft = 0f;
         _liveSeconds = 0f; _endTick = 0; _endClock = 0f; _lastShot = null;
-        _controller = null; _awayFor = 0f; _softPending = false; _shotAtFoot = false; _strikeFoot = Foot.Right;
+        _controller = null; _awayFor = 0f; _softPending = false; _ballPlayed = Scenario.BallLoose; _shotAtFoot = false; _strikeFoot = Foot.Right;
         _shotStartTick = -1; _shotCancelled = false; _strikeEstMax = -1; _fakeTick = -1; _fake = default;
 
         float r = Tuning.Ball.Radius;
         Ball.Position = new Vector3(Scenario.Ball.X, r, Scenario.Ball.Z);
-        Ball.Velocity = Vector3.Zero;
-        Ball.Spin = Vector3.Zero;
+        float heading = Scenario.BallHeadingDeg * MathF.PI / 180f;
+        Ball.Velocity = new Vector3(MathF.Cos(heading), 0f, MathF.Sin(heading)) * Scenario.BallSpeed;
+        Ball.Spin = Scenario.BallSpeed > 0f ? Ball.RollingSpin(Ball.Velocity) : Vector3.Zero;
 
         var team0 = Teams[0];
         var team1 = Teams[1];
@@ -277,6 +281,7 @@ public sealed class World
         p.StunUntil = -100f;
         p.ActionContactEta = float.NaN;
         p.Chasing = false;
+        p.Regain = RegainMode.None;
         p.LastTouchKind = ActionKind.First;
         p.KnockOnRequested = false;
         p.StepsSinceTouch = 0;
@@ -513,6 +518,11 @@ public sealed class World
 
         // From the press to the strike the controller's go-get-it legs run on to the ball (the left stick only aims).
         bool windup = State == RoundState.Live && shootHeld || State == RoundState.Strike && _pending.Active;
+        // A lost ball in front of him in live play, no shot under way: he goes for it (see Regain). A ball loose at the start
+        // of the round (on the spot) is not lost: he stands by it until he plays it.
+        p.Regain = State == RoundState.Live && _ballPlayed && !windup && !_shootWasHeld && !_pending.Active && p.ShotAction == null
+            && _controller == null && !TouchPlanner.Stunned(p, SimTime)
+            ? Regain.Assess(p, it, Ball, Keeper, tuning) : RegainMode.None;
         var assist = TouchPlanner.BeginTick(p, it, Ball, inPossession, State == RoundState.Live || windup, Tick, SimTime, tuning, Pitch, out var legs);
         Movement.Step(p, legs, _dt, SimTime, assist, tuning, Pitch);
 
@@ -754,6 +764,7 @@ public sealed class World
         _awayFor = 0f;
         if (p != null)
         {
+            _ballPlayed = true;
             p.InPossession = true;
             _events.Add(new SimEvent(EventKind.PossessionGained, Ball.Position, speed, Team: p.Team, PlayerIndex: p.Index));
         }
@@ -873,6 +884,7 @@ public sealed class World
         _shots.Add(result);
         _lastShot = result;
         _pending = default;
+        _ballPlayed = true;
         _events.Add(new SimEvent(EventKind.Strike, Ball.Position, result.Speed, Foot: result.Foot, Team: Attacker.Team, PlayerIndex: Attacker.Index));
         SetController(null); // a struck ball is nobody's
         _brain.OnStrike(_keeperRng, Ball);

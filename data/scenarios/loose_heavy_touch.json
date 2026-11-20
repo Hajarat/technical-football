@@ -1,0 +1,30 @@
+{
+  "id": "loose_heavy_touch",
+  "name": "Loose ball: heavy touch",
+  "default_attacker": "striker_a",
+  "default_keeper": "the_wall",
+  "team_size": 1,
+  "ball": {
+    "x": 15.0,
+    "z": 0
+  },
+  "ball_speed": 3.5,
+  "ball_heading_deg": 0,
+  "ball_loose": true,
+  "attacker": {
+    "x": 12.0,
+    "z": 0,
+    "facing_deg": 0
+  },
+  "keeper_on_line": false,
+  "clock_limit": 20,
+  "shoot_distance": 12,
+  "pitch": {
+    "length": 30.0,
+    "width": 20.0,
+    "goal_width": 7.32,
+    "goal_height": 2.44,
+    "penalty_area_depth": 16.5,
+    "penalty_area_width": 40.32
+  }
+}

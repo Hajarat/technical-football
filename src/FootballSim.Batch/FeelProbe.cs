@@ -233,7 +233,7 @@ static class FeelProbe
                 F(Vector2.Dot(rel, fwd)).PadLeft(10), F(TouchModel.Lateral(p.Position, p.Facing, w.Ball.Position)).PadLeft(8),
                 F(new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z).Length()).PadLeft(6),
                 (a == null ? "-" : a.Kind.ToString()).PadRight(12), (a == null ? "-" : a.Phase.ToString()).PadRight(9),
-                (p.Chasing ? "Chase" : "Stick").PadRight(8),
+                (p.Regain == RegainMode.Free ? "Regain" : p.Regain == RegainMode.Contested ? "Race" : p.Chasing ? "Chase" : "Stick").PadRight(8),
                 F(p.NextTouchEta).PadLeft(5), touched ? "TOUCH" : "",
             }));
         }
