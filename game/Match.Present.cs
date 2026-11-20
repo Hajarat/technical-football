@@ -267,6 +267,8 @@ public partial class Match
             _shotId = shot.PlanTick;
             Hud.ShowShotType(shot.Kind switch { ActionKind.Finesse => "FINESSE", ActionKind.Chip => "CHIP", ActionKind.Driven => "DRIVEN", ActionKind.LowFinesse => "LOW FINESSE", _ => "POWER" });
         }
+        // a fake shot: the shot's name goes from the tick the core publishes the pending fake (the cancel read)
+        if (w.Attacker.PendingSkill != null || w.Attacker.SkillMove is { Kind: ActionKind.FakeCut or ActionKind.FakeStop }) Hud.HideShotType();
         Hud.SetClock(w.Clock);
         if (w.State == RoundState.Report && w.Report != null)
             Hud.ShowReport(ReportText.Title(w.Report), ReportText.Lines(w.Report));

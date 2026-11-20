@@ -141,6 +141,13 @@ public partial class Hud : CanvasLayer
         _shotTypeLeft = seconds;
     }
 
+    /// <summary>Hides the shot type's name at once (a fake shot: the shot was cancelled).</summary>
+    public void HideShotType()
+    {
+        _shotType.Visible = false;
+        _shotTypeLeft = 0f;
+    }
+
     /// <summary>Clock in seconds, shown as "11.4 s".</summary>
     public void SetClock(float seconds) => _clock.Text = seconds.ToString("0.0", CultureInfo.InvariantCulture) + " s";
 
