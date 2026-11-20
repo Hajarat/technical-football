@@ -255,7 +255,7 @@ speed he came in at (0 at the standing clip's entry speed, 1 at the running clip
 follows the core's ticks: its `start`→`contact` span plays over the move's start→contact tick (a step-over's or feint's contact is its middle
 tick; a fake shot is drawn as the real shot's wind-up until 0.10 s before its contact, and its clip starts there, part way in), `contact`→`release` over contact→end tick (with the
 spin's `lift` and the second contact `contact2` of the elastico, spin and heel-to-heel on their ticks), and `release`→`end` in real time after the end tick (the settle), through a monotone cubic, so
-each event lands on its tick and the rate changes smoothly from one span to the next. A reach the core makes more than 1.5 times shorter than
+each event lands on its tick and the rate changes smoothly from one span to the next; the standing and running clips each have their own map (a running clip may have its own spans, as the running spin's swap at the core's 0.05 s), so the two are blended at the same event on the same tick. A reach the core makes more than 1.5 times shorter than
 the clip's starts the clip part way in (a fake shot counts its wind-up from the shot's press). The pose relative to the clip's root (a straight
 line under its hips from first frame to last, heading fixed at its first frame, so a turn the clip makes is kept; for the spin the clip's
 own heading is taken out, since the simulation's facing makes the 360 degrees) is put on the simulation's position and facing. The hand-in from the cycles or the standing pose and the hand-back at the clip's end are inertialised (each bone's
@@ -271,7 +271,7 @@ spans, not read off its motion: such a foot is taken from the hand-in's offset o
 (stepping into place at up to 6 m/s, lifted on the way), held from its first stance tick where the clip's foot stands then, and follows
 the clip's own foot from then on, its hops and landings as authored (at the take-off the drift between the simulation's travel and the
 clip's root, carried from the spot it stood on, dies away over 0.14 s). A running clip with a second ending (the clip of the same name
-with `_swap`: the ball roll's support foot swinging into the exit touch instead of standing under it) is crossed over to it in 0.05 s
+with `_swap`: the ball roll's support foot swinging into the exit touch instead of standing under it; the step-over's and spin's) is crossed over to it in 0.05 s
 while the exit touch the core forecasts is the support foot's, and back when it is not. A touch the figure draws after
 the move began (the exit touch) takes its leg by the touch's weight, so its boot meets the ball on the contact tick as any touch; made by
 the foot that made a touch of the move's own (a fake cut's exit touch, 0.1 s after the hook), its leg moves at most 0.06 m a tick against the

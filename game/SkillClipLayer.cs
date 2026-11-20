@@ -716,12 +716,12 @@ public sealed class SkillClipLayer
                 target = NVec3.Lerp(target, baseGp![foot], twi);
                 gFoot = TurnFoot(i, gFoot, _baseG[foot], twi);
                 // the exit touch winding up for its contact on the move's end tick, made by a foot that made a touch of the move's own
-                // (a fake cut's hook 0.1 s before, an elastico's push): its leg moves at most TouchStepMax a tick against the
+                // (a fake cut's hook 0.1 s before, an elastico's push, a spin's sole): its leg moves at most TouchStepMax a tick against the
                 // hips (or evenly faster when the contact is due sooner than that would arrive) and reaches at most TouchReach of its
                 // length, and its foot turns toward the touch's own turn ahead of the touch's weight (all of it by TouchTurnLead) at most
                 // TouchTurnMax a tick: the figure's own wind-up can whip the boot back and round faster than the clip's body allows. The
                 // contact is drawn where the touch has it.
-                bool due = twi < 0.999f && f.Skill.Valid && f.Skill.Id == _moveId && OwnTouchFoot(i);
+                bool due = twi < 0.999f && f.Skill.Valid && f.Skill.Id == _moveId && (OwnTouchFoot(i) || SoleSwapFoot(i));
                 if (due)
                 {
                     if (!_twLim[i]) { _twLimP[i] = pre - _outP[0]; _twLimR[i] = preRot; _twLim[i] = true; }
@@ -729,10 +729,10 @@ public sealed class SkillClipLayer
                     var d = target - _outP[0] - _twLimP[i];
                     float len = d.Length(), step = Math.Max(TouchStepMax / sc, len / (left + 1f));
                     if (len > step) target = _outP[0] + _twLimP[i] + d * (step / len);
-                    // over the last TouchCatchTicks the leg goes straight for where the figure's windup has the ankle at the contact, an
+                    // over the last TouchCatchTicks (a spin: SpinCatchTicks) the leg goes straight for where the figure's windup has the ankle at the contact, an
                     // even share of the way each tick: the windup's own weights speed up at their end (standing, the hook's pose fading as
                     // the touch's comes in), which would leave the leg the last two ticks' worth of way to cover in one
-                    if (left <= TouchCatchTicks && _tcHave[i])
+                    if (left <= (SoleSwapFoot(i) ? SpinCatchTicks : TouchCatchTicks) && _tcHave[i])
                     {
                         var aim = M(_tcAnk[i], sc);
                         var cur = _outP[0] + _twLimP[i];
@@ -888,6 +888,8 @@ public sealed class SkillClipLayer
     const float TouchStepMax = 0.06f, TouchReach = 0.96f, TouchTurnMax = 0.24f, TouchTurnLead = 0.4f;
     /// <summary>Over its last this many ticks the exit touch's windup goes evenly for the ankle at its contact (see <see cref="SetTouchContact"/>).</summary>
     const float TouchCatchTicks = 3f;
+    /// <summary>The same for a spin's exit touch, whose leg starts it further from the contact (the figure's windup out of the turn swings from a metre behind him).</summary>
+    const float SpinCatchTicks = 6f;
     readonly bool[] _tcHave = new bool[2];
     readonly Vector3[] _tcAnk = new Vector3[2];
     /// <summary>Foot <paramref name="i"/>'s ankle (world) at the contact of the touch the figure winds up for now, or none.</summary>
@@ -928,6 +930,18 @@ public sealed class SkillClipLayer
     bool OwnTouchFoot(int i)
     {
         foreach (var q in _pins) if (q.Foot == i && q.From == q.To) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Whether foot <paramref name="i"/> had the ball under its sole in a spin (its soles take turns on the ball): its exit touch winds
+    /// up as a touch of the move's own does (the figure's own wind-up out of a spin swings the boot from a metre behind him at nearly
+    /// 30 m/s).
+    /// </summary>
+    bool SoleSwapFoot(int i)
+    {
+        if (_move != "spin") return false;
+        foreach (var q in _pins) if (q.Foot == i && q.To > q.From) return true;
         return false;
     }
 
