@@ -261,6 +261,50 @@ public static class SkillMoves
         return Start(p, ActionKind.DragBack, SkillSide.None, dir, ball, tick, now, t, feetTurn: true);
     }
 
+    /// <summary>The part of the foot a move plays the ball with.</summary>
+    static FootSurface SurfaceFor(ActionKind kind, SkillSide side, Foot foot) => kind switch
+    {
+        ActionKind.BallRoll or ActionKind.DragBack or ActionKind.FakeStop or ActionKind.Spin => FootSurface.Sole,
+        ActionKind.Elastico => FootSurface.Outside,
+        ActionKind.HeelToHeel => FootSurface.Heel,
+        // A hook toward the foot's own side is played with the outside of the foot.
+        ActionKind.FakeCut => (side == SkillSide.Right) == (foot == Foot.Right) ? FootSurface.Outside : FootSurface.Inside,
+        ActionKind.StepOver => FootSurface.Outside,
+        _ => FootSurface.Inside,
+    };
+
+    /// <summary>A fake stop's or fake cut's length from its contact, seconds.</summary>
+    static float FakeSeconds(ActionKind kind, Tuning t) => kind == ActionKind.FakeStop ? t.Skill.FakeStopSeconds : t.Skill.FakeSeconds;
+
+    /// <summary>
+    /// The move a fake shot read on the cancel will be when it is made on <paramref name="contactTick"/> (see
+    /// <see cref="PlayerState.PendingSkill"/>), as <see cref="Start"/> would make it if it started now: the shot's strike foot, its
+    /// surface, the shoot press as its start, its contact and end ticks, the ball rolled on to the contact as its contact point.
+    /// Changes no state.
+    /// </summary>
+    internal static BallAction PendingFake(PlayerState p, in GestureRead g, int pressTick, int contactTick, int tick, Ball ball, Tuning t)
+    {
+        var kind = KindOf(g.Kind);
+        Foot foot = FootFor(p, kind, g.Side, ball, t);
+        float eta = Math.Max(0, contactTick - tick) * t.Dt;
+        return new BallAction
+        {
+            Kind = kind,
+            Phase = ActionPhase.Windup,
+            Side = kind == ActionKind.FakeStop ? SkillSide.None : g.Side,
+            Foot = foot,
+            Surface = SurfaceFor(kind, g.Side, foot),
+            StartTick = pressTick,
+            PlanTick = tick,
+            ExecuteTick = contactTick,
+            ContactTick = contactTick,
+            EndTick = contactTick + Ticks(FakeSeconds(kind, t), t),
+            ContactPoint = new Vector3(ball.Position.X + ball.Velocity.X * eta, t.Ball.Radius, ball.Position.Z + ball.Velocity.Z * eta),
+            HoldDirection = GestureReader.FrameForward(p, t),
+            SkillCut = g.CutDirection,
+        };
+    }
+
     static BallAction Start(PlayerState p, ActionKind kind, SkillSide side, Vector2 cut, Ball ball, int tick, float now, Tuning t,
         bool feetTurn = false, int fakeFrom = -1)
     {
@@ -291,7 +335,7 @@ public static class SkillMoves
             ActionKind.BallRoll => p.SkillChainCount > 0 ? k.BallRollChainSeconds
                 : k.BallRollFirstSeconds + (k.BallRollRunSeconds - k.BallRollFirstSeconds) * RollRunShare(entry, t),
             ActionKind.DragBack => feetTurn ? k.FeetTurnSeconds : k.DragBackSeconds,
-            ActionKind.FakeStop => k.FakeStopSeconds,
+            ActionKind.FakeStop or ActionKind.FakeCut => FakeSeconds(kind, t),
             // The two-contact moves from their first contact.
             ActionKind.Elastico => k.ElasticoSeconds,
             ActionKind.Spin => k.SpinSeconds,
@@ -306,16 +350,7 @@ public static class SkillMoves
             : contactless ? CloseInTicks(p, ball, fwd, entry, t) : 0;
         // A two-contact move's contacts are fixed from its start (the heel-to-heel's from the start, the others' from the first).
         if (kind == ActionKind.HeelToHeel) dur = Ticks(k.HeelToHeelSeconds, t) - reach;
-        FootSurface surface = kind switch
-        {
-            ActionKind.BallRoll or ActionKind.DragBack or ActionKind.FakeStop or ActionKind.Spin => FootSurface.Sole,
-            ActionKind.Elastico => FootSurface.Outside,
-            ActionKind.HeelToHeel => FootSurface.Heel,
-            // A hook toward the foot's own side is played with the outside of the foot.
-            ActionKind.FakeCut => (side == SkillSide.Right) == (foot == Foot.Right) ? FootSurface.Outside : FootSurface.Inside,
-            ActionKind.StepOver => FootSurface.Outside,
-            _ => FootSurface.Inside,
-        };
+        FootSurface surface = SurfaceFor(kind, side, foot);
         var a = new BallAction
         {
             Kind = kind,
@@ -791,6 +826,103 @@ public static class SkillMoves
         }
         TouchPlanner.UpdatePhases(p, tick, t);
         return made;
+    }
+
+    /// <summary>How far ahead the exit-touch forecast looks, seconds (more than a touch's windup, so the view can draw one).</summary>
+    const float ExitForecastSeconds = 0.2f;
+
+    /// <summary>
+    /// The exit touch the core expects on the end tick of the move under way (see <see cref="PlayerState.SkillExitTouch"/>), or null:
+    /// none under way, more than <see cref="ExitForecastSeconds"/> to go, the stick released, a heel-to-heel (its flick is the exit
+    /// touch), or the ball predicted out of foot reach then. What the touch planner decides for an immediate touch, on the player and
+    /// the ball carried on to the end tick at their pace and the ball's velocity as <see cref="Finish"/> leaves it (exact on the tick
+    /// before the end, where the ball is already where the touch meets it). Changes no state.
+    /// </summary>
+    internal static BallAction? ExitForecast(PlayerState p, in TickIntent intent, Ball ball, int tick, Tuning t)
+    {
+        var a = p.SkillAction;
+        if (a == null || a.Kind == ActionKind.HeelToHeel || a.Phase == ActionPhase.Done) return null;
+        int n = a.EndTick - tick;
+        if (n < 1 || n * t.Dt > ExitForecastSeconds + 1e-5f) return null;
+        if (intent.Move.Length() < t.Touch.StickThreshold) return null;
+        float dt = t.Dt;
+        var pv = new Vector3(p.Velocity.X, 0f, p.Velocity.Z);
+        // The player on the end tick (he moves before the touch on it), the ball where it is left after the tick before.
+        var feet = p.Position + pv * (n * dt);
+        Vector3 b;
+        if (Reaches(a.Kind) && tick >= a.ContactTick)
+        {
+            b = CarriedBall(p, a, a.EndTick - 1, t);
+            // (the carried ball goes along the run with the player: moved on with him to the tick before the end)
+            if (a.Kind is ActionKind.BallRoll or ActionKind.Elastico)
+            {
+                var f3 = new Vector3(a.HoldDirection.X, 0f, a.HoldDirection.Y);
+                b += f3 * (Vector3.Dot(pv, f3) * (n - 1) * dt);
+            }
+            else if (a.Kind == ActionKind.Spin) b += pv * ((n - 1) * dt);
+        }
+        else b = ball.Position + new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z) * ((n - 1) * dt);
+        b.Y = ball.Position.Y;
+        if (!TouchModel.InReach(p.Sheet, feet, b, t)) return null;
+
+        // The ball's travel as Finish leaves it.
+        Vector2 fwd = a.HoldDirection;
+        Vector3 bv = a.Kind switch
+        {
+            ActionKind.BallRoll => new Vector3(fwd.X, 0f, fwd.Y) * MathF.Max(0f, Vector2.Dot(new Vector2(pv.X, pv.Z), fwd)),
+            ActionKind.DragBack or ActionKind.FakeStop => Vector3.Zero,
+            ActionKind.Elastico => ElasticoReleaseVelocity(p, a),
+            ActionKind.Spin => FacedPace(p),
+            _ => new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z),
+        };
+        float run = a.Kind == ActionKind.Spin ? FacedPace(p).Length() : p.RunSpeed;
+        Foot foot = p.IsStepping ? Gait.SwingFoot((p.GaitPhase + p.StepFrequency * n * dt) % 2f)
+            : TouchModel.ChooseFoot(p.Sheet, feet, p.Facing, b, t);
+        var k = t.Touch;
+        var wanted = Vector3.Normalize(new Vector3(intent.Move.X, 0f, intent.Move.Y));
+        ActionKind kind = p.KnockOnRequested ? ActionKind.KnockOn : TouchPlanner.ModeKind(TouchModel.ModeFor(intent, t));
+        float turnSign = 0f;
+        if (kind != ActionKind.KnockOn)
+        {
+            var bv2 = new Vector2(bv.X, bv.Z);
+            float reference = bv2.Length() > 0.3f ? MathF.Atan2(bv2.Y, bv2.X) : p.Facing;
+            float turnDeg = MathF.Abs(Movement.WrapAngle(MathF.Atan2(wanted.Z, wanted.X) - reference)) * 180f / MathF.PI;
+            if (run > k.ExecutionMinSpeed && turnDeg > k.ExecutionAngle) kind = ActionKind.Turn;
+            if (turnDeg > k.CutDeg && run > k.CutMinSpeed) kind = ActionKind.Cut;
+            turnSign = TouchPlanner.TurnSign(wanted, bv);
+        }
+        var cp = new Vector3(b.X, t.Ball.Radius, b.Z);
+        return new BallAction
+        {
+            Kind = kind,
+            Phase = ActionPhase.Windup,
+            Foot = foot,
+            Surface = TouchPlanner.SurfaceFor(kind, foot, turnSign),
+            PlanTick = a.EndTick,
+            ContactTick = a.EndTick,
+            EndTick = a.EndTick,
+            ContactPoint = cp,
+            NextMeetTick = a.EndTick,
+            NextMeetPoint = cp + wanted * 2f,
+            NextMeetFoot = foot,
+        };
+    }
+
+    /// <summary>The elastico's ball velocity at the release (see <see cref="ElasticoRelease"/>).</summary>
+    static Vector3 ElasticoReleaseVelocity(PlayerState p, BallAction a)
+    {
+        var r = ElasticoRelease(p, a);
+        var side = SideOf(a);
+        Vector2 fwd = a.HoldDirection;
+        return new Vector3(fwd.X * r.X + side.X * r.Y, 0f, fwd.Y * r.X + side.Y * r.Y);
+    }
+
+    /// <summary>The spin's ball velocity out of the turn: along his facing at his pace that way.</summary>
+    static Vector3 FacedPace(PlayerState p)
+    {
+        var face = new Vector2(MathF.Cos(p.Facing), MathF.Sin(p.Facing));
+        float pace = MathF.Max(0f, Vector2.Dot(new Vector2(p.Velocity.X, p.Velocity.Z), face));
+        return new Vector3(face.X * pace, 0f, face.Y * pace);
     }
 
     /// <summary>Elastico: the ball ends this far ahead of the player along the run at the release, metres.</summary>

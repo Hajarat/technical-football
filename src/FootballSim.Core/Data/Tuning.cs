@@ -433,6 +433,16 @@ public sealed class PossessionTuning
     public float OffBallTurnBonus { get; set; } = -0.2f;
     /// <summary>How far ahead the touch controller looks for a step that can play the ball, seconds.</summary>
     public float PredictionHorizon { get; set; } = 1.5f;
+    /// <summary>A loose ball within this angle either side of the facing counts as in front of the player (the eager regain), degrees.</summary>
+    public float RegainConeDeg { get; set; } = 75f;
+    /// <summary>A loose ball further than this is not gone for, metres.</summary>
+    public float RegainMaxDistance { get; set; } = 10f;
+    /// <summary>The keeper within this of the ball contests it, metres.</summary>
+    public float RegainKeeperDistance { get; set; } = 3f;
+    /// <summary>The keeper contests the ball when he would reach it no more than this after the attacker, seconds.</summary>
+    public float RegainKeeperMargin { get; set; } = 0.3f;
+    /// <summary>An uncontested regain takes the ball from this far from the body (beyond foot reach, at the stretched errors), metres.</summary>
+    public float RegainReach { get; set; } = 1.2f;
 }
 
 /// <summary>Shot model constants.</summary>

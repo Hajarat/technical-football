@@ -95,6 +95,8 @@ public struct FigureSkill
     public float Contact2Elapsed, LiftElapsed;
     public bool Right2;
     public BootSurface Surface2;
+    /// <summary>A drag-back the touch controller made as its own turn at the feet (not a skill gesture of the player's).</summary>
+    public bool FeetTurn;
 }
 
 /// <summary>Plain-value input for one figure for one physics tick. The figure never sees the simulation types.</summary>
@@ -113,6 +115,11 @@ public struct FigureFrame
     public bool TouchEvent, StrikeEvent, EventRight;
     /// <summary>The skill move under way (a touch event it raises is <see cref="SkillTouch"/>, never <see cref="TouchEvent"/>).</summary>
     public FigureSkill Skill;
+    /// <summary>
+    /// A fake shot read but not made yet (while <see cref="Shot"/> still winds up): the move it will be, with the shot's press as its
+    /// start (the same <see cref="FigureSkill.Id"/> the move has once it is made) and its contact still to come. Not valid when none.
+    /// </summary>
+    public FigureSkill PendingSkill;
     /// <summary>The shot under way (a touch event it raises is the strike event).</summary>
     public FigureShot Shot;
     public bool SkillTouch;
@@ -871,8 +878,9 @@ public partial class PlayerFigure : Node3D
             if (_kW > 0f && i == _kFoot)
             {
                 // a touch the core makes with the striking foot while the shot still winds up (the ball kept at that foot) is drawn over
-                // the drawn-back foot: the foot comes through to the ball for it and goes back to the wind-up after
-                float kwi = f.Shot.Valid && !f.Shot.Made ? _kW * (1f - tw[i]) : _kW;
+                // the drawn-back foot: the foot comes through to the ball for it and goes back to the wind-up after; so is the exit
+                // touch winding up toward the end of a skill move drawn with the kick (a fake cut's hook)
+                float kwi = f.Shot.Valid && !f.Shot.Made || f.Skill.Valid ? _kW * (1f - tw[i]) : _kW;
                 ank[i] = ank[i].Lerp(_kAnkle, kwi);
                 dir[i] = dir[i].Lerp(_kDir, kwi).Normalized();
                 planted[i] = false;
@@ -888,7 +896,7 @@ public partial class PlayerFigure : Node3D
             // an unmade touch (a windup, or a predicted immediate touch) that vanishes without its contact (dropped, or not made as
             // predicted): the foot goes from where it was drawn back to its pose over a short swing instead of in one frame
             // the same when a shot or skill pose is dropped at once (a fake shot aborts the shot, a lost ball ends the move)
-            float kw = _kW > 0f && i == _kFoot ? (f.Shot.Valid && !f.Shot.Made ? _kW * (1f - tw[i]) : _kW) : 0f;
+            float kw = _kW > 0f && i == _kFoot ? (f.Shot.Valid && !f.Shot.Made || f.Skill.Valid ? _kW * (1f - tw[i]) : _kW) : 0f;
             // the stride's foot pitch gives way to a touch, kick or skill pose by their weights (a contact is drawn flat, exactly as planned)
             float pw = (1f - tw[i]) * (1f - kw) * (1f - plw);
             // (so does a made touch's follow-through the shot's soft touch takes out of the core's slots: the soft touch is not drawn)
@@ -1090,6 +1098,7 @@ public partial class PlayerFigure : Node3D
             MocapShown(f, ankEff, knee, ref pel, ref lean, fwd, dt);
             // a skill clip holds its own planted feet
             if (_atkAnim?.Skills is { Playing: true } sl) for (int i = 0; i < 2; i++) planted[i] = sl.Planted(i);
+            else if (_atkAnim?.Skills is { Active: true } hb) for (int i = 0; i < 2; i++) planted[i] &= !hb.HandBackStepping(i);
             int layNow = _atkAnim?.Skills is { } sk2 ? (sk2.Playing ? 2 : sk2.Active ? 1 : 0) : 0;
             if (MocapLogOn && Stats != null && (layNow != _layWas || f.Skill.Valid != _laySkillWas))
                 GD.Print($"SKILL_LAYER tick={Stats.Tick} state={(layNow == 2 ? "clip" : layNow == 1 ? "hand-back" : "off")} skill={(f.Skill.Valid ? f.Skill.Kind.ToString() : "-")} {_atkAnim?.Skills?.Describe()}");
@@ -1328,7 +1337,7 @@ public partial class PlayerFigure : Node3D
         float best = 0f;
         float r = f.BallRadius;
         _ovWind[i] = false;
-        float upW = 0f;
+        float upW = 0f; int upId = int.MinValue;
         (int Id, float Tau) handover = (int.MinValue, 0f);   // a touch that takes over from the early hint this tick
         int windId = int.MinValue; float windTau = 0f;        // the unmade touch drawn this tick
         for (int n = 0; n < 3; n++)
@@ -1380,7 +1389,15 @@ public partial class PlayerFigure : Node3D
             {
                 // windup: the foot comes through from behind the contact point, carried with the body
                 // a touch first seen while the early hint drew this foot carries its approach on (the same weight curve), else it starts its own
-                if (tf.Id != a.Id) { tf.Id = a.Id; tf.Span = _hintPrev[i] ? Math.Max(tau, TouchLead) : Math.Max(tau, 0.04f); if (_hintPrev[i]) handover = (a.Id, tau); }
+                // so does the touch the core then commits where the immediate touch it forecast was drawn (a skill move's exit
+                // touch planned with a windup after all: the same id, a later contact), at the weight drawn
+                bool fromUp = n == 0 && _upIdPrev[i] == a.Id && !_teleporting;
+                if (tf.Id != a.Id)
+                {
+                    tf.Id = a.Id;
+                    tf.Span = fromUp ? tau / Math.Max(1e-3f, 1f - InvSmooth(_upW[i])) : _hintPrev[i] ? Math.Max(tau, TouchLead) : Math.Max(tau, 0.04f);
+                    if (_hintPrev[i] || fromUp) handover = (a.Id, tau);
+                }
                 wgt = Smooth(1f - tau / tf.Span);
                 target = c0 - hv * tau - d * (0.12f * k * Smooth(tau / tf.Span));
                 target = WindupTargetJump(tf, a.Id, target, pelXZ, tau);
@@ -1406,14 +1423,14 @@ public partial class PlayerFigure : Node3D
             if (n == 2 && !_teleporting)
             {
                 float rise = Math.Max(f.Dt / HintRise, (1f - _upW[i]) * f.Dt / Math.Max(tau, f.Dt));
-                wgt = Math.Min(wgt, _upW[i] + rise); upW = Math.Max(upW, wgt);
+                wgt = Math.Min(wgt, _upW[i] + rise); if (wgt > upW) { upW = wgt; upId = a.Id; }
             }
             if (wgt <= best) continue;
             best = wgt; surf = a.Surface;
             _ovWind[i] = !a.Made;
             if (!a.Made && tau > 0f) { windId = a.Id; windTau = tau; } else windId = int.MinValue;
             Vector3 cur = dirv;
-            float yaw = Mathf.LerpAngle(Mathf.Atan2(cur.Z, cur.X), Mathf.Atan2(fdUse.Z, fdUse.X), wgt);
+            float yaw = TurnToward(i, Mathf.Atan2(cur.Z, cur.X), Mathf.Atan2(fdUse.Z, fdUse.X), wgt);
             ank = ank.Lerp(target, wgt);
             dirv = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
         }
@@ -1457,8 +1474,9 @@ public partial class PlayerFigure : Node3D
                 dirv = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
             }
         }
+        if (best <= 0f) _ovTurn[i] = 0f;
         _ovAnk[i, 1] = _ovAnk[i, 0]; _ovAnk[i, 0] = ank; _ovYaw[i] = Mathf.Atan2(dirv.Z, dirv.X);
-        _hintPrev[i] = hint; _hintW[i] = hint ? best : 0f; _upW[i] = upW;
+        _hintPrev[i] = hint; _hintW[i] = hint ? best : 0f; _upW[i] = upW; _upIdPrev[i] = upW > 0f ? upId : int.MinValue;
         return best;
     }
 
@@ -1485,12 +1503,30 @@ public partial class PlayerFigure : Node3D
     const float WindupJumpM = 0.03f;
 
     readonly float[] _hintW = new float[2], _upW = new float[2];
+    readonly int[] _upIdPrev = { int.MinValue, int.MinValue };
+    /// <summary>The inverse of <see cref="Smooth"/> on 0..1.</summary>
+    static float InvSmooth(float y) => 0.5f - MathF.Sin(MathF.Asin(Math.Clamp(1f - 2f * y, -1f, 1f)) / 3f);
     const float HintRise = 0.08f;
 
     /// <summary>Per foot: last tick drew the early touch hint (see TouchOverlay).</summary>
     readonly bool[] _hintPrev = new bool[2];
     /// <summary>Per foot: the hint-to-touch handover being taken out (touch id, eta when it began, place and yaw difference) and the last two overlay ankles and yaw.</summary>
     readonly int[] _hoId = { int.MinValue, int.MinValue }; readonly float[] _hoTau0 = new float[2], _hoYaw = new float[2], _ovYaw = new float[2];
+    /// <summary>Each foot's turn (radians, signed) from the stride's heading to the touch's on the latest tick, 0 when no touch drew it.</summary>
+    readonly float[] _ovTurn = new float[2];
+
+    /// <summary>
+    /// The heading <paramref name="w"/> of the way from <paramref name="from"/> to <paramref name="to"/> for foot <paramref name="i"/>'s
+    /// touch. The shorter way, except near half a turn, where the shorter way can change sides from one tick to the next as both
+    /// headings move (the body turning in a spin): there the foot keeps turning the way it turned on the tick before.
+    /// </summary>
+    float TurnToward(int i, float from, float to, float w)
+    {
+        float d = Mathf.Wrap(to - from, -Mathf.Pi, Mathf.Pi);
+        if (Math.Abs(d) > 0.6f * Mathf.Pi && _ovTurn[i] != 0f && Math.Sign(d) != Math.Sign(_ovTurn[i])) d -= Math.Sign(d) * Mathf.Tau;
+        _ovTurn[i] = d;
+        return from + d * w;
+    }
     readonly Vector3[] _hoOff = new Vector3[2]; readonly Vector3[,] _ovAnk = new Vector3[2, 2];
 
     /// <summary>Distance from the touching foot's instep point to the ball surface at the latest contact event (for logging).</summary>

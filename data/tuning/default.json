@@ -193,7 +193,12 @@
     "lose_distance_fast": 3.5,
     "chase_speed_fraction": 0.97,
     "off_ball_turn_bonus": -0.2,
-    "prediction_horizon": 1.5
+    "prediction_horizon": 1.5,
+    "regain_cone_deg": 75,
+    "regain_max_distance": 10,
+    "regain_keeper_distance": 3,
+    "regain_keeper_margin": 0.3,
+    "regain_reach": 1.2
   },
   "shot": {
     "base_sigma_deg": 4.9,

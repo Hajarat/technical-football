@@ -35,20 +35,8 @@ public partial class Match
         f.CloseControl = _closeControl;
         f.BallPos = G(w.Ball.Position); f.BallVel = G(w.Ball.Velocity); f.BallRadius = w.Ball.Radius;
         f.Dt = w.Tuning.Dt;
-        if (p.Action is { IsSkill: true } sk && sk.Phase != ActionPhase.Done)
-            f.Skill = new FigureSkill
-            {
-                Valid = true, Kind = SkillKindOf(sk.Kind), Id = sk.StartTick,
-                Side = sk.Side == SkillSide.Left ? -1f : sk.Side == SkillSide.Right ? 1f : 0f,
-                Right = sk.Foot == Foot.Right, Surface = (BootSurface)(int)sk.Surface,
-                Elapsed = (p.CurrentTick - sk.StartTick) * f.Dt, Duration = (sk.EndTick - sk.StartTick) * f.Dt,
-                ExecElapsed = (p.CurrentTick - sk.ExecuteTick) * f.Dt, ExecDuration = (sk.EndTick - sk.ExecuteTick) * f.Dt,
-                ContactElapsed = (p.CurrentTick - sk.ContactTick) * f.Dt, ReachSpan = (sk.ContactTick - sk.StartTick) * f.Dt,
-                ContactPoint = G(sk.ContactPoint), OutVelocity = G(sk.BallOutVelocity),
-                Contact2Elapsed = sk.Contact2Tick >= 0 ? (p.CurrentTick - sk.Contact2Tick) * f.Dt : float.NaN,
-                LiftElapsed = sk.LiftTick >= 0 ? (p.CurrentTick - sk.LiftTick) * f.Dt : float.NaN,
-                Right2 = sk.Foot2 == Foot.Right, Surface2 = (BootSurface)(int)sk.Surface2,
-            };
+        if (p.Action is { IsSkill: true } sk && sk.Phase != ActionPhase.Done) f.Skill = SkillFrame(sk, p, f.Dt);
+        if (p.PendingSkill is { } pending) f.PendingSkill = SkillFrame(pending, p, f.Dt);
         foreach (var e in w.Events)
         {
             if (e.Team is not (-1 or 0) || e.PlayerIndex is not (-1 or 0)) continue;
@@ -105,8 +93,9 @@ public partial class Match
 
     /// <summary>
     /// The touch the core is about to make at once, with no windup of its own (an immediate touch: the exit touch on the tick a skill
-    /// move ends, the soft touch that keeps the ball at the foot during a shot's windup, the first touch of a loose ball), predicted
-    /// from the current state and stick so the figure can swing the right foot toward it beforehand. Presentation only: it reads the
+    /// move ends, the soft touch that keeps the ball at the foot during a shot's windup, the first touch of a loose ball), so the figure
+    /// can swing the right foot toward it beforehand: the exit touch as the core forecasts it (<see cref="PlayerState.SkillExitTouch"/>),
+    /// the others predicted here from the current state and stick. Presentation only: it reads the
     /// world and decides nothing in it; the core's own touch, when it comes, is drawn from <see cref="FigureFrame.Action"/> as usual.
     /// <paramref name="ready"/> is set for a still ball at the feet of a standing player, where the touch waits for the stick.
     /// </summary>
@@ -142,25 +131,19 @@ public partial class Match
         float turnRef = MathF.Atan2(bv.Z, bv.X);
         if (p.Action is { IsSkill: true } sk && sk.Phase != ActionPhase.Done)
         {
-            // the exit touch: made on the move's last tick if the stick is pushed and the ball is in reach then
-            int n = sk.EndTick - p.CurrentTick;
-            // (with some slack: the legs and the ball change course on that tick; a touch drawn for but not made fades back)
-            if (n < 1 || n > Horizon || !stickOn || !InReachAt(n, 0.05f)) return default;
-            j = n; anchor = sk.StartTick;
-            dir = System.Numerics.Vector3.Normalize(new System.Numerics.Vector3(stick.X, 0f, stick.Y));
-            var mode = TouchModel.ModeFor(_intent, t);
-            kind = mode == TouchMode.CloseControl ? ActionKind.Close : mode == TouchMode.Jog ? ActionKind.Jog : ActionKind.Sprint;
-            // the ball's travel on that tick: a ball roll leaves it rolling along the run at the player's pace, a drag-back or fake stop at rest
-            var rd = new System.Numerics.Vector3(sk.RunDirection.X, 0f, sk.RunDirection.Y);
-            var bvEnd = sk.Kind == ActionKind.BallRoll ? rd * MathF.Max(0f, System.Numerics.Vector3.Dot(pv, rd))
-                : sk.Kind is ActionKind.DragBack or ActionKind.FakeStop ? System.Numerics.Vector3.Zero : bv;
-            float refA = bvEnd.Length() > 0.3f ? MathF.Atan2(bvEnd.Z, bvEnd.X) : p.Facing;
-            turnRef = refA;
-            float turnDeg = MathF.Abs(Movement.WrapAngle(MathF.Atan2(dir.Z, dir.X) - refA)) * 180f / MathF.PI;
-            if (p.RunSpeed > t.Touch.ExecutionMinSpeed && turnDeg > t.Touch.ExecutionAngle) kind = ActionKind.Turn;
-            if (turnDeg > t.Touch.CutDeg && p.RunSpeed > t.Touch.CutMinSpeed) kind = ActionKind.Cut;
+            // the exit touch, made at once on the move's end tick: the core's own forecast of it (foot, kind, surface, where the ball is
+            // then, the way out), with the id the touch has when it is made, so the windup drawn toward it runs on into its contact
+            if (p.SkillExitTouch is not { } ex) return default;
+            int n = ex.ContactTick - p.CurrentTick;
+            if (n < 1 || n > Horizon) return default;
+            return new FigureAction
+            {
+                Valid = true, Kind = (int)ex.Kind, Phase = TouchPhase.Windup, Right = ex.Foot == Foot.Right, Surface = (BootSurface)(int)ex.Surface,
+                Id = ex.PlanTick, ContactTick = ex.ContactTick, ContactEta = n * dt, RecoverySeconds = 0f,
+                ContactPoint = G(ex.ContactPoint), BallOutVelocity = Vector3.Zero, NextMeetPoint = G(ex.NextMeetPoint), ContactMiss = float.NaN,
+            };
         }
-        else if (p.Action is { IsShot: true, Made: false } shot && p.InPossession
+        if (p.Action is { IsShot: true, Made: false } shot && p.InPossession
             // a touch already winding up at the press is waited for; one planned after it is dropped for the soft touch
             && (p.TouchAction is not { Pending: true } pt || pt.PlanTick > shot.PlanTick)
             && p.TouchAction is not { Kind: ActionKind.Soft, Made: true } && p.PreviousTouchAction is not { Kind: ActionKind.Soft, Made: true })
@@ -212,6 +195,20 @@ public partial class Match
             ContactPoint = G(cp), BallOutVelocity = Vector3.Zero, NextMeetPoint = G(cp + dir * 2f), ContactMiss = float.NaN,
         };
     }
+
+    static FigureSkill SkillFrame(BallAction sk, PlayerState p, float dt) => new()
+    {
+        Valid = true, Kind = SkillKindOf(sk.Kind), Id = sk.StartTick,
+        Side = sk.Side == SkillSide.Left ? -1f : sk.Side == SkillSide.Right ? 1f : 0f,
+        Right = sk.Foot == Foot.Right, Surface = (BootSurface)(int)sk.Surface,
+        Elapsed = (p.CurrentTick - sk.StartTick) * dt, Duration = (sk.EndTick - sk.StartTick) * dt,
+        ExecElapsed = (p.CurrentTick - sk.ExecuteTick) * dt, ExecDuration = (sk.EndTick - sk.ExecuteTick) * dt,
+        ContactElapsed = (p.CurrentTick - sk.ContactTick) * dt, ReachSpan = (sk.ContactTick - sk.StartTick) * dt,
+        ContactPoint = G(sk.ContactPoint), OutVelocity = G(sk.BallOutVelocity),
+        Contact2Elapsed = sk.Contact2Tick >= 0 ? (p.CurrentTick - sk.Contact2Tick) * dt : float.NaN,
+        LiftElapsed = sk.LiftTick >= 0 ? (p.CurrentTick - sk.LiftTick) * dt : float.NaN,
+        Right2 = sk.Foot2 == Foot.Right, Surface2 = (BootSurface)(int)sk.Surface2, FeetTurn = sk.FeetTurn,
+    };
 
     static FigureAction ActionFrame(BallAction? a, PlayerState p, float dt)
     {

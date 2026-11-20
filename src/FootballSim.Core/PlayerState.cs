@@ -136,11 +136,29 @@ public sealed class PlayerState
     /// within reach at an eligible swing), false while they follow the stick.
     /// </summary>
     public bool Chasing { get; internal set; }
+    /// <summary>How eagerly he goes for a loose ball this tick (see <see cref="Core.Regain"/>); None in possession.</summary>
+    public RegainMode Regain { get; internal set; }
 
     // ---- Skill moves (phase B). ----
 
     /// <summary>The skill move under way (also <see cref="Action"/> while it lasts), or null.</summary>
     public BallAction? SkillMove => SkillAction;
+    /// <summary>
+    /// A fake shot read but not made yet: from the tick the cancel is read until the fake's contact the shot winds up on as a real one
+    /// (it is still <see cref="Action"/>), and this is the move the fake will be, as the core expects it now (kind, side, foot,
+    /// surface, its <see cref="BallAction.StartTick"/> the shoot press, its contact and end ticks; phase Windup, not made). On the
+    /// contact tick the move itself starts with the same StartTick and this goes back to null. For the view only.
+    /// </summary>
+    public BallAction? PendingSkill { get; internal set; }
+    /// <summary>
+    /// While a skill move runs toward its end with the stick pushed: the exit touch the core expects to make at once on the move's
+    /// end tick (which has no windup of its own), as an unmade touch in its windup: its foot, kind and surface, the ball's centre
+    /// then as <see cref="BallAction.ContactPoint"/>, the stick's direction as the way out (<see cref="BallAction.NextMeetPoint"/>
+    /// two metres along it), <see cref="BallAction.ContactTick"/> and <see cref="BallAction.PlanTick"/> the end tick (the exit
+    /// touch has that PlanTick too, and so has the touch the controller commits with a windup on the end tick instead, when it
+    /// does). Null when no such touch is expected. A forecast for the view only: the touch is decided on the end tick as usual.
+    /// </summary>
+    public BallAction? SkillExitTouch { get; internal set; }
     /// <summary>The most recent gesture recognised (right stick, skill key or fake shot), and its world tick.</summary>
     public Gesture LastGesture { get; internal set; }
     /// <summary>World tick of <see cref="LastGesture"/>.</summary>
