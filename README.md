@@ -12,7 +12,7 @@ The pitch (`src/FootballSim.Core/Pitch.cs`) is a walled arena whose lengths come
 
 | What | Command |
 | --- | --- |
-| Play (needs a gamepad) | `godot-mono --path game` |
+| Play (needs a gamepad); builds the C# first, since `godot-mono --path game` alone runs the last compiled build, which a pull does not update | `./play.sh` |
 | Build the game project | `dotnet build game/FootballSim.Game.csproj` |
 | Tests | `dotnet test FootballSim.slnx` |
 | Batch run, 10 000 scripted rounds | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario penalty --n 10000 --seed 1` |
