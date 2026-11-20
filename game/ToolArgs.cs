@@ -9,6 +9,8 @@ public sealed class ToolArgs
 {
     public int QuitAfterTicks;
     public bool QuitAfterRound;
+    /// <summary>--session-log: write the session folder (session.jsonl, round replays) in replay mode too.</summary>
+    public bool LogSession;
     public string? ShotDir;
     public readonly List<int> ShotTicks = new();
     public readonly List<string> ShotOn = new();
@@ -71,6 +73,7 @@ public sealed class ToolArgs
             {
                 case "--quit-after-ticks": int.TryParse(Next(), out a.QuitAfterTicks); break;
                 case "--quit-after-round": a.QuitAfterRound = true; break;
+                case "--session-log": a.LogSession = true; break;
                 case "--background": a.Background = true; break;
                 case "--frame-times": a.FrameTimes = true; break;
                 case "--close-cam": a.CloseCam = true; break;

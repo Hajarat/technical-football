@@ -82,27 +82,29 @@ foot_r = { pos = [-0.14, 0.10, 0.18], yaw = -25, pitch = -5, knee = [-0.2, 0.2, 
 [[key]]
 t = 0.5
 label = "contact: not the laces but the inside, hooking the ball across to the left"
-pelvis = { pos = [0.06, 0.87, 0.26], yaw = 10, pitch = 14, roll = 3 }
-chest = { yaw = 4, pitch = 14, roll = 0 }
-head = { yaw = 4, pitch = 38 }
+pelvis = { pos = [0.06, 0.86, 0.26], yaw = 12, pitch = 15, roll = 7 }
+chest = { yaw = 8, pitch = 16, roll = 12 }
+head = { yaw = 10, pitch = 38 }
 foot_r = { pos = [-0.135, -0.085, -0.078], frame = "ball", yaw = -30, pitch = 0, knee = [-0.2, 0.2, 1], ease = 0 }
-hand_l = { swing = 20, abduct = 45, bend = 35, trail = 90 }
-hand_r = { swing = 5, abduct = 30, bend = 40 }
+hand_l = { swing = 5, abduct = 60, bend = 30, trail = 90 }
+hand_r = { swing = 25, abduct = 15, bend = 50 }
 ball = { pos = [-0.04, 0.11, 0.42], ease = 1 }
 
 [[key]]
 t = 0.65
 label = "release: the inside carries the ball away, the hips turning with it"
-pelvis = { pos = [0.09, 0.87, 0.30], yaw = 25, pitch = 13, roll = 4 }
-chest = { yaw = 6, pitch = 12, roll = 3 }
-head = { yaw = 12, pitch = 32 }
+pelvis = { pos = [0.13, 0.85, 0.3], yaw = 30, pitch = 15, roll = 10 }
+chest = { yaw = 14, pitch = 16, roll = 18 }
+head = { yaw = 20, pitch = 32 }
 foot_r = { pos = [-0.135, -0.085, -0.078], frame = "ball", yaw = -20, pitch = 0, ease = 0 }
 ball = { pos = [0.20, 0.11, 0.56], ease = 0 }
+hand_l = { swing = -10, abduct = 68, bend = 28, trail = 90 }
+hand_r = { swing = 45, abduct = -5, bend = 60 }
 
 [[key]]
 t = 0.8
 label = "the right foot follows across and comes down"
-pelvis = { pos = [0.14, 0.885, 0.34], yaw = 40 }
+pelvis = { pos = [0.18, 0.87, 0.34], yaw = 45, roll = 9 }
 foot_r = { pos = [0.14, 0.05, 0.52], yaw = 25, pitch = 0, knee = [0.3, 0.1, 1] }
 foot_l = { pos = [0.21, 0.002, 0.29], yaw = 10, pitch = -8, toe = 10, ease = 1 }
 
@@ -110,11 +112,11 @@ foot_l = { pos = [0.21, 0.002, 0.29], yaw = 10, pitch = -8, toe = 10, ease = 1 }
 t = 1.0
 ease = 0.0
 label = "end: turned into the cut, away after the ball"
-pelvis = { pos = [0.22, 0.90, 0.42], yaw = 55, pitch = 13, roll = 4 }
-chest = { yaw = 4, pitch = 10, roll = 2 }
-head = { yaw = 4, pitch = 16 }
+pelvis = { pos = [0.22, 0.89, 0.42], yaw = 55, pitch = 15, roll = 7 }
+chest = { yaw = 6, pitch = 14, roll = 6 }
+head = { yaw = 6, pitch = 16 }
 foot_r = { pos = [0.20, 0.002, 0.56], yaw = 50, pitch = 0, knee = [0.6, 0, 1] }
 foot_l = { pos = [0.24, 0.05, 0.30], yaw = 40, pitch = -25, toe = 25, knee = [0.5, 0, 1] }
-hand_l = { swing = -20, abduct = 18, bend = 80 }
-hand_r = { swing = 25, abduct = 12, bend = 80 }
+hand_l = { swing = -35, abduct = 25, bend = 85 }
+hand_r = { swing = 40, abduct = 10, bend = 85 }
 ball = { pos = [0.80, 0.11, 0.90], ease = 0 }

@@ -65,13 +65,13 @@ foot_r = { pos = [-0.11, 0.24, 0.05], yaw = -6, pitch = 14, toe = 0, knee = [-0.
 [[key]]
 t = 0.14
 label = "contact: the right sole on top of the ball; the turn to the left begins on the left foot"
-pelvis = { pos = [0.02, 0.88, 0.02], yaw = 0, pitch = 12, roll = 0 }
-chest = { yaw = 8, pitch = 9 }
-head = { yaw = -4, pitch = 36 }
+pelvis = { pos = [0.02, 0.865, 0.02], yaw = 0, pitch = 14, roll = 0 }
+chest = { yaw = 16, pitch = 12 }
+head = { yaw = 10, pitch = 38 }
 foot_l = { pos = [0.24, 0.002, 0.3], yaw = 6, pitch = 0, toe = 0, knee = [0.2, 0, 1], ease = 1 }
 foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 0, pitch = 12, knee = [-0.2, 0.3, 1], ease = 0.3 }
-hand_l = { swing = 10, abduct = 45, bend = 30, trail = 90 }
-hand_r = { swing = 10, abduct = 45, bend = 30, trail = 90 }
+hand_l = { swing = 5, abduct = 62, bend = 25, trail = 90 }
+hand_r = { swing = 15, abduct = 62, bend = 25, trail = 90 }
 ball = { pos = [-0.09, 0.11, 0.25], ease = 1 }
 
 [[key]]
@@ -82,13 +82,13 @@ foot_l = { pos = [0.24, 0.02, 0.3], yaw = 30, pitch = -12, toe = 15, ease = 0 }
 [[key]]
 t = 0.3
 label = "a quarter turn: the sole drags the ball back and round, shoulders and head leading"
-pelvis = { pos = [0.07, 0.87, 0.28], yaw = 85, pitch = 10, roll = 2 }
-chest = { yaw = 18, pitch = 8 }
-head = { yaw = 25, pitch = 30 }
+pelvis = { pos = [0.07, 0.835, 0.28], yaw = 85, pitch = 15, roll = 2 }
+chest = { yaw = 34, pitch = 14 }
+head = { yaw = 34, pitch = 34 }
 foot_l = { pos = [0.26, 0.02, 0.32], yaw = 90, pitch = -12, toe = 15 }
 foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 80, pitch = 12, knee = [0, 0.3, 1] }
-hand_l = { swing = -5, abduct = 55, bend = 30, trail = 100 }
-hand_r = { swing = 20, abduct = 50, bend = 30, trail = 100 }
+hand_l = { swing = -10, abduct = 78, bend = 22, trail = 100 }
+hand_r = { swing = 20, abduct = 72, bend = 22, trail = 100 }
 ball = { pos = [-0.05, 0.11, 0.27] }
 
 [[key]]
@@ -99,9 +99,9 @@ foot_l = { pos = [0.17, 0.21, 0.33], yaw = 175, pitch = 5, toe = 0 }
 [[key]]
 t = 0.44
 label = "lift: turned 180 degrees, facing back, the ball in front of him; the right sole leaves it"
-pelvis = { pos = [0.12, 0.87, 0.55], yaw = 180, pitch = 11, roll = 0 }
-chest = { yaw = 12, pitch = 8 }
-head = { yaw = 10, pitch = 34 }
+pelvis = { pos = [0.12, 0.84, 0.55], yaw = 180, pitch = 15, roll = 0 }
+chest = { yaw = 28, pitch = 14 }
+head = { yaw = 26, pitch = 36 }
 foot_r = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 170, pitch = 10, knee = [0, 0.3, 1], ease = 0 }
 ball = { pos = [0.0, 0.11, 0.28], ease = 0 }
 
@@ -125,25 +125,25 @@ foot_r = { pos = [0.44, 0.002, 0.66], yaw = 220, pitch = 0, knee = [0, 0, 1], ea
 [[key]]
 t = 0.66
 label = "three-quarters: the left sole drags the ball on round, shielded by the body"
-pelvis = { pos = [0.27, 0.87, 0.72], yaw = 275, pitch = 10, roll = 0 }
-chest = { yaw = 12, pitch = 8 }
-head = { yaw = 20, pitch = 28 }
+pelvis = { pos = [0.27, 0.835, 0.72], yaw = 275, pitch = 15, roll = 0 }
+chest = { yaw = 30, pitch = 14 }
+head = { yaw = 30, pitch = 32 }
 foot_l = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 270, pitch = 12, knee = [0, 0.3, 1] }
 foot_r = { pos = [0.44, 0.02, 0.66], yaw = 260, pitch = -12, toe = 15, ease = 0 }
-hand_l = { swing = 15, abduct = 50, bend = 30, trail = 100 }
-hand_r = { swing = -5, abduct = 55, bend = 30, trail = 100 }
+hand_l = { swing = 15, abduct = 75, bend = 22, trail = 100 }
+hand_r = { swing = -10, abduct = 78, bend = 22, trail = 100 }
 ball = { pos = [0.1, 0.11, 0.62] }
 
 [[key]]
 t = 0.8
 label = "release: facing his original way again, the ball ahead of him, the left sole lets go"
-pelvis = { pos = [0.4, 0.875, 0.85], yaw = 360, pitch = 12, roll = 0 }
-chest = { yaw = 0, pitch = 9 }
-head = { yaw = 0, pitch = 18 }
+pelvis = { pos = [0.4, 0.86, 0.85], yaw = 360, pitch = 14, roll = 0 }
+chest = { yaw = 6, pitch = 11 }
+head = { yaw = 4, pitch = 22 }
 foot_l = { pos = [0.0, 0.11, 0.0], frame = "ball", yaw = 355, pitch = 10, knee = [0, 0.3, 1], ease = 0 }
 foot_r = { pos = [0.44, 0.03, 0.66], yaw = 330, pitch = -15, toe = 20, ease = 0 }
-hand_l = { swing = 10, abduct = 30, bend = 45 }
-hand_r = { swing = -10, abduct = 30, bend = 45 }
+hand_l = { swing = 10, abduct = 45, bend = 40 }
+hand_r = { swing = -10, abduct = 45, bend = 40 }
 ball = { pos = [0.34, 0.11, 1.12], ease = 0 }
 
 [[key]]

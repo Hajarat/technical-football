@@ -538,10 +538,12 @@ pressed twice.
 
 ## Session logs
 
-Every launch except replay mode creates `sessions/<yyyyMMdd-HHmmss>/` at the repo root (ignored by git):
+Every launch except replay mode (unless it is given `--session-log`) creates `sessions/<yyyyMMdd-HHmmss>/` at the repo root (ignored by git):
 
 - `session.jsonl`: one JSON object per line, flushed after each line, each with `t` (seconds since launch), `wall` (local time) and `type`:
-  `start`, `pads`, `input_mode`, `round_setup`, `round_begin`, `round_end` (with the full round report), `flag`, `selection`, `warning`, `pause`, `quit`.
+  `start`, `pads`, `input_mode`, `round_setup`, `round_begin`, `round_end` (with the full round report), `flag`, `selection`, `warning`, `pause`, `quit`,
+  and `skill` each time the attacker's figure starts drawing a skill move (round, world `tick`, `move`, `foot`, `side`, `stand_clip` and `run_clip`, `w_run`,
+  `entry_speed`, and `drawing`: `clips` or `procedural`), so a play-test shows what was drawn.
 - `round-<NNN>-<scenario>-<outcome>.json`: the replay of every finished round, saved automatically. Re-run one with
   `dotnet run -c Release --project src/FootballSim.Batch -- --replay sessions/<folder>/round-007-penalty-goal.json`.
 
