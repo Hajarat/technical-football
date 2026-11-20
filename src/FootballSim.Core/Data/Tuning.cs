@@ -1153,6 +1153,16 @@ public sealed class SkillTuning
     public float HeelToHeelBack { get; set; } = 0.15f;
     public float HeelToHeelFlickRatio { get; set; } = 1.3f;
     public float HeelToHeelFlickMinSpeed { get; set; } = 5.0f;
+    /// <summary>
+    /// How much of the run version of the heel-to-heel flick a move entered at this running speed takes, m/s to 0..1; the rest
+    /// is the standing flick (heel_to_heel_flick_ratio, at least heel_to_heel_flick_min_speed).
+    /// </summary>
+    public Curve HeelToHeelRunBlend { get; set; } = new((1f, 0f), (2.5f, 1f));
+    /// <summary>
+    /// At a run the flick is a short one he runs onto: paced so that, with him keeping his pace, the ball is this far ahead of
+    /// him 0.2 s after the move's end, metres (where the next dribble touch meets it).
+    /// </summary>
+    public float HeelToHeelRunFlickAhead { get; set; } = 0.45f;
 
     // ---- chain and exit burst ----
     /// <summary>A move starting within this long of the previous one's end is chained.</summary>

@@ -933,12 +933,63 @@ public class SkillMoveTests
         float Ahead(int tick) => (tr.At[tick].B.X - tr.At[tick].P.X) * f.X + (tr.At[tick].B.Z - tr.At[tick].P.Z) * f.Y;
         // Back about 0.15 m against the trailing foot (relative to him) by the flick.
         Assert.InRange(Ahead(m.Contact2Tick - 1) - Ahead(m.ContactTick), -0.2f, -0.1f);
-        // The flick: straight on at about 1.3 times his speed (5 m/s from standing), never more than he can catch.
         var v = tr.At[m.Contact2Tick + 1].B - tr.At[m.Contact2Tick].B;
         float speed = new Vector2(v.X, v.Z).Length() / t.Dt;
-        float want = MathF.Max(5f, 1.3f * tr.At[m.Contact2Tick].Run);
-        Assert.InRange(speed, MathF.Min(want, 7f) - 0.3f, want + 0.3f);
+        if (e == Entry.Standing)
+        {
+            // The flick: straight on at about 1.3 times his speed (5 m/s from standing), never more than he can catch.
+            float want = MathF.Max(5f, 1.3f * tr.At[m.Contact2Tick].Run);
+            Assert.InRange(speed, MathF.Min(want, 7f) - 0.3f, want + 0.3f);
+        }
+        else
+        {
+            // At a run a short flick he runs onto: a little faster than he runs (see the next test).
+            float run = tr.At[m.Contact2Tick].Run;
+            Assert.InRange(speed, run, run + 1.5f);
+        }
         Assert.True(Ahead(m.EndTick) > Ahead(m.Contact2Tick), "the ball did not run on ahead of him");
+    }
+
+    [Theory]
+    [InlineData(Entry.Jog)]
+    [InlineData(Entry.Sprint)]
+    public void AtARunTheHeelToHeelIsAShortFlickHeRunsOnto(Entry e)
+    {
+        // The ball is never more than 0.8 m ahead of him until the next touch, which comes within 0.5 s of the move's end, and
+        // he leaves the move at no less than his entry pace.
+        var (trace, _) = TraceFor("heel_to_heel", 0);
+        for (ulong seed = 1; seed <= 4; seed++)
+        {
+            var w = Field(seed);
+            var p = w.Attacker;
+            var t = w.Tuning;
+            var buf = new TickIntent[w.PlayerCount];
+            BallAction? a = null;
+            float aheadMax = float.MinValue, endSpeed = float.NaN;
+            int next = -1;
+            bool lost = false;
+            for (int tick = 1; tick <= 600 && (a == null || (next < 0 && w.Tick < a.EndTick + 240)); tick++)
+            {
+                int i = tick - 241;
+                buf[0] = i >= 0 && i < 40 ? trace(i, Run(e, tick)) : Run(e, tick);
+                w.Step(buf);
+                if (a == null && w.Events.Any(ev => ev.Kind == EventKind.SkillMove)) a = p.SkillMove!;
+                lost |= w.Events.Any(ev => ev.Kind == EventKind.PossessionLost);
+                if (a == null) continue;
+                var f = a.RunDirection;
+                aheadMax = MathF.Max(aheadMax, (w.Ball.Position.X - p.Position.X) * f.X + (w.Ball.Position.Z - p.Position.Z) * f.Y);
+                if (w.Tick == a.EndTick - 1) endSpeed = new Vector2(p.Velocity.X, p.Velocity.Z).Length();
+                if (w.Tick >= a.EndTick && w.Events.Any(ev => ev.Kind == EventKind.Touch)) next = w.Tick;
+            }
+            string at = $"{e} seed {seed}";
+            Assert.NotNull(a);
+            Assert.Equal(ActionKind.HeelToHeel, a!.Kind);
+            Assert.True(aheadMax <= 0.8f, $"{at}: the ball went {aheadMax:F2} m ahead");
+            Assert.True(next >= 0 && (next - a.EndTick) * t.Dt <= 0.5f + 1e-4f, $"{at}: next touch at tick {next}, end {a.EndTick}");
+            Assert.True(endSpeed >= a.SkillEntry - 0.01f, $"{at}: left the move at {endSpeed:F2} m/s from {a.SkillEntry:F2}");
+            Assert.False(lost, $"{at}: lost the ball");
+            Assert.True(p.InPossession, $"{at}: not in possession");
+        }
     }
 
     [Fact]

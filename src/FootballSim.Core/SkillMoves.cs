@@ -514,7 +514,7 @@ public static class SkillMoves
                 return SpinTick(p, a, ball, tick, cap, t, ref legs);
             case ActionKind.HeelToHeel:
                 // He keeps his speed: the ball goes back between his feet and is flicked on ahead of him.
-                run = MathF.Min(entry, cap);
+                run = HeelHold(a, cap, t);
                 break;
             default: // fake cut
                 run = entry * (1f - (1f - FakeCutSpeedKept) * u1);
@@ -709,7 +709,7 @@ public static class SkillMoves
     static MoveAssist ReachTick(PlayerState p, BallAction a, Ball ball, int tick, float cap, Tuning t)
     {
         // A ball roll's, elastico's or spin's run eases toward its forward speed from the move's start, the reach included.
-        float hold = MathF.Min(a.SkillEntry, cap);
+        float hold = a.Kind == ActionKind.HeelToHeel ? HeelHold(a, cap, t) : MathF.Min(a.SkillEntry, cap);
         float eased = EasedForwardSpeed(a.Kind, t);
         bool roll = float.IsFinite(eased), ballRoll = a.Kind == ActionKind.BallRoll;
         float floor = MathF.Min(hold, eased), budget = t.Movement.BalanceDeceleration * t.Dt;
@@ -922,9 +922,11 @@ public static class SkillMoves
         if (a.Kind == ActionKind.HeelToHeel && tick == a.Contact2Tick)
         {
             // The trailing foot's flick: straight on at heel_to_heel_flick_ratio times his running speed (at least the minimum),
-            // never faster than he can catch, and chased as a knock-on is (without the dribble cap) until he meets it.
+            // never faster than he can catch, and chased as a knock-on is (without the dribble cap) until he meets it. At a run
+            // (heel_to_heel_run_blend) it is a short flick he runs straight onto (see HeelRunFlick).
             var f3 = new Vector3(a.HoldDirection.X, 0f, a.HoldDirection.Y);
             float want = MathF.Max(k.HeelToHeelFlickMinSpeed, k.HeelToHeelFlickRatio * p.RunSpeed);
+            want += (HeelRunFlick(p, a, ball, tick, t) - want) * HeelRunShare(a.SkillEntry, t);
             float speed = MathF.Min(want, TouchPlanner.CatchablePush(p, ball, f3, 0f, t));
             var v = f3 * speed;
             ball.Velocity = new Vector3(v.X, ball.Velocity.Y, v.Z);
@@ -1056,6 +1058,37 @@ public static class SkillMoves
         float pace = MathF.Max(0f, Vector2.Dot(new Vector2(p.Velocity.X, p.Velocity.Z), face));
         return new Vector3(face.X * pace, 0f, face.Y * pace);
     }
+
+    /// <summary>How much of the run version of the heel-to-heel a move entered at <paramref name="entry"/> m/s takes, 0..1.</summary>
+    static float HeelRunShare(float entry, Tuning t) => Math.Clamp(t.Skill.HeelToHeelRunBlend.Evaluate(entry), 0f, 1f);
+
+    /// <summary>
+    /// The heel-to-heel's running speed: his entry pace, at most the speed cap from standing; at a run (heel_to_heel_run_blend)
+    /// the entry pace itself, so a move entered above the cap (on a touch's boost) does not drop to it.
+    /// </summary>
+    static float HeelHold(BallAction a, float cap, Tuning t)
+    {
+        float capped = MathF.Min(a.SkillEntry, cap);
+        return capped + (a.SkillEntry - capped) * HeelRunShare(a.SkillEntry, t);
+    }
+
+    /// <summary>
+    /// The heel-to-heel's flick at a run, m/s: straight on at the pace that, with him keeping his pace along the run and the
+    /// ball rolling down at roll_deceleration, brings it heel_to_heel_run_flick_ahead in front of him 0.2 s after the move's
+    /// end (where the next dribble touch meets it), never slower than he runs.
+    /// </summary>
+    static float HeelRunFlick(PlayerState p, BallAction a, Ball ball, int tick, Tuning t)
+    {
+        var f = a.HoldDirection;
+        float pace = MathF.Max(0f, Vector2.Dot(new Vector2(p.Velocity.X, p.Velocity.Z), f));
+        float ahead = Vector2.Dot(new Vector2(ball.Position.X - p.Position.X, ball.Position.Z - p.Position.Z), f);
+        float T = (a.EndTick - tick) * t.Dt + HeelFlickMeetAfter;
+        float lead = (t.Skill.HeelToHeelRunFlickAhead - ahead) / T + 0.5f * t.Ball.RollDeceleration * T;
+        return pace + MathF.Max(0f, lead);
+    }
+
+    /// <summary>The heel-to-heel's run flick is paced to its distance this long after the move's end, seconds.</summary>
+    const float HeelFlickMeetAfter = 0.2f;
 
     /// <summary>Elastico: the carried ball eases toward this far ahead of the player along the run (reached at the move's end), metres.</summary>
     const float ElasticoEndAhead = 0.25f;
