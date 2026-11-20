@@ -52,10 +52,13 @@ public sealed class BodyLanguage
     public float TurnFullRad = 0.2f;
     public float ArmOut(int side) => OuterArmPerRad * MathF.Max(0f, side == 0 ? _bank : -_bank);
 
+    /// <summary>The free share eased (half-life <see cref="LeadHalfLife"/>), for amounts the figure lays on itself.</summary>
+    public float FreeShare => _free;
+    float _free, _freeV;
     float _bank, _bankV, _shLead, _shLeadV, _hdLead, _hdLeadV, _look, _lookV;
     bool _have;
 
-    public void Reset() { _have = false; _bank = _bankV = _shLead = _shLeadV = _hdLead = _hdLeadV = _look = _lookV = 0f; }
+    public void Reset() { _have = false; _bank = _bankV = _shLead = _shLeadV = _hdLead = _hdLeadV = _look = _lookV = 0f; _free = _freeV = 0f; }
 
     /// <summary>The bank's target for a speed and sideways acceleration, before the free share (radians).</summary>
     public float BankTarget(float speed, float lateral)
@@ -89,12 +92,13 @@ public sealed class BodyLanguage
         float bT = BankTarget(x.Speed, x.Lateral) * free;
         var (sT, hT, lT) = LeadTarget(x.Speed, x.Lateral);
         sT *= free; hT *= free; lT *= free;
-        if (!_have) { _bank = bT; _shLead = sT; _hdLead = hT; _look = lT; _bankV = _shLeadV = _hdLeadV = _lookV = 0f; _have = true; return; }
+        if (!_have) { _bank = bT; _shLead = sT; _hdLead = hT; _look = lT; _free = free; _bankV = _shLeadV = _hdLeadV = _lookV = _freeV = 0f; _have = true; return; }
         float dt = x.Dt > 0f ? x.Dt : 1f / 120f;
         Follow(ref _bank, ref _bankV, bT, BankHalfLife, dt);
         Follow(ref _shLead, ref _shLeadV, sT, LeadHalfLife, dt);
         Follow(ref _hdLead, ref _hdLeadV, hT, LeadHalfLife, dt);
         Follow(ref _look, ref _lookV, lT, LeadHalfLife, dt);
+        Follow(ref _free, ref _freeV, free, LeadHalfLife, dt);
     }
 
     /// <summary>A critically damped approach of <paramref name="x"/> (velocity <paramref name="v"/>) to <paramref name="target"/>, exact for any step.</summary>

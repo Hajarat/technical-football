@@ -689,6 +689,14 @@ public partial class PlayerFigure
         return _twPrev[side] > 0f || _kW > 0f && side == _kFoot || f.Skill.Valid && (f.Skill.Right ? 1 : 0) == side;
     }
 
+    /// <summary>Whether driven bone <paramref name="k"/> is in the leg (thigh, shin, foot, toes) of a foot playing the ball this tick.</summary>
+    bool PlayingLegBone(in FigureFrame f, int k)
+    {
+        int side = k is >= 10 and <= 13 ? 0 : k is >= 18 and <= 21 ? 1 : -1;   // driven order: left thigh 10 .. toe 13; right 18 .. 21
+        if (side < 0) return false;
+        return _twPrev[side] > 0f || _kW > 0f && side == _kFoot || f.Skill.Valid && (f.Skill.Right ? 1 : 0) == side;
+    }
+
     /// <summary>The fastest bone turn of the tick (local rotations, outside shots) into the stats; returns whether a shot is under way.</summary>
     bool BoneSpeeds(in FigureFrame f, SkinnedBody b, float dt)
     {
@@ -698,6 +706,12 @@ public partial class PlayerFigure
             for (int k = 0; k < n; k++)
             {
                 float deg = _bonePrev[k].AngleTo(b.DrivenLocalRotation(k)) * 180f / Mathf.Pi / dt;
+                // (BODY_LANG: the same outside the whole leg of a foot playing the ball)
+                if (!PlayingLegBone(f, k))
+                {
+                    if (deg > 1500f) Stats.BodyLang.OffLegFast++;
+                    if (deg > Stats.BodyLang.OffLegMaxDegS) { Stats.BodyLang.OffLegMaxDegS = deg; Stats.BodyLang.OffLegAt = $"{b.DrivenBoneNames[k]}@{Stats.Tick}"; }
+                }
                 // the playing foot turning onto its surface (a touch's windup and contact, a skill move, a kick) is reported apart
                 if (PlayingFootBone(f, k))
                 {

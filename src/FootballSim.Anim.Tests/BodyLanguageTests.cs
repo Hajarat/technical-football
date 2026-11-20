@@ -76,6 +76,18 @@ public class BodyLanguageTests
     }
 
     [Fact]
+    public void TheFreeShareEasesBetweenOwnedAndFree()
+    {
+        var b = new BodyLanguage();
+        Run(b, 5f, 0f, 0.2f);
+        Assert.Equal(1f, b.FreeShare, 4);
+        b.Step(new BodyLanguage.Input { Speed = 5f, Free = 0f, Dt = Dt });
+        Assert.InRange(b.FreeShare, 0.8f, 1f);
+        Run(b, 5f, 0f, 0.4f, free: 0f);
+        Assert.InRange(b.FreeShare, 0f, 0.01f);
+    }
+
+    [Fact]
     public void TheFirstTickStartsAtItsTargetAndResetForgets()
     {
         var b = new BodyLanguage();

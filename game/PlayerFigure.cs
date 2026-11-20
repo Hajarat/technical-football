@@ -954,6 +954,7 @@ public partial class PlayerFigure : Node3D
                 float mp = MocapPitch(i, _cycPitch[i], ank[i], out float mToe, out float mLift);
                 ank[i].Y += mLift;
                 _pitch[i] = mp * pw; _toeBend[i] = (Mathf.Lerp(_cycToe[i], 0f, _mW) + mToe) * pw;
+                if (BodyTouchOn) _pitch[i] += TouchPitch(i) * tw[i];
                 MocapPitchRate(i, tw[i] >= 0.999f && !_ovWind[i], dt, ref ank[i]);
                 ank[i].Y += PivotLift(_pitch[i]) * (1f - _mW);   // the cycle's ankle already rises as its heel lifts
                 if (_pitch[i] < -0.03f) planted[i] = false;   // the heel is up: the foot rolls on its toes and is no longer planted flat
@@ -1065,7 +1066,7 @@ public partial class PlayerFigure : Node3D
             // (a shot's plant foot takes the soft reach out by its weight, so neither its landing nor its release moves it in a tick)
             if (_plW > 0f && i == _plFoot && !IsKeeper) ank[i] = MocapSoftReach(hip, ank[i]).Lerp(ank[i], _plW);
             else if (!planted[i] && tw[i] <= 0f && !(_kW > 0f && i == _kFoot)) ank[i] = MocapSoftReach(hip, ank[i]);
-            SolveLeg(hip, ank[i], fwd, out knee[i], out ankEff[i]);
+            SolveLeg(hip, ank[i], BodyTouchOn ? TouchKneePole(i, fwd, dir[i], tw[i]) : fwd, out knee[i], out ankEff[i]);
         }
 
         // ---- arms: each swings against the leg on its own side (forward when the opposite foot lands) ----
@@ -1409,7 +1410,7 @@ public partial class PlayerFigure : Node3D
         if (IsKeeper) return 0f;
         float best = 0f;
         float r = f.BallRadius;
-        _ovWind[i] = false;
+        _ovWind[i] = false; _blTouchS[i] = -1f;
         float upW = 0f; int upId = int.MinValue;
         (int Id, float Tau) handover = (int.MinValue, 0f);   // a touch that takes over from the early hint this tick
         int windId = int.MinValue; float windTau = 0f;        // the unmade touch drawn this tick
@@ -1425,6 +1426,7 @@ public partial class PlayerFigure : Node3D
             // swing to the contact zone in the windup alone
             if (a.Phase is TouchPhase.Planned or TouchPhase.Done || (a.Phase == TouchPhase.PreWindup && !(n == 0 && !a.Made && a.ContactEta <= TouchLead))) continue;
             bool ready = n == 2 && f.UpcomingReady;
+            float touchS = -1f;
             var tf = n == 2 ? _tfUp[i] : _tf[i];
             float tau = a.ContactEta;
             Vector3 centre = a.ContactPoint;
@@ -1475,7 +1477,8 @@ public partial class PlayerFigure : Node3D
                     if (_hintPrev[i] || fromUp) handover = (a.Id, tau);
                 }
                 wgt = Smooth(1f - tau / tf.Span);
-                target = c0 - hv * tau - d * (0.12f * k * Smooth(tau / tf.Span));
+                // (mocap: the foot swings through the ball, arriving along the touch's direction with speed, see TouchSwingBack)
+                target = c0 - hv * tau - d * (k * Mathf.Lerp(0.12f * Smooth(tau / tf.Span), TouchSwingBack(tau / tf.Span), BodyTouchOn ? _mW : 0f));
                 target = WindupTargetJump(tf, a.Id, target, pelXZ, tau);
             }
             else
@@ -1492,7 +1495,9 @@ public partial class PlayerFigure : Node3D
                 wgt = s <= 0.02f ? 1f : 1f - Smooth((s - 0.02f) / (rec - 0.02f));
                 target = pelXZ + tf.RelC + d * (0.25f * k * Smooth(s / 0.08f));
                 target.Y = tf.RelC.Y + 0.10f * k * Smooth(s / 0.10f);
+                if (BodyTouchOn) TouchFollowThrough(i, s, rec, k, pelXZ, f.Facing, pelXZ + tf.RelC, tf.RelC.Y, d, ref wgt, ref target);
                 fdUse = new Vector3(Mathf.Cos(tf.Psi), 0, Mathf.Sin(tf.Psi));
+                touchS = s;
             }
             // a predicted immediate touch (re)appearing is eased in, as the hint is: the prediction comes and goes with the stick
             // (but always fast enough to be all there by its contact)
@@ -1503,6 +1508,7 @@ public partial class PlayerFigure : Node3D
             }
             if (wgt <= best) continue;
             best = wgt; surf = a.Surface;
+            _blTouchD[i] = d; _blTouchS[i] = touchS; _blTouchSurf[i] = sf;
             _ovWind[i] = !a.Made;
             if (!a.Made && tau > 0f) { windId = a.Id; windTau = tau; } else windId = int.MinValue;
             Vector3 cur = dirv;
@@ -1530,6 +1536,7 @@ public partial class PlayerFigure : Node3D
             ank = ank.Lerp(target, wgt);
             dirv = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
             best = wgt; surf = BootSurface.Inside; _ovWind[i] = true; hint = wgt > 0f;
+            _blTouchD[i] = d; _blTouchSurf[i] = BootSurface.Inside;
         }
         // Where the touch took over from the hint, what the hint drew (carried on at its last velocity) and what the touch draws differ by the
         // guess's error (place, surface): that difference is kept and taken out by the contact, so the foot bends its path instead of jumping.
@@ -1550,7 +1557,7 @@ public partial class PlayerFigure : Node3D
                 dirv = new Vector3(Mathf.Cos(yaw), 0, Mathf.Sin(yaw));
             }
         }
-        if (best <= 0f) _ovTurn[i] = 0f;
+        if (best <= 0f) { _ovTurn[i] = 0f; _blTouchS[i] = -1f; }
         _ovAnk[i, 1] = _ovAnk[i, 0]; _ovAnk[i, 0] = ank; _ovYaw[i] = Mathf.Atan2(dirv.Z, dirv.X);
         _hintPrev[i] = hint; _hintW[i] = hint ? best : 0f; _upW[i] = upW; _upIdPrev[i] = upW > 0f ? upId : int.MinValue;
         return best;

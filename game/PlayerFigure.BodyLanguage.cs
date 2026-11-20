@@ -30,6 +30,7 @@ public partial class PlayerFigure
     {
         if (_teleporting) _bl.Reset();
         FacingRate(f, dt);
+        _blFacing = f.Facing;
         _blFree = BodyOwned(f) ? 0f : 1f;
         _bl.Step(new BodyLanguage.Input { Speed = _speedS, Lateral = _latS, Forward = _accFS, Free = _blFree, Dt = dt });
     }
@@ -54,10 +55,100 @@ public partial class PlayerFigure
         _faceRateS = _teleporting ? 0f : Mathf.Lerp(_faceRateS, BodyOwned(f) ? 0f : r, 1f - Mathf.Exp(-dt / FaceRateTau));
     }
 
+    // ---- visible touches (mocap): the swing through the ball, its follow-through, the knee and the trunk with it ----
+    /// <summary>Per foot, from the touch drawn this tick: the ball's direction out, seconds since its contact (-1 before it or none) and the surface.</summary>
+    readonly Vector3[] _blTouchD = new Vector3[2];
+    readonly float[] _blTouchS = { -1f, -1f };
+    readonly BootSurface[] _blTouchSurf = new BootSurface[2];
+    float _blFacing;
+    bool BodyTouchOn => _atkAnim != null && !BodyLangOff;
+
+    /// <summary>
+    /// The windup's backswing (metres at 1.8 m) behind the contact along the touch's direction, <paramref name="x"/> = time left over the
+    /// windup's span (1 at its start, 0 at the contact): x(2 - x) times <see cref="TouchBackM"/>, flat where it starts and steepest at the contact,
+    /// so the foot arrives moving through the ball (the backswing over the span, twice over, is its speed against the body there).
+    /// </summary>
+    static float TouchSwingBack(float x) { x = Math.Clamp(x, 0f, 1f); return TouchBackM * x * (2f - x); }
+    const float TouchBackM = 0.18f;
+    /// <summary>The follow-through: along the touch's direction against the body, <see cref="FollowM"/> over <see cref="FollowS"/> (easing out from
+    /// its fastest at the contact), lifted <see cref="FollowLiftM"/>; the touch's pose held whole for <see cref="FollowHoldS"/> (at most half
+    /// the recovery) and given back to the stride over the rest of it, and from <see cref="FollowHandS"/> to <see cref="FollowS"/> all of
+    /// this handed over to the procedural recovery.</summary>
+    const float FollowReach = 0.96f;
+    const float FollowM = 0.20f, FollowS = 0.125f, FollowHandS = 0.085f, FollowLiftM = 0.07f, FollowHoldS = 0.09f;
+
+    /// <summary>The touch's pose after its contact (mocap): <paramref name="c"/> the ankle at the contact (world, carried with the body), <paramref name="cy"/> its height.</summary>
+    /// <remarks>The follow-through stays within <see cref="FollowReach"/> of the leg from its hip (a reach past it would sink the pelvis, see Update).</remarks>
+    void TouchFollowThrough(int i, float s, float rec, float k, Vector3 pelXZ, float facing, Vector3 c, float cy, Vector3 d, ref float wgt, ref Vector3 target)
+    {
+        float w0 = wgt; Vector3 t0 = target;
+        // (all given back by the recovery's end, when the core drops the touch: held at most half of it)
+        float hold = Math.Min(FollowHoldS, 0.5f * rec);
+        wgt = s <= hold ? 1f : 1f - Smooth((s - hold) / Math.Max(rec - hold, 1e-3f));
+        float u = Math.Min(1f, s / FollowS);
+        target = c + d * (FollowM * k * (1f - (1f - u) * (1f - u)));
+        target.Y = cy + FollowLiftM * k * Smooth(s / 0.10f);
+        Vector3 right = new(-Mathf.Sin(facing), 0, Mathf.Cos(facing));
+        Vector3 hip = new Vector3(pelXZ.X, StandY * _ratioS, pelXZ.Z) + right * (i == 0 ? -HipW : HipW);
+        Vector3 dh = target - hip;
+        // (never nearer than the contact's own pose: the contact is drawn exactly where the touch has it)
+        float most = Math.Max(FollowReach * Leg, (new Vector3(c.X, cy, c.Z) - hip).Length());
+        if (dh.Length() > most) target = hip + dh * (most / dh.Length());
+        // past the follow-through it hands over to the stride's own recovery (exactly that from FollowS on): a skill move or shot that
+        // starts then takes over from the pose it would have taken over from anyway
+        float m = FollowShare(s);
+        wgt = Mathf.Lerp(w0, wgt, m); target = t0.Lerp(target, m);
+    }
+
+    /// <summary>The playing foot's pitch over its stride pitch (radians, toes up positive) after the contact: the laces' toe pointed down through the follow-through.</summary>
+    float TouchPitch(int i) => _blTouchS[i] >= 0f && _blTouchSurf[i] == BootSurface.Laces ? -LacesToeDown * Smooth(_blTouchS[i] / 0.05f) * FollowShare(_blTouchS[i]) : 0f;
+
+    /// <summary>The follow-through's share of the touch's pose <paramref name="s"/> seconds after its contact: the cycles' weight, handed over to the procedural recovery from <see cref="FollowHandS"/> to <see cref="FollowS"/> (a touch from standing keeps the procedural one).</summary>
+    float FollowShare(float s) => _mW * (1f - Smooth((s - FollowHandS) / (FollowS - FollowHandS)));
+    const float LacesToeDown = 0.35f;
+
+    /// <summary>The playing leg's knee pole (mocap): from the facing toward the boot's heading and the touch's direction by the touch's weight, so the knee drives over the ball the way it goes.</summary>
+    /// <remarks>Its weight follows the touch's at most <see cref="TouchKneeRate"/> a second and its heading is kept from the last tick a touch drew the foot, so a touch dropped at once
+    /// (a forecast hint withdrawn) never twists the leg about its hip-to-ankle line in a tick.</remarks>
+    Vector3 TouchKneePole(int i, Vector3 fwd, Vector3 dir, float tw)
+    {
+        if (tw > 0f)
+        {
+            Vector3 t = new Vector3(dir.X, 0, dir.Z).Normalized() + 0.5f * _blTouchD[i];
+            if (t.LengthSquared() > 1e-4f) _poleT[i] = t.Normalized();
+        }
+        // (handed back with the follow-through: none of it left once the procedural recovery has the foot)
+        if (_blTouchS[i] >= 0f) tw *= 1f - Smooth((_blTouchS[i] - FollowHandS) / (FollowS - FollowHandS));
+        _poleW[i] = _teleporting ? tw : _poleW[i] + Math.Clamp(tw - _poleW[i], -TouchKneeRate / 120f, TouchKneeRate / 120f);
+        float w = Math.Clamp(_poleW[i], 0f, 1f);
+        if (w <= 1e-4f || _poleT[i].LengthSquared() < 0.5f) return fwd;
+        Vector3 p = fwd.Lerp(_poleT[i], TouchKneeShare * w);
+        return p.LengthSquared() > 1e-4f ? p.Normalized() : fwd;
+    }
+    const float TouchKneeShare = 0.8f, TouchKneeRate = 8f;
+    readonly float[] _poleW = new float[2];
+    readonly Vector3[] _poleT = new Vector3[2];
+
+    /// <summary>The trunk's turn toward a turn or cut touch as it is played (radians, positive toward his right): a share of the touch's angle off the facing past <see cref="TouchTurnFrom"/>, capped, by the touch's weight.</summary>
+    float TouchTrunkYaw()
+    {
+        float sum = 0f;
+        for (int i = 0; i < 2; i++)
+        {
+            float w = _twPrev[i];
+            if (w <= 0f || _blTouchD[i].LengthSquared() < 0.5f) continue;
+            float a = Mathf.Wrap(Mathf.Atan2(_blTouchD[i].Z, _blTouchD[i].X) - _blFacing, -Mathf.Pi, Mathf.Pi);
+            float on = Smooth((Math.Abs(a) - TouchTurnFrom) / TouchTurnFrom);
+            sum += Math.Clamp(a * TouchTurnShare, -TouchTurnMax, TouchTurnMax) * on * w;
+        }
+        return Math.Clamp(sum, -TouchTurnMax, TouchTurnMax);
+    }
+    const float TouchTurnFrom = 0.2f, TouchTurnShare = 0.3f, TouchTurnMax = 0.17f;
+
     /// <summary>The layers the animator lays over the cycles' trunk, head and arms this tick.</summary>
     BodyLayers BodyLayersNow() => new()
     {
-        TrunkYaw = _bl.ShoulderLead, HeadYaw = _bl.HeadLead, ArmOutL = _bl.ArmOut(0), ArmOutR = _bl.ArmOut(1),
+        TrunkYaw = _bl.ShoulderLead + TouchTrunkYaw() * _bl.FreeShare, HeadYaw = _bl.HeadLead, ArmOutL = _bl.ArmOut(0), ArmOutR = _bl.ArmOut(1),
     };
 
     // ---- measurement (BODY_LANG): read from the shown body ----
@@ -143,7 +234,8 @@ public partial class PlayerFigure
             bool prevMade = f.PrevAction.Valid && f.PrevAction.Made && f.PrevAction.Phase == TouchPhase.Contact;
             var a = curMade ? f.Action : f.PrevAction;
             Vector3 d = new(a.BallOutVelocity.X, 0, a.BallOutVelocity.Z);
-            if ((curMade || prevMade) && a.Kind != SoftTouchKind && !a.IsSkill && d.LengthSquared() > 0.04f)
+            if ((curMade || prevMade) && a.Kind != SoftTouchKind && !a.IsSkill && d.LengthSquared() > 0.04f && _mW < 0.99f) s.FollowStanding++;
+            else if ((curMade || prevMade) && a.Kind != SoftTouchKind && !a.IsSkill && d.LengthSquared() > 0.04f)
             {
                 _blFollowTick = tick; _blFollowFoot = a.Right ? 1 : 0; _blFollowDir = d.Normalized();
                 _blFollowRel0 = ank[_blFollowFoot] - pel; _blFollowRel0.Y = 0;
@@ -171,6 +263,10 @@ public sealed class BodyLangStats
     public readonly List<Turn> Turns = new();
     public readonly List<Sample> Ticks = new();
     public readonly List<float> Follow = new();
+    /// <summary>The fastest bone turn (deg/s, shots left out) outside the whole leg of a foot playing the ball, where, and the ticks over 1,500.</summary>
+    public float OffLegMaxDegS; public string OffLegAt = "-"; public int OffLegFast;
+    /// <summary>Dribble touches made below the cycles' full weight (from standing, at a walk): left out of the follow-through, counted.</summary>
+    public int FollowStanding;
     public float StraightMaxDeg, StraightNetDeg, AfterTurnMaxDeg, AfterTurnNetDeg; public int StraightN;
 
     const float D = 180f / MathF.PI;
@@ -212,6 +308,7 @@ public sealed class BodyLangStats
             $" lean_acc_peak_deg={accPk:F1} at_speed={accSp:F2} acc={accA:F1} lean_brake_peak_deg={brkPk:F1} at_speed={brkSp:F2} acc={brkA:F1} brake_pelvis_drop_m={brkDrop:F3} lean_brake_at_6_min_deg={at6:F1}" +
             $" posture_lean_deg={(nB > 0 && nN > 0 ? (rB - rN) * D : float.NaN):F1} posture_pelvis_drop_m={(nB > 0 && nN > 0 ? pelB / nB - pelN / nN : float.NaN):F3} pelvis_below_cycles_ball_m={(nB > 0 ? pelB / nB : float.NaN):F3}" +
             $" head_down_deg_mean={(hdN > 0 ? hdSum / hdN : float.NaN):F1} min={hdMin:F1} n={hdN}" +
-            $" follow_m_min={fMin:F3} mean={(Follow.Count > 0 ? fSum / Follow.Count : float.NaN):F3} n={Follow.Count}";
+            $" follow_m_min={fMin:F3} mean={(Follow.Count > 0 ? fSum / Follow.Count : float.NaN):F3} n={Follow.Count} standing_n={FollowStanding}" +
+            $" off_leg_bone_max_deg_s={OffLegMaxDegS:F0} at={OffLegAt} off_leg_over_1500={OffLegFast}";
     }
 }
