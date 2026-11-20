@@ -1205,7 +1205,9 @@ public partial class PlayerFigure : Node3D
                 // the boot's contact surface of the action's foot against the ball surface at the contact tick; the figure aims at the action's contact point
                 var a = curMade ? f.Action : f.PrevAction;
                 int fi = a.Right ? 1 : 0;
-                Vector3 off = Off(fi, a.Surface);
+                // (the surface the figure plays it with: an immediate touch keeps the one its forecast windup was drawn with)
+                var drawn = _tfUp[fi].SurfId == a.Id ? _tfUp[fi].Surf : a.Surface;
+                Vector3 off = Off(fi, drawn);
                 Vector3 fd = dir[fi]; fd.Y = 0; fd = fd.Normalized();
                 Vector3 fr = new(-fd.Z, 0, fd.X);
                 Vector3 pt = ankEff[fi] + fd * off.X + Vector3.Up * off.Y + fr * off.Z;
@@ -1215,7 +1217,7 @@ public partial class PlayerFigure : Node3D
                 Stats.ContactBall.Add(Math.Abs((pt - f.BallPos).Length() - f.BallRadius));
                 if (!float.IsNaN(a.ContactMiss)) Stats.TouchMiss.Add(a.ContactMiss);
                 if (_body != null && _body.HasSurfaces)
-                    Stats.Skin.Add(Math.Abs((_body.SurfacePoint(fi, a.Surface) - a.ContactPoint).Length() - f.BallRadius));
+                    Stats.Skin.Add(Math.Abs((_body.SurfacePoint(fi, drawn) - a.ContactPoint).Length() - f.BallRadius));
                 // the foot drawn in the swing (the stride clock's) and the foot the touch event names are both the action's foot
                 Stats.Touches++;
                 if (a.Right != f.EventRight || (f.HasGait && f.IsStepping && f.SwingRight != a.Right) || tw[fi] < 0.999f) Stats.FootMismatches++;
@@ -1414,9 +1416,12 @@ public partial class PlayerFigure : Node3D
             }
             // the drawn direction follows the wanted one at a limited rate within one touch (a new touch starts from its own)
             d = DrawnOutDir(i, a.Id, d, f.Dt);
-            // until the contact the foot is shaped for the surface the windup began with; the contact itself uses the touch's own surface
+            // until the contact the foot is shaped for the surface the windup began with; the contact itself uses the touch's own surface,
+            // except for an immediate touch whose windup was drawn toward the forecast (the same id) with another surface: a stick or sprint
+            // change in its last ticks would otherwise turn the boot over on the contact tick (it plays the ball with the surface it came with)
             BootSurface sf = a.Surface;
             if (!a.Made) { if (tf.SurfId != a.Id) { tf.SurfId = a.Id; tf.Surf = a.Surface; } sf = tf.Surf; }
+            else if (n == 0 && _tfUp[i].SurfId == a.Id) sf = _tfUp[i].Surf;
             Vector3 fd = SurfaceDir(sf, i, d);
             Vector3 rv = new(-fd.Z, 0, fd.X);
             Vector3 off = Off(i, sf);
