@@ -600,7 +600,6 @@
     "elastico_push_distance": 0.3,
     "elastico_contact2_seconds": 0.22,
     "elastico_seconds": 0.26,
-    "elastico_snap_distance": 0.3,
     "elastico_forward_speed": 2,
     "spin_reach_max": 0.12,
     "spin_seconds": 0.6,

@@ -237,6 +237,8 @@ public sealed class BallAction
     /// <summary>Where the carried ball was sent on the latest tick, and how far from it the ball was at the second contact, metres (NaN before).</summary>
     internal Vector3 LastTarget;
     internal float Contact2PathMiss = float.NaN;
+    /// <summary>Elastico: the exit burst's scale for the way its second contact played the ball on (NaN before it).</summary>
+    internal float ExitBurstScale = float.NaN;
     /// <summary>A fake cut's direction (unit X, Z).</summary>
     internal Vector2 SkillCut;
     /// <summary>The effective skill_moves rating the move was made with.</summary>

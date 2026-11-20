@@ -558,6 +558,10 @@ public class SkillMoveTests
         public float Entry;
         public bool Lost, InPossessionAtEnd;
         public readonly List<(int Tick, Foot Foot)> Touches = new();
+        /// <summary>The first touch after the second contact (-1: none) and whether it was a skill move's; the ball's velocity on the second contact.</summary>
+        public int NextTouch = -1;
+        public bool NextTouchSkill;
+        public Vector3 BallV2;
     }
 
     static Track PlayTwoContact(string move, Entry e, int side, ulong seed)
@@ -568,7 +572,8 @@ public class SkillMoveTests
         var tr = new Track();
         var buf = new TickIntent[w.PlayerCount];
         bool gained = false;
-        // The exit: toward the side at 45 degrees for the elastico, straight on otherwise, with sprint.
+        // The exit: toward the side at 45 degrees for the elastico (from the gesture's end: its second contact plays the ball on that
+        // way), straight on otherwise from the move's end, with sprint.
         float exitDeg = move == "elastico" ? side * 45f : 0f;
         var exit = new TickIntent { MoveX = MathF.Cos(exitDeg * MathF.PI / 180f), MoveZ = MathF.Sin(exitDeg * MathF.PI / 180f), Sprint = 1f };
         int g0 = -1;
@@ -579,7 +584,7 @@ public class SkillMoveTests
             if (g0 < 0 && tick > 240 && (e == Entry.Standing || p.ActionContactEta is > 0.05f and < 0.2f || tick > 360)) g0 = tick - 1;
             int i = g0 < 0 ? -1 : tick - 1 - g0;
             if (i >= 0 && i < 20) it = trace(i, it);
-            else if (tr.Move != null && w.Tick >= tr.Move.EndTick) it = exit;
+            else if (tr.Move != null && (w.Tick >= tr.Move.EndTick || move == "elastico" && i >= 20)) it = exit;
             float run0 = p.RunSpeed;
             buf[0] = it;
             w.Step(buf);
@@ -590,7 +595,13 @@ public class SkillMoveTests
                 if (ev.Kind == EventKind.PossessionLost && gained) tr.Lost = true;
                 if (ev.Kind == EventKind.SkillMove && tr.Move == null) { tr.Move = p.SkillMove!; tr.Entry = run0; }
                 if (ev.Kind == EventKind.Touch && tr.Move != null && w.Tick < tr.Move.EndTick) tr.Touches.Add((w.Tick, ev.Foot));
+                if (ev.Kind == EventKind.Touch && tr.Move != null && w.Tick > tr.Move.Contact2Tick && tr.NextTouch < 0)
+                {
+                    tr.NextTouch = w.Tick;
+                    tr.NextTouchSkill = p.TouchAction is { IsSkill: true };
+                }
             }
+            if (tr.Move != null && w.Tick == tr.Move.Contact2Tick) tr.BallV2 = w.Ball.Velocity;
             if (tr.Move != null && w.Tick <= tr.Move.EndTick) tr.At[w.Tick] = (p.Position, p.Velocity, p.RunSpeed, p.Facing, w.Ball.Position);
             if (tr.Move != null && w.Tick > tr.Move.EndTick + 240) break;
         }
@@ -689,8 +700,9 @@ public class SkillMoveTests
     [InlineData(Entry.Standing, 1)]
     [InlineData(Entry.Jog, -1)]
     [InlineData(Entry.Sprint, 1)]
-    public void TheElasticoPushesTheBallOutAndSnapsItAcrossToItsSide(Entry e, int side)
+    public void TheElasticoPushesTheBallOutAndItsInsidePlaysItOnAsTheExitTouch(Entry e, int side)
     {
+        var t = TestData.Tuning();
         var tr = PlayTwoContact("elastico", e, side, 1);
         var m = tr.Move;
         var f = m.RunDirection;
@@ -698,17 +710,21 @@ public class SkillMoveTests
         float Lat(Vector3 v) => v.X * s.X + v.Z * s.Y;
         float Along(Vector3 v) => v.X * f.X + v.Z * f.Y;
         var b0 = tr.At[m.ContactTick].B;
-        // The outside's push: about 0.30 m away from the side by 0.11 s; the snap leaves it about 0.30 m to the side at the release.
-        // (The release's 0.30 m is measured from the line the player was on at the first contact.)
-        var p0 = tr.At[m.ContactTick - 1].P;
-        float push = Lat(tr.At[m.ContactTick + 13].B - b0), wrap = Lat(tr.At[m.Contact2Tick - 1].B - b0), rel = Lat(tr.At[m.EndTick - 1].B - p0);
-        Assert.True(push is > -0.35f and < -0.25f && wrap is > -0.35f and < -0.25f && rel is > 0.22f and < 0.38f, $"push {push:F3} wrap {wrap:F3} release {rel:F3}");
-        // At the release the ball is where a normal exit touch plays it: ahead and to the exit side of the player, within reach.
-        var end = tr.At[m.EndTick - 1];
-        Assert.InRange(Along(end.B - end.P), 0.15f, 0.5f);
-        Assert.InRange(Lat(end.B - end.P), -0.05f, 0.5f);
+        // The outside's push: about 0.30 m away from the side by 0.11 s, held there as the foot wraps round it.
+        float push = Lat(tr.At[m.ContactTick + 13].B - b0), wrap = Lat(tr.At[m.Contact2Tick - 1].B - b0);
+        Assert.True(push is > -0.35f and < -0.25f && wrap is > -0.35f and < -0.25f, $"push {push:F3} wrap {wrap:F3}");
+        // The inside plays it on toward the stick (45 degrees to the side) at the second contact: that is the exit touch, so none
+        // is made on the end tick; the next touch is an ordinary one, at least a windup after the second contact.
+        float deg = MathF.Atan2(Lat(tr.BallV2), Along(tr.BallV2)) * 180f / MathF.PI;
+        Assert.InRange(deg, 30f, 60f);
+        Assert.True(new Vector2(tr.BallV2.X, tr.BallV2.Z).Length() > 1f, $"ball {tr.BallV2} after the second contact");
+        Assert.True(tr.NextTouch > m.EndTick, $"next touch on {tr.NextTouch}, the move ends on {m.EndTick}");
+        Assert.True(tr.NextTouch - m.Contact2Tick >= TouchPlanner.WindupTicks(t), $"next touch {tr.NextTouch - m.Contact2Tick} ticks after the second contact");
+        Assert.False(tr.NextTouchSkill);
+        Assert.False(tr.Lost);
         // He comes out of it driving toward the side.
-        Assert.True(Lat(end.V) > 0.5f, $"sideways {Lat(end.V):F2} m/s at the release");
+        var end = tr.At[m.EndTick - 1];
+        Assert.True(Lat(end.V) > 0.5f, $"sideways {Lat(end.V):F2} m/s at the end");
     }
 
     [Theory]

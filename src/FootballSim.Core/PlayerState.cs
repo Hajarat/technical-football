@@ -294,7 +294,7 @@ public sealed class PlayerState
     internal int SkillBufFakeFrom = -1;
     /// <summary>World tick a move ended on, when the touch planner may make the exit touch at once; -1 otherwise.</summary>
     internal int SkillExitTick = -1;
-    /// <summary>World tick a heel-to-heel ended on, when its exit burst starts (its flick was the exit touch); -1 otherwise.</summary>
+    /// <summary>World tick a heel-to-heel or elastico ended on, when its exit burst starts (its second contact was the exit touch); -1 otherwise.</summary>
     internal int SkillBurstAtTick = -1;
     /// <summary>Simulation seconds before which no move starts (the drag-back's cooldown).</summary>
     internal float SkillCooldownUntil = -100f;

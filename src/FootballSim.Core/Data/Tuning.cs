@@ -1105,16 +1105,14 @@ public sealed class SkillTuning
     public float FakeCutTime { get; set; } = 0.5f;
     /// <summary>
     /// Elastico: the reach for the ball (at most, seconds); from the first contact the outside's push away from the exit side
-    /// (this long, this far), the inside's snap back (its contact this long after the first) and the release; the ball ends
-    /// elastico_snap_distance to the exit side of where it was first played. The running speed eases down to at most
-    /// elastico_forward_speed (within balance_deceleration).
+    /// (this long, this far), the inside's contact that plays the ball on as the exit touch (this long after the first) and the
+    /// move's end. The running speed eases down to at most elastico_forward_speed (within balance_deceleration).
     /// </summary>
     public float ElasticoReachMax { get; set; } = 0.10f;
     public float ElasticoPushSeconds { get; set; } = 0.11f;
     public float ElasticoPushDistance { get; set; } = 0.30f;
     public float ElasticoContact2Seconds { get; set; } = 0.22f;
     public float ElasticoSeconds { get; set; } = 0.26f;
-    public float ElasticoSnapDistance { get; set; } = 0.30f;
     public float ElasticoForwardSpeed { get; set; } = 2.0f;
     /// <summary>
     /// Spin: the reach (at most, seconds); from the first sole's landing the move's length, the second sole's contact and the

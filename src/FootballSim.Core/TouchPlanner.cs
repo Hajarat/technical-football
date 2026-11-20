@@ -991,7 +991,7 @@ public static class TouchPlanner
     {
         if (p.StepBegun) p.StepsSinceTouch++;
         // A skill move under way plays the ball itself, whatever the shoot button does.
-        if (inPossession && p.SkillAction != null) return SkillMoves.Step(p, ball, tick, now, t);
+        if (inPossession && p.SkillAction != null) return SkillMoves.Step(p, Debounced(p, rawIntent, t), ball, tick, now, t, pitch);
         if (p.SkillBurstAtTick == tick)
         {
             p.SkillBurstAtTick = -1;
@@ -1087,10 +1087,11 @@ public static class TouchPlanner
     /// <paramref name="steps"/> steps on (at least the windup ahead), or the one nearest <paramref name="nearTicks"/> when that
     /// is set.
     /// </summary>
-    static bool FindMeet(PlayerState from, in TickIntent user, int steps, int nearTicks, float now, Tuning t, Pitch? pitch, out Meet meet)
+    static bool FindMeet(PlayerState from, in TickIntent user, int steps, int nearTicks, float now, Tuning t, Pitch? pitch, out Meet meet,
+        int minJ = 0)
     {
         meet = default;
-        int pre = Math.Max(1, WindupTicks(t));
+        int pre = Math.Max(Math.Max(1, WindupTicks(t)), minJ);
         var c = from.Scratch();
         int horizon = nearTicks > 0 ? nearTicks + Ticks(1f, t) : Ticks(3f, t);
         int count = 0, bestGap = int.MaxValue;
@@ -1126,6 +1127,40 @@ public static class TouchPlanner
             if (count >= steps) return true;
         }
         return found;
+    }
+
+    /// <summary>
+    /// The push of a skill move's own contact that is also its exit touch (the elastico's inside): the ball sent toward
+    /// <paramref name="dir"/> (unit, world X, Z) as a dribble touch made at once along it would send it (its mode's steps, cut
+    /// short for a turn, onto the swing that many steps on, no sooner than <paramref name="minJ"/> ticks), without the rated
+    /// errors. Returns the ball's velocity; <paramref name="steps"/> the steps it was solved for. Changes no state.
+    /// </summary>
+    internal static Vector3 SkillExitPush(PlayerState p, in TickIntent intent, Vector2 dir, Ball ball, int minJ, float now, Tuning t,
+        Pitch? pitch, out int steps)
+    {
+        var k = t.Touch;
+        var user = intent;
+        user.MoveX = dir.X;
+        user.MoveZ = dir.Y;
+        var mode = TouchModel.ModeFor(user, t);
+        var wanted = new Vector3(dir.X, 0f, dir.Y);
+        float turnDeg = TouchModel.TurnAngleDeg(p, ball, wanted);
+        steps = TouchModel.StepsPerTouch(p.Sheet, mode, t);
+        bool turning = p.RunSpeed > k.ExecutionMinSpeed && turnDeg > k.ExecutionAngle;
+        if (turning)
+        {
+            steps = Math.Max(1, (int)MathF.Round(EarlyFraction(p, turnDeg, t) * steps));
+            steps = Math.Min(steps, mode == TouchMode.Sprint ? k.TurningMaxSteps.Sprint : mode == TouchMode.Jog ? k.TurningMaxSteps.Jog : steps);
+        }
+        ActionKind kind = !turning ? ModeKind(mode) : turnDeg > k.CutDeg && p.RunSpeed > k.CutMinSpeed ? ActionKind.Cut : ActionKind.Turn;
+        bool hasMeet = FindMeet(p, user, steps, 0, now, t, pitch, out var meet, minJ);
+        if (hasMeet) steps = Math.Max(1, Math.Min(steps, meet.Swings));
+        Vector3 target = hasMeet ? meet.Cp : p.Position + wanted * 2f;
+        float minPush = TouchModel.MinPush(mode, t);
+        float u = SolveLiftedPush(p, ball, target, hasMeet ? meet.J : Ticks(0.6f, t), kind, mode, minPush, MathF.Max(k.MaxPush, minPush), t,
+            out var d, out _, out float lift);
+        if (u > p.RunSpeed + 1f) u = MathF.Min(u, CatchablePush(p, ball, d, lift, t));
+        return Launch(d, u, lift, 0f);
     }
 
     /// <summary>The longest a push is solved for, seconds (inside the 1.5 s the player is always back on the ball).</summary>

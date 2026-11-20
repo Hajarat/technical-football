@@ -756,7 +756,7 @@ public static class SkillMoves
     /// After the player has moved this tick: the contact on the contact tick (a sole landing on the ball, or the fake cut's
     /// hook), and the ball's path while the sole controls it. Returns the touch made, if any.
     /// </summary>
-    internal static TouchResult? Step(PlayerState p, Ball ball, int tick, float now, Tuning t)
+    internal static TouchResult? Step(PlayerState p, in TickIntent intent, Ball ball, int tick, float now, Tuning t, Pitch? pitch)
     {
         var a = p.SkillAction!;
         var k = t.Skill;
@@ -777,8 +777,9 @@ public static class SkillMoves
         Vector3 contactBall = ball.Position;
         if (tick == a.Contact2Tick && TwoContacts(a.Kind))
             a.Contact2PathMiss = new Vector2(ball.Position.X - a.LastTarget.X, ball.Position.Z - a.LastTarget.Z).Length();
-        // The heel-to-heel carries the ball only until the flick; the others to the release.
-        if (carried && tick >= a.ContactTick && !(a.Kind == ActionKind.HeelToHeel && tick >= a.Contact2Tick))
+        // The heel-to-heel carries the ball only until the flick and the elastico until its inside plays it on; the others to the
+        // release.
+        if (carried && tick >= a.ContactTick && !(a.Kind is ActionKind.HeelToHeel or ActionKind.Elastico && tick >= a.Contact2Tick))
         {
             Vector3 target = CarriedBall(p, a, tick, t);
             a.LastTarget = target;
@@ -799,6 +800,12 @@ public static class SkillMoves
             p.KnockOnFrom = now;
             p.KnockOnUntil = now + TouchModel.KnockOnCatchTime(p.Sheet, t) + t.Touch.KnockOnChaseGrace;
             p.KnockOnDirection = a.HoldDirection;
+        }
+        if (a.Kind == ActionKind.Elastico && tick == a.Contact2Tick)
+        {
+            var v = ElasticoExit(p, a, intent, ball, tick, now, t, pitch);
+            ball.Velocity = v;
+            ball.Spin = ball.RollingSpin(v);
         }
         if (tick == a.ContactTick && (carried || a.Kind == ActionKind.FakeCut))
         {
@@ -825,7 +832,7 @@ public static class SkillMoves
         }
         else if (tick == a.Contact2Tick && TwoContacts(a.Kind))
         {
-            // The second contact: the elastico's inside, the spin's other sole, the heel-to-heel's flick.
+            // The second contact: the elastico's inside (its exit touch), the spin's other sole, the heel-to-heel's flick.
             p.LastTouchTime = now;
             p.LastTouchFoot = a.Foot2;
             p.LastTouchKind = a.Kind;
@@ -840,15 +847,15 @@ public static class SkillMoves
 
     /// <summary>
     /// The exit touch the core expects on the end tick of the move under way (see <see cref="PlayerState.SkillExitTouch"/>), or null:
-    /// none under way, more than <see cref="ExitForecastSeconds"/> to go, the stick released, a heel-to-heel (its flick is the exit
-    /// touch), or the ball predicted out of foot reach then. What the touch planner decides for an immediate touch, on the player and
+    /// none under way, more than <see cref="ExitForecastSeconds"/> to go, the stick released, a heel-to-heel or elastico (its second
+    /// contact is the exit touch), or the ball predicted out of foot reach then. What the touch planner decides for an immediate touch, on the player and
     /// the ball carried on to the end tick at their pace and the ball's velocity as <see cref="Finish"/> leaves it (exact on the tick
     /// before the end, where the ball is already where the touch meets it). Changes no state.
     /// </summary>
     internal static BallAction? ExitForecast(PlayerState p, in TickIntent intent, Ball ball, int tick, Tuning t)
     {
         var a = p.SkillAction;
-        if (a == null || a.Kind == ActionKind.HeelToHeel || a.Phase == ActionPhase.Done) return null;
+        if (a == null || a.Kind is ActionKind.HeelToHeel or ActionKind.Elastico || a.Phase == ActionPhase.Done) return null;
         int n = a.EndTick - tick;
         if (n < 1 || n * t.Dt > ExitForecastSeconds + 1e-5f) return null;
         if (intent.Move.Length() < t.Touch.StickThreshold) return null;
@@ -860,14 +867,8 @@ public static class SkillMoves
         if (Reaches(a.Kind) && tick >= a.ContactTick)
         {
             b = CarriedBall(p, a, a.EndTick - 1, t);
-            // (the carried ball goes along the run with the player: moved on with him to the tick before the end; the ball roll's
-            // also goes across with his step)
-            if (a.Kind == ActionKind.Elastico)
-            {
-                var f3 = new Vector3(a.HoldDirection.X, 0f, a.HoldDirection.Y);
-                b += f3 * (Vector3.Dot(pv, f3) * (n - 1) * dt);
-            }
-            else if (a.Kind is ActionKind.Spin or ActionKind.BallRoll) b += pv * ((n - 1) * dt);
+            // (the carried ball goes with the player: moved on with him to the tick before the end)
+            if (a.Kind is ActionKind.Spin or ActionKind.BallRoll) b += pv * ((n - 1) * dt);
         }
         else b = ball.Position + new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z) * ((n - 1) * dt);
         b.Y = ball.Position.Y;
@@ -879,7 +880,6 @@ public static class SkillMoves
         {
             ActionKind.BallRoll => new Vector3(fwd.X, 0f, fwd.Y) * RollReleasePace(a, new Vector2(pv.X, pv.Z), t),
             ActionKind.DragBack or ActionKind.FakeStop => Vector3.Zero,
-            ActionKind.Elastico => ElasticoReleaseVelocity(p, a),
             ActionKind.Spin => FacedPace(p),
             _ => new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z),
         };
@@ -916,15 +916,6 @@ public static class SkillMoves
         };
     }
 
-    /// <summary>The elastico's ball velocity at the release (see <see cref="ElasticoRelease"/>).</summary>
-    static Vector3 ElasticoReleaseVelocity(PlayerState p, BallAction a)
-    {
-        var r = ElasticoRelease(p, a);
-        var side = SideOf(a);
-        Vector2 fwd = a.HoldDirection;
-        return new Vector3(fwd.X * r.X + side.X * r.Y, 0f, fwd.Y * r.X + side.Y * r.Y);
-    }
-
     /// <summary>The spin's ball velocity out of the turn: along his facing at his pace that way.</summary>
     static Vector3 FacedPace(PlayerState p)
     {
@@ -933,8 +924,17 @@ public static class SkillMoves
         return new Vector3(face.X * pace, 0f, face.Y * pace);
     }
 
-    /// <summary>Elastico: the ball ends this far ahead of the player along the run at the release, metres.</summary>
+    /// <summary>Elastico: the carried ball eases toward this far ahead of the player along the run (reached at the move's end), metres.</summary>
     const float ElasticoEndAhead = 0.25f;
+    /// <summary>
+    /// The elastico's inside plays the ball on across him toward the move's side: at least this far off the run (it comes back
+    /// across in front of him, even for an exit straight on) ...
+    /// </summary>
+    const float ElasticoExitMinDeg = 30f;
+    /// <summary>... and at most this far, degrees (what that foot's inside can play).</summary>
+    const float ElasticoExitMaxDeg = 90f;
+    /// <summary>With the stick released the elastico's inside sets the ball across in front of him this far off the run, degrees.</summary>
+    const float ElasticoSetDeg = 45f;
     /// <summary>The elastico's player drives toward the exit side at this pace by the release, m/s.</summary>
     const float ElasticoExitSideSpeed = 2.0f;
     /// <summary>The spin brings the ball to this far ahead of the player in his own frame, metres ...</summary>
@@ -963,25 +963,13 @@ public static class SkillMoves
             case ActionKind.Elastico:
             {
                 // Across the run, from where it was first played: the outside pushes it elastico_push_distance away from the side
-                // over elastico_push_seconds, the foot wraps round it, and from the second contact the inside snaps it across to
-                // elastico_snap_distance toward the side of where he played it first by the release, leaving at the pace it is
-                // released with (see Finish).
+                // over elastico_push_seconds and the foot wraps round it, until the inside plays it on at the second contact (see
+                // ElasticoExit); along it the ball eases toward ElasticoEndAhead ahead of him.
                 var s2 = SideOf(a);
                 var s3 = new Vector3(s2.X, 0f, s2.Y);
                 float tau = (tick + 1 - a.ContactTick) * t.Dt;
-                float tp = Ticks(k.ElasticoPushSeconds, t) * t.Dt, t2 = (a.Contact2Tick - a.ContactTick) * t.Dt, te = dur * t.Dt;
-                float lat;
-                if (tau <= tp) lat = -k.ElasticoPushDistance * Smooth(tau / tp);
-                else if (tau <= t2) lat = -k.ElasticoPushDistance;
-                else
-                {
-                    // A cubic from rest at the push's end to the release's sideways pace at the snap's end.
-                    float h = te - t2, x = Math.Clamp((tau - t2) / h, 0f, 1f);
-                    float m1 = ElasticoRelease(p, a).Y * h;
-                    // It ends elastico_snap_distance to the side of the line the player was on when he first played it.
-                    float p0 = -k.ElasticoPushDistance, p1 = k.ElasticoSnapDistance - a.SideOffset0;
-                    lat = (2 * x * x * x - 3 * x * x + 1) * p0 + (x * x * x - x * x) * m1 + (-2 * x * x * x + 3 * x * x) * p1;
-                }
+                float tp = Ticks(k.ElasticoPushSeconds, t) * t.Dt;
+                float lat = -k.ElasticoPushDistance * Smooth(tau / tp);
                 float ahead = a.RollAhead0 + (ElasticoEndAhead - a.RollAhead0) * u1;
                 var b = a.SkillBallFrom + s3 * lat;
                 return b - f3 * Vector3.Dot(b, f3) + f3 * (along + ahead);
@@ -1034,14 +1022,37 @@ public static class SkillMoves
     }
 
     /// <summary>
-    /// The elastico's release: the ball leaves toward the side at 45 degrees off the run at the player's pace that way (so his
-    /// exit touch meets it), as (along the run, toward the side) m/s.
+    /// The elastico's second contact is its exit touch: the inside plays the ball on across him toward the stick, turned into
+    /// <see cref="ElasticoExitMinDeg"/> to <see cref="ElasticoExitMaxDeg"/> toward the move's side off the run, as a dribble touch
+    /// made at once that way would push it (see TouchPlanner.SkillExitPush), onto a swing at least a windup after the move's end,
+    /// so the controller's next touch, planned from the end as usual, meets it. With the stick released it is set across in front
+    /// of him (<see cref="ElasticoSetDeg"/> off the run) as a close-control touch would push it. Readies the exit burst's scale for
+    /// that direction (the burst starts at the end, see <see cref="Finish"/>). Returns the ball's velocity.
     /// </summary>
-    static Vector2 ElasticoRelease(PlayerState p, BallAction a)
+    static Vector3 ElasticoExit(PlayerState p, BallAction a, in TickIntent intent, Ball ball, int tick, float now, Tuning t, Pitch? pitch)
     {
-        var dir = Vector2.Normalize(a.HoldDirection + SideOf(a));
-        float pace = MathF.Max(0f, Vector2.Dot(new Vector2(p.Velocity.X, p.Velocity.Z), dir));
-        return new Vector2(pace * dir.X * a.HoldDirection.X + pace * dir.Y * a.HoldDirection.Y, pace / MathF.Sqrt(2f));
+        Vector2 fwd = a.HoldDirection, side = SideOf(a), stick = intent.Move;
+        var user = intent;
+        float ang;
+        if (stick.Length() >= t.Touch.StickThreshold)
+        {
+            float min = ElasticoExitMinDeg * MathF.PI / 180f, max = ElasticoExitMaxDeg * MathF.PI / 180f;
+            ang = Math.Clamp(MathF.Atan2(Vector2.Dot(stick, side), Vector2.Dot(stick, fwd)), min, max);
+        }
+        else
+        {
+            ang = ElasticoSetDeg * MathF.PI / 180f;
+            user.CloseControl = true;
+            user.Sprint = 0f;
+        }
+        var dir = fwd * MathF.Cos(ang) + side * MathF.Sin(ang);
+        a.ExitBurstScale = ExitScale(a, stick.Length() >= t.Touch.StickThreshold ? dir : Vector2.Zero, t);
+        int minJ = Math.Max(0, a.EndTick - tick) + TouchPlanner.WindupTicks(t);
+        var v = TouchPlanner.SkillExitPush(p, user, dir, ball, minJ, now, t, pitch, out int steps);
+        // The next touch is counted from here, as after a push.
+        p.PushSteps = steps;
+        p.StepsSinceTouch = 0;
+        return v;
     }
 
     /// <summary>Where the sole has the ball at progress <paramref name="u"/> (0..1) of the move.</summary>
@@ -1094,16 +1105,6 @@ public static class SkillMoves
                 ball.Velocity = new Vector3(0f, ball.Velocity.Y, 0f);
                 ball.Spin = Vector3.Zero;
                 break;
-            case ActionKind.Elastico:
-            {
-                // Released toward the side at 45 degrees off the run, at his pace that way: the exit touch meets it.
-                var r = ElasticoRelease(p, a);
-                var side = SideOf(a);
-                var v = new Vector3(fwd.X * r.X + side.X * r.Y, ball.Velocity.Y, fwd.Y * r.X + side.Y * r.Y);
-                ball.Velocity = v;
-                ball.Spin = ball.RollingSpin(v);
-                break;
-            }
             case ActionKind.Spin:
             {
                 // Out of the turn facing his original way: his step becomes his run again (no change of his ground velocity), and
@@ -1130,7 +1131,8 @@ public static class SkillMoves
 
         // The exit burst rides on the exit touch (the planner's next touch), like a touch boost: started here it would make
         // the legs outrun a ball at the feet before that touch could be planned.
-        float scale = ExitScale(a, intent.Move, t);
+        // (The elastico's for the way its second contact played the ball on.)
+        float scale = a.Kind == ActionKind.Elastico && !float.IsNaN(a.ExitBurstScale) ? a.ExitBurstScale : ExitScale(a, intent.Move, t);
         if (scale > 0f)
         {
             bool roll = a.Kind == ActionKind.BallRoll;
@@ -1139,10 +1141,11 @@ public static class SkillMoves
             p.SkillBoostCap = k.BurstSpeedCap.ForRating(a.SkillEffective) * scale;
             p.SkillBoostUntil = now + ExitTouchWithin;
         }
-        if (a.Kind == ActionKind.HeelToHeel)
+        if (a.Kind is ActionKind.HeelToHeel or ActionKind.Elastico)
         {
-            // The flick was the exit touch (the ball is already pushed on ahead of him): the burst starts once he has moved this
-            // tick (as after an exit touch) and he runs on to the ball as after a knock-on.
+            // The heel-to-heel's flick or the elastico's inside was the exit touch (the ball is already played on): the burst
+            // starts once he has moved this tick (as after an exit touch), and the controller plans the next touch as usual (after
+            // the flick he runs on to the ball as after a knock-on).
             p.SkillBurstAtTick = tick;
             return;
         }
