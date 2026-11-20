@@ -1206,7 +1206,7 @@ public partial class PlayerFigure : Node3D
                 var a = curMade ? f.Action : f.PrevAction;
                 int fi = a.Right ? 1 : 0;
                 // (the surface the figure plays it with: an immediate touch keeps the one its forecast windup was drawn with)
-                var drawn = _tfUp[fi].SurfId == a.Id ? _tfUp[fi].Surf : a.Surface;
+                var drawn = ImmediateFromForecast(fi, a) ? _tfUp[fi].Surf : a.Surface;
                 Vector3 off = Off(fi, drawn);
                 Vector3 fd = dir[fi]; fd.Y = 0; fd = fd.Normalized();
                 Vector3 fr = new(-fd.Z, 0, fd.X);
@@ -1347,6 +1347,12 @@ public partial class PlayerFigure : Node3D
         _stepTick = Stats.Tick; _stepAt = plant; _stepRunning = run;
     }
 
+    /// <summary>
+    /// A touch made at once (its contact on its plan tick) whose windup was drawn toward the core's forecast of it (the same id) and not
+    /// as a committed touch of its own: it is played with the surface that windup was drawn with.
+    /// </summary>
+    bool ImmediateFromForecast(int i, in FigureAction a) => a.Made && a.ContactTick == a.Id && _tfUp[i].SurfId == a.Id && _tf[i].SurfId != a.Id;
+
     /// <summary>The boot's contact surface point relative to the ankle joint in the foot's frame (forward, up, the character's right), metres.</summary>
     Vector3 Off(int foot, BootSurface surface)
     {
@@ -1421,7 +1427,7 @@ public partial class PlayerFigure : Node3D
             // change in its last ticks would otherwise turn the boot over on the contact tick (it plays the ball with the surface it came with)
             BootSurface sf = a.Surface;
             if (!a.Made) { if (tf.SurfId != a.Id) { tf.SurfId = a.Id; tf.Surf = a.Surface; } sf = tf.Surf; }
-            else if (n == 0 && _tfUp[i].SurfId == a.Id) sf = _tfUp[i].Surf;
+            else if (n == 0 && ImmediateFromForecast(i, a)) sf = _tfUp[i].Surf;
             Vector3 fd = SurfaceDir(sf, i, d);
             Vector3 rv = new(-fd.Z, 0, fd.X);
             Vector3 off = Off(i, sf);
