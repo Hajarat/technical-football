@@ -880,7 +880,10 @@ public static class SkillMoves
             var s2 = SideOf(a);
             var s3 = new Vector3(s2.X, 0f, s2.Y);
             float stepped = Vector3.Dot(p.Position - a.SkillBallFrom, s3) + a.SideOffset0;
-            target += s3 * (stepped - plan.Peak * RollStepTravel(a, tick - a.ContactTick, t));
+            // (Never further across than the longest roll, ball_roll_distance's last point.)
+            var rd = t.Skill.BallRollDistance;
+            float roomOut = MathF.Max(0f, rd[rd.Count - 1].Y - rd.Evaluate(a.SkillEntry));
+            target += s3 * MathF.Min(roomOut, stepped - plan.Peak * RollStepTravel(a, tick - a.ContactTick, t));
             float m0 = plan.AheadEnd - a.RollAhead0;
             float m1 = share * (MathF.Sqrt(plan.RunEnd * plan.RunEnd + plan.StepEnd * plan.StepEnd) - plan.RunEnd + RollReleaseMargin) * dur * t.Dt;
             float x = u1, x2 = x * x, x3 = x2 * x;
