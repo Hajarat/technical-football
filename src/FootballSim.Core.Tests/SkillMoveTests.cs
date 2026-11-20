@@ -402,7 +402,7 @@ public class SkillMoveTests
 
     public static IEnumerable<object[]> FlowingMoves()
     {
-        foreach (string move in new[] { "step_over", "body_feint", "elastico" })
+        foreach (string move in new[] { "step_over", "body_feint", "elastico", "spin" })
         foreach (var e in new[] { Entry.Jog, Entry.Sprint })
         foreach (int side in new[] { -1, 1 })
             yield return new object[] { move, e, side };
@@ -482,7 +482,8 @@ public class SkillMoveTests
             }
             else
             {
-                // The elastico's inside plays the ball across in front of him toward its side (its exit touch): ahead of him.
+                // The elastico's inside plays the ball across in front of him toward its side (its exit touch), the spin leaves
+                // it in front of his facing: ahead of him.
                 Assert.True(along > 0f, $"{at}: the ball {along:F2} m ahead of him");
             }
             Assert.True(ballSpeed >= speed, $"{at}: ball {ballSpeed:F2} m/s, player {speed:F2} m/s");
@@ -852,6 +853,15 @@ public class SkillMoveTests
                 {
                     // He keeps his speed.
                     Assert.InRange(s.Run, tr.Entry - 0.2f, tr.Entry + 0.2f);
+                    continue;
+                }
+                if (move == "spin" && e != Entry.Standing)
+                {
+                    // At a run the spin's pace along the run eases from the entry pace no faster than spin_run_brake to
+                    // spin_run_keep of it (from the start, the reach included): never below 60% of the entry.
+                    float keepS = t.Skill.SpinRunKeep * tr.Entry;
+                    Assert.True(fwd >= MathF.Max(keepS, tr.Entry - t.Skill.SpinRunBrake * t.Dt * (tick - m.StartTick + 1)) - 0.1f, $"{move} {e} tick +{tick - m.StartTick}: forward {fwd:F2} from {tr.Entry:F2}");
+                    Assert.True(fwd >= 0.6f * tr.Entry, $"{move} {e} tick +{tick - m.StartTick}: forward {fwd:F2} from {tr.Entry:F2}");
                     continue;
                 }
                 if (move == "elastico" && e != Entry.Standing)

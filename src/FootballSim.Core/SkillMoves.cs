@@ -555,7 +555,9 @@ public static class SkillMoves
     /// <summary>The spin's forward pace on its <paramref name="i"/>-th tick from the landing: from the landing's toward the planned one within the budget.</summary>
     static float SpinForwardAt(BallAction a, int i, Tuning t)
     {
-        float b = t.Movement.BalanceDeceleration * t.Dt * (i + 1);
+        // (At a run, spin_run_blend, within spin_run_brake.)
+        float share = SpinRunShare(a.SkillEntry, t);
+        float b = (t.Movement.BalanceDeceleration + (t.Skill.SpinRunBrake - t.Movement.BalanceDeceleration) * share) * t.Dt * (i + 1);
         return a.SpinVel0.X + Math.Clamp(a.SpinForward - a.SpinVel0.X, -b, b);
     }
 
@@ -580,14 +582,33 @@ public static class SkillMoves
             return d;
         }
         float lo = 0f, hi = MathF.Max(0f, MathF.Min(cap, k.SpinForwardSpeed));
-        if (Travel(hi) <= wantF) { a.SpinForward = hi; return; }
-        if (Travel(lo) >= wantF) { a.SpinForward = lo; return; }
-        for (int n = 0; n < 20; n++)
+        if (Travel(hi) <= wantF) a.SpinForward = hi;
+        else if (Travel(lo) >= wantF) a.SpinForward = lo;
+        else
         {
-            float mid = 0.5f * (lo + hi);
-            if (Travel(mid) > wantF) hi = mid; else lo = mid;
+            for (int n = 0; n < 20; n++)
+            {
+                float mid = 0.5f * (lo + hi);
+                if (Travel(mid) > wantF) hi = mid; else lo = mid;
+            }
+            a.SpinForward = 0.5f * (lo + hi);
         }
-        a.SpinForward = 0.5f * (lo + hi);
+        // At a run he travels on through the turn: his pace along the run eases only to spin_run_keep of the entry pace.
+        a.SpinForward += (k.SpinRunKeep * a.SkillEntry - a.SpinForward) * SpinRunShare(a.SkillEntry, t);
+    }
+
+    /// <summary>How much of the run version of the spin a move entered at <paramref name="entry"/> m/s takes, 0..1.</summary>
+    static float SpinRunShare(float entry, Tuning t) => Math.Clamp(t.Skill.SpinRunBlend.Evaluate(entry), 0f, 1f);
+
+    /// <summary>
+    /// The run spin's running speed through its reach on <paramref name="tick"/>: from the entry pace it eases down no faster
+    /// than spin_run_brake to spin_run_keep of it, m/s.
+    /// </summary>
+    static float SpinRun(BallAction a, int tick, Tuning t)
+    {
+        var k = t.Skill;
+        float hold = a.SkillEntry;
+        return MathF.Min(hold, MathF.Max(hold * k.SpinRunKeep, hold - k.SpinRunBrake * (tick + 1 - a.StartTick) * t.Dt));
     }
 
     /// <summary>The tick the move's own motion starts: the sole's landing for a sole move, the start for the others.</summary>
@@ -718,11 +739,17 @@ public static class SkillMoves
         float eased = EasedForwardSpeed(a.Kind, t);
         bool roll = float.IsFinite(eased), ballRoll = a.Kind == ActionKind.BallRoll;
         float floor = MathF.Min(hold, eased), budget = t.Movement.BalanceDeceleration * t.Dt;
-        float elastico = a.Kind == ActionKind.Elastico ? ElasticoRunShare(a.SkillEntry, t) : 0f;
+        // At a run the elastico and spin ease only a little (see ElasticoRun, SpinRun).
+        float share = a.Kind switch
+        {
+            ActionKind.Elastico => ElasticoRunShare(a.SkillEntry, t),
+            ActionKind.Spin => SpinRunShare(a.SkillEntry, t),
+            _ => 0f,
+        };
         float Eased(float r, int tk)
         {
             float e = MathF.Min(hold, MathF.Max(floor, r - budget));
-            return elastico > 0f ? e + (ElasticoRun(a, tk, t) - e) * elastico : e;
+            return share > 0f ? e + ((a.Kind == ActionKind.Spin ? SpinRun(a, tk, t) : ElasticoRun(a, tk, t)) - e) * share : e;
         }
         int at = tick;
         float Next(float r) => ballRoll ? RollRun(a, ++at, t) : roll ? Eased(r, ++at) : hold;
@@ -1025,7 +1052,7 @@ public static class SkillMoves
         {
             ActionKind.BallRoll => RollReleaseDir(a, intent.Move, t) is var rd ? new Vector3(rd.X, 0f, rd.Y) * RollReleasePace(a, new Vector2(pv.X, pv.Z), t) : default,
             ActionKind.DragBack or ActionKind.FakeStop => Vector3.Zero,
-            ActionKind.Spin => FacedPace(p),
+            ActionKind.Spin => FacedPace(p) is var fp && fp.Length() > 0f ? fp * ((fp.Length() + DummyReleaseMargin * SpinRunShare(a.SkillEntry, t)) / fp.Length()) : fp,
             ActionKind.StepOver or ActionKind.BodyFeint => DummyRelease(p, a, ball, t) with { Y = 0f },
             _ => new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z),
         };
@@ -1319,7 +1346,9 @@ public static class SkillMoves
                 p.RunSpeed = pace;
                 p.SteerCarry = Vector2.Zero;
                 p.SteerVelocity = Vector3.Zero;
-                var v = new Vector3(face.X * pace, ball.Velocity.Y, face.Y * pace);
+                // (At a run a little faster, so it keeps rolling ahead of him.)
+                float bp = pace + DummyReleaseMargin * SpinRunShare(a.SkillEntry, t);
+                var v = new Vector3(face.X * bp, ball.Velocity.Y, face.Y * bp);
                 ball.Velocity = v;
                 ball.Spin = ball.RollingSpin(v);
                 break;

@@ -1149,6 +1149,14 @@ public sealed class SkillTuning
     public float SpinForward { get; set; } = 0.6f;
     public float SpinSide { get; set; } = 0.5f;
     public float SpinForwardSpeed { get; set; } = 2.0f;
+    /// <summary>
+    /// How much of the run version of the spin a move entered at this running speed takes, m/s to 0..1: at a run his pace along
+    /// the run eases from the entry pace no faster than spin_run_brake to spin_run_keep of it (he travels on through the turn)
+    /// instead of down to spin_forward_speed.
+    /// </summary>
+    public Curve SpinRunBlend { get; set; } = new((1f, 0f), (2.5f, 1f));
+    public float SpinRunKeep { get; set; } = 0.7f;
+    public float SpinRunBrake { get; set; } = 6f;
     public float SpinBallRadius { get; set; } = 0.35f;
     /// <summary>
     /// Heel-to-heel: the move's length, the heel's contact and the trailing foot's flick (seconds from the start), how far the
