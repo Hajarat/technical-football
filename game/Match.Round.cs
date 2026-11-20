@@ -27,6 +27,7 @@ public partial class Match
     string _lastWarnings = "";
     int _flightTicks, _liveTicks;
     bool _beganReplay;
+    string _buildCommit = "", _headCommit = "";
 
     /// <summary>The round being played. Rebuilt from disk every time a round is set up.</summary>
     public World World { get; private set; } = null!;
@@ -38,7 +39,16 @@ public partial class Match
         _data = new GameData(Path.GetFullPath(_args.DataDir ?? Path.Combine(game, "..", "data")));
         _data.Reload();
         if (_args.ReplayPath == null && _args.GalleryDir == null && _args.ClipGalleryDir == null) _log = SessionLog.Create(Path.GetFullPath(Path.Combine(game, "..")));
+        _buildCommit = BuildInfo.Commit;
+        _headCommit = BuildInfo.ReadHead(game);
+        bool stale = BuildInfo.IsStale(_buildCommit, _headCommit);
+        GD.Print($"BUILD commit={_buildCommit} head={_headCommit} stale={(stale ? "true" : "false")}");
+        if (stale && _args.Interactive)
+            Hud.SetStaleBuild($"This game was built from {_buildCommit}, but the checkout is at {_headCommit}. Run: dotnet build game/FootballSim.Game.csproj");
         _log?.Write("start",
+            ("build_commit", _buildCommit),
+            ("head_commit", _headCommit),
+            ("build_stale", stale),
             ("godot", Engine.GetVersionInfo()["string"].AsString()),
             ("refresh_hz", float.IsFinite(DisplayServer.ScreenGetRefreshRate()) ? DisplayServer.ScreenGetRefreshRate() : 0f), // infinite under a virtual display
             ("window", $"{DisplayServer.WindowGetSize().X}x{DisplayServer.WindowGetSize().Y}"),
@@ -269,6 +279,7 @@ public partial class Match
     void FinishRound()
     {
         _lastFinishedRound = _round;
+        Hud.SetStaleBuild("");
         var report = World.Report!;
         string outcome = World.Outcome.Label().ToLowerInvariant();
         string file = $"round-{_round:D3}-{_scenarioId}-{outcome}.json";
