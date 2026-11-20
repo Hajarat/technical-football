@@ -126,6 +126,11 @@
     "turn_arc_keep": 0.4,
     "turn_arc_min_speed": 2.4,
     "turn_arc_done_deg": 15,
+    "turn_arc_brake": 13.5,
+    "turn_arc_rotation": {
+      "at1": 600,
+      "at99": 900
+    },
     "foot_switch_every": 4,
     "steps_per_touch": {
       "close": 1,

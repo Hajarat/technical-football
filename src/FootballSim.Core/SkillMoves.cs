@@ -690,7 +690,7 @@ public static class SkillMoves
     /// tick from where it is (a cubic over the ticks left). A move entered between a walk and a run blends this with the free
     /// ball (step_over_run_blend).
     /// </summary>
-    static void CarryDummyBall(PlayerState p, BallAction a, Ball ball, int tick, Tuning t)
+    static void CarryDummyBall(PlayerState p, BallAction a, Ball ball, int tick, Tuning t, Pitch? pitch)
     {
         float share = DummyRunShare(a.SkillEntry, t);
         if (share <= 0f) return;
@@ -712,8 +712,25 @@ public static class SkillMoves
         var carry = (target - new Vector2(ball.Position.X, ball.Position.Z)) / t.Dt;
         var free = new Vector2(ball.Velocity.X, ball.Velocity.Z);
         var v = free + (carry - free) * share;
-        ball.Velocity = new Vector3(v.X, ball.Velocity.Y, v.Y);
+        ball.Velocity = OffBoards(ball, new Vector3(v.X, ball.Velocity.Y, v.Y), pitch, t);
         ball.Spin = ball.RollingSpin(ball.Velocity);
+    }
+
+    /// <summary>A ball a move carries is kept this far clear of the boards, metres.</summary>
+    const float BoardClear = 0.02f;
+
+    /// <summary>
+    /// The velocity of a ball a move carries this tick, kept off the boards: where <paramref name="v"/> would take it past
+    /// <see cref="BoardClear"/> from a board, it goes only as far as that along the board instead (a path into a board is cut
+    /// short or bent along it), so the board is never fed the carry tick after tick (which bounces the ball up off it).
+    /// </summary>
+    static Vector3 OffBoards(Ball ball, Vector3 v, Pitch? pitch, Tuning t)
+    {
+        if (pitch == null) return v;
+        var to = new Vector2(ball.Position.X + v.X * t.Dt, ball.Position.Z + v.Z * t.Dt);
+        var kept = pitch.KeepOffBoards(to, t.Ball.Radius + BoardClear);
+        if (kept == to) return v;
+        return new Vector3((kept.X - ball.Position.X) / t.Dt, v.Y, (kept.Y - ball.Position.Z) / t.Dt);
     }
 
     /// <summary>The run step-over's and body feint's ball as it is released: along his travel at his ground speed plus the margin (blended as in <see cref="CarryDummyBall"/>).</summary>
@@ -952,11 +969,11 @@ public static class SkillMoves
         {
             Vector3 target = CarriedBall(p, a, tick, t);
             a.LastTarget = target;
-            var v = new Vector3((target.X - ball.Position.X) / t.Dt, ball.Velocity.Y, (target.Z - ball.Position.Z) / t.Dt);
+            var v = OffBoards(ball, new Vector3((target.X - ball.Position.X) / t.Dt, ball.Velocity.Y, (target.Z - ball.Position.Z) / t.Dt), pitch, t);
             ball.Velocity = v;
             ball.Spin = ball.RollingSpin(v);
         }
-        if (a.Kind is ActionKind.StepOver or ActionKind.BodyFeint) CarryDummyBall(p, a, ball, tick, t);
+        if (a.Kind is ActionKind.StepOver or ActionKind.BodyFeint) CarryDummyBall(p, a, ball, tick, t, pitch);
         if (a.Kind == ActionKind.HeelToHeel && tick == a.Contact2Tick)
         {
             // The trailing foot's flick: straight on at heel_to_heel_flick_ratio times his running speed (at least the minimum),

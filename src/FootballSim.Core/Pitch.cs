@@ -241,6 +241,36 @@ public sealed class Pitch
     }
 
     /// <summary>
+    /// A player's step (a velocity, X, Z) at <paramref name="pos"/> with its part into every board he is heading for cut to what
+    /// he can shed at <paramref name="decel"/> before he reaches it and still arrive at <paramref name="arrive"/> or less (as
+    /// <see cref="WallRunCap"/> caps his run); the step itself when nothing is cut.
+    /// </summary>
+    internal Vector2 WallStepCap(Vector2 pos, Vector2 step, float arrive, float decel)
+    {
+        void Wall(Vector2 n, float gap)
+        {
+            float sn = Vector2.Dot(step, n);
+            if (sn <= 0f) return;
+            float vn = MathF.Sqrt(arrive * arrive + 2f * decel * MathF.Max(0f, gap));
+            if (sn > vn) step -= n * (sn - vn);
+        }
+        for (int i = 0; i < _wallN.Length; i++) Wall(_wallN[i], _wallC[i] - PlayerRadius - Vector2.Dot(_wallN[i], pos));
+        if (CornerRadius > 0f)
+        {
+            float rr = MathF.Max(0f, CornerRadius - PlayerRadius);
+            for (int sgn = -1; sgn <= 1; sgn += 2)
+            {
+                var c = new Vector2(CornerRadius, sgn * (HalfWidth - CornerRadius));
+                if (pos.X >= c.X || sgn * pos.Y <= sgn * c.Y) continue;
+                Vector2 f = pos - c;
+                float len = f.Length();
+                if (len > 1e-4f) Wall(f / len, rr - len);
+            }
+        }
+        return step;
+    }
+
+    /// <summary>
     /// How far a point (X, Z) inside the outline is from the nearest board, metres (the rounded back corners measured along their
     /// radius). The goal mouth counts as the goal-end wall, as it does for players.
     /// </summary>
@@ -256,6 +286,43 @@ public sealed class Pitch
                 gap = MathF.Min(gap, CornerRadius - (pos - c).Length());
             }
         return gap;
+    }
+
+    /// <summary>
+    /// The nearest point to <paramref name="pos"/> (X, Z) that is at least <paramref name="margin"/> in from every board (the
+    /// rounded back corners measured along their radius): the point itself when it already is. The goal mouth counts as the
+    /// goal-end wall, as in <see cref="BoardGap"/>.
+    /// </summary>
+    internal Vector2 KeepOffBoards(Vector2 pos, float margin)
+    {
+        // The region is convex, so a second pass settles a point pushed off one wall into a neighbouring one (a corner).
+        for (int pass = 0; pass < 2; pass++)
+        {
+            bool moved = false;
+            for (int i = 0; i < _wallN.Length; i++)
+            {
+                float s = Vector2.Dot(_wallN[i], pos) - (_wallC[i] - margin);
+                if (s <= 0f) continue;
+                pos -= _wallN[i] * s;
+                moved = true;
+            }
+            if (CornerRadius > 0f)
+            {
+                float rr = MathF.Max(0f, CornerRadius - margin);
+                for (int sgn = -1; sgn <= 1; sgn += 2)
+                {
+                    var c = new Vector2(CornerRadius, sgn * (HalfWidth - CornerRadius));
+                    if (pos.X >= c.X || sgn * pos.Y <= sgn * c.Y) continue;
+                    Vector2 f = pos - c;
+                    float len = f.Length();
+                    if (len <= rr) continue;
+                    pos = c + f / len * rr;
+                    moved = true;
+                }
+            }
+            if (!moved) break;
+        }
+        return pos;
     }
 
     /// <summary>

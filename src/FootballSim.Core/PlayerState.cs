@@ -195,6 +195,8 @@ public sealed class PlayerState
     internal float TurnArcSpeed;
     /// <summary>The braking arc has had its turning touch: he brakes to <see cref="TurnArcSpeed"/> (armed before it, he runs on to the ball).</summary>
     internal bool TurnArcBraking;
+    /// <summary>Out of a braking arc: he speeds up no faster than the arc braked (turn_arc_brake) until the speed law asks for less.</summary>
+    internal bool TurnArcRelease;
     /// <summary>The stick the braking arc turns him onto (unit, world X, Z), the latest while it is held.</summary>
     internal Vector2 TurnArcStick;
     /// <summary>
@@ -331,7 +333,7 @@ public sealed class PlayerState
         Position = o.Position; Velocity = o.Velocity; Facing = o.Facing; HandPosition = o.HandPosition;
         LastTouchTime = o.LastTouchTime; TouchBoostUntil = o.TouchBoostUntil; TouchBoostFactor = o.TouchBoostFactor;
         TouchBoostFrom = o.TouchBoostFrom; KnockOnFrom = o.KnockOnFrom; KnockOnDirection = o.KnockOnDirection;
-        KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PostTurnUntil = o.PostTurnUntil; TurnArcSpeed = o.TurnArcSpeed; TurnArcBraking = o.TurnArcBraking; TurnArcStick = o.TurnArcStick; PlannerSteer = o.PlannerSteer; SteerFacing = o.SteerFacing; SteerCarry = o.SteerCarry; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
+        KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PostTurnUntil = o.PostTurnUntil; TurnArcSpeed = o.TurnArcSpeed; TurnArcBraking = o.TurnArcBraking; TurnArcRelease = o.TurnArcRelease; TurnArcStick = o.TurnArcStick; PlannerSteer = o.PlannerSteer; SteerFacing = o.SteerFacing; SteerCarry = o.SteerCarry; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed; StepBegun = o.StepBegun;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction;
