@@ -323,9 +323,11 @@ public sealed class FigureStats
     public string SkillLine() => Line("SKILL_CONTACT", SkillContact) + $" skill_min_pelvis_ratio={F(SkillMinPelvisRatio)} skill_lean_max_deg={SkillLeanMaxDeg:F1} foot_jump_body_m={SkillFootJumpBody:F3} foot_jump_world_m={SkillFootJumpWorld:F3} plain_foot_jump_body_m={PlainFootJumpBody:F3} sole_max_err_m={SkillSoleMaxErr:F3} on_ball_max_err_m={SkillOnBallMaxErr:F3} on_ball_exit_touch_ticks={SkillOnBallTouchTicks} on_ball_exit_touch_max_err_m={SkillOnBallTouchMaxErr:F3} step_over_clear_min_m={F(StepOverClearMinM)}";
     public string TouchMissLine() => Line("TOUCH_MISS", TouchMiss);
     public string TouchFootLine() => $"TOUCH_FOOT n={Touches} mismatches={FootMismatches} soft_undrawn={SoftTouches}";
+    /// <summary>The body-language measurements (BODY_LANG, printed after MOCAP_POSE in --attacker-anim mocap).</summary>
+    public readonly BodyLangStats BodyLang = new();
     public string PoseLine() =>
         $"POSE_LIMITS min_pelvis_ratio={MinPelvisRatio:F3} min_knee_m={MinKneeM:F3} min_limb_y_m={MinLimbYM:F3} lean_deg_min={LeanMinDeg:F1} lean_deg_max={LeanMaxDeg:F1}" +
-        $" run_min_pelvis_ratio={F(RunMinPelvisRatio)} close_min_pelvis_ratio={F(CloseMinPelvisRatio)} run_lean_max_deg={RunLeanMaxDeg:F1} run_bob_max_m={RunBobMaxM:F3}" + "\n" + BodyLine() + (MocapTicks > 0 || BoneMaxDegS > 0 ? "\n" + MocapLine() : "");
+        $" run_min_pelvis_ratio={F(RunMinPelvisRatio)} close_min_pelvis_ratio={F(CloseMinPelvisRatio)} run_lean_max_deg={RunLeanMaxDeg:F1} run_bob_max_m={RunBobMaxM:F3}" + "\n" + BodyLine() + (MocapTicks > 0 || BoneMaxDegS > 0 ? "\n" + MocapLine() : "") + (BodyLang.Ticks.Count > 0 ? "\n" + string.Join("\n", BodyLang.Lines()) : "");
 
     static string F(float v) => v == float.MaxValue ? "n/a" : v.ToString("F3");
     static string Line(string name, List<float> l) => $"{name} n={l.Count} mean_m={Mean(l):F3} max_m={Max(l):F3}";
@@ -1109,14 +1111,20 @@ public partial class PlayerFigure : Node3D
             // the head stays level and steady: it looks along the travel and, with the ball, partly at it; within a yaw limit from the chest
             Vector3 look = speed > 1f ? fm : fwd;
             float yawT = Mathf.Atan2(look.Z, look.X);
+            bool blOn = _atkAnim != null && !BodyLangOff;
+            // (mocap: in a turn the look goes with the facing, which turns ahead of the travel, see BodyLookYaw)
+            if (blOn) yawT = Mathf.LerpAngle(yawT, f.Facing, BodyTurnWeight * _mW);
             float pitchT = HeadPitchBase;
             Vector3 toBall = new(f.BallPos.X - pos.X, 0, f.BallPos.Z - pos.Z);
             float bd = toBall.Length();
             if (f.InPossession && bd > 0.15f)
             {
-                yawT = Mathf.LerpAngle(yawT, Mathf.Atan2(toBall.Z, toBall.X), HeadBallYaw);
+                // (mocap: in a turn the look leaves the ball for where he is going, see BodyLanguage.TurnWeight)
+                float ballYaw = blOn ? HeadBallYaw * (1f - BodyTurnWeight * _mW) : HeadBallYaw;
+                yawT = Mathf.LerpAngle(yawT, Mathf.Atan2(toBall.Z, toBall.X), ballYaw);
                 pitchT = Mathf.Clamp(Mathf.Atan2(0.93f * H - f.BallPos.Y, bd) * HeadBallPitch, HeadPitchBase, HeadPitchMaxRad);
             }
+            if (blOn) yawT += BodyLookAhead(HeadTau) * _mW;   // (mocap: the look aimed ahead along a turn, see BodyLanguage)
             float chestYaw = f.Facing - _pelYaw * counter;
             yawT = chestYaw + Mathf.Clamp(Mathf.Wrap(yawT - chestYaw, -Mathf.Pi, Mathf.Pi), -HeadYawMaxRad, HeadYawMaxRad);
             float ah = 1f - Mathf.Exp(-dt / HeadTau);

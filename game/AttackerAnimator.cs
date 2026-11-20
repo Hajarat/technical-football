@@ -39,6 +39,8 @@ public sealed class AttackerAnimator
     readonly Quaternion[] _clipLocal, _rot, _gP, _gF;
     readonly Vector3[] _pos;
     readonly int _spine2, _neck, _head;
+    readonly int[] _spineChain;
+    readonly Quaternion[] _restG;
     readonly int[] _clav = new int[2], _arm = new int[2], _fore = new int[2], _hand = new int[2];
 
     /// <summary>The skill moves' authored clips (--skill-anim clips, see <see cref="SkillClipLayer"/>); null when they cannot load.</summary>
@@ -51,10 +53,15 @@ public sealed class AttackerAnimator
     {
         _body = body; _sk = sk;
         _motion = new CycleMotion(sk, cycles);
+        _refMotion = new CycleMotion(sk, cycles);
         int n = sk.Count;
+        _refLocal = new NQuat[n]; _refGr = new NQuat[n]; _refGp = new NVec3[n];
         _local = new NQuat[n]; _gr = new NQuat[n]; _gp = new NVec3[n];
         _clipLocal = new Quaternion[n]; _rot = new Quaternion[n]; _gP = new Quaternion[n]; _gF = new Quaternion[n]; _pos = new Vector3[n];
         _spine2 = sk.Find("Spine2"); _neck = sk.Find("Neck"); _head = sk.Find("Head");
+        _spineChain = new[] { sk.Find("Spine"), sk.Find("Spine1"), _spine2 };
+        _restG = new Quaternion[n];
+        for (int k = 0; k < n; k++) { var r = sk.RestGlobal[k]; _restG[k] = new Quaternion(r.X, r.Y, r.Z, r.W); }
         // the rest foot (the left; the right mirrors it)
         var rest = new NQuat[n]; for (int k = 0; k < n; k++) rest[k] = sk.RestLocal[k];
         sk.Forward(rest, sk.Offsets[0], _gr, _gp);
@@ -128,6 +135,9 @@ public sealed class AttackerAnimator
     /// <summary>The point between the hip joints (the figure's pelvis) and the pelvis's turn (world basis, X forward, Y up, Z his right).</summary>
     public Vector3 Pelvis;
     public Basis PelvisBasis = Basis.Identity;
+    /// <summary>The cycle's own trunk roll (hips to neck, radians toward his right) and its shoulders' turn against its hips (radians toward his right) this tick, before any layer.</summary>
+    public float CycleRoll { get; private set; }
+    public float CycleShoulderTurn { get; private set; }
     /// <summary>The stride stretch this tick and the blended cycles' own speed.</summary>
     public float Stride { get; private set; } = 1f;
     public float NativeSpeed => _motion.NativeSpeed;
@@ -174,6 +184,16 @@ public sealed class AttackerAnimator
             FootDir[i] = (fwd * MathF.Cos(yaw) + left * MathF.Sin(yaw)).Normalized();
         }
         for (int i = 0; i < 2; i++) Hip[i] = W(_gp[_sk.UpLeg[i]], 1f);
+        {
+            // the cycle's own trunk roll (toward his right) and shoulders' turn against the hips at this phase, for the measurements
+            // (model: x his left, y up, z forward)
+            var up = _gp[_neck] - (_gp[_sk.UpLeg[0]] + _gp[_sk.UpLeg[1]]) * 0.5f;
+            CycleRoll = MathF.Atan2(-up.X, up.Y);
+            NVec3 hr = _gp[_sk.UpLeg[1]] - _gp[_sk.UpLeg[0]], sr = _gp[_arm[1]] - _gp[_arm[0]];
+            // a model line's heading as the world has it at facing 0 (model z -> world X, model x -> world -Z): positive toward his right
+            static float Yaw(NVec3 r) => MathF.Atan2(-r.X, r.Z);
+            CycleShoulderTurn = Spring.WrapPi(Yaw(sr) - Yaw(hr));
+        }
         var mid = (_gp[_sk.UpLeg[0]] + _gp[_sk.UpLeg[1]]) * 0.5f;
         Pelvis = W(mid, 1f);
         // the hips bone's turn from rest, from the model's frame (x his left, z forward) into the world (X forward, Z his right) basis
@@ -192,7 +212,14 @@ public sealed class AttackerAnimator
     /// clip plays (<paramref name="tw"/> each foot's touch weight, <paramref name="planted"/> the figure's planted feet), and the shot
     /// layer while a struck shot is drawn from motion capture.
     /// </summary>
-    public void Present(FigureJoints j, float w, float armOut, ReadOnlySpan<float> tw, ReadOnlySpan<bool> planted, bool teleport)
+    public void Present(FigureJoints j, float w, float armOut, ReadOnlySpan<float> tw, ReadOnlySpan<bool> planted, bool teleport) =>
+        Present(j, w, armOut, default, tw, planted, teleport);
+
+    /// <summary>
+    /// <see cref="Present(FigureJoints, float, float, ReadOnlySpan{float}, ReadOnlySpan{bool}, bool)"/> with the body-language layers
+    /// (<see cref="BodyLayers"/>) laid over the cycles' trunk, head and arms by the same weight, before a skill or shot clip takes the pose.
+    /// </summary>
+    public void Present(FigureJoints j, float w, float armOut, in BodyLayers bl, ReadOnlySpan<float> tw, ReadOnlySpan<bool> planted, bool teleport)
     {
         _body.Solve(j);
         var sr = _body.SolvedRotations; var sp = _body.SolvedPositions;
@@ -223,10 +250,76 @@ public sealed class AttackerAnimator
                     _rot[_arm[i]] = (_gF[_clav[i]].Inverse() * g).Normalized();
                 }
             }
+            Layers(bl, w);
         }
         Skills?.Apply(_frame, j.Height, tw, planted, teleport, _rot, _pos);
         Shots?.Apply(_frame, j.Height, j.AnkleHeight, tw, planted, teleport, _rot, _pos);
         _body.PoseBones(_rot, _pos[0], _pos);
+        // the head's forward as shown (its turn from rest applied to the model's forward), for the measurements
+        Globals(_rot, _gF);
+        var hq = _gF[_head] * _restG[_head].Inverse();
+        var hm = hq * new Vector3(0, 0, 1);
+        HeadForward = new Vector3(hm.Z, hm.Y, -hm.X).Normalized();   // model (x his left, y up, z forward) to world
+    }
+
+    readonly CycleMotion _refMotion;
+    readonly Dictionary<int, float> _steadyLean = new();
+    readonly NQuat[] _refLocal; readonly NQuat[] _refGr; readonly NVec3[] _refGp;
+
+    /// <summary>
+    /// The cycles' own trunk lean (hips to neck, radians forward) at a steady <paramref name="speed"/>: the blend the speed asks for, averaged
+    /// over a stride (32 phases); per 0.1 m/s, cached. The measurements' reference for "the same speed held steady".
+    /// </summary>
+    public float SteadyLean(float speed)
+    {
+        int key = (int)MathF.Round(speed * 10f);
+        if (_steadyLean.TryGetValue(key, out float v)) return v;
+        float sum = 0f;
+        for (int p = 0; p < 32; p++)
+        {
+            _refMotion.Reset();
+            var hips = _refMotion.Step(p / 16f, key / 10f, 1f / 120f, _refLocal);
+            _sk.Forward(_refLocal, hips, _refGr, _refGp);
+            var up = _refGp[_neck] - (_refGp[_sk.UpLeg[0]] + _refGp[_sk.UpLeg[1]]) * 0.5f;
+            sum += MathF.Atan2(up.Z, up.Y);
+        }
+        return _steadyLean[key] = sum / 32f;
+    }
+
+    /// <summary>The shown head's forward direction (world), set by <see cref="Present(FigureJoints, float, float, in BodyLayers, ReadOnlySpan{float}, ReadOnlySpan{bool}, bool)"/>.</summary>
+    public Vector3 HeadForward { get; private set; } = new(1, 0, 0);
+
+    /// <summary>
+    /// The body-language layers over the cycles' pose (see <see cref="BodyLayers"/>), by the cycles' weight <paramref name="w"/>: the
+    /// spine turned about the vertical (a right-handed turn about up is toward his left, hence the sign; a third per spine bone, so the shoulders turn by the whole of it against the hips), the neck and
+    /// head by the head's lead on top, each arm out from the body about the chest's forward.
+    /// </summary>
+    void Layers(in BodyLayers bl, float w)
+    {
+        if (Math.Abs(bl.TrunkYaw) > 1e-5f)
+            for (int s = 0; s < 3; s++) TurnGlobal(_spineChain[s], new Quaternion(Vector3.Up, -bl.TrunkYaw * w / 3f));
+        if (Math.Abs(bl.HeadYaw) > 1e-5f)
+        {
+            TurnGlobal(_neck, new Quaternion(Vector3.Up, -0.4f * bl.HeadYaw * w));
+            TurnGlobal(_head, new Quaternion(Vector3.Up, -0.6f * bl.HeadYaw * w));
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            float a = i == 0 ? bl.ArmOutL : bl.ArmOutR;
+            if (Math.Abs(a) < 1e-5f) continue;
+            Globals(_rot, _gF);
+            Vector3 fwdM = (_gF[_spine2] * new Vector3(0, 0, 1)).Normalized();
+            TurnGlobal(_arm[i], new Quaternion(fwdM, (i == 0 ? 1f : -1f) * a * w));
+        }
+    }
+
+    /// <summary>Turns bone <paramref name="k"/> by <paramref name="q"/> in body space (its children with it).</summary>
+    void TurnGlobal(int k, Quaternion q)
+    {
+        Globals(_rot, _gF);
+        int p = _sk.Parents[k];
+        var g = (q * _gF[k]).Normalized();
+        _rot[k] = p < 0 ? g : (_gF[p].Inverse() * g).Normalized();
     }
 
     bool IsLeg(int k) { for (int i = 0; i < 2; i++) if (k == _sk.UpLeg[i] || k == _sk.Leg[i] || k == _sk.Foot[i] || k == _sk.Toe[i]) return true; return false; }
@@ -241,6 +334,15 @@ public sealed class AttackerAnimator
             g[k] = p < 0 ? local[k] : (g[p] * local[k]).Normalized();
         }
     }
+}
+
+/// <summary>
+/// The body-language layers' amounts for one tick (radians), laid over the cycles' trunk, head and arms by <see cref="AttackerAnimator"/>:
+/// the shoulders' turn against the hips and the head's against the shoulders (positive toward his right), each arm's extra abduction.
+/// </summary>
+public struct BodyLayers
+{
+    public float TrunkYaw, HeadYaw, ArmOutL, ArmOutR;
 }
 
 /// <summary>The figure's side of --attacker-anim mocap (see <see cref="AttackerAnimator"/>): its weight, the held feet and the measurements of the shown pose.</summary>
@@ -297,6 +399,7 @@ public partial class PlayerFigure
         _mW = _teleporting ? target : Mathf.Lerp(_mW, target, 1f - Mathf.Exp(-dt / MocapTau));
         if (_mW < 1e-3f && target == 0f) _mW = 0f;
         _atkAnim.Compute(f, pos, fwd, _speedS, stepLen, H, dt);
+        BodyLanguageStep(f, dt);
     }
 
     /// <summary>
@@ -500,7 +603,9 @@ public partial class PlayerFigure
     {
         if (_atkAnim == null || _mW <= 0f) return pel;
         Vector3 pm = _atkAnim.Pelvis;
-        pm += right * (Mathf.Sin(_bank) * BankShift * (pm.Y - AnkleH));
+        float bank = BodyLangOff ? _bank : _bl.Bank;
+        pm += right * (Mathf.Sin(bank) * BankShift * (pm.Y - AnkleH));
+        if (!BodyLangOff) pm.Y -= _bl.PelvisDrop * H / 1.8f;
         return pel.Lerp(pm, _mW);
     }
 
@@ -510,7 +615,7 @@ public partial class PlayerFigure
         if (_atkAnim == null || _mW <= 0f) return P;
         // the acceleration lean only (the figure's lean less its speed lean): the cycles carry their own lean with speed
         float lean = _lean - SpeedLean;
-        Basis pm = new Basis(right, -lean) * new Basis(fwd, _bank) * _atkAnim.PelvisBasis;
+        Basis pm = new Basis(right, -lean) * new Basis(fwd, BodyLangOff ? _bank : _bl.Bank) * _atkAnim.PelvisBasis;
         return P.Orthonormalized().Slerp(pm.Orthonormalized(), _mW);
     }
 
@@ -518,7 +623,7 @@ public partial class PlayerFigure
     bool MocapPresent()
     {
         if (_atkAnim == null) return false;
-        _atkAnim.Present(_joints, _mW * (1f - ShotUpperShare * _shUpper), AttackerAnimator.ArmOutClose * _closeW, _layTw, _layPlanted, _teleporting);
+        _atkAnim.Present(_joints, _mW * (1f - ShotUpperShare * _shUpper), AttackerAnimator.ArmOutClose * _closeW, BodyLangOff ? default : BodyLayersNow(), _layTw, _layPlanted, _teleporting);
         return true;
     }
 
@@ -570,6 +675,7 @@ public partial class PlayerFigure
             Stats.MinToeYM = Math.Min(Stats.MinToeYM, _shownToe[i].Y);
             if (Log && _shownToe[i].Y < -0.005f) GD.Print($"MOCAP_TOE tick={Stats.Tick} foot={i} toe_y={_shownToe[i].Y:F3} ank_y={ankEff[i].Y:F3} pitch={_pitch[i]:F2} bend={_toeBend[i]:F2} lock={(_mLock[i].Locked ? 1 : 0)} w={_mW:F2}");
         }
+        BodyLangMeasure(f, ankEff, pel, lean, fwd, dt);
         bool shot = BoneSpeeds(f, b, dt);
         if (f.Skill.Valid || shot) return;
         Stats.MocapTicks++; if (_mW >= 0.999f) Stats.MocapFull++;
