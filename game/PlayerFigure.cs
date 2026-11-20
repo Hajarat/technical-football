@@ -2039,7 +2039,8 @@ public partial class PlayerFigure : Node3D
     {
         var s = f.Skill;
         int fi = s.Right ? 1 : 0;
-        if (s.Kind == SkillKind.StepOver && Stats != null && s.ExecElapsed >= 0f)
+        // (not on ticks the core's exit touch has the foot: its inside is meant to be on the ball then, it is not the step-over passing it)
+        if (s.Kind == SkillKind.StepOver && Stats != null && s.ExecElapsed >= 0f && tw[fi] < 0.9f)
         {
             float clear = float.MaxValue;
             for (int k = 0; k < 4; k++) clear = Math.Min(clear, (SurfaceAt(fi, (BootSurface)k, ank, dir) - f.BallPos).Length() - f.BallRadius);
