@@ -102,6 +102,33 @@ public class SkillClipTests
         for (float t = 0f; t < se + 0.3f; t += Dt / 4f) { float v = map.ClipTime(t); Assert.True(v >= prev - 1e-6f); prev = v; }
     }
 
+    [Fact]
+    public void TwoClipsWithDifferentSpansMeetAtEachEventOnItsTick()
+    {
+        // the standing spin (lift to contact2 0.03 s) and a running one with the core's 0.05 s: each clip's own map puts each of its
+        // events on the core's tick, so the blend is at the same event on the same tick
+        var stand = new Dictionary<string, int> { ["start"] = 0, ["contact"] = 7, ["lift"] = 23, ["contact2"] = 25, ["release"] = 43, ["end"] = 55 };
+        var run = new Dictionary<string, int> { ["start"] = 0, ["contact"] = 7, ["lift"] = 22, ["contact2"] = 25, ["release"] = 43, ["end"] = 55 };
+        float sc = 0.1f, sl = sc + 30 * Dt, s2 = sc + 36 * Dt, se = sc + 72 * Dt;
+        var ev = new[] { ("contact", sc), ("lift", sl), ("contact2", s2), ("release", se) };
+        var ms = SkillTimeMap.ForEvents(stand, 60, ev, 0f);
+        var mr = SkillTimeMap.ForEvents(run, 60, ev, 0f);
+        foreach (var (e, t) in ev)
+        {
+            Assert.Equal(stand[e] / 60f, ms.ClipTime(t), 4);
+            Assert.Equal(run[e] / 60f, mr.ClipTime(t), 4);
+        }
+        Assert.Equal(ms.SimEnd, mr.SimEnd, 4);
+        // the same events give the same map; an event the clip does not have is left out
+        var same = SkillTimeMap.ForEvents(stand, 60, ev, 0f);
+        var direct = new SkillTimeMap(0f, new[] { (sc, 7 / 60f), (sl, 23 / 60f), (s2, 25 / 60f), (se, 43 / 60f) }, 55 / 60f, 0f);
+        for (float t = 0f; t < se + 0.3f; t += Dt / 4f) { Assert.Equal(ms.ClipTime(t), same.ClipTime(t)); Assert.Equal(direct.ClipTime(t), ms.ClipTime(t)); }
+        var roll = new Dictionary<string, int> { ["start"] = 0, ["contact"] = 7, ["release"] = 31, ["end"] = 46 };
+        var mroll = SkillTimeMap.ForEvents(roll, 60, ev, 0f);
+        Assert.Equal(31 / 60f, mroll.ClipTime(se), 4);
+        Assert.Equal(4, mroll.KnotCount);
+    }
+
     [Theory]
     [InlineData(0f, 0f)]
     [InlineData(-1f, 0f)]
@@ -158,8 +185,8 @@ public class SkillClipTests
                 var (stand, run) = pair!.Value;
                 Assert.Equal("stand", stand.Entry); Assert.Equal("run", run.Entry);
                 Assert.True(run.EntrySpeed > stand.EntrySpeed);
-                // the two variants share their event frames, so one time map drives both
-                foreach (var e in stand.Clip.Events) Assert.Equal(e.Value, run.Clip.Events[e.Key]);
+                // the two variants have the same events in the same order (each has its own time map onto them; the spans may differ)
+                Assert.Equal(stand.Clip.Events.OrderBy(e => e.Value).Select(e => e.Key), run.Clip.Events.OrderBy(e => e.Value).Select(e => e.Key));
                 Assert.True(MathF.Abs(stand.RootYaw) < 0.2f, $"{stand.Clip.Name} root yaw {stand.RootYaw}");
             }
     }

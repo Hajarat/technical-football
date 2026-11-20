@@ -11,7 +11,8 @@ namespace FootballSim.Game;
 /// by tools/anim/author.py), timed by the simulation. When a move starts, its standing and running clips for the move's playing
 /// foot (and side) are picked and blended by the player's speed then (<see cref="SkillEntryBlend"/>, fixed for the move); the clip
 /// time follows the core's ticks (<see cref="SkillTimeMap"/>: start→contact onto the move's start→contact tick, contact→release onto
-/// contact→end tick, release→end in real time after it). The pose relative to the clip's root (<see cref="SkillClip.Root"/>) is put
+/// contact→end tick, release→end in real time after it; each clip by its own spans, so the two are blended at the same event on the
+/// same tick even when a running clip's spans differ from the standing one's). The pose relative to the clip's root (<see cref="SkillClip.Root"/>) is put
 /// on the simulation's position and facing; each tick, after the hand-over offset (<see cref="Inertializer"/>), the playing foot's
 /// surface is brought onto the live ball by leg IK over the clip's on-ball spans (ramping in through the reach and out after the
 /// release; a step-over's circling foot keeps its path relative to the live ball), a foot the clip plants is held where it landed
@@ -65,8 +66,9 @@ public sealed class SkillClipLayer
     public const float EndingBlend = 0.05f;
     /// <summary>A fake shot is drawn as the real shot's wind-up until this long before its contact; its clip checks the swing from there.</summary>
     public const float FakeCheckSeconds = 0.10f;
-    float _wRun, _t, _ct, _shotElapsed = float.NaN, _prevSpeed = float.NaN;
-    SkillTimeMap? _map;
+    float _wRun, _t, _ct, _ctRun, _cp, _shotElapsed = float.NaN, _prevSpeed = float.NaN;
+    /// <summary>The standing clip's time map and the running clip's (its own spans, the same events on the same ticks; its endings share it).</summary>
+    SkillTimeMap? _map, _mapRun;
     BootSurface _surface;
     string _move = "";
     readonly NVec3[] _legOff = new NVec3[2], _legOffVel = new NVec3[2], _baseAnkPrev = new NVec3[2];
@@ -197,7 +199,7 @@ public sealed class SkillClipLayer
             _t = s.Valid && s.Id == _moveId ? s.Elapsed : _t + dt;
             // the clip has played out, or a shot or another move it cannot draw takes over, or a fake read was not made
             bool cut = !s.Valid && f.Shot.Valid || s.Valid && s.Id != _moveId || _pending && !s.Valid;
-            if (_t > _map!.SimEnd + 1e-4f || cut) BeginHandBack(sc, dt);
+            if (_t > Math.Max(_map!.SimEnd, _mapRun!.SimEnd) + 1e-4f || cut) BeginHandBack(sc, dt);
         }
 
         if (_playing)
@@ -279,13 +281,14 @@ public sealed class SkillClipLayer
         // this tick, FakeCheckSeconds before the contact, part way into its own wind-up, and reaches its contact on the core's)
         _pending = !f.Skill.Valid;
         float origin = _pending ? Math.Max(0f, s.Elapsed - f.Dt) : float.IsNaN(_shotElapsed) ? 0f : -Math.Max(0f, _shotElapsed + f.Dt - s.Elapsed);
-        var c = _stand;
-        // the clip's events onto the core's ticks: contact, the spin's lift, the second contact, release on the end tick
-        var knots = new System.Collections.Generic.List<(float, float)> { (simContact, c.EventSeconds("contact")) };
-        if (c.HasEvent("lift") && !float.IsNaN(s.LiftElapsed)) knots.Add((s.Elapsed - s.LiftElapsed, c.EventSeconds("lift")));
-        if (c.HasEvent("contact2") && !float.IsNaN(s.Contact2Elapsed)) knots.Add((s.Elapsed - s.Contact2Elapsed, c.EventSeconds("contact2")));
-        knots.Add((simEnd, c.EventSeconds("release")));
-        _map = new SkillTimeMap(c.EventSeconds("start"), knots, c.EventSeconds("end"), origin);
+        // the clips' events onto the core's ticks: contact, the spin's lift, the second contact, release on the end tick; each clip
+        // by its own spans
+        var simEvents = new System.Collections.Generic.List<(string, float)> { ("contact", simContact) };
+        if (!float.IsNaN(s.LiftElapsed)) simEvents.Add(("lift", s.Elapsed - s.LiftElapsed));
+        if (!float.IsNaN(s.Contact2Elapsed)) simEvents.Add(("contact2", s.Elapsed - s.Contact2Elapsed));
+        simEvents.Add(("release", simEnd));
+        _map = _stand.TimeMap(simEvents, origin);
+        _mapRun = _run == _stand ? _map : _run.TimeMap(simEvents, origin);
         _moveId = s.Id; _t = s.Elapsed; _playing = true; _handBack = false; _transition = true;
         foreach (var l in _lock) l.Reset();
         _shotElapsed = float.NaN; Array.Clear(_pinHave); Array.Clear(_legU); Array.Clear(_flagWas); Array.Clear(_anchor); Array.Clear(_anchor0);
@@ -342,16 +345,16 @@ public sealed class SkillClipLayer
     /// <summary>The running clip's root at <paramref name="ct"/>, its second ending crossed in.</summary>
     System.Numerics.Vector2 RunRoot(float ct) => _runAlt == null || _wAlt <= 0f ? _run!.Root(ct) : System.Numerics.Vector2.Lerp(_run!.Root(ct), _runAlt.Root(ct), _wAlt);
 
-    /// <summary>The blended clip pose at simulation time <paramref name="t"/>, placed on the simulation's position and facing.</summary>
+    /// <summary>The blended clip pose at simulation time <paramref name="t"/>, placed on the simulation's position and facing (each clip at its own time).</summary>
     void ClipPose(in FigureFrame f, float sc, float t, NQuat[] outRot, out NVec3 hips)
     {
-        float ct = _map!.ClipTime(t);
-        if (outRot == _src) _ct = ct;
+        float ct = _map!.ClipTime(t), cr = _mapRun!.ClipTime(t);
+        if (outRot == _src) { _ct = ct; _ctRun = cr; _cp = _wRun > 0.5f ? cr : ct; }
         var ha = _stand!.Clip.Sample(ct, _a);
-        var hb = RunSample(ct);
+        var hb = RunSample(cr);
         for (int k = 0; k < _n; k++) outRot[k] = _wRun <= 0f ? _a[k] : _wRun >= 1f ? _b[k] : NQuat.Slerp(_a[k], _b[k], _wRun);
         var h = NVec3.Lerp(ha, hb, _wRun);
-        var root = System.Numerics.Vector2.Lerp(_stand.Root(ct), RunRoot(ct), _wRun);
+        var root = System.Numerics.Vector2.Lerp(_stand.Root(ct), RunRoot(cr), _wRun);
         var q = Placement(f);
         var rm = M(f.Position, sc); rm.Y = 0f;
         hips = rm + NVec3.Transform(new NVec3(h.X - root.X, h.Y, h.Z - root.Y), q);
@@ -364,16 +367,16 @@ public sealed class SkillClipLayer
     /// </summary>
     NQuat Placement(in FigureFrame f)
     {
-        float own = _move == "spin" ? _stand!.Heading(_ct) * (1f - _wRun) + _run!.Heading(_ct) * _wRun : _stand!.RootYaw * (1f - _wRun) + _run!.RootYaw * _wRun;
+        float own = _move == "spin" ? _stand!.Heading(_ct) * (1f - _wRun) + _run!.Heading(_ctRun) * _wRun : _stand!.RootYaw * (1f - _wRun) + _run!.RootYaw * _wRun;
         return Spring.Yaw(ModelSpace.YawFromFacing(f.Facing) - own);
     }
 
     /// <summary>The authored ball centre this tick, placed as the pose is.</summary>
     NVec3 ClipBall(in FigureFrame f, float sc)
     {
-        var rb = _runAlt == null || _wAlt <= 0f ? _run!.Ball(_ct) : NVec3.Lerp(_run!.Ball(_ct), _runAlt.Ball(_ct), _wAlt);
+        var rb = _runAlt == null || _wAlt <= 0f ? _run!.Ball(_ctRun) : NVec3.Lerp(_run!.Ball(_ctRun), _runAlt.Ball(_ctRun), _wAlt);
         var b = NVec3.Lerp(_stand!.Ball(_ct), rb, _wRun);
-        var root = System.Numerics.Vector2.Lerp(_stand.Root(_ct), RunRoot(_ct), _wRun);
+        var root = System.Numerics.Vector2.Lerp(_stand.Root(_ct), RunRoot(_ctRun), _wRun);
         var rm = M(f.Position, sc); rm.Y = 0f;
         return rm + NVec3.Transform(new NVec3(b.X - root.X, b.Y, b.Z - root.Y), Placement(f));
     }
@@ -390,7 +393,10 @@ public sealed class SkillClipLayer
     readonly NQuat[] _clipPrevR = new NQuat[64];
     readonly NVec3[] _clipPrevP = new NVec3[64];
 
-    /// <summary>A span of the clip during which a foot's surface is pinned to the ball (clip seconds), and the surface the core names for it.</summary>
+    /// <summary>The clip the ball pins are timed by (the running one when it has most of the blend) and its time this tick (<see cref="_cp"/>).</summary>
+    SkillClip PinClip => _wRun > 0.5f ? _run! : _stand!;
+
+    /// <summary>A span of the clip during which a foot's surface is pinned to the ball (clip seconds of <see cref="PinClip"/>), and the surface the core names for it.</summary>
     struct Pin { public int Foot; public float From, To, RampFrom; public BootSurface Surface; public bool Path; }
     readonly System.Collections.Generic.List<Pin> _pins = new();
 
@@ -402,7 +408,7 @@ public sealed class SkillClipLayer
     void BuildPins(FigureSkill s)
     {
         _pins.Clear();
-        var c = _stand!;
+        var c = PinClip;
         int f1 = s.Right ? 1 : 0, f2 = s.Right2 ? 1 : 0;
         bool two = !float.IsNaN(s.Contact2Elapsed);
         BootSurface SurfaceFor(int foot, string ev, string what)
@@ -426,7 +432,7 @@ public sealed class SkillClipLayer
         {
             var q = _pins[i];
             // the first ramps in from where the clip starts, a later one over at most 0.12 s after the one before it ends
-            q.RampFrom = i == 0 ? Math.Min(_map!.ClipStart, q.From) : Math.Min(q.From, Math.Max(prevTo, q.From - 0.12f));
+            q.RampFrom = i == 0 ? Math.Min((_wRun > 0.5f ? _mapRun! : _map!).ClipStart, q.From) : Math.Min(q.From, Math.Max(prevTo, q.From - 0.12f));
             prevTo = Math.Max(prevTo, q.To);
             _pins[i] = q;
         }
@@ -451,7 +457,7 @@ public sealed class SkillClipLayer
         for (int k = 0; k < _pins.Count; k++)
         {
             if (_pins[k].Foot != i) continue;
-            float wk = PinWeight(_pins[k], _ct, out bool ek);
+            float wk = PinWeight(_pins[k], _cp, out bool ek);
             if (wk > w) { w = wk; exact = ek; best = k; }
         }
         return best;
@@ -466,10 +472,10 @@ public sealed class SkillClipLayer
     /// </summary>
     float OwnWeight(in Pin q)
     {
-        if (_ct <= q.To + 1e-4f) return PinWeight(q, _ct, out _);
-        float rel = _stand!.EventSeconds("release");
+        if (_cp <= q.To + 1e-4f) return PinWeight(q, _cp, out _);
+        float rel = PinClip.EventSeconds("release");
         float span = rel > q.To + 1e-4f ? Math.Min(PinRampOut, rel - q.To) : 1e-4f;
-        return 1f - Smooth((_ct - q.To) / span);
+        return 1f - Smooth((_cp - q.To) / span);
     }
 
     /// <summary>
@@ -506,12 +512,12 @@ public sealed class SkillClipLayer
             {
                 var q = _pins[k2];
                 if (q.Foot != i) continue;
-                float wk = PinWeight(q, _ct, out bool exact);
-                if (!_pinHave[k2] || exact || _ct < q.From - 1e-4f) { _pinBallK[k2] = live; _pinHave[k2] = _ct >= q.From - 1e-4f; }
+                float wk = PinWeight(q, _cp, out bool exact);
+                if (!_pinHave[k2] || exact || _cp < q.From - 1e-4f) { _pinBallK[k2] = live; _pinHave[k2] = _cp >= q.From - 1e-4f; }
                 if (wk <= 0f) continue;
                 _pinShift[i] += (PinTarget(f, sc, i, q, _pinBallK[k2], 1f) - _gp[_sk.Foot[i]]) * wk;
                 sum += wk;
-                if (_pinIdx[i] < 0 || wk > PinWeight(_pins[_pinIdx[i]], _ct, out _)) _pinIdx[i] = k2;
+                if (_pinIdx[i] < 0 || wk > PinWeight(_pins[_pinIdx[i]], _cp, out _)) _pinIdx[i] = k2;
             }
             if (sum > 1f) _pinShift[i] /= sum;
             // a pin on its span (or at its touch) has the foot to itself: the core's contact is drawn exactly
@@ -519,7 +525,7 @@ public sealed class SkillClipLayer
             {
                 var q = _pins[k2];
                 if (q.Foot != i) continue;
-                if (_ct >= q.From - 1e-4f && _ct <= q.To + 1e-4f)
+                if (_cp >= q.From - 1e-4f && _cp <= q.To + 1e-4f)
                 { _pinShift[i] = PinTarget(f, sc, i, q, _pinBallK[k2], 1f) - _gp[_sk.Foot[i]]; sum = 1f; _pinIdx[i] = k2; }
                 // a touch of the move itself (an elastico's snap, a heel-to-heel's flick) is not a touch for the figure to draw
                 // over it: the pin takes the foot from a touch the figure draws (the exit touch winding up) over its ramp, has it
@@ -585,7 +591,7 @@ public sealed class SkillClipLayer
             float pinI = _pinIdx[i] < 0 ? 0f : _pinRaw[i] * (1f - twi);
             // a foot the clip plants is held where it landed (not while it plays the ball or a touch)
             bool contact = (_stand!.Contacts(_ct) & (i == 0 ? Clip.LeftFoot : Clip.RightFoot)) != 0;
-            if (_wRun > 0.5f) contact = ((_wAlt > 0.5f ? _runAlt! : _run!).Contacts(_ct) & (i == 0 ? Clip.LeftFoot : Clip.RightFoot)) != 0;
+            if (_wRun > 0.5f) contact = ((_wAlt > 0.5f ? _runAlt! : _run!).Contacts(_ctRun) & (i == 0 ? Clip.LeftFoot : Clip.RightFoot)) != 0;
             var runClip = _wAlt > 0.5f ? _runAlt! : _run!;
             bool declared = _wRun > 0.5f && _declared.Contains(runClip.Clip.Name);
             // (a step-over's circling foot that a declared stance plants, as it lands out of the circle, is the stance's from then
@@ -775,18 +781,18 @@ public sealed class SkillClipLayer
     /// <summary>A foot on the ground moving slower than this (m/s) as the clip takes over counts as planted (a landing settling; a swinging foot moves at twice the body's speed).</summary>
     const float HandInStill = 2.5f;
 
-    /// <summary>Simulation seconds from now to the next declared stance of foot <paramref name="i"/> in <paramref name="c"/> (infinity when it has none).</summary>
+    /// <summary>Simulation seconds from now to the next declared stance of foot <paramref name="i"/> in the running clip <paramref name="c"/> (infinity when it has none).</summary>
     float NextStance(SkillClip c, int i)
     {
         byte bit = i == 0 ? Clip.LeftFoot : Clip.RightFoot;
-        int f0 = Math.Max(0, (int)MathF.Round(_ct * c.Clip.Fps) + 1);
+        int f0 = Math.Max(0, (int)MathF.Round(_ctRun * c.Clip.Fps) + 1);
         while (f0 < c.Clip.FrameCount && (c.Clip.Contacts(f0) & bit) != 0) f0++;   // (past the stance it is on, when it leaves one early)
         for (int fr = f0; fr < c.Clip.FrameCount; fr++)
             if ((c.Clip.Contacts(fr) & bit) != 0)
             {
                 // (the time map's inverse, by bisection: it rises monotonically)
                 float want = fr / (float)c.Clip.Fps, lo = _t, hi = _t + 3f;
-                for (int k = 0; k < 30; k++) { float mid = 0.5f * (lo + hi); if (_map!.ClipTime(mid) < want) lo = mid; else hi = mid; }
+                for (int k = 0; k < 30; k++) { float mid = 0.5f * (lo + hi); if (_mapRun!.ClipTime(mid) < want) lo = mid; else hi = mid; }
                 return Math.Max(1e-3f, 0.5f * (lo + hi) - _t);
             }
         return float.PositiveInfinity;
