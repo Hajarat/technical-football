@@ -191,6 +191,12 @@ public sealed class PlayerState
     internal float ReverseTime = -100f;
     /// <summary>Until this simulation time the turn rate is at least post_turn_rotation_rate (after a turn or cut touch).</summary>
     internal float PostTurnUntil = -100f;
+    /// <summary>A braking arc under way (a sharp turn with the ball at a run): the speed he slows to and keeps until it ends, m/s; 0 when none.</summary>
+    internal float TurnArcSpeed;
+    /// <summary>The braking arc has had its turning touch: he brakes to <see cref="TurnArcSpeed"/> (armed before it, he runs on to the ball).</summary>
+    internal bool TurnArcBraking;
+    /// <summary>The stick the braking arc turns him onto (unit, world X, Z), the latest while it is held.</summary>
+    internal Vector2 TurnArcStick;
     /// <summary>
     /// The touch controller's sideways steering correction last tick (world X, Z), m/s: it eases from there, and turns with the
     /// body (see <see cref="SteerFacing"/>); zero during a skill move.
@@ -325,7 +331,7 @@ public sealed class PlayerState
         Position = o.Position; Velocity = o.Velocity; Facing = o.Facing; HandPosition = o.HandPosition;
         LastTouchTime = o.LastTouchTime; TouchBoostUntil = o.TouchBoostUntil; TouchBoostFactor = o.TouchBoostFactor;
         TouchBoostFrom = o.TouchBoostFrom; KnockOnFrom = o.KnockOnFrom; KnockOnDirection = o.KnockOnDirection;
-        KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PostTurnUntil = o.PostTurnUntil; PlannerSteer = o.PlannerSteer; SteerFacing = o.SteerFacing; SteerCarry = o.SteerCarry; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
+        KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PostTurnUntil = o.PostTurnUntil; TurnArcSpeed = o.TurnArcSpeed; TurnArcBraking = o.TurnArcBraking; TurnArcStick = o.TurnArcStick; PlannerSteer = o.PlannerSteer; SteerFacing = o.SteerFacing; SteerCarry = o.SteerCarry; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime;
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed; StepBegun = o.StepBegun;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction;

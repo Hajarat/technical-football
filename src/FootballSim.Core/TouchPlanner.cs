@@ -245,6 +245,7 @@ public static class TouchPlanner
         UpdatePhases(p, tick, t);
         if (!inPossession)
         {
+            p.TurnArcSpeed = 0f; p.TurnArcBraking = false;
             p.Chasing = false;
             p.ClearForecast();
             // The steering under way when the ball went (a strike, the keeper taking it) eases out instead of stopping at once.
@@ -266,13 +267,16 @@ public static class TouchPlanner
         // A skill move owns the legs while it lasts; on the tick it ends, the controller takes over at once.
         if (p.SkillAction is { } skill)
         {
+            p.TurnArcSpeed = 0f; p.TurnArcBraking = false;
             if (tick < skill.EndTick) return SkillTick(p, ball, tick, t, out legs);
             SkillMoves.Finish(p, intent, ball, tick, now, t);
             UpdatePhases(p, tick, t);
         }
 
-        // The stick reversed with the ball at the feet: the sole turns it at once (a drag-back onto the stick's line).
+        // The stick reversed with the ball at the feet: the sole turns it at once (a drag-back onto the stick's line); at a run,
+        // a braking arc instead.
         if (live && FeetTurn(p, intent, ball, tick, now, t)) return SkillTick(p, ball, tick, t, out legs);
+        TurnArc(p, intent, live && !Stunned(p, now) && p.ShotAction == null, t);
 
         Vector2 steer;
         float along = 0f;
@@ -387,13 +391,36 @@ public static class TouchPlanner
         Vector2 stick = intent.Move;
         if (stick.Length() < k.StickThreshold || p.SkillAction != null || p.ShotAction != null || Stunned(p, now)) return false;
         if (now < p.SkillCooldownUntil || p.SkillExitTick == tick || Possession.CanLoseByDistance(p)) return false;
-        if (p.RunSpeed <= k.ExecutionMinSpeed || ball.Position.Y > t.Skill.MaxBallHeight) return false;
+        if (p.RunSpeed <= k.ExecutionMinSpeed || p.RunSpeed > k.FeetTurnMaxSpeed || ball.Position.Y > t.Skill.MaxBallHeight) return false;
         if (p.TouchAction is { Pending: true }) return false;
         if (Horizontal(ball.Position, p.Position) > k.FeetTurnReach) return false;
         var wanted = new Vector3(stick.X, 0f, stick.Y);
         if (TouchModel.TurnAngleDeg(p, ball, wanted) < k.FeetTurnDeg) return false;
         SkillMoves.StartFeetTurn(p, Vector2.Normalize(stick), ball, tick, now, t);
         return true;
+    }
+
+    /// <summary>
+    /// The braking arc: above feet_turn_max_speed, a stick turned feet_turn_deg or more from his travel arms it at
+    /// turn_arc_keep of the speed he has then (never below turn_arc_min_speed). He runs on to the ball, and from the touch that
+    /// turns it round (see <see cref="Execute"/>) brakes to that speed within the deceleration budget and keeps it while he comes
+    /// round with the ball, until he faces within turn_arc_done_deg of the stick (see <see cref="Movement"/>); the stick
+    /// released, a skill move, a shot or the ball lost ends it. Then he speeds up along the stick as usual.
+    /// </summary>
+    static void TurnArc(PlayerState p, in TickIntent intent, bool live, Tuning t)
+    {
+        var k = t.Touch;
+        Vector2 stick = intent.Move;
+        float mag = stick.Length();
+        if (!live || p.TurnArcSpeed > 0f && mag < k.StickThreshold) { p.TurnArcSpeed = 0f; p.TurnArcBraking = false; return; }
+        if (p.TurnArcSpeed > 0f) { p.TurnArcStick = stick / mag; return; }
+        if (mag < k.StickThreshold || p.RunSpeed <= k.FeetTurnMaxSpeed) return;
+        var v = new Vector2(p.Velocity.X, p.Velocity.Z);
+        float speed = v.Length();
+        if (speed < 1e-3f || MathF.Acos(Math.Clamp(Vector2.Dot(v / speed, stick / mag), -1f, 1f)) * 180f / MathF.PI < k.FeetTurnDeg) return;
+        p.TurnArcSpeed = MathF.Max(k.TurnArcKeep * speed, k.TurnArcMinSpeed);
+        p.TurnArcBraking = false;
+        p.TurnArcStick = stick / mag;
     }
 
     /// <summary>
@@ -1441,6 +1468,8 @@ public static class TouchPlanner
                 // line slowly enough to meet the player where his predicted path brings him back to it (he brakes within the
                 // deceleration budget, turns and comes back), never sent away faster than that.
                 bool reversal = !first && turnDeg >= k.FeetTurnDeg && p.RunSpeed > k.ExecutionMinSpeed;
+                // A braking arc armed: he brakes from this touch on (its path below is planned with the braking).
+                if (p.TurnArcSpeed > 0f && kind is ActionKind.Turn or ActionKind.Cut) p.TurnArcBraking = true;
                 hasMeet = reversal ? FindReversalMeet(p, intent, now, t, pitch, out meet) : FindMeet(p, intent, steps, 0, now, t, pitch, out meet);
                 if (reversal && hasMeet) steps = Math.Max(1, meet.Swings);
                 // A push cut short by MaxMeetSeconds counts the steps it was solved for, so the next touch is played there.

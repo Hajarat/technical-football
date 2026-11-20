@@ -338,6 +338,17 @@ public sealed class TouchTuning
     public float FeetTurnDeg { get; set; } = 120f;
     /// <summary>The ball's largest distance from the body for that turn at the feet, metres (GOALS' execution radius 0.6 m).</summary>
     public float FeetTurnReach { get; set; } = 0.6f;
+    /// <summary>
+    /// The turn at the feet only up to this running speed, m/s; faster, a stick turned feet_turn_deg or more from his travel is a
+    /// braking arc: he slows to turn_arc_keep of his entry speed (never below turn_arc_min_speed) and turns with the ball.
+    /// </summary>
+    public float FeetTurnMaxSpeed { get; set; } = 3f;
+    /// <summary>The braking arc's speed, as a share of the speed he came into it at.</summary>
+    public float TurnArcKeep { get; set; } = 0.4f;
+    /// <summary>The braking arc's lowest speed, m/s.</summary>
+    public float TurnArcMinSpeed { get; set; } = 2.4f;
+    /// <summary>The braking arc ends when his travel is within this of the stick, degrees.</summary>
+    public float TurnArcDoneDeg { get; set; } = 15f;
     /// <summary>The steering correction changes by at most this, m/s^2 (0: at once), so it never steps the velocity.</summary>
     public float SteerAccel { get; set; } = 6f;
     /// <summary>With an even steps_per_touch, every this-many-th touch takes one step more so the other foot plays on.</summary>

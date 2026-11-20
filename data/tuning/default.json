@@ -121,6 +121,10 @@
     "release_debounce": 0.04,
     "feet_turn_deg": 120,
     "feet_turn_reach": 0.6,
+    "feet_turn_max_speed": 3,
+    "turn_arc_keep": 0.4,
+    "turn_arc_min_speed": 2.4,
+    "turn_arc_done_deg": 15,
     "foot_switch_every": 4,
     "steps_per_touch": {
       "close": 1,
