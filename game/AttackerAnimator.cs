@@ -615,6 +615,7 @@ public partial class PlayerFigure
         if (_atkAnim == null || _mW <= 0f) return P;
         // the acceleration lean only (the figure's lean less its speed lean): the cycles carry their own lean with speed
         float lean = _lean - SpeedLean;
+        if (!BodyLangOff) lean += _bl.Lean;   // (the body-language layers: the acceleration's lean)
         Basis pm = new Basis(right, -lean) * new Basis(fwd, BodyLangOff ? _bank : _bl.Bank) * _atkAnim.PelvisBasis;
         return P.Orthonormalized().Slerp(pm.Orthonormalized(), _mW);
     }

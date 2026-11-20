@@ -200,6 +200,10 @@ the procedural recovery from 0.085 s to 0.125 s, so a skill move or shot that st
 touch points its toe down through the follow-through (0.35 rad); the playing leg's knee turns toward the boot's heading plus half the
 launch direction (0.8 of the way, at most 8 of its weight a second, so a withdrawn forecast never twists the leg); and a touch more than
 0.2 rad off the facing turns the trunk toward it by 0.3 of its angle (at most 10 degrees) by its weight.
+Speeding up and slowing down: on top of the acceleration lean the pelvis already takes (12 degrees at 4 m/s^2), the trunk leans forward a
+further 0.035 rad per m/s^2 of forward acceleration (at most 0.22 rad) and back 0.03 rad per m/s^2 of braking (at most 0.24 rad), faded in
+from 0.4 to 0.8 m/s^2 so a steady run's jitter stays upright, eased with a 0.06 s half-life; braking also drops the pelvis 1 cm per m/s^2
+(at most 6 cm: deeper knees).
 Touches stay the figure's: its touch pose is the swinging leg's target, so the boot's surface meets the ball on the contact tick as before.
 Standing and idle steps, starts from rest and stops below a walking pace and kicks stay procedural: the procedural pose is
 still solved every tick, the cycles' share of it rises to 1 while stepping above a walking pace with no skill or kick, eased over 0.1 s,

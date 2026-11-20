@@ -88,6 +88,20 @@ public class BodyLanguageTests
     }
 
     [Fact]
+    public void SpeedingUpLeansForwardAndBrakingLeansBackWithTheKneesDeeper()
+    {
+        var b = new BodyLanguage();
+        Run(b, 3f, 0f, 0.5f, forward: 5f);
+        Assert.True(b.Lean > 8f * MathF.PI / 180f, $"lean {b.Lean}");
+        Assert.Equal(0f, b.PelvisDrop, 4);
+        Run(b, 5f, 0f, 0.5f, forward: -6f);
+        Assert.True(b.Lean < -8f * MathF.PI / 180f, $"lean {b.Lean}");
+        Assert.True(b.PelvisDrop > 0.04f);
+        Run(b, 5f, 0f, 0.5f, forward: 0.3f);   // a steady run's jitter
+        Assert.InRange(MathF.Abs(b.Lean), 0f, 0.002f);
+    }
+
+    [Fact]
     public void TheFirstTickStartsAtItsTargetAndResetForgets()
     {
         var b = new BodyLanguage();
