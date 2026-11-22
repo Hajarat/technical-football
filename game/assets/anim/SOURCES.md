@@ -1,4 +1,4 @@
-# Keeper motion clips
+# Motion clips
 
 `keeper/*.kclip` and `keeper/clips.json` are generated from the CMU Graphics Lab Motion Capture Database by the scripts in
 `tools/anim/`. The motion files themselves are downloaded into the git-ignored `tools/anim/.cache/` and are not committed.
@@ -169,6 +169,62 @@ its angles without gaps. To regenerate:
 uv run --with numpy python3 tools/anim/shot_author.py
 ```
 
+
+## Defender clips
+
+`defender/*.kclip` and `defender/clips.json` are the defender's clips and the attacker's reactions to him, listed in
+`tools/anim/defender_clips.toml` (the keys of `clips.toml`, plus `fps` for a trial not recorded at 120 Hz and `file_from` for a
+baked clip copied from another folder) and retargeted onto `game/assets/characters/player.glb`. The game plays them through
+`game/DefenderAnimator.cs` (`--defender-anim mocap`, the default; see `docs/animation.md`). Same CMU licence and credit as above.
+
+24 trials from subjects 22, 76, 77, 78, 83, 90, 104, 127, 135, 136, 139, 140, 144: 22_12, 76_11, 77_03, 78_25, 78_26, 78_27, 78_28, 78_29, 78_30, 83_05, 83_13, 90_16, 90_17, 90_18, 104_13, 127_14, 135_04, 136_12, 139_18, 140_03, 140_08, 144_05, 144_11, 144_17.
+
+| Trial | Source range (AMC frames, 120 Hz) | Clip | Set | Verdict | What it shows |
+| --- | --- | --- | --- | --- | --- |
+| 78_29 | frames 1–171 | `jockey_side_shuffle_78_29` | `jockey` | keep | low side shuffle to his right, arms out, facing held (about 2.5 m/s) |
+| 78_30 | frames 1–703 | `jockey_side_toside_78_30` | `jockey` | keep | side shuffles right, left, right with the turns between them, facing held |
+| 78_28 | frames 1–448 | `jockey_back_zigzag_78_28` | `jockey` | keep | dropping off on the diagonal, hips opening one way then the other |
+| 76_11 | frames 40–360 | `jockey_back_quick_76_11` | `jockey` | keep | quick large steps straight backwards, upright |
+| 136_12 | frames 121–600 | `jockey_back_crouch_136_12` | `jockey` | keep | walking backwards crouched (slow) |
+| 78_25 | frames 1–356 | `jockey_close_left_78_25` | `jockey` | keep | closing down forward and to his left, then stopping low |
+| 78_27 | frames 1–296 | `jockey_close_right_78_27` | `jockey` | keep | closing down forward and to his right, then stopping low |
+| 78_26 | frames 200–326 | `set_low_78_26` | `set` | keep | low defensive stance after closing down: knees bent, arms out, small weight shifts |
+| 77_03 | frames 241–480 (60 Hz) | `set_ready_77_03` | `set` | keep | crouched ready stance with small weight shifts (the keeper's ready stance trial) |
+| 144_17 | frames 760–960 | `lunge_deep_144_17` | `lunge` | keep | deep lunge straight forward onto the right foot, then back up |
+| 144_11 | frames 1050–1250 | `lunge_deep_144_11` | `lunge` | keep | deep lunge forward onto the left foot, left arm up |
+| 144_05 | frames 320–440 | `lunge_kick_144_05` | `lunge` | keep | front kick with the right foot from a guard stance (hands up), foot at waist height |
+| 135_04 | frames 289–480 | `lunge_stepkick_135_04` | `lunge` | keep | step forward and front kick with the right foot, landing in a long stance |
+| 83_05 | frames 100–300 | `block_sidestep_83_05` | `block` | keep | very large step to his right, the right leg stretched out wide |
+| 83_13 | frames 121–420 | `block_sidestep_83_13` | `block` | keep | wide step to his right into a low stance |
+| 127_14 | frames 1–151 | `barge_sidestep_127_14` | `barge` | keep | running, a hard step to his right (the nearest CMU has to a shoulder into a runner alongside) |
+| baked | `keeper/slide_baked.kclip` | `slide_baked` | `slide` | keep | the procedural slide tackle baked for the keeper: down on his side, the right leg out along the ground at the ball (side: the leading leg) |
+| 140_03 | frames 231–760, 601–645 cut | `getup_side_140_03` | `getup` | keep | get up from lying on his side |
+| 140_08 | frames 161–660, 495–545 cut | `getup_back_140_08` | `getup` | keep | get up from lying on his back |
+| 139_18 | frames 141–600, 371–471 cut | `getup_back_139_18` | `getup` | keep | get up from his back, rolling over |
+| 104_13 | frames 60–230 | `stumble_trip_104_13` | `stumble` | keep | trips forward, arms flung out, catches himself and goes on |
+| 22_12 | frames 1–150 | `stumble_catch_22_12` | `stumble` | keep | pitched forward low, catches himself over three steps |
+| 104_13 | frames 230–420 | `barged_lurch_104_13` | `barged` | keep | staggers sideways with an arm thrown up, then recovers |
+| 90_16 | frames 400–620 | `fall_face_90_16` | `fall` | keep | falls forward onto his front (onto a mat) and lies |
+| 90_17 | frames 300–520 | `fall_slip_90_17` | `fall` | keep | feet slip out from under him, lands on his back |
+| 90_18 | frames 61–300 | `fall_rug_90_18` | `fall` | keep | legs pulled from under him, lands on his back and lies |
+
+The jockey clips are basketball defensive slides (subject 78): CMU has no football defending. It has no slide tackle and no
+shoulder barge either: the slide is the keeper's baked slide (the same file, copied by `retarget.py`), and the barge keeps
+the figure's own lean over the run. The lunges are deep fencing-style lunges and front kicks, the blocks wide side steps,
+the get-ups the keeper's trials, the attacker's stumbles a stumbling walk, his falls staged falls onto a mat.
+No clip has been rejected yet: the audition's verdicts are still to come.
+
+Events were read off each trial's motion: a lunge's `contact` is the frame the pelvis is lowest (a kick's: the foot furthest
+forward), a block's the frame the leg is widest, `up` and `landing` as for the keeper's clips. `side` on a lunge, block or
+slide is the leading leg; the game mirrors every clip for the other one.
+
+```sh
+python3 tools/anim/cmu.py --config tools/anim/defender_clips.toml
+uv run --with numpy python3 tools/anim/retarget.py --config tools/anim/defender_clips.toml --model game/assets/characters/player.glb --out game/assets/anim/defender
+game/tests/run-bg.sh -- --clip-gallery ../out/defender-clips --clip-folder res://assets/anim/defender --clip-model res://assets/characters/player.glb --video
+uv run --with imageio-ffmpeg python3 tools/anim/encode_video.py out/defender-clips
+game/tests/run-bg.sh -- --defender-gallery ../out/defender-gallery
+```
 
 ## Baked clips
 

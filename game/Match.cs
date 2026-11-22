@@ -64,6 +64,7 @@ public partial class Match : Node3D
         Attacker.Figure.AttackerLocoMode = _args.AttackerLoco;
         Attacker.Figure.SkillAnimMode = _args.SkillAnim;
         Attacker.Figure.ShotAnimMode = _args.ShotAnim;
+        Attacker.Figure.DefenderAnimMode = _args.DefenderAnim;
         Attacker.Figure.SkillStarted += LogSkill;
         Keeper.Figure.Stats = FootStats; Keeper.Figure.StatsName = "keeper";
         // The defender: the outfield figure in the keeper's side's colours, with measurements of his own (they are not printed).
@@ -71,6 +72,7 @@ public partial class Match : Node3D
         Defender.Figure.Stats = new FigureStats(); Defender.Figure.StatsName = "defender";
         Defender.Figure.AttackerAnimMode = _args.AttackerAnim;
         Defender.Figure.AttackerLocoMode = _args.AttackerLoco;
+        Defender.Figure.DefenderAnimMode = _args.DefenderAnim;
         Defender.Visible = false;
         Overlay.Enabled = true; // default on for now
         if (_args.TopCam) Camera.UseTopDown();
@@ -86,6 +88,7 @@ public partial class Match : Node3D
 
         if (!StartSession()) { _quitting = true; GetTree().Quit(1); }
         else if (_args.GalleryDir != null) StartGallery();
+        else if (_args.DefenderGalleryDir != null) StartDefenderGallery();
         else if (_args.ClipGalleryDir != null) StartClipGallery();
     }
 
@@ -105,6 +108,15 @@ public partial class Match : Node3D
 
     KeeperGallery? _gallery;
     ClipGallery? _clipGallery;
+    DefenderGallery? _defenderGallery;
+
+    /// <summary>--defender-gallery: the defender (and the attacker, for his reactions) is driven from a script instead of the simulation; the keeper, ball, overlay and HUD stay out of the shots.</summary>
+    void StartDefenderGallery()
+    {
+        Keeper.Visible = false; Ball.Visible = false; Hud.Visible = false;
+        Overlay.Enabled = false;
+        _defenderGallery = new DefenderGallery(this, _args.DefenderGalleryDir!, World.Pitch.GoalLineX);
+    }
 
     /// <summary>--clip-gallery: motion clips (the keeper's unless --clip-folder / --clip-model say otherwise) play on a body of their own; the match figures, ball, overlay and HUD stay out of the shots.</summary>
     void StartClipGallery()
@@ -144,6 +156,11 @@ public partial class Match : Node3D
         if (_gallery != null)
         {
             if (_gallery.Step()) { _quitting = true; GD.Print("GALLERY_DONE"); GetTree().Quit(0); }
+            return;
+        }
+        if (_defenderGallery != null)
+        {
+            if (_defenderGallery.Step()) { _quitting = true; GD.Print("DEFENDER_GALLERY_DONE"); GetTree().Quit(0); }
             return;
         }
         if (_clipGallery != null)

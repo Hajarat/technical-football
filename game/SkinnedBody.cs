@@ -581,6 +581,28 @@ public sealed partial class SkinnedBody : Node3D
         _poseFrame = Engine.GetPhysicsFrames();
     }
 
+    /// <summary>
+    /// Replaces the pose shown this tick (set by <see cref="Pose"/> or <see cref="PoseBones"/> earlier in the same physics tick) with
+    /// another: same inputs as <see cref="PoseBones(ReadOnlySpan{Quaternion}, Vector3, ReadOnlySpan{Vector3})"/>, but the previous
+    /// tick's pose stays the one to interpolate from. For a layer that takes the body over after the figure has posed it.
+    /// </summary>
+    public void Repose(ReadOnlySpan<Quaternion> local, Vector3 hips, ReadOnlySpan<Vector3> positions)
+    {
+        if (local.Length < _driven.Length) throw new ArgumentException($"Repose needs {_driven.Length} rotations, got {local.Length}");
+        for (int k = 0; k < _driven.Length; k++)
+        {
+            int b = _driven[k];
+            Quaternion rot = local[k].Normalized();
+            Vector3 pos = k == 0 ? hips : positions.IsEmpty ? _sk.GetBoneRest(b).Origin : positions[k];
+            _glob[b] = k == 0 ? new Transform3D(new Basis(rot), pos) : _glob[_parent[b]] * new Transform3D(new Basis(rot), pos);
+            _posCur[k] = pos; _rotCur[k] = rot;
+        }
+        for (int i = 0; i < 2; i++) { _footRot[i] = _glob[_foot[i]].Basis * _restBasis[_foot[i]].Transposed(); _footPos[i] = _glob[_foot[i]].Origin; }
+    }
+
+    /// <summary>A driven bone's local position as last shown (index 0: the hips' position in model space).</summary>
+    public Vector3 DrivenLocalPosition(int k) => _posCur[k];
+
     /// <summary>A driven bone's head in model space from the latest <see cref="Pose"/> or <see cref="PoseBones"/> (the physics-tick pose).</summary>
     public Vector3 DrivenBoneOrigin(int k) => _glob[_driven[k]].Origin;
 

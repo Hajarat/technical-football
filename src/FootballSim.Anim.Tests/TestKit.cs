@@ -88,8 +88,22 @@ static class TestKit
         return null;
     }
 
-    static ClipLibrary? _keeper;
+    static ClipLibrary? _keeper, _defender;
     static readonly object Gate = new();
+
+    /// <summary>The committed defender clips, game/assets/anim/defender (loaded once).</summary>
+    public static ClipLibrary Defender
+    {
+        get
+        {
+            lock (Gate)
+            {
+                if (_defender != null) return _defender;
+                var keeper = KeeperClipDir() ?? throw new InvalidOperationException("game/assets/anim/keeper not found");
+                return _defender = ClipLibrary.Load(Path.Combine(Path.GetDirectoryName(keeper)!, "defender"));
+            }
+        }
+    }
 
     /// <summary>The committed keeper clips (loaded once).</summary>
     public static ClipLibrary Keeper

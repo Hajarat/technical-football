@@ -31,6 +31,13 @@ public struct MotionInput
     public Vector3 SavePoint;
     /// <summary>The time warp's clamp for the target event (zero: the save clamp, <see cref="TimeWarp.SaveMin"/>..<see cref="TimeWarp.SaveMax"/>).</summary>
     public float WarpMin, WarpMax;
+    /// <summary>
+    /// Above zero, a timed set is entered by the clock, whatever frame the matcher liked (which then only picks the clip): where
+    /// the clip's own time to its target event is the simulation's time to it times this rate, and no earlier than the event can
+    /// still land on the tick. 1 enters a tackle so it plays at its own speed; a get-up much shorter than its recordings takes its
+    /// fastest rate, to show as much of the rise as fits. Zero (the keeper's saves): the matcher's frame.
+    /// </summary>
+    public float EntryRate;
     /// <summary>How the drawn root follows the simulation's position (see <see cref="RootMode"/>).</summary>
     public RootMode Root;
     /// <summary>A lying or get-up set: switches blend with <see cref="Inertializer.HalfLifeGround"/>.</summary>
@@ -565,6 +572,7 @@ public sealed class KeeperMotion
                 left -= cost;
                 latest--;
             }
+            if (input.EntryRate > 0f) f = pc.TargetFrame - (int)MathF.Round(Math.Max(0f, input.TargetTime) * input.EntryRate * pc.Clip.Fps);
             return Math.Clamp(Math.Max(f, latest), 0, Math.Max(0, pc.TargetFrame - 1));
         }
         if (_chainStage == 0)
