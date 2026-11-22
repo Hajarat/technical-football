@@ -130,6 +130,12 @@
       "at99": 30
     },
     "fatigue_penalty": [[0, 0], [20, 0], [60, 1]],
+    "danger_radius": 1,
+    "danger_min_steps": {
+      "at1": 2,
+      "at99": 1
+    },
+    "danger_speed": [[0, 1], [1, 0.9]],
     "turning_stick_rate_deg": 20,
     "turning_max_steps": {
       "jog": 2,

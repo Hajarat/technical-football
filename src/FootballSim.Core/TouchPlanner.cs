@@ -1185,7 +1185,7 @@ public static class TouchPlanner
     /// ball. Returns the touch made, if any.
     /// </summary>
     internal static TouchResult? Step(PlayerState p, in TickIntent rawIntent, Ball ball, bool inPossession, TouchStepMode mode,
-        int tick, float now, Tuning t, Pitch? pitch, SimRng rng)
+        int tick, float now, Tuning t, Pitch? pitch, SimRng rng, IReadOnlyList<PlayerState>? opponents = null)
     {
         if (p.StepBegun) p.StepsSinceTouch++;
         if (inPossession) RecoverTurnFatigue(p, t);
@@ -1204,7 +1204,7 @@ public static class TouchPlanner
         var a = p.TouchAction;
         if (a is { Pending: true } && tick >= a.ContactTick)
         {
-            var r = Execute(p, a, intent, ball, tick, now, t, pitch, rng, immediate: false);
+            var r = Execute(p, a, intent, ball, tick, now, t, pitch, rng, immediate: false, opponents);
             if (r != null) return r;
         }
         if (mode == TouchStepMode.CommittedOnly) return null;
@@ -1231,7 +1231,7 @@ public static class TouchPlanner
             var exit = new BallAction { Kind = ModeKind(TouchModel.ModeFor(intent, t)), PlanTick = tick, ContactTick = tick };
             exit.Foot = p.IsStepping ? p.SwingFoot : TouchModel.ChooseFoot(p.Sheet, p.Position, p.Facing, ball.Position, t);
             Install(p, exit, tick, t);
-            return Execute(p, exit, intent, ball, tick, now, t, pitch, rng, immediate: true);
+            return Execute(p, exit, intent, ball, tick, now, t, pitch, rng, immediate: true, opponents);
         }
         return null;
     }
@@ -1273,29 +1273,69 @@ public static class TouchPlanner
         return p.TouchCadenceCount % Math.Max(1, t.Touch.FootSwitchEvery) == 0 ? spt + 1 : spt;
     }
 
-    struct Meet
+    internal struct Meet
     {
         public int J;
         public Foot Foot;
         public Vector3 Cp;
         /// <summary>Steps begun from now to the meet, the meet's own included.</summary>
         public int Swings;
+        /// <summary>The walk stopped because an opponent could reach the predicted path (see <see cref="Endangered"/>).</summary>
+        public bool Danger;
     }
+
+    /// <summary>The speed an opponent closes on the ball's path at: a keeper's rush speed, an outfield player's top speed.</summary>
+    internal static float DangerSpeedOf(PlayerState o, Tuning t) =>
+        o.Role == PlayerRole.Keeper ? Keeper.RushSpeed(o.Sheet, t) : Movement.TopSpeed(o.Sheet, t);
+
+    /// <summary>
+    /// True when an opponent could reach the path from <paramref name="start"/> to <paramref name="at"/> (where the player is
+    /// predicted to be <paramref name="elapsed"/> seconds after the touch): his distance to the closest point of that segment
+    /// is under his speed (see <see cref="DangerSpeedOf"/>) times the time, plus danger_radius. An opponent behind or level with
+    /// the start (the closest point within the first hundredth of the segment) never counts. Only his position is read.
+    /// </summary>
+    internal static bool Endangered(Vector3 start, Vector3 at, float elapsed, IReadOnlyList<PlayerState> opponents, Tuning t)
+    {
+        var s = new Vector2(start.X, start.Z);
+        var seg = new Vector2(at.X - start.X, at.Z - start.Z);
+        float len2 = seg.LengthSquared();
+        if (len2 < 1e-8f) return false;
+        for (int i = 0; i < opponents.Count; i++)
+        {
+            var o = opponents[i];
+            var op = new Vector2(o.Position.X, o.Position.Z);
+            float u = Math.Clamp(Vector2.Dot(op - s, seg) / len2, 0f, 1f);
+            if (u <= DangerBehindShare) continue;
+            if (Vector2.Distance(op, s + seg * u) < DangerSpeedOf(o, t) * elapsed + t.Touch.DangerRadius) return true;
+        }
+        return false;
+    }
+
+    /// <summary>An opponent whose closest point on the predicted path is within this share of it from the start is behind or level.</summary>
+    const float DangerBehindShare = 0.01f;
+
+    /// <summary>The fewest steps a sprint push is cut to near an opponent: danger_min_steps by sprint dribbling, rounded, at least 1.</summary>
+    internal static int DangerMinSteps(PlayerSheet s, Tuning t) =>
+        Math.Max(1, (int)MathF.Round(t.Touch.DangerMinSteps.ForRating(s.SprintDribbling), MidpointRounding.AwayFromZero));
 
     /// <summary>
     /// Predicts the player from now with the legs following <paramref name="user"/> and finds the swing middle of the step
     /// <paramref name="steps"/> steps on (at least the windup ahead), or the one nearest <paramref name="nearTicks"/> when that
-    /// is set.
+    /// is set. With <paramref name="opponents"/> (a sprint push): once <paramref name="dangerMinSteps"/> steps have begun, the
+    /// first predicted tick at which an opponent could reach the path walked so far (see <see cref="Endangered"/>) stops the
+    /// walk, and the meet is the last swing middle before that tick that is at least that many steps on (kept on the foot the
+    /// requested steps would have played, as for a push cut short by <see cref="MaxMeetSeconds"/>), else the first one that is;
+    /// <see cref="Meet.Danger"/> is then set.
     /// </summary>
-    static bool FindMeet(PlayerState from, in TickIntent user, int steps, int nearTicks, float now, Tuning t, Pitch? pitch, out Meet meet,
-        int minJ = 0)
+    internal static bool FindMeet(PlayerState from, in TickIntent user, int steps, int nearTicks, float now, Tuning t, Pitch? pitch, out Meet meet,
+        int minJ = 0, IReadOnlyList<PlayerState>? opponents = null, int dangerMinSteps = 1)
     {
         meet = default;
         int pre = Math.Max(Math.Max(1, WindupTicks(t)), minJ);
         var c = from.Scratch();
         int horizon = nearTicks > 0 ? nearTicks + Ticks(1f, t) : Ticks(3f, t);
         int count = 0, bestGap = int.MaxValue;
-        bool found = false;
+        bool found = false, danger = false;
         Meet prev = default;
         float tn = now;
         float cap = Possession.SpeedCap(from, true, false, user, t);
@@ -1304,6 +1344,16 @@ public static class TouchPlanner
             tn += t.Dt;
             Movement.Step(c, Turned(user, Lead(from, tn - now, t)), t.Dt, tn, new MoveAssist(cap, 1f, Vector2.Zero), t, pitch);
             if (c.StepBegun) count++;
+            if (opponents != null && !danger && count >= dangerMinSteps && Endangered(from.Position, c.Position, tn - now, opponents, t))
+            {
+                danger = true;
+                if (found && meet.Swings >= dangerMinSteps)
+                {
+                    if ((steps - meet.Swings) % 2 != 0 && prev.Swings >= dangerMinSteps) meet = prev;
+                    meet.Danger = true;
+                    return true;
+                }
+            }
             if (c.SwingMiddleCrossed is not Foot f || count == 0) continue;
             if (j < pre) continue;
             if (nearTicks > 0)
@@ -1324,6 +1374,8 @@ public static class TouchPlanner
             prev = meet;
             meet = new Meet { J = j, Foot = f, Cp = ContactPointFor(c, f, t), Swings = count };
             found = true;
+            // (In danger with no swing middle yet at the fewest steps: this one is the push, never one under the minimum.)
+            if (danger && count >= dangerMinSteps) { meet.Danger = true; return true; }
             if (count >= steps) return true;
         }
         return found;
@@ -1522,7 +1574,7 @@ public static class TouchPlanner
     /// spin, draws the rated errors, starts the boost, and records the next meet the push is solved onto.
     /// </summary>
     static TouchResult? Execute(PlayerState p, BallAction a, in TickIntent stick, Ball ball, int tick, float now, Tuning t,
-        Pitch? pitch, SimRng rng, bool immediate)
+        Pitch? pitch, SimRng rng, bool immediate, IReadOnlyList<PlayerState>? opponents = null)
     {
         var k = t.Touch;
         Vector3 cp = immediate ? new Vector3(ball.Position.X, t.Ball.Radius, ball.Position.Z) : ContactPointFor(p, a.Foot, t);
@@ -1570,6 +1622,7 @@ public static class TouchPlanner
         Meet meet = default;
         bool hasMeet = false;
         int pushSteps = 1;
+        float cut = 0f;
         p.LastTouchTime = now;
         p.LastTouchFoot = foot;
 
@@ -1704,7 +1757,22 @@ public static class TouchPlanner
                 bool reversal = !first && turnDeg >= k.FeetTurnDeg && p.RunSpeed > k.ExecutionMinSpeed;
                 // A braking arc armed: he brakes from this touch on (its path below is planned with the braking).
                 if (p.TurnArcSpeed > 0f && kind is ActionKind.Turn or ActionKind.Cut) p.TurnArcBraking = true;
-                hasMeet = reversal ? FindReversalMeet(p, intent, now, t, pitch, out meet) : FindMeet(p, intent, steps, 0, now, t, pitch, out meet);
+                // A sprint push (not a turn, a cut or a first touch) near an opponent ahead of him: cut short of the first
+                // tick the opponent could reach his predicted path, never under the fewest steps.
+                bool scan = opponents != null && kind == ActionKind.Sprint && mode == TouchMode.Sprint && !reversal;
+                int minSteps = scan ? DangerMinSteps(p.Sheet, t) : 1;
+                hasMeet = reversal ? FindReversalMeet(p, intent, now, t, pitch, out meet)
+                    : FindMeet(p, intent, steps, 0, now, t, pitch, out meet, 0, scan ? opponents : null, minSteps);
+                if (hasMeet && meet.Danger && meet.Swings < steps)
+                {
+                    // He slows by the share of the push that was cut, and the push is solved again for that step on the
+                    // slowed legs (the cap applies from this touch, see Possession.DangerSlow).
+                    int chosen = Math.Max(1, meet.Swings);
+                    cut = Math.Clamp((steps - chosen) / (float)Math.Max(1, steps - minSteps), 0f, 1f);
+                    p.DangerSlowFrom = now;
+                    p.DangerSlowFactor = Math.Clamp(k.DangerSpeed.Evaluate(cut), 0f, 1f);
+                    if (FindMeet(p, intent, chosen, 0, now, t, pitch, out var slowed)) meet = slowed;
+                }
                 if (reversal && hasMeet) steps = Math.Max(1, meet.Swings);
                 // A push cut short by MaxMeetSeconds counts the steps it was solved for, so the next touch is played there.
                 else if (hasMeet) steps = Math.Max(1, Math.Min(steps, meet.Swings));
@@ -1749,6 +1817,7 @@ public static class TouchPlanner
         a.ContactMiss = miss;
         a.BallOutVelocity = v;
         a.BallOutSpin = spin;
+        a.DangerCut = cut;
         a.EndTick = tick + RecoveryTicks(t);
         // A committed touch keeps the surface the view has been swinging onto the ball since its commit.
         if (immediate) a.Surface = SurfaceFor(kind, foot, turnSign);

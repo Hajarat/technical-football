@@ -229,7 +229,7 @@ public static class DataLoader
             foreach (var (field, curve) in new[] { ("ball.drag_curve", t.Ball.DragCurve), ("ball.lift_curve", t.Ball.LiftCurve), ("ball.restitution_curve", t.Ball.RestitutionCurve), ("ball.bounce_friction_curve", t.Ball.BounceFrictionCurve),
                 ("movement.accel_by_speed_jog", t.Movement?.AccelBySpeedJog), ("movement.accel_by_speed_sprint", t.Movement?.AccelBySpeedSprint),
                 ("movement.decel_by_speed", t.Movement?.DecelBySpeed), ("movement.turn_angle_mult", t.Movement?.TurnAngleMult), ("movement.sharp_turn_cost", t.Movement?.SharpTurnCost),
-                ("touch.early_execution", t.Touch.EarlyExecution), ("touch.fatigue_turn", t.Touch.FatigueTurn), ("touch.fatigue_penalty", t.Touch.FatiguePenalty), ("touch.weak_foot_error", t.Touch.WeakFootError), ("touch.execution_time", t.Touch.ExecutionTime), ("skill.ball_roll_distance", t.Skill.BallRollDistance),
+                ("touch.early_execution", t.Touch.EarlyExecution), ("touch.fatigue_turn", t.Touch.FatigueTurn), ("touch.fatigue_penalty", t.Touch.FatiguePenalty), ("touch.danger_speed", t.Touch.DangerSpeed), ("touch.weak_foot_error", t.Touch.WeakFootError), ("touch.execution_time", t.Touch.ExecutionTime), ("skill.ball_roll_distance", t.Skill.BallRollDistance),
                 ("skill.ball_roll_run_blend", t.Skill.BallRollRunBlend), ("skill.ball_roll_keep", t.Skill.BallRollKeep),
                 ("skill.step_over_run_blend", t.Skill.StepOverRunBlend), ("skill.step_over_run_keep", t.Skill.StepOverRunKeep),
                 ("skill.heel_to_heel_run_blend", t.Skill.HeelToHeelRunBlend), ("skill.elastico_run_blend", t.Skill.ElasticoRunBlend), ("skill.spin_run_blend", t.Skill.SpinRunBlend), ("skill.mcgeady_run_blend", t.Skill.McGeadyRunBlend),
@@ -253,12 +253,15 @@ public static class DataLoader
             if (badBand != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: shot.far_post_band: {badBand} (default tuning in use)" };
             string? badProfile = t.Touch.Profiles == null ? "must be an object" : t.Touch.Profiles.Validate();
             if (badProfile != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: touch.profiles.{badProfile} (default tuning in use)" };
-            foreach (var (field, range) in new[] { ("touch.fatigue_gain", t.Touch.FatigueGain), ("touch.fatigue_recovery", t.Touch.FatigueRecovery) })
+            foreach (var (field, range) in new[] { ("touch.fatigue_gain", t.Touch.FatigueGain), ("touch.fatigue_recovery", t.Touch.FatigueRecovery),
+                ("touch.danger_min_steps", t.Touch.DangerMinSteps) })
             {
                 string? bad = range == null ? "must be an object with at1 and at99"
                     : !float.IsFinite(range.At1) || !float.IsFinite(range.At99) || range.At1 < 0f || range.At99 < 0f ? "at1 and at99 must be finite and not negative" : null;
                 if (bad != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: {field}: {bad} (default tuning in use)" };
             }
+            if (!float.IsFinite(t.Touch.DangerRadius) || t.Touch.DangerRadius < 0f)
+                return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: touch.danger_radius: must be finite and not negative (default tuning in use)" };
             var w = new List<LoadWarning>();
             if (t.TickRate < 1 || t.TickRate > 1000)
             {

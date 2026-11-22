@@ -483,6 +483,19 @@ public sealed class TouchTuning
     /// </summary>
     public Curve FatiguePenalty { get; set; } = new((0f, 0f), (20f, 0f), (60f, 1f));
     /// <summary>
+    /// A sprint push is cut short when an opponent ahead of him could reach the path he is predicted to run while it is out
+    /// of his feet: the opponent's reach is his top speed (a keeper's rush speed) times the time since the touch, plus this,
+    /// metres.
+    /// </summary>
+    public float DangerRadius { get; set; } = 1.0f;
+    /// <summary>The fewest steps a sprint push is cut to near an opponent, by the sprint dribbling rating (rounded to whole steps).</summary>
+    public RatingRange DangerMinSteps { get; set; } = new(2f, 1f);
+    /// <summary>
+    /// The legs' speed cap through a sprint push that was cut short near an opponent, as a factor by the share of the push
+    /// that was cut (0: nothing, 1: cut down to the fewest steps).
+    /// </summary>
+    public Curve DangerSpeed { get; set; } = new((0f, 1f), (1f, 0.9f));
+    /// <summary>
     /// The stick counts as moving (a turn is likely) when its smoothed turn rate is above this, degrees per second; then, as
     /// for a touch sent more than the execution angle off the ball's travel, the push goes to a meet at most
     /// <see cref="TurningMaxSteps"/> steps away.

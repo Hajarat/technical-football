@@ -48,17 +48,25 @@ public static class Possession
     /// <summary>
     /// The speed cap: off-ball top speed off possession or while chasing a knock-on; in possession the with-ball cap of the
     /// dribbling style <paramref name="legs"/> ask for (close into speed by the sprint input), or 97% of top speed during a
-    /// recovery run. The legs given here are the ones moved under the cap, so a plan and the step it plans for agree.
+    /// recovery run. Through a sprint push that was cut short near an opponent the with-ball cap is lowered by its
+    /// danger_speed factor (see <see cref="DangerSlow"/>). The legs given here are the ones moved under the cap, so a plan and
+    /// the step it plans for agree.
     /// </summary>
     internal static float SpeedCap(PlayerState p, bool inPossession, bool recovering, in TickIntent legs, Tuning t)
     {
         if (!inPossession || ChasingKnockOn(p, t)) return Movement.TopSpeed(p.Sheet, t);
         // A skill move's exit burst lifts the with-ball cap a little while it lasts.
         float burst = p.MoveTime < p.SkillBurstUntil ? Movement.TopSpeed(p.Sheet, t) * p.SkillBurstCap : 0f;
-        float withBall = Movement.TopSpeedWithBall(p.Sheet, legs, t);
+        float withBall = Movement.TopSpeedWithBall(p.Sheet, legs, t) * DangerSlow(p);
         if (recovering) return MathF.Max(withBall + burst, Movement.TopSpeed(p.Sheet, t) * t.Possession.ChaseSpeedFraction);
         return withBall + burst;
     }
+
+    /// <summary>
+    /// The factor on the with-ball speed cap while the player's last touch is a sprint push that was cut short near an
+    /// opponent: danger_speed by the share of the push that was cut, 1 otherwise. It lapses with his next touch or strike.
+    /// </summary>
+    internal static float DangerSlow(PlayerState p) => p.DangerSlowFrom == p.LastTouchTime ? p.DangerSlowFactor : 1f;
 
     /// <summary>
     /// The next touch of a player in possession: the committed touch (seconds to its contact tick, its foot and its contact

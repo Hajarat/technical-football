@@ -10,7 +10,7 @@ using FootballSim.Core;
 /// contact check handed it to the other foot, the body angle, the launch speed, the time from the press to the strike and his
 /// turn fatigue just before the strike) and how the round
 /// ended, then prints means and shares (on target = the shots that, flying free of the keeper, go in), the reasons wide shots went
-/// wide, and why rounds had no shot.
+/// wide, why rounds had no shot, and the share of all sprint pushes that were cut short near the keeper.
 /// </summary>
 static class ShotDiag
 {
@@ -33,6 +33,7 @@ static class ShotDiag
         var ends = new Dictionary<string, int>();
         var noShot = new Dictionary<string, int>();
         int wide = 0, wideAimOut = 0, wideError = 0;
+        int sprintPushes = 0, cutPushes = 0;
         for (int r = 0; r < n; r++)
         {
             var w = new World(tuning, sc, att, kee, seed0 + (ulong)r);
@@ -52,6 +53,11 @@ static class ShotDiag
                 buf[0] = script.Next(w);
                 w.Step(buf);
                 touches += w.Events.Count(e => e.Kind == EventKind.Touch && e.Team == 0);
+                if (p.TouchAction is { Made: true, Kind: ActionKind.Sprint } push && push.ContactTick == w.Tick)
+                {
+                    sprintPushes++;
+                    if (push.DangerCut > 0f) cutPushes++;
+                }
                 if (w.Shots.Count > 0) { shot = true; break; }
                 if (w.State is RoundState.Outcome or RoundState.Report) break;
             }
@@ -109,6 +115,7 @@ static class ShotDiag
         Console.WriteLine($"  ball from the feet m: {F(offFeet)}   ahead along the facing m: {F(ahead)}   from the striking foot's contact point m: {F(offFoot)}");
         Console.WriteLine($"  touches before the shot: {F(touchesBefore)}   seconds to the shot: {F(timeToShot)}");
         Console.WriteLine($"  turn fatigue at the strike (0-100): {F(fatigue)}");
+        Console.WriteLine($"  sprint pushes cut near the keeper: {(sprintPushes == 0 ? "-" : $"{100.0 * cutPushes / sprintPushes:F1}% ({cutPushes} of {sprintPushes})")}");
         foreach (var kv in factors.OrderBy(kv => kv.Key)) Console.WriteLine($"  factor {kv.Key}: {F(kv.Value)}");
         Console.WriteLine($"  wide {wide}: aimed outside the posts {wideAimOut}, aimed inside and sent wide {wideError}");
         return 0;

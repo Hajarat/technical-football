@@ -50,6 +50,16 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   a skill gesture waiting, a shot's strike) shortens the cooldown to `early_execution` of the cadence (by the angle and
   close dribbling), never sooner than `early_min_interval` (0.22 s); the go-get-it legs then take over when they play the ball a few
   ticks sooner, and the stride may be quickened by up to a quarter to bring a step's window onto the ball.
+- A sprint push near the keeper is cut short. When a sprint push (not a turn, a cut or a first touch) is solved, the walk
+  along his predicted run checks every tick, once `danger_min_steps` steps have begun (2 at sprint dribbling 1, 1 from 51),
+  whether an opponent could reach the path run so far: his distance to the closest point of the straight line from where
+  the attacker is now to where he is predicted then is under his speed (a keeper's rush speed, an outfield player's top
+  speed) times the time since the touch, plus `danger_radius` (1 m). An opponent behind or level with the attacker never
+  counts, and only his position is read. At the first such tick the walk stops: the push is solved for the last step whose
+  swing middle came before it (kept on the foot the full push would have played, as for the 1.2 s cut), never under the
+  fewest steps. Through that push the with-ball speed cap is multiplied by `danger_speed` at the share of the push that was
+  cut ((full steps - played steps) / (full steps - fewest steps): 0.9 for a push cut to the fewest), and the push is solved
+  for those slowed legs. There are no random draws in it.
 - Turn fatigue (0 to 100) tires rapid zig-zags: each touch the touch controller plays (a dribble touch, turn, cut, stop or
   knock-on; not a trap, a first touch, a shot's soft touch, a skill move's own contacts or the strike) adds `fatigue_turn`
   by the angle from his facing at the contact to the direction the ball is pushed (nothing up to 30 degrees, 10 at 60, 20

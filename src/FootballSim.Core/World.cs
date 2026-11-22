@@ -303,6 +303,8 @@ public sealed class World
         p.TouchBoostUntil = -100f;
         p.TouchBoostFactor = 1f;
         p.KnockOnFrom = float.NaN;
+        p.DangerSlowFrom = float.NaN;
+        p.DangerSlowFactor = 1f;
         p.KnockOnUntil = -100f;
         p.KnockOnDirection = Vector2.Zero;
         p.MoveTime = 0f;
@@ -851,7 +853,7 @@ public sealed class World
     void TryTouch(PlayerState p, in TickIntent it, TouchStepMode mode)
     {
         bool inPossession = _controller == p;
-        if (TouchPlanner.Step(p, it, Ball, inPossession, mode, Tick, SimTime, Tuning, Pitch, _rng) is not TouchResult touch) return;
+        if (TouchPlanner.Step(p, it, Ball, inPossession, mode, Tick, SimTime, Tuning, Pitch, _rng, Teams[1 - p.Team]) is not TouchResult touch) return;
         if (touch.Kind == ActionKind.Soft) _softPending = false;
         _events.Add(new SimEvent(EventKind.Touch, touch.ContactPoint, touch.BallVelocity.Length(), Foot: touch.Foot, Team: p.Team, PlayerIndex: p.Index));
         if (!inPossession) SetController(p);

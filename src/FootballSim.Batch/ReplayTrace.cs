@@ -113,7 +113,7 @@ static class ReplayTrace
                     F(new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z).Length()).PadLeft(5), "|",
                     (p.SkillMove is { FeetTurn: true } ? "FeetTurn" : skill ? "SKILL:" + p.SkillMove?.Kind : kind).PadRight(9), phase.PadRight(9), legs.PadRight(8), F(p.NextTouchEta).PadLeft(5),
                     F(debt).PadLeft(5), (post ? "P" : ".").PadLeft(3), F(tau).PadLeft(5), F(p.TurnFatigue, 1).PadLeft(5), "|",
-                    dropped ? "UNPLAYED" : "", touched ? "TOUCH " + w.Events.First(e => e.Kind == EventKind.Touch).ToString() : "", isStep ? "<STEP" : "", !measured ? "(unmeasured)" : "",
+                    dropped ? "UNPLAYED" : "", touched ? "TOUCH " + w.Events.First(e => e.Kind == EventKind.Touch).ToString() : "", touched && p.TouchAction is { DangerCut: > 0f } ? "near_keeper" : "", isStep ? "<STEP" : "", !measured ? "(unmeasured)" : "",
                 }));
             }
             v0 = p.Velocity; run0 = p.RunSpeed; st0 = p.SteerVelocity;

@@ -193,6 +193,10 @@ public sealed class PlayerState
     internal Vector2 KnockOnDirection;
     /// <summary>Simulation seconds at which the knock-on chase ends if the ball has not been touched again.</summary>
     internal float KnockOnUntil = -100f;
+    /// <summary>Time of the sprint push that was cut short near an opponent (see TouchPlanner.FindMeet); its slow-down lasts until the next touch.</summary>
+    internal float DangerSlowFrom = float.NaN;
+    /// <summary>The with-ball speed cap is multiplied by this through that push.</summary>
+    internal float DangerSlowFactor = 1f;
     /// <summary>Simulation seconds of the player's most recent movement step (lets possession rules that get no clock see the time).</summary>
     internal float MoveTime;
     /// <summary>Running speed still to be shed after a sharp turn or a cut (at balance_deceleration), m/s.</summary>
@@ -355,7 +359,7 @@ public sealed class PlayerState
         Position = o.Position; Velocity = o.Velocity; Facing = o.Facing; HandPosition = o.HandPosition;
         LastTouchTime = o.LastTouchTime; TouchBoostUntil = o.TouchBoostUntil; TouchBoostFactor = o.TouchBoostFactor;
         TouchBoostFrom = o.TouchBoostFrom; KnockOnFrom = o.KnockOnFrom; KnockOnDirection = o.KnockOnDirection;
-        KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PostTurnUntil = o.PostTurnUntil; TurnArcSpeed = o.TurnArcSpeed; TurnArcBraking = o.TurnArcBraking; TurnArcRelease = o.TurnArcRelease; TurnArcStick = o.TurnArcStick; PlannerSteer = o.PlannerSteer; SteerFacing = o.SteerFacing; SteerCarry = o.SteerCarry; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime; TurnCostTaken = o.TurnCostTaken; TurnCostFrom = o.TurnCostFrom;
+        KnockOnUntil = o.KnockOnUntil; DangerSlowFrom = o.DangerSlowFrom; DangerSlowFactor = o.DangerSlowFactor; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PostTurnUntil = o.PostTurnUntil; TurnArcSpeed = o.TurnArcSpeed; TurnArcBraking = o.TurnArcBraking; TurnArcRelease = o.TurnArcRelease; TurnArcStick = o.TurnArcStick; PlannerSteer = o.PlannerSteer; SteerFacing = o.SteerFacing; SteerCarry = o.SteerCarry; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime; TurnCostTaken = o.TurnCostTaken; TurnCostFrom = o.TurnCostFrom;
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed; StepBegun = o.StepBegun;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction; TurnFatigue = o.TurnFatigue;

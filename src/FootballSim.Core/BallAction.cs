@@ -156,6 +156,11 @@ public sealed class BallAction
     public Vector3 NextMeetPoint { get; internal set; }
     /// <summary>The foot planned for the next meet.</summary>
     public Foot NextMeetFoot { get; internal set; }
+    /// <summary>
+    /// For a sprint push that was cut short because an opponent ahead (the keeper) could reach the path: the share of the
+    /// push that was cut, above 0 up to 1 (cut to the fewest steps); 0 for every other touch.
+    /// </summary>
+    public float DangerCut { get; internal set; }
     /// <summary>True once the contact was made; false while waiting and for a touch not played (the ball out of reach at its contact).</summary>
     public bool Made { get; internal set; }
     /// <summary>Horizontal distance from the ball centre to <see cref="ContactPoint"/> at contact, metres (NaN before).</summary>
