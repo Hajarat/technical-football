@@ -56,14 +56,21 @@ public static class Regain
     /// keeper's rush speed, the attacker's sprint speed); a keeper on the ground or getting up is timed as if he could run
     /// at once, so a recovering keeper still counts as close.
     /// </summary>
-    public static bool Contested(PlayerState p, Ball ball, PlayerState keeper, Tuning t)
+    public static bool Contested(PlayerState p, Ball ball, PlayerState keeper, Tuning t) =>
+        ContestedBy(p, ball, keeper, Keeper.RushSpeed(keeper.Sheet, t), t);
+
+    /// <summary>
+    /// <see cref="Contested"/> for any opponent who runs at <paramref name="opponentSpeed"/>, m/s (an outfield defender at his
+    /// sprint speed), with the same distance and margin.
+    /// </summary>
+    public static bool ContestedBy(PlayerState p, Ball ball, PlayerState opponent, float opponentSpeed, Tuning t)
     {
         var k = t.Possession;
-        float dk = TouchModel.HorizontalDistance(keeper.Position, ball.Position);
+        float dk = TouchModel.HorizontalDistance(opponent.Position, ball.Position);
         if (dk <= k.RegainKeeperDistance) return true;
         float reach = TouchModel.FootReach(p.Sheet, t);
         float ta = MathF.Max(0f, TouchModel.HorizontalDistance(p.Position, ball.Position) - reach) / MathF.Max(1f, Movement.TopSpeed(p.Sheet, t));
-        float tk = MathF.Max(0f, dk - reach) / MathF.Max(1f, Keeper.RushSpeed(keeper.Sheet, t));
+        float tk = MathF.Max(0f, dk - reach) / MathF.Max(1f, opponentSpeed);
         return tk <= ta + k.RegainKeeperMargin;
     }
 

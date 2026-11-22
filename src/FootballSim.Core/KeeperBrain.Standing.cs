@@ -55,7 +55,15 @@ public sealed partial class KeeperBrain
         if (!holdLine && !s.ShotInFlight && !s.BallDead)
         {
             var race = Race(ball, s, rng);
-            switch (AreaPlayFor(race))
+            var play = AreaPlayFor(race);
+            // A defender covers the ball: the keeper leaves it to him and holds his arc. Only a ball within a dive is still his.
+            if (s.DefenderCovers)
+            {
+                if (play != AreaPlay.Smother) play = AreaPlay.None;
+                race = race with { Win = false, Anticipate = false };
+                _tRaceBlock = "defender covers";
+            }
+            switch (play)
             {
                 case AreaPlay.Smother:
                     _anticipating = false; StartSmother(race.Point); Think(KeeperMode.Smother); return;
@@ -113,7 +121,7 @@ public sealed partial class KeeperBrain
 
         // Charging: an attacker who has come in with the ball, in front of him and inside the charge range. Once he can close
         // him down quickly enough (the chip risk weighed), he runs at him and jockeys a couple of metres from the ball.
-        bool chargeable = !holdLine && _engaged && s.AttackerHasBall && inFront && !s.BallDead && !s.ShotInFlight;
+        bool chargeable = !holdLine && _engaged && s.AttackerHasBall && inFront && !s.BallDead && !s.ShotInFlight && !s.DefenderCovers;
         _chargeSoon = false;
         _charging = chargeable && ChargeDecision(ball, s, toBall, feet, rng);
         if (_charging)

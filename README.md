@@ -39,7 +39,7 @@ Today the game is the 1v1 duel, one attacker against the keeper: a simulation co
 
 ## How the project is laid out
 
-- `src/` is the simulation core in C#: `FootballSim.Core` (the pitch, ball, touch controller, shots, keeper and rounds), `FootballSim.Anim` (the animation runtime shared by the game), `FootballSim.Batch` (the batch runner and probes) and the test projects.
+- `src/` is the simulation core in C#: `FootballSim.Core` (the pitch, ball, touch controller, shots, keeper, defender and rounds), `FootballSim.Anim` (the animation runtime shared by the game), `FootballSim.Batch` (the batch runner and probes) and the test projects.
 - `data/` is JSON: `tuning/` (every number of the feel), `players/` (rated player sheets) and `scenarios/` (start spots).
 - `game/` is the Godot 4.7 .NET shell: the match scene, the figures and their animation, the HUD, input and the assets in `game/assets/`.
 - `tools/` is the animation pipeline (`tools/anim/`, Python, run with `uv`) and the character build (`tools/characters/`).
@@ -50,6 +50,7 @@ Today the game is the 1v1 duel, one attacker against the keeper: a simulation co
 - [docs/dribbling.md](docs/dribbling.md): speeds, turning, the touch controller, the boards, regaining a loose ball, and the skill moves with their timings.
 - [docs/shooting.md](docs/shooting.md): the five shot types, the striking foot, accuracy, aim, charge and the strike.
 - [docs/keeper.md](docs/keeper.md): how the keeper positions himself, closes down, saves and recovers, and the keeper probes.
+- [docs/defending.md](docs/defending.md): the defender: his bot, the auto tackle, lunge, slide, barge and block, how a round ends with him in it, and the defender probe.
 - [docs/controls.md](docs/controls.md): the controls panel, the gamepad and keyboard controls, skill-move gestures and the macOS controller note.
 - [docs/animation.md](docs/animation.md): the rigged character models, how the attacker's running, skill moves and shots and the keeper are drawn, and the measurements the game prints.
 - [docs/tools.md](docs/tools.md): the commands table, game options, probes, replays and session logs.

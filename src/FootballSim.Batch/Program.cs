@@ -36,6 +36,12 @@ using FootballSim.Core;
 //                                               human-style attacker plans (TickIntent per tick, no ScriptedAttacker) against the keeper
 //   ... --write-probe-replays <dir>             writes keeper-probe showcase replays (charge, jockey, step-over, chip) for screenshots
 //   ... --probe-replays <dir|file> [--every 30]  re-runs play-test replays (round-*.json) with the keeper's timeline every 0.25 s
+//   ... --probe defender [--n 2000] [--seed 1] [--styles straight,cut,skill] [--sweep awareness=1,50,99]
+//                                               scripted rounds of the defender duel per attacker style, with their bands
+//   ... --trace-defender <seed> [--style straight|cut|skill] [--every 12]
+//                                               prints the defender's state through one scripted round
+//   ... --write-defender-replays <dir>          searches scripted rounds for each defender action and writes one replay each
+//   ... --set defender.overshoot_m=0.6,...     overrides plain tuning numbers by their file names (experiments)
 //   ... --counters off                          the scripted attacker ignores the keeper (no shorter touches, rounding or chips)
 //   ... --close-down off                        the shallow keeper: he never closes down (close_down_range 0), so never charges
 
@@ -65,6 +71,23 @@ static class Cli
         if (tr.Error != null) Console.Error.WriteLine("warning: " + tr.Error);
         foreach (var w in tr.Warnings) Console.Error.WriteLine("warning: " + w);
         var tuning = tr.Value!;
+        // --set a.b=1.5,c.d=2: overrides plain numbers of the loaded tuning by their file names, for experiments.
+        if (opts.TryGetValue("set", out var sets))
+        {
+            var node = System.Text.Json.Nodes.JsonNode.Parse(DataLoader.TuningToJson(tuning))!;
+            foreach (var pair in sets.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var kv = pair.Split('=');
+                var keys = kv[0].Split('.');
+                var at = node;
+                for (int i = 0; i < keys.Length - 1; i++) at = at![keys[i]];
+                if (at?[keys[^1]] == null) { Console.Error.WriteLine($"--set: no tuning value '{kv[0]}'"); return 2; }
+                at[keys[^1]] = double.Parse(kv[1], CultureInfo.InvariantCulture);
+            }
+            var again = DataLoader.ParseTuning(node.ToJsonString(), "--set");
+            if (again.Error != null) { Console.Error.WriteLine("error: " + again.Error); return 2; }
+            tuning = again.Value!;
+        }
 
         if (opts.TryGetValue("replay", out var replayPath)) return RunReplay(replayPath, dataDir, tuning);
         if (opts.TryGetValue("shot-audit", out var auditPath))
@@ -82,9 +105,13 @@ static class Cli
             if (probe == "sessions") return SessionProbe.Run(opts, root ?? Directory.GetCurrentDirectory(), dataDir, tuning);
             if (probe == "shots") return ShotDiag.Run(opts, dataDir, tuning);
             if (probe == "shot") return ShotProbe.Run(opts, dataDir, tuning);
-            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, sessions, shots, shot)"); return 2; }
+            if (probe == "defender") return DefenderProbe.Run(opts, dataDir, tuning);
+            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, sessions, shots, shot, defender)"); return 2; }
             return DribbleProbe.Run(opts, dataDir, tuning);
         }
+
+        if (opts.TryGetValue("trace-defender", out var traceDefender)) return DefenderProbe.Trace(opts, dataDir, tuning, ulong.Parse(traceDefender, CultureInfo.InvariantCulture));
+        if (opts.TryGetValue("write-defender-replays", out var defenderDir)) return DefenderProbe.WriteReplays(defenderDir, opts, dataDir, tuning);
 
         if (!opts.TryGetValue("scenario", out var scenarioId)) { Console.Error.WriteLine("Need --scenario <id> (or --replay <file>)"); return 2; }
         var sc = Load(DataLoader.LoadScenario(Path.Combine(dataDir, "scenarios", scenarioId + ".json")));
@@ -94,6 +121,13 @@ static class Cli
         var attacker = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", attackerId + ".json")));
         var keeper = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", keeperId + ".json")));
         if (attacker == null || keeper == null) return 1;
+        // A scenario with a defender: his sheet (--defender, else the scenario's).
+        PlayerSheet? defender = null;
+        if (sc.Defenders > 0)
+        {
+            defender = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", (opts.TryGetValue("defender", out var df) ? df : sc.DefaultDefender) + ".json")));
+            if (defender == null) return 1;
+        }
 
         if (opts.TryGetValue("trace-keeper", out var traceSeed))
             return KeeperReplays.Trace(tuning, sc, attacker, keeper, ulong.Parse(traceSeed, CultureInfo.InvariantCulture),
@@ -103,7 +137,7 @@ static class Cli
         if (opts.TryGetValue("save-replay", out var savePath))
         {
             ulong rs = opts.TryGetValue("seed", out var rss) ? ulong.Parse(rss, CultureInfo.InvariantCulture) : 1UL;
-            var report = RoundRunner.RunToReport(tuning, sc, attacker, keeper, rs, out var replay);
+            var report = RoundRunner.RunToReport(tuning, sc, attacker, keeper, rs, out var replay, defender: defender);
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(savePath))!);
             replay.Save(savePath);
             Console.WriteLine($"saved {savePath} ({replay.TickCount} ticks), outcome {report.Outcome.Label()}");
@@ -154,7 +188,7 @@ static class Cli
             var sw = Stopwatch.StartNew();
             for (int i = 0; i < n; i++)
             {
-                var r = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i, new ScriptedAttacker { Counters = counters }, followUp: true);
+                var r = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i, new ScriptedAttacker { Counters = counters }, followUp: true, defender: defender);
                 counts[(int)r.End]++;
                 stats.Add(r);
             }
@@ -197,12 +231,18 @@ static class Cli
             : Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", replay.AttackerId + ".json")));
         var kee = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", replay.KeeperId + ".json")));
         if (sc == null || att == null || kee == null) return 1;
+        PlayerSheet? def = null;
+        if (sc.Defenders > 0)
+        {
+            def = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", (replay.DefenderId ?? sc.DefaultDefender) + ".json")));
+            if (def == null) return 1;
+        }
         if (!replay.MatchesTuning(tuning))
             Console.WriteLine("Tuning has changed since this replay, so the result may differ.");
         if (replay.Partial)
         {
             // a capture or an unfinished round: the recorded ticks, then the shots so far (there is no report)
-            var world = replay.Play(tuning, sc, att, kee);
+            var world = replay.Play(tuning, sc, att, kee, defender: def);
             Console.WriteLine($"replay {path}: scenario={replay.ScenarioId} attacker={replay.AttackerId} keeper={replay.KeeperId} seed={replay.Seed} ticks={replay.TickCount}");
             if (replay.Capture is { } c) Console.WriteLine($"capture {c.Id}: {c.Tag}{(c.Note.Length > 0 ? " · " + c.Note : "")}");
             Console.WriteLine($"partial: {replay.TickCount} ticks, no report");
@@ -215,7 +255,7 @@ static class Cli
             if (world.Shots.Count == 0) Console.WriteLine("no shots");
             return 0;
         }
-        var report = replay.Run(tuning, sc, att, kee);
+        var report = replay.Run(tuning, sc, att, kee, def);
         Console.WriteLine($"replay {path}: scenario={replay.ScenarioId} attacker={replay.AttackerId} keeper={replay.KeeperId} seed={replay.Seed} ticks={replay.TickCount}");
         Console.WriteLine(report.ToJson());
         return 0;

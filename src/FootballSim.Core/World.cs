@@ -7,7 +7,7 @@ namespace FootballSim.Core;
 /// <see cref="Begin"/> once, then <see cref="Step"/> once per tick (1/120 s), and reads the state afterwards.
 /// All randomness comes from one <see cref="SimRng"/> seeded per round, so the same seed and intents give the same round.
 /// </summary>
-public sealed class World
+public sealed partial class World
 {
     readonly List<SimEvent> _events = new();
     readonly List<ShotResult> _shots = new();
@@ -79,7 +79,8 @@ public sealed class World
     /// <param name="attacker">Sheet of the attacker (team 0, player 0).</param>
     /// <param name="keeper">Sheet of the keeper (team 1, player 0).</param>
     /// <param name="seed">Seed for the round's random generator.</param>
-    public World(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, ulong seed)
+    /// <param name="defender">Sheet of the defender (team 1, player 1) in a scenario with one; a default sheet when null.</param>
+    public World(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, ulong seed, PlayerSheet? defender = null)
     {
         Tuning = tuning;
         Scenario = scenario;
@@ -97,6 +98,11 @@ public sealed class World
         {
             t0.Add(new PlayerState(0, i, PlayerRole.Outfield, attacker));
             t1.Add(new PlayerState(1, i, i == 0 ? PlayerRole.Keeper : PlayerRole.Outfield, i == 0 ? keeper : attacker));
+        }
+        if (scenario.Defenders > 0)
+        {
+            Defender = new PlayerState(1, t1.Count, PlayerRole.Outfield, defender ?? new PlayerSheet { Id = "defender", Name = "Defender" });
+            t1.Add(Defender);
         }
         Teams = new IReadOnlyList<PlayerState>[] { t0, t1 };
         Reset(seed);
@@ -228,6 +234,7 @@ public sealed class World
             p.Facing = MathF.PI;
             ResetPlayer(p);
         }
+        ResetDefender(seed);
         _brain = new KeeperBrain(Keeper, Pitch, Tuning, Scenario.KeeperHoldLine, Attacker.Sheet)
         { HoldLineThroughDribble = Scenario.KeeperHoldLineThroughDribble };
         IdealCharge = ShotModel.IdealCharge(ShotModel.GoalDistance(Ball.Position, Pitch), Tuning);
@@ -308,6 +315,17 @@ public sealed class World
         p.KnockOnUntil = -100f;
         p.KnockOnDirection = Vector2.Zero;
         p.MoveTime = 0f;
+        p.Def.Reset();
+        p.DefenderAction = DefenderAction.Hold;
+        p.DefenderActionTime = 0f;
+        p.ActionSide = SkillSide.None;
+        p.StumbleUntil = -100f;
+        p.TackledLockUntil = -100f;
+        p.Jockeying = false;
+        p.BlockReach = 0f;
+        p.TackleFoot = p.Position;
+        p.TackleContactTime = float.NaN;
+        p.PushVelocity = Vector3.Zero;
         GestureReader.Reset(p);
         SkillMoves.Reset(p);
     }
@@ -330,15 +348,29 @@ public sealed class World
         _events.Clear();
         if (State is RoundState.Setup or RoundState.Report) return;
 
-        _recorder?.Record(intents);
+        // The defender's intent comes from his bot (or, with the bot off, from the caller); either way it is what is recorded.
+        TickIntent def = default;
+        if (Defender != null)
+        {
+            int flat = Teams[0].Count + Defender.Index;
+            def = DefenderBotEnabled && State != RoundState.Outcome ? _bot!.Next(this) : IntentFor(intents, 1, Defender.Index);
+            if (_recorder != null)
+            {
+                Span<TickIntent> all = stackalloc TickIntent[PlayerCount];
+                for (int i = 0; i < all.Length && i < intents.Length; i++) all[i] = intents[i];
+                all[flat] = def;
+                _recorder.Record(all);
+            }
+        }
+        else _recorder?.Record(intents);
         Tick++;
         SimTime += _dt;
         TickIntent atk = IntentFor(intents, 0, 0);
-        StepSimulation(atk);
+        StepSimulation(atk, def);
         PublishContract();
     }
 
-    void StepSimulation(in TickIntent atk)
+    void StepSimulation(in TickIntent atk, in TickIntent def)
     {
         _brain.BeginTick(_dt);
         if (State == RoundState.Outcome)
@@ -353,12 +385,16 @@ public sealed class World
         // 2. The released shot (see TryStrike); a shot turned into a fake is never struck.
         if (State == RoundState.Strike && _pending.Active && _fakeTick < 0) TryStrike();
 
+        // 2b. The defender (his movement, the tackles he starts, the auto tackle, a loose ball he controls), then the body
+        // contact between him and the attacker. A shot struck above is already on its way.
+        if (Defender != null && StepDefender(def)) return;
+
         // 3. Keeper.
         _brain.Update(_dt, Ball, _keeperRng, KeeperSituation());
 
-        // 4. Ball, with the frame, the arena boards and the keeper's hands as obstacles.
+        // 4. Ball, with the frame, the arena boards, the keeper's hands and the defender's body, leg and foot as obstacles.
         Vector3 prev = Ball.Position;
-        var res = Ball.Step(_dt, Pitch, _brain.HandsSphere, _brain.BodyCapsule, _brain.HandsCapsule);
+        var res = Ball.Step(_dt, Pitch, _brain.HandsSphere, _brain.BodyCapsule, _brain.HandsCapsule, DefenderObstacles());
         float speed = Ball.Velocity.Length();
         if (res.Bounced) _events.Add(new SimEvent(EventKind.Bounce, res.BouncePoint, res.BounceSpeed));
         if (res.FrameHit)
@@ -391,6 +427,8 @@ public sealed class World
             if (held) { EndRound(Outcome.Held); return; }
             if (State == RoundState.Flight) State = RoundState.Live;
         }
+        // The defender's foot, leg or body meeting the ball, and a lunge or slide that meets the attacker instead.
+        if (Defender != null && ResolveDefenderContact(res)) return;
 
         // Possession is lost when the ball stays beyond the lose distance for long enough.
         if (_controller != null && _controller.Role != PlayerRole.Keeper)
@@ -408,7 +446,8 @@ public sealed class World
         _liveSeconds += _dt;
 
         // 6. Referee.
-        if (!IsFinite(Ball.Position) || !IsFinite(Ball.Velocity) || !IsFinite(Attacker.Position) || !IsFinite(Keeper.Position))
+        if (!IsFinite(Ball.Position) || !IsFinite(Ball.Velocity) || !IsFinite(Attacker.Position) || !IsFinite(Keeper.Position)
+            || Defender != null && !IsFinite(Defender.Position))
         {
             _diagnostics.Add($"seed {Seed} tick {Tick}: position or speed became not-a-number");
             EndRound(Outcome.Out);
@@ -475,6 +514,7 @@ public sealed class World
             ShotInFlight = State == RoundState.Flight,
             AttackerPosition = a.Position,
             AttackerVelocity = a.Velocity,
+            DefenderCovers = Defender != null && DefenderCovers(),
         };
     }
 
@@ -538,7 +578,14 @@ public sealed class World
         p.Regain = State == RoundState.Live && _ballPlayed && !windup && !_shootWasHeld && !_pending.Active && p.ShotAction == null
             && _controller == null && !TouchPlanner.Stunned(p, SimTime)
             ? Regain.Assess(p, it, Ball, Keeper, tuning) : RegainMode.None;
+        if (Defender != null) p.Regain = RegainAgainstDefender(p, p.Regain);
         var assist = TouchPlanner.BeginTick(p, it, Ball, inPossession, State == RoundState.Live || windup, Tick, SimTime, tuning, Pitch, out var legs);
+        // Stumbling (tackled or barged), his speed is capped.
+        if (Defending.Stumbling(p, SimTime))
+        {
+            float stumble = tuning.Defending.StumbleSpeed;
+            assist = assist with { TopSpeed = MathF.Min(assist.TopSpeed, stumble), HardCap = MathF.Min(assist.HardCap, stumble) };
+        }
         Movement.Step(p, legs, _dt, SimTime, assist, tuning, Pitch);
 
         // Other players on both teams stand still (no behaviour yet).
@@ -580,6 +627,8 @@ public sealed class World
                 : _controller != p ? TouchStepMode.None
                 : _softPending ? TouchStepMode.SoftOnly : TouchStepMode.CommittedOnly;
             if (TouchPlanner.Stunned(p, SimTime)) mode = TouchStepMode.None;
+            // Stumbling or just tackled he cannot play the ball; nor can he take a loose ball the defender is nearer to.
+            if (Defending.Stumbling(p, SimTime) || SimTime < p.TackledLockUntil || DefenderDeniesTouch(p)) mode = TouchStepMode.None;
             TryTouch(p, it, mode);
         }
         UpdateStrikeEstimate();
@@ -711,6 +760,12 @@ public sealed class World
     void TryStrike()
     {
         var a = Attacker;
+        // Tackled or stumbling he cannot strike; the shot is dropped after the buffer like any that lost the ball.
+        if (Defending.Stumbling(a, SimTime) || SimTime < a.TackledLockUntil)
+        {
+            if (_controller != a && Tick >= _pending.DeadlineTick) DropShot();
+            return;
+        }
         if (_controller != a)
         {
             if (Tick < _pending.ContactTick) return;
@@ -858,6 +913,7 @@ public sealed class World
         _events.Add(new SimEvent(EventKind.Touch, touch.ContactPoint, touch.BallVelocity.Length(), Foot: touch.Foot, Team: p.Team, PlayerIndex: p.Index));
         if (!inPossession) SetController(p);
         _awayFor = 0f;
+        p.Def.AutoCooldownUntil = SimTime + Tuning.Defending.Auto.CooldownS;   // (no auto tackle just after he has played the ball himself)
     }
 
     /// <summary>Changes who controls the ball, raising PossessionLost for the old controller and PossessionGained for the new.</summary>
@@ -875,6 +931,7 @@ public sealed class World
         }
         _controller = p;
         _awayFor = 0f;
+        _looseTie = null;
         if (p != null)
         {
             _ballPlayed = true;
@@ -1038,6 +1095,7 @@ public sealed class World
     {
         var idle = default(TickIntent);
         Movement.Step(Attacker, idle, _dt, SimTime, false, Tuning, Pitch);
+        if (Defender != null) StepDefenderOutcome();
         _brain.Update(_dt, Ball, _keeperRng, new KeeperSituation { AttackerNextTouch = float.PositiveInfinity, AttackerTouchTick = -1, StrikeIn = float.PositiveInfinity, BallDead = true });
         if (Outcome == Outcome.Held) Ball.Position = Keeper.HandPosition;
         else if (Outcome == Outcome.Goal)
@@ -1076,6 +1134,7 @@ public sealed class World
             Clock = _endClock,
             Shots = _shots.ToArray(),
             Keeper = _brain.Report,
+            Defender = FinishDefenderReport(),
         };
         State = RoundState.Report;
     }

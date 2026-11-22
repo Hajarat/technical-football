@@ -67,7 +67,12 @@ static class ShotAuditCli
         else Console.WriteLine($"== {file}");
         Console.WriteLine($"   {r.ScenarioId}, attacker {r.AttackerId} (foot {att.PreferredFoot}, curve {att.Curve}, traits {att.Traits}), keeper {r.KeeperId}, " +
                           $"{r.TickCount} ticks{(r.Partial ? ", partial" : "")}{(r.MatchesTuning(tuning) ? "" : ", tuning has changed since")}");
-        var shots = ShotReleaseAudit.Run(r, tuning, sc, att, kee);
+        // a scenario with a defender replays with his sheet (the replay's, else the scenario's default)
+        PlayerSheet? def = sc.Defenders > 0
+            ? DataLoader.LoadPlayer(Path.Combine(dataDir, "players", (r.DefenderId ?? sc.DefaultDefender) + ".json")).Value
+            : null;
+        if (sc.Defenders > 0 && def == null) { Console.WriteLine($"== {file}: missing data (defender '{r.DefenderId ?? sc.DefaultDefender}')"); return false; }
+        var shots = ShotReleaseAudit.Run(r, tuning, sc, att, kee, def);
         if (shots.Count == 0) Console.WriteLine("   no shots");
         for (int i = 0; i < shots.Count; i++) Console.WriteLine("   " + shots[i].Line(i));
         return true;

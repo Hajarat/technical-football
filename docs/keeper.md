@@ -129,6 +129,13 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
 - **Recover.** After a dive or smother he lies for `grounded_seconds`, then gets up in `get_up_seconds`; a new save can start
   `get_up_save_after` into getting up.
 
+## With a defender
+
+In a scenario with a defender the keeper yields to him: while the defender is on his feet, within `defender.keeper_yield_cone_deg`
+of the keeper's line to the ball, nearer to the ball than the keeper and not beaten, the keeper neither charges nor rushes
+(the trace's race block reads `defender covers`). A ball within a dive of him is still his and his saves are unchanged. See
+[defending.md](defending.md#the-keeper-yields).
+
 ## Diagnostics
 
 The batch tool prints, under the scoring table, the keeper's distance off his line and the ball's distance from goal at the

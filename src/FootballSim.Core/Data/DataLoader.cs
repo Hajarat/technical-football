@@ -41,6 +41,32 @@ public static class DataLoader
 
     static readonly JsonSerializerOptions CompactOptions = new(MakeOptions()) { WriteIndented = false };
 
+    /// <summary>
+    /// The options <see cref="TuningHash"/> writes with: compact, and without the defender and defending blocks, which have their
+    /// own hash (<see cref="DefendingHash"/>). A round without a defender reads neither block, so its replay's hash does not move
+    /// when they are tuned.
+    /// </summary>
+    static readonly JsonSerializerOptions HashOptions = MakeHashOptions();
+
+    static JsonSerializerOptions MakeHashOptions()
+    {
+        var o = MakeOptions();
+        o.WriteIndented = false;
+        o.TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver
+        {
+            Modifiers =
+            {
+                info =>
+                {
+                    if (info.Type != typeof(Tuning)) return;
+                    for (int i = info.Properties.Count - 1; i >= 0; i--)
+                        if (info.Properties[i].Name is "defender" or "defending") info.Properties.RemoveAt(i);
+                },
+            },
+        };
+        return o;
+    }
+
     // ---- players ----
 
     /// <summary>Loads a player sheet from a file.</summary>
@@ -86,6 +112,10 @@ public static class DataLoader
                 if (n == "skill_moves" && !root.TryGetProperty(n, out _)) { s.SkillMoves = s.CloseDribbling; continue; }
                 s.SetRating(n, (int)MathF.Round(ReadNumber(root, n, fileLabel, warnings, PlayerSheet.RatingDefault, 1, 99)));
             }
+            // The defending ratings came later: a sheet without one reads 50, without a warning.
+            foreach (var n in PlayerSheet.DefendingRatingNames)
+                if (root.TryGetProperty(n, out _))
+                    s.SetRating(n, (int)MathF.Round(ReadNumber(root, n, fileLabel, warnings, PlayerSheet.RatingDefault, 1, 99)));
             s.HeightM = ReadNumber(root, "height_m", fileLabel, warnings, 1.80f, PlayerSheet.HeightMin, PlayerSheet.HeightMax);
             s.WeightKg = ReadNumber(root, "weight_kg", fileLabel, warnings, 75f, PlayerSheet.WeightMin, PlayerSheet.WeightMax);
             var foot = ReadString(root, "preferred_foot", fileLabel, warnings, "right", warn: true).ToLowerInvariant();
@@ -169,6 +199,12 @@ public static class DataLoader
         s.Pitch ??= new PitchSpec();
         s.Ball ??= new StartSpot();
         s.Attacker ??= new StartSpot();
+        s.Defender ??= new StartSpot { X = 16f };
+        if (s.Defenders < 0 || s.Defenders > 1)
+        {
+            w.Add(new LoadWarning(fileLabel, "defenders", $"{s.Defenders} is outside 0..1; clamped"));
+            s.Defenders = Math.Clamp(s.Defenders, 0, 1);
+        }
         s.Pitch.Length = Fix(s.Pitch.Length, 10f, 200f, "pitch.length");
         s.Pitch.Width = Fix(s.Pitch.Width, 10f, 200f, "pitch.width");
         s.Pitch.GoalWidth = Fix(s.Pitch.GoalWidth, 1f, 20f, "pitch.goal_width");
@@ -226,6 +262,9 @@ public static class DataLoader
             if (t.Skill == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: skill: must be an object (default tuning in use)" };
             if (t.Keeper == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: keeper: must be an object (default tuning in use)" };
             if (t.Shot == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: shot: must be an object (default tuning in use)" };
+            if (t.Defender == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: defender: must be an object (default tuning in use)" };
+            if (t.Defending?.Auto == null || t.Defending.Stand == null || t.Defending.Slide == null || t.Defending.Barge == null || t.Defending.Block == null)
+                return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: defending: must be an object with auto, stand, slide, barge and block (default tuning in use)" };
             foreach (var (field, curve) in new[] { ("ball.drag_curve", t.Ball.DragCurve), ("ball.lift_curve", t.Ball.LiftCurve), ("ball.restitution_curve", t.Ball.RestitutionCurve), ("ball.bounce_friction_curve", t.Ball.BounceFrictionCurve),
                 ("movement.accel_by_speed_jog", t.Movement?.AccelBySpeedJog), ("movement.accel_by_speed_sprint", t.Movement?.AccelBySpeedSprint),
                 ("movement.decel_by_speed", t.Movement?.DecelBySpeed), ("movement.turn_angle_mult", t.Movement?.TurnAngleMult), ("movement.sharp_turn_cost", t.Movement?.SharpTurnCost),
@@ -244,7 +283,12 @@ public static class DataLoader
                 ("keeper.counter_momentum_penalty", t.Keeper?.CounterMomentumPenalty),
                 ("keeper.catch_range_standing_min", t.Keeper?.CatchRangeStandingMin), ("keeper.catch_range_standing_max", t.Keeper?.CatchRangeStandingMax),
                 ("keeper.catch_range_diving_min", t.Keeper?.CatchRangeDivingMin), ("keeper.catch_range_diving_max", t.Keeper?.CatchRangeDivingMax),
-                ("keeper.catch_range_time", t.Keeper?.CatchRangeTime) })
+                ("keeper.catch_range_time", t.Keeper?.CatchRangeTime),
+                ("defender.hold_distance_m", t.Defender.HoldDistanceM), ("defender.hold_offset_min_m", t.Defender.HoldOffsetMinM), ("defender.hold_offset_max_m", t.Defender.HoldOffsetMaxM),
+                ("defender.to_active_after_s", t.Defender.ToActiveAfterS), ("defender.active_max_s", t.Defender.ActiveMaxS),
+                ("defending.auto.radius_walk_m", t.Defending.Auto.RadiusWalkM), ("defending.auto.radius_jockey_m", t.Defending.Auto.RadiusJockeyM), ("defending.auto.angle_deg", t.Defending.Auto.AngleDeg),
+                ("defending.stand.reach_speed_factor", t.Defending.Stand.ReachSpeedFactor), ("defending.stand.miss_stun_s", t.Defending.Stand.MissStunS),
+                ("defending.block.exit_speed", t.Defending.Block.ExitSpeed) })
             {
                 string? bad = curve == null ? "must be an array of [x, y] pairs" : curve.Validate();
                 if (bad != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: {field}: {bad} (default tuning in use)" };
@@ -283,7 +327,14 @@ public static class DataLoader
     /// <summary>A short stable hash of every tuning value, recorded in replays.</summary>
     public static string TuningHash(Tuning t)
     {
-        var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(t, CompactOptions));
+        var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(t, HashOptions));
+        return Convert.ToHexString(SHA256.HashData(bytes)).Substring(0, 16).ToLowerInvariant();
+    }
+
+    /// <summary>A short stable hash of the defender and defending tuning, recorded in the replay of a round with a defender.</summary>
+    public static string DefendingHash(Tuning t)
+    {
+        var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(t.Defender, CompactOptions) + JsonSerializer.Serialize(t.Defending, CompactOptions));
         return Convert.ToHexString(SHA256.HashData(bytes)).Substring(0, 16).ToLowerInvariant();
     }
 

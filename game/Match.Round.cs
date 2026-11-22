@@ -16,7 +16,7 @@ public partial class Match
     ReplayDriver? _replay;
     SessionLog? _log;
     Random _seeds = new();            // session-level seed source: the core never makes its own seeds
-    string _scenarioId = "", _attackerId = "", _keeperId = "";
+    string _scenarioId = "", _attackerId = "", _keeperId = "", _defenderId = "";
     int _scenarioIndex;
     ulong _seed;
     int _round;                       // number of the round being set up or played; a retry is a new number
@@ -87,6 +87,7 @@ public partial class Match
             _scenarioIndex = _data.Scenarios.FindIndex(s => s.Id == r.ScenarioId);
             if (_scenarioIndex < 0) { GD.PrintErr($"Replay scenario '{r.ScenarioId}' not found in {_data.Dir}"); return false; }
             _scenarioId = r.ScenarioId; _attackerId = r.AttackerId; _keeperId = r.KeeperId; _seed = r.Seed;
+            _defenderId = r.DefenderId ?? "";
             // A round played with the editor's Custom player carries its sheet; it plays as Custom whatever the store holds.
             if (r.ParseAttackerSheet() is { } embedded)
             {
@@ -132,6 +133,7 @@ public partial class Match
         // Custom stays the attacker across start spots; only picking another attacker ends it.
         if (!(_attackerId == PlayerPresets.CustomId && _data.Custom != null)) _attackerId = Pick(_data.Attackers, sc.DefaultAttacker);
         _keeperId = Pick(_data.Keepers, sc.DefaultKeeper);
+        _defenderId = sc.Defenders > 0 ? sc.DefaultDefender : "";
     }
 
     static string Pick(System.Collections.Generic.List<PlayerSheet> list, string wanted) =>
@@ -158,15 +160,24 @@ public partial class Match
         _attackerId = att.Id; _keeperId = kee.Id;
         if (newRound) _round++;
 
-        World = new World(_data.Tuning, sc, att, kee, _seed);
+        // A scenario with a defender: his sheet is the replay's or the scenario's (any outfield player file), else a plain one.
+        PlayerSheet? def = null;
+        if (sc.Defenders > 0)
+        {
+            if (_defenderId == "") _defenderId = sc.DefaultDefender;
+            def = _data.Attackers.Find(p => p.Id == _defenderId) ?? _data.Attackers.Find(p => p.Id == sc.DefaultDefender);
+            if (def == null) _data.Warnings.Add($"{sc.Id}: defender '{_defenderId}' not found in players; a plain sheet is used");
+        }
+        World = new World(_data.Tuning, sc, att, kee, _seed, def);
         Pitch.Build(World.Pitch);
         // Left edge at the back wall; right edge may reach 0.5 m past the back of the net so the whole goal shows; the bottom
         // edge stops at the near boards.
         Camera.SetLimits(World.Pitch.MinX, World.Pitch.GoalLineX + World.Pitch.NetDepth + 0.5f, World.Pitch.HalfWidth);
-        World.Recorder = new ReplayRecorder(World, att.Id, kee.Id, sc.Id);
+        World.Recorder = new ReplayRecorder(World, att.Id, kee.Id, sc.Id, def?.Id);
+        Defender.Visible = World.Defender != null && _gallery == null && _clipGallery == null;
         if (att.Id == PlayerPresets.CustomId && att == _data.Custom) World.Recorder.Replay.SetAttackerSheet(att);
         _flightTicks = 0; _liveTicks = 0; _beganReplay = false;
-        _log?.Write("round_setup", ("round", _round), ("scenario", sc.Id), ("attacker", att.Id), ("keeper", kee.Id),
+        _log?.Write("round_setup", ("round", _round), ("scenario", sc.Id), ("attacker", att.Id), ("keeper", kee.Id), ("defender", World.Defender?.Sheet.Id),
             ("seed", _seed.ToString()), ("retry_of", retryOf > 0 ? retryOf : null));
         ResetPresentation();
         return true;

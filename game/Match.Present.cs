@@ -71,6 +71,30 @@ public partial class Match
         f.ShotCharge = w.ShotCharge;
         // The core counts StrikeEta down through the strike delay and fixes StrikeFoot at the button press.
         f.StrikeEta = p.StrikeEta; f.StrikeRight = p.StrikeFoot == Foot.Right;
+        // Tackled or barged, he stumbles: drawn with the defending pose of that name.
+        if (Defending.Stumbling(p, w.SimTime))
+            f.Defender = new FigureDefender { Valid = true, Action = DefenderAction.Stumble, ActionTime = 0f };
+        return f;
+    }
+
+    /// <summary>Everything the defender's figure needs this tick: the outfield body's movement and stride, and his defending action.</summary>
+    FigureFrame DefenderFrame(PlayerState p)
+    {
+        var w = World;
+        var f = FigureFrame.At(G(p.Position), p.Facing);
+        f.Velocity = G(p.Velocity + p.PushVelocity);
+        f.HeightM = p.Sheet.HeightM;
+        f.Dt = w.Tuning.Dt;
+        f.BallPos = G(w.Ball.Position); f.BallVel = G(w.Ball.Velocity); f.BallRadius = w.Ball.Radius;
+        f.InPossession = p.InPossession;
+        FillGait(ref f, p);
+        f.Defender = new FigureDefender
+        {
+            Valid = true, Action = p.DefenderAction, ActionTime = p.DefenderActionTime,
+            Side = p.ActionSide == SkillSide.Left ? -1f : p.ActionSide == SkillSide.Right ? 1f : 0f,
+            TackleFoot = G(p.TackleFoot), ContactTime = p.TackleContactTime, BlockReach = p.BlockReach, Jockeying = p.Jockeying,
+            GetUpSeconds = w.Tuning.Defending.Slide.GetupS,
+        };
         return f;
     }
 
@@ -288,6 +312,8 @@ public partial class Match
         Ball.SetPossession(false);
         Attacker.Teleport(AttackerFrame(World.Attacker), World.Attacker.InPossession);
         Keeper.Teleport(KeeperFrame(World.Keeper));
+        if (World.Defender is { } def) Defender.Teleport(DefenderFrame(def), false);
+        _tackles = 0; _blocks = 0;
         Camera.Snap(Ball.Position);
         UpdateHudText();
     }
@@ -309,11 +335,17 @@ public partial class Match
     {
         var w = World;
         Ball.Apply(G(w.Ball.Position));
-        Ball.SetPossession(w.Attacker.InPossession || w.Keeper.InPossession);
+        Ball.SetPossession(w.Attacker.InPossession || w.Keeper.InPossession || w.Defender is { InPossession: true });
         var af = AttackerFrame(w.Attacker);
         FootStats.Tick = _tick;
         Attacker.Apply(af, w.Attacker.InPossession);
         Keeper.Apply(KeeperFrame(w.Keeper));
+        if (w.Defender is { } def) Defender.Apply(DefenderFrame(def), def.InPossession);
+        foreach (var e in w.Events)
+        {
+            if (e.Kind == EventKind.Tackle) _tackles++;
+            else if (e.Kind == EventKind.Block) _blocks++;
+        }
         if (af.TouchEvent || af.StrikeEvent)
         {
             if (af.TouchEvent && !af.StrikeEvent) _touchCount++;
@@ -350,7 +382,8 @@ public partial class Match
     {
         var sc = World.Scenario;
         string hint = World.State == RoundState.Setup ? "  ·  A/Enter to start" : "";
-        Hud.SetSpotLine($"Round {_round}  ·  {sc.Name}  ·  {World.Attacker.Sheet.Name} vs {World.Keeper.Sheet.Name}{hint}");
+        string defender = World.Defender != null ? $" and {World.Defender.Sheet.Name}" : "";
+        Hud.SetSpotLine($"Round {_round}  ·  {sc.Name}  ·  {World.Attacker.Sheet.Name} vs {World.Keeper.Sheet.Name}{defender}{hint}");
     }
 
     void UpdateOverlay()
@@ -395,6 +428,9 @@ public partial class Match
             EventKind.Strike => (0.3f, 0.2f, 0.12f),
             EventKind.FrameHit => (0.6f, 0.5f, 0.2f),
             EventKind.Goal => (1.0f, 0.9f, 0.6f),
+            EventKind.Tackle => (0.5f, 0.4f, 0.15f),
+            EventKind.Block => (0.4f, 0.3f, 0.12f),
+            EventKind.Foul => (0.8f, 0.7f, 0.3f),
             _ => (0f, 0f, 0f),
         };
         if (secs <= 0f) return;
@@ -403,8 +439,14 @@ public partial class Match
 
     // ---- screenshot moments for --shot-on ----
 
+    int _tackles, _blocks;
+
     bool MomentReached(string name) => name switch
     {
+        // (with a defender) hold: he stands on his spot or jockeys; tackle: a ball won from the dribble; block: a ball deflected
+        "hold" => World.State == RoundState.Live && _liveTicks >= 30 && World.Defender is { DefenderAction: DefenderAction.Hold or DefenderAction.Jockey },
+        "tackle" => _tackles > 0,
+        "block" => _blocks > 0,
         "setup" => World.State == RoundState.Setup && _tick >= 2,
         "live" => World.State == RoundState.Live && _liveTicks >= 60,
         "charge" => World.State == RoundState.Live && World.ShotCharge >= 0.5f,

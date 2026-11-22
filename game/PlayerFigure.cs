@@ -158,6 +158,8 @@ public struct FigureFrame
     public Vector3 HandPosition;
     /// <summary>Where the keeper's current save, smother or slide expects to meet the ball, and when (seconds after the action began; NaN when none is under way).</summary>
     public Vector3 SaveTarget; public float SaveContactTime;
+    /// <summary>An outfield player's defending (and an attacker's stumble); not valid when the frame carries none.</summary>
+    public FigureDefender Defender;
     public float Dt;
 
     public static FigureFrame At(Vector3 pos, float facing) => new()
@@ -1146,6 +1148,7 @@ public partial class PlayerFigure : Node3D
             _split = true; _pelB = P;
             _headB = new Basis(hr, -_headPitch) * new Basis(hf, Vector3.Up, hr);
             _layTw = tw; _layPlanted = planted;
+            if (f.Defender.Valid || _dfW > 0f) DefenderOverlay(f, pos, fwd, right, dt, ref pel, ref B, ref shoulderC, knee, ankEff, dir, handT, elbowPole);
             RenderBody(pel, B, shoulderC, knee, ankEff, dir, handT, elbowPole);
             MocapShown(f, ankEff, knee, ref pel, ref lean, fwd, dt);
             // a skill clip holds its own planted feet

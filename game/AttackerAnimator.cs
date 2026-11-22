@@ -721,7 +721,8 @@ public partial class PlayerFigure
     bool MocapPresent()
     {
         if (_atkAnim == null) return false;
-        _atkAnim.Present(_joints, _mW * (1f - ShotUpperShare * _shUpper), AttackerAnimator.ArmOutClose * _closeW, BodyLangOff ? default : BodyLayersNow(), _layTw, _layPlanted, _teleporting);
+        // (a defending pose takes the trunk and arms from the cycles by its weight)
+        _atkAnim.Present(_joints, _mW * (1f - ShotUpperShare * _shUpper) * (1f - DefenderPoseWeight), AttackerAnimator.ArmOutClose * _closeW, BodyLangOff ? default : BodyLayersNow(), _layTw, _layPlanted, _teleporting);
         return true;
     }
 

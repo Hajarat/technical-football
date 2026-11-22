@@ -28,6 +28,13 @@ public sealed class PlayerSheet
     public static readonly IReadOnlyList<string> KeeperRatingNames = new[]
         { "reflexes", "diving", "reach", "positioning", "handling", "rushing_out" };
 
+    /// <summary>
+    /// Ratings that only defending reads, in file order. A file without one reads 50 (no warning), and a sheet whose defending
+    /// ratings are all 50 is written without them, so sheets from before they existed load and save exactly as they did.
+    /// </summary>
+    public static readonly IReadOnlyList<string> DefendingRatingNames = new[]
+        { "stand_tackle", "slide_tackle", "jockeying", "blocking", "awareness", "strength" };
+
     public const float HeightMin = 1.60f, HeightMax = 2.05f, WeightMin = 55f, WeightMax = 100f;
     public const int RatingDefault = 50;
 
@@ -62,6 +69,18 @@ public sealed class PlayerSheet
     public int Positioning { get; set; } = RatingDefault;
     public int Handling { get; set; } = RatingDefault;
     public int RushingOut { get; set; } = RatingDefault;
+    /// <summary>Standing tackles: the reach of the auto tackle and of a lunge.</summary>
+    public int StandTackle { get; set; } = RatingDefault;
+    /// <summary>Slide tackles: how far a slide carries.</summary>
+    public int SlideTackle { get; set; } = RatingDefault;
+    /// <summary>The pace he keeps while jockeying.</summary>
+    public int Jockeying { get; set; } = RatingDefault;
+    /// <summary>How quickly his leg gets out in front of a shot.</summary>
+    public int Blocking { get; set; } = RatingDefault;
+    /// <summary>The defender bot's reading of the play: how soon he presses, how long, how close he holds to the line.</summary>
+    public int Awareness { get; set; } = RatingDefault;
+    /// <summary>Shoulder barges, with weight.</summary>
+    public int Strength { get; set; } = RatingDefault;
     public float HeightM { get; set; } = 1.80f;
     public float WeightKg { get; set; } = 75f;
     public Foot PreferredFoot { get; set; } = Foot.Right;
@@ -82,6 +101,8 @@ public sealed class PlayerSheet
         "composure" => Composure, "weak_foot" => WeakFoot,
         "reflexes" => Reflexes, "diving" => Diving, "reach" => Reach, "positioning" => Positioning,
         "handling" => Handling, "rushing_out" => RushingOut,
+        "stand_tackle" => StandTackle, "slide_tackle" => SlideTackle, "jockeying" => Jockeying,
+        "blocking" => Blocking, "awareness" => Awareness, "strength" => Strength,
         _ => throw new ArgumentException($"Unknown rating '{name}'", nameof(name)),
     };
 
@@ -112,6 +133,12 @@ public sealed class PlayerSheet
             case "positioning": Positioning = v; break;
             case "handling": Handling = v; break;
             case "rushing_out": RushingOut = v; break;
+            case "stand_tackle": StandTackle = v; break;
+            case "slide_tackle": SlideTackle = v; break;
+            case "jockeying": Jockeying = v; break;
+            case "blocking": Blocking = v; break;
+            case "awareness": Awareness = v; break;
+            case "strength": Strength = v; break;
             default: throw new ArgumentException($"Unknown rating '{name}'", nameof(name));
         }
     }
@@ -129,6 +156,8 @@ public sealed class PlayerSheet
             w.WriteString("id", Id);
             w.WriteString("name", Name);
             foreach (var n in RatingNames) w.WriteNumber(n, GetRating(n));
+            if (DefendingRatingNames.Any(n => GetRating(n) != RatingDefault))
+                foreach (var n in DefendingRatingNames) w.WriteNumber(n, GetRating(n));
             w.WriteNumber("height_m", HeightM);
             w.WriteNumber("weight_kg", WeightKg);
             w.WriteString("preferred_foot", PreferredFoot == Foot.Left ? "left" : "right");

@@ -57,7 +57,8 @@ public sealed class ShotReleaseEntry
 /// </summary>
 public static class ShotReleaseAudit
 {
-    public static List<ShotReleaseEntry> Run(Replay replay, Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper)
+    public static List<ShotReleaseEntry> Run(Replay replay, Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper,
+        PlayerSheet? defender = null)
     {
         var entries = new List<ShotReleaseEntry>();
         BallAction? seen = null;
@@ -77,7 +78,7 @@ public static class ShotReleaseAudit
                 if (open != null) open.Strike = s;
             }
         }
-        var world = replay.Play(tuning, scenario, attacker, keeper, Observe);
+        var world = replay.Play(tuning, scenario, attacker, keeper, Observe, defender);
         if (!replay.Partial)
         {
             var idle = new TickIntent[world.PlayerCount];

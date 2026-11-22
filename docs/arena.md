@@ -10,6 +10,9 @@ The pitch (`src/FootballSim.Core/Pitch.cs`) is a walled arena whose lengths come
 Scenario files are in `data/scenarios/`; player and tuning files are in `data/players/` and `data/tuning/`. Player, tuning and scenario files are re-read every time a round is set up, so editing a JSON file in `data/` shows up next round.
 A file that fails to load keeps its last good version and the HUD warning line names the file and field.
 
+The defender duel (`data/scenarios/defender_duel.json`) has `"defenders": 1`: one outfield defender, placed by the scenario's
+`defender` spot and played by the defender bot, with the sheet named in `default_defender`. See [defending.md](defending.md).
+
 ## Loose-ball start spots
 
 Loose-ball start spots (`data/scenarios/loose_*.json`, D-pad left / right in the game) begin with the ball already lost
@@ -25,7 +28,7 @@ Scripted rounds: the batch tool's scripted attacker runs at the goal and, in a s
 inside it once the ball is strikable or its next touch comes early enough in the wind-up; with `strike_distance` (breakaway
 11.3, halfway run 12.4, angled run 11.1 m, the distances the scoring bands were first measured at) it presses only once the
 ball, carried on at his speed to the contact, will be that close at the strike. Within 4 m of the keeper it stops sprinting
-and within 6 m takes close control.
+and within 6 m takes close control. Against a defender it plays one of the styles in [defending.md](defending.md#the-probe).
 
 ## How the arena is drawn
 

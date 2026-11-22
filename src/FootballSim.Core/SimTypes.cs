@@ -37,17 +37,34 @@ public enum RoundState { Setup, Live, Strike, Flight, Outcome, Report }
 /// <summary>
 /// How a round ended. <see cref="None"/> while it is still running. In the arena a round ends only as Goal, Held or TimeUp;
 /// Wide and Over are kept for scripted shot results and older reports, Out only marks a round stopped because a value became
-/// not-a-number. Claimed is reserved and not produced yet.
+/// not-a-number. Claimed is reserved and not produced yet. With a defender a round also ends as Dispossessed (he controls the
+/// ball he won) or Foul (his lunge or slide met the attacker's body before the ball).
 /// </summary>
-public enum Outcome { None, Goal, Held, Wide, Over, Claimed, Out, TimeUp }
+public enum Outcome { None, Goal, Held, Wide, Over, Claimed, Out, TimeUp, Dispossessed, Foul }
+
+/// <summary>
+/// What an outfield player without the ball is doing (the game draws a defender from it, with
+/// <see cref="PlayerState.DefenderActionTime"/> and <see cref="PlayerState.ActionSide"/>). Hold: on his spot between the ball and
+/// the goal. Recover: sprinting back to that spot. Jockey: stepping at the jockey pace, facing the ball carrier. Press: closing
+/// the attacker down. Lunge: a standing tackle. Slide: a slide tackle. Barge: a shoulder barge. Block: set in front of a shot,
+/// a leg out. Collect: going for a loose ball. Grounded: lying after a slide. GettingUp: rising. Stumble: off balance after
+/// being tackled or barged, or after a lunge that missed.
+/// </summary>
+public enum DefenderAction { Hold, Recover, Jockey, Press, Lunge, Slide, Barge, Block, Collect, Grounded, GettingUp, Stumble }
+
+/// <summary>How a ball was won from a dribble, for the report.</summary>
+public enum TackleKind { None, Auto, Lunge, Slide }
 
 /// <summary>Kinds of event raised during one <c>World.Step</c>.</summary>
 /// <remarks>
 /// OutOfPlay is no longer raised: the arena's boards keep the ball in play. BoardHit is the ball meeting a board or the ceiling
 /// (position = ball centre at contact, speed = arriving speed). SkillMove is a skill move starting (position = ball centre,
 /// speed = the player's speed, <see cref="SimEvent.Skill"/> = the move); a move's sole contact also raises a Touch.
+/// Tackle is a ball won from a dribble (position = ball centre, speed = the ball's speed after it, the player = the tackler);
+/// TackleStart a lunge or slide beginning; Block a ball deflected by an outfield player's body, leg or foot; Barge a shoulder
+/// barge that landed; Foul a lunge or slide that met the opponent's body before the ball.
 /// </remarks>
-public enum EventKind { Touch, Strike, Bounce, FrameHit, Save, Goal, OutOfPlay, PossessionGained, PossessionLost, BoardHit, SkillMove }
+public enum EventKind { Touch, Strike, Bounce, FrameHit, Save, Goal, OutOfPlay, PossessionGained, PossessionLost, BoardHit, SkillMove, Tackle, TackleStart, Block, Barge, Foul }
 
 /// <summary>
 /// Shot flavour chosen by the modifiers held while shooting: chip wins; driven with finesse is a low finesse; then driven,

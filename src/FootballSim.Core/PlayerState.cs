@@ -147,6 +147,34 @@ public sealed class PlayerState
     /// <summary>How eagerly he goes for a loose ball this tick (see <see cref="Core.Regain"/>); None in possession.</summary>
     public RegainMode Regain { get; internal set; }
 
+    // ---- Defending. The view draws a defender, and an attacker's reactions, from these. ----
+
+    /// <summary>For an outfield player without the ball: what he is doing (see <see cref="Core.DefenderAction"/>).</summary>
+    public DefenderAction DefenderAction { get; internal set; }
+    /// <summary>Seconds since <see cref="DefenderAction"/> last changed.</summary>
+    public float DefenderActionTime { get; internal set; }
+    /// <summary>The side of his body a lunge, slide, barge or block goes to (None otherwise).</summary>
+    public SkillSide ActionSide { get; internal set; }
+    /// <summary>Simulation seconds until which he stumbles (tackled, barged, or after a lunge that missed): no control of the ball, his speed capped.</summary>
+    public float StumbleUntil { get; internal set; } = -100f;
+    /// <summary>Simulation seconds until which a tackled player cannot touch the ball.</summary>
+    public float TackledLockUntil { get; internal set; } = -100f;
+    /// <summary>True while he moves at the jockey pace, facing the ball carrier whatever way he steps.</summary>
+    public bool Jockeying { get; internal set; }
+    /// <summary>Set in front of a shot: how far his leg reaches now, metres from his feet (0 when not blocking).</summary>
+    public float BlockReach { get; internal set; }
+    /// <summary>The leading foot of a lunge or slide under way, world position (for the view; the feet position otherwise).</summary>
+    public Vector3 TackleFoot { get; internal set; }
+    /// <summary>
+    /// Seconds after a lunge began (see <see cref="DefenderActionTime"/>) at which its foot is planned to meet the ball, or NaN
+    /// when no lunge is under way. For the view only.
+    /// </summary>
+    public float TackleContactTime { get; internal set; } = float.NaN;
+    /// <summary>A push he is carried by (a barge), m/s on the ground; it dies away. Added to his position, not to <see cref="Velocity"/>.</summary>
+    public Vector3 PushVelocity { get; internal set; }
+    /// <summary>The defending state behind those (see <see cref="Defending"/>).</summary>
+    internal readonly DefendState Def = new();
+
     // ---- Skill moves (phase B). ----
 
     /// <summary>The skill move under way (also <see cref="Action"/> while it lasts), or null.</summary>
@@ -362,6 +390,7 @@ public sealed class PlayerState
         KnockOnUntil = o.KnockOnUntil; DangerSlowFrom = o.DangerSlowFrom; DangerSlowFactor = o.DangerSlowFactor; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PostTurnUntil = o.PostTurnUntil; TurnArcSpeed = o.TurnArcSpeed; TurnArcBraking = o.TurnArcBraking; TurnArcRelease = o.TurnArcRelease; TurnArcStick = o.TurnArcStick; PlannerSteer = o.PlannerSteer; SteerFacing = o.SteerFacing; SteerCarry = o.SteerCarry; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime; TurnCostTaken = o.TurnCostTaken; TurnCostFrom = o.TurnCostFrom;
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed; StepBegun = o.StepBegun;
+        StumbleUntil = o.StumbleUntil; TackledLockUntil = o.TackledLockUntil;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction; TurnFatigue = o.TurnFatigue;
         GZone = o.GZone; GPrevZone = o.GPrevZone; GZoneStart = o.GZoneStart; GFwdLastTick = o.GFwdLastTick;
         GFwdStart = o.GFwdStart; GFwdFromNeutral = o.GFwdFromNeutral; GBackLastTick = o.GBackLastTick;
