@@ -1,0 +1,28 @@
+{
+  "id": "penalty",
+  "name": "Penalty",
+  "default_attacker": "striker_a",
+  "default_keeper": "the_wall",
+  "team_size": 1,
+  "ball": {
+    "x": 19.0,
+    "z": 0
+  },
+  "attacker": {
+    "x": 18.4,
+    "z": 0,
+    "facing_deg": 0
+  },
+  "keeper_on_line": true,
+  "keeper_hold_line": true,
+  "clock_limit": 20,
+  "shoot_distance": 0,
+  "pitch": {
+    "length": 30.0,
+    "width": 20.0,
+    "goal_width": 7.32,
+    "goal_height": 2.44,
+    "penalty_area_depth": 16.5,
+    "penalty_area_width": 40.32
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "keeper_rush",
+  "name": "Keeper rush",
+  "default_attacker": "striker_a",
+  "default_keeper": "the_wall",
+  "team_size": 1,
+  "ball": {
+    "x": 5.0,
+    "z": 0
+  },
+  "attacker": {
+    "x": 4.4,
+    "z": 0,
+    "facing_deg": 0
+  },
+  "keeper_on_line": false,
+  "keeper_off_line": 8,
+  "clock_limit": 20,
+  "shoot_distance": 12,
+  "pitch": {
+    "length": 30.0,
+    "width": 20.0,
+    "goal_width": 7.32,
+    "goal_height": 2.44,
+    "penalty_area_depth": 16.5,
+    "penalty_area_width": 40.32
+  }
+}

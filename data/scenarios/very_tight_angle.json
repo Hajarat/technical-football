@@ -1,0 +1,27 @@
+{
+  "id": "very_tight_angle",
+  "name": "Very tight angle",
+  "default_attacker": "striker_a",
+  "default_keeper": "the_wall",
+  "team_size": 1,
+  "ball": {
+    "x": 29.0,
+    "z": 9.0
+  },
+  "attacker": {
+    "x": 28.89,
+    "z": 9.59,
+    "facing_deg": -79.4
+  },
+  "keeper_on_line": false,
+  "clock_limit": 20,
+  "shoot_distance": 0,
+  "pitch": {
+    "length": 30.0,
+    "width": 28.0,
+    "goal_width": 7.32,
+    "goal_height": 2.44,
+    "penalty_area_depth": 16.5,
+    "penalty_area_width": 40.32
+  }
+}

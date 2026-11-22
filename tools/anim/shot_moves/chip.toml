@@ -1,0 +1,180 @@
+# Chip: a short stab under the ball with the toes, the body leaning back, the follow-through cut off low.
+# Right-foot form; see shot_author.py for the frames.
+
+kind = "chip"
+surface = "inside"
+notes = "chip: a short stab under the ball, leaning back, the follow-through cut off"
+
+[ball]
+radius = 0.115
+
+[[bin]]
+deg = 0
+label = "0"
+range = [-22.5, 22.5]
+body = 1.0
+
+[[bin]]
+deg = -45
+label = "across45"
+range = [-67.5, -22.5]
+body = 0.6
+
+# ---- the approach at a jog: two keys in the ground frame, he starts at the origin running along +Z ----
+
+[entry.run]
+entry_speed = 2.8
+ball = [-0.10, 1.50]
+spans = [0.25, 0.17, 0.05, 0.08, 0.40, 0.20]
+
+[[entry.run.key]]
+t = 0.0
+label = "start: the right foot planted under him, the left (plant) foot leaving the ground behind"
+pelvis = { pos = [0.0, 0.93, 0.0], yaw = 0, pitch = 10, roll = 0 }
+chest = { yaw = 8, pitch = 6, roll = 0 }
+head = { yaw = 0, pitch = 22 }
+foot_r = { pos = [-0.11, 0.002, 0.34], yaw = -4, pitch = 0, toe = 0, knee = [-0.1, 0, 1], ease = 1 }
+foot_l = { pos = [0.11, 0.08, -0.48], yaw = 4, pitch = -35, toe = 20, knee = [0.1, 0, 1] }
+hand_l = { swing = 25, abduct = 12, bend = 70 }
+hand_r = { swing = -20, abduct = 12, bend = 70 }
+
+[[entry.run.key]]
+t = 0.12
+label = "the right foot still flat as he rides over it"
+foot_r = { pos = [-0.11, 0.002, 0.34], yaw = -4, pitch = 0, toe = 0, knee = [-0.1, 0, 1], ease = 1 }
+
+[entry.run.stance]
+right = [[0.0, 0.12], [0.9, 1.0]]
+left = [[0.5, 0.74]]
+
+[[entry.run.key]]
+t = 0.2
+label = "takeoff: the right foot pushes off, the left foot flying to its plant"
+pelvis = { pos = [0.02, 0.92, 0.62], yaw = 0, pitch = 12, roll = 0 }
+chest = { yaw = -6, pitch = 8, roll = 0 }
+foot_r = { pos = [-0.11, 0.12, 0.40], yaw = -4, pitch = -45, toe = 25, knee = [-0.1, 0, 1] }
+foot_l = { pos = [0.14, 0.16, 0.72], yaw = 4, pitch = 5, toe = 0, knee = [0.1, 0.1, 1] }
+hand_l = { swing = -10, abduct = 30, bend = 45 }
+hand_r = { swing = 20, abduct = 25, bend = 50 }
+
+# ---- the approach from standing: one step of the plant foot ----
+
+[entry.stand]
+entry_speed = 0.0
+ball = [-0.10, 0.92]
+spans = [0.28, 0.20, 0.05, 0.08, 0.38, 0.20]
+
+[[entry.stand.key]]
+t = 0.0
+label = "start: standing behind the ball, the left (plant) foot lifting for its step"
+pelvis = { pos = [0.0, 0.95, 0.0], yaw = 0, pitch = 4, roll = 0 }
+chest = { yaw = 0, pitch = 4, roll = 0 }
+head = { yaw = 0, pitch = 28 }
+foot_r = { pos = [-0.11, 0.002, 0.0], yaw = -4, pitch = 0, toe = 0, knee = [-0.1, 0, 1], ease = 1 }
+foot_l = { pos = [0.11, 0.03, -0.02], yaw = 4, pitch = -10, toe = 10, knee = [0.1, 0, 1] }
+hand_l = { swing = 5, abduct = 12, bend = 30 }
+hand_r = { swing = -5, abduct = 12, bend = 30 }
+
+[[entry.stand.key]]
+t = 0.14
+label = "the right foot still flat as the weight goes forward"
+foot_r = { pos = [-0.11, 0.002, 0.0], yaw = -4, pitch = 0, toe = 0, knee = [-0.1, 0, 1], ease = 1 }
+
+[entry.stand.stance]
+right = [[0.0, 0.14], [0.9, 1.0]]
+left = [[0.5, 0.74]]
+
+[[entry.stand.key]]
+t = 0.2
+label = "takeoff: weight going forward over the stepping left foot, the right heel coming up"
+pelvis = { pos = [0.02, 0.90, 0.26], yaw = 0, pitch = 10, roll = 0 }
+chest = { yaw = -6, pitch = 8, roll = 0 }
+foot_r = { pos = [-0.11, 0.10, 0.08], yaw = -4, pitch = -45, toe = 25, knee = [-0.1, 0, 1] }
+foot_l = { pos = [0.14, 0.12, 0.38], yaw = 4, pitch = 5, toe = 0, knee = [0.1, 0.1, 1] }
+hand_l = { swing = -10, abduct = 30, bend = 45 }
+hand_r = { swing = 15, abduct = 25, bend = 45 }
+
+# ---- the kick, in the kick frame (from the ground under the ball, z the way the ball leaves) ----
+
+[[kick]]
+t = 0.3
+turn = 0.45
+swing = 0.45
+label = "the last stride: coming round the ball, the plant foot carried high, the right leg trailing"
+pelvis = { pos = [0.07, 0.90, -0.84], yaw = -6, pitch = 12, roll = 2 }
+foot_l = { pos = [0.20, 0.20, -0.56], yaw = 6, pitch = 8, toe = 0, knee = [0.15, 0.2, 1] }
+foot_r = { pos = [-0.12, 0.30, -1.26], yaw = -5, pitch = -55, toe = 10, knee = [-0.05, -0.3, 1] }
+
+[[kick]]
+t = 0.4
+turn = 0.85
+label = "backswing: short, the knee bent, the heel only half way up"
+pelvis = { pos = [0.10, 0.89, -0.52], yaw = -10, pitch = 6, roll = 3 }
+chest = { yaw = 12, pitch = 2, roll = -2 }
+head = { yaw = 2, pitch = 32 }
+foot_l = { pos = [0.22, 0.07, -0.22], yaw = 8, pitch = 8, toe = 0, knee = [0.15, 0.1, 1] }
+foot_r = { pos = [-0.12, 0.34, -0.86], yaw = -6, pitch = -50, toe = 0, knee = [-0.05, -0.2, 1] }
+hand_l = { swing = 25, abduct = 50, bend = 30, trail = 90 }
+hand_r = { swing = -25, abduct = 35, bend = 35, trail = 90 }
+
+[[kick]]
+t = 0.5
+label = "plant: the left foot beside the ball, the right foot dropping low behind it"
+pelvis = { pos = [0.09, 0.88, -0.38], yaw = -8, pitch = 4, roll = 3 }
+chest = { yaw = 8, pitch = 0, roll = -2 }
+foot_l = { pos = [0.21, 0.002, -0.06], yaw = 8, pitch = 0, toe = 0, knee = [0.15, 0, 1], ease = 1 }
+foot_r = { pos = [-0.10, 0.26, -0.84], yaw = -4, pitch = -35, toe = 0, knee = [-0.05, -0.1, 1] }
+
+[[kick]]
+t = 0.57
+label = "the foot comes in low and straight at the bottom of the ball"
+foot_r = { pos = [-0.04, 0.06, -0.50], yaw = -2, pitch = -14, toe = 0, knee = [-0.05, 0.2, 1] }
+
+[[kick]]
+t = 0.6
+label = "contact: the toes dig under the ball, the foot almost flat, the trunk back"
+pelvis = { pos = [0.08, 0.88, -0.26], yaw = -2, pitch = -4, roll = 2 }
+chest = { yaw = -4, pitch = -8, roll = 0 }
+head = { yaw = 0, pitch = 40 }
+foot_l = { pos = [0.21, 0.002, -0.06], yaw = 8, pitch = 0, toe = 0, knee = [0.15, 0, 1], ease = 1 }
+foot_r = { pos = [-0.02, 0.03, -0.26], yaw = 0, pitch = -8, toe = 0, knee = [-0.05, 0.3, 1] }
+hand_l = { swing = 20, abduct = 55, bend = 25, trail = 90 }
+hand_r = { swing = -5, abduct = 45, bend = 30, trail = 90 }
+
+[[kick]]
+t = 0.66
+label = "the foot comes up under where the ball was and stops"
+foot_r = { pos = [-0.01, 0.16, -0.04], yaw = 0, pitch = 12, toe = 0, knee = [-0.05, 0.4, 1] }
+
+[[kick]]
+t = 0.74
+label = "follow-through cut off: the foot hangs low ahead of the plant foot"
+pelvis = { pos = [0.07, 0.90, -0.14], yaw = 2, pitch = -4, roll = 1 }
+chest = { yaw = -6, pitch = -6, roll = 0 }
+foot_l = { pos = [0.21, 0.002, -0.06], yaw = 8, pitch = 0, toe = 0, knee = [0.15, 0, 1], ease = 1 }
+foot_r = { pos = [0.0, 0.20, 0.10], yaw = 0, pitch = 10, toe = 0, knee = [-0.05, 0.4, 1] }
+hand_l = { swing = 5, abduct = 45, bend = 30, trail = 90 }
+hand_r = { swing = 10, abduct = 40, bend = 35, trail = 90 }
+
+[[kick]]
+t = 0.9
+swing = 0.0
+label = "end: the right foot comes down ahead of him"
+pelvis = { pos = [0.05, 0.90, 0.04], yaw = 4, pitch = 4, roll = 0 }
+chest = { yaw = -6, pitch = 8, roll = 0 }
+head = { yaw = 0, pitch = 26 }
+foot_l = { pos = [0.21, 0.03, -0.06], yaw = 8, pitch = -25, toe = 20, knee = [0.15, 0, 1] }
+foot_r = { pos = [-0.06, 0.002, 0.26], yaw = -2, pitch = 0, toe = 0, knee = [-0.05, 0.1, 1], ease = 1 }
+hand_l = { swing = 10, abduct = 30, bend = 40 }
+hand_r = { swing = 5, abduct = 28, bend = 40 }
+
+[[kick]]
+t = 1.0
+swing = 0.0
+label = "last pose: over the right foot, the left coming through"
+pelvis = { pos = [0.02, 0.92, 0.18], yaw = 2, pitch = 6, roll = 0 }
+chest = { yaw = 0, pitch = 6, roll = 0 }
+foot_l = { pos = [0.14, 0.10, 0.06], yaw = 6, pitch = -15, toe = 10, knee = [0.1, 0.1, 1] }
+foot_r = { pos = [-0.06, 0.002, 0.26], yaw = -2, pitch = 0, toe = 0, knee = [-0.05, 0, 1], ease = 1 }
+hand_l = { swing = 15, abduct = 18, bend = 55 }
+hand_r = { swing = -10, abduct = 18, bend = 55 }

@@ -1,0 +1,113 @@
+# Step-over from standing, selling his left (side = left, the simulation's left foot): the left foot lifts, circles in from the
+# ball's inside, over and around its front without touching it and lands wide to the outside; the shoulders drop and the hips
+# swivel to the left with it, head and eyes going left; then the weight comes back off the planted left foot and he pushes off it
+# to his right, the right foot stepping out right-forward for the exit (the runtime's exit touch takes the ball).
+# step_over_left and its mirror step_over_right. step_over_run.toml is the same at 2 m/s. Conventions as in ball_roll.toml.
+
+name = "step_over"
+move = "step_over"
+side = "left"
+foot = "left"
+entry = "stand"
+entry_speed = 0.0
+notes = "step-over from standing: left foot circles wide and high over the front of the still ball, deep shoulder and hip drop left with the right arm swinging across, push off right"
+
+[sim]
+step_over_s = 0.25                # step_over_seconds, ExecuteTick to EndTick (0.15 with a still ball, still_ball_speed 0.1 m/s)
+contact_at = "ExecuteTick + half the duration: the foot passes over the ball"
+close_in_max_s = 0.15             # CloseInMax: before ExecuteTick the player may close in on a ball further than 0.45 m ahead
+max_ahead_m = 0.5                 # step_over_max_ahead: the ball at most this far ahead at the middle
+pace_match_ahead_m = 0.25         # he ends with the ball this far beyond the contact zone's lead
+authored_s = [0.22, 0.20, 0.25]   # start->contact (lift and circle in), contact->release (out and down), release->end (push off)
+ball_start = [0.0, 0.11, 0.30]
+ball_radius = 0.11
+
+[events]
+start = 0.0
+contact = 0.35                    # the foot passes over the front of the ball (ContactTick)
+release = 0.65                    # the foot lands outside the ball (EndTick)
+end = 1.0                         # weight back, pushing off to the other side
+
+[[variant]]
+suffix = ""
+spans = [0.22, 0.20, 0.25]
+
+[ball]
+radius = 0.11
+
+[[key]]
+t = 0.0
+ease = 1.0
+label = "start: ready stance behind the ball"
+pelvis = { pos = [0.0, 0.93, 0.0], pitch = 10 }
+chest = { pitch = 6 }
+head = { pitch = 22 }
+foot_l = { pos = [0.13, 0.002, 0.06], yaw = 8, knee = [0.15, 0, 1] }
+foot_r = { pos = [-0.13, 0.002, 0.06], yaw = -8, knee = [-0.15, 0, 1] }
+hand_l = { swing = 8, abduct = 14, bend = 40 }
+hand_r = { swing = 8, abduct = 14, bend = 40 }
+ball = { pos = [0.0, 0.11, 0.30] }
+
+[[key]]
+t = 0.14
+label = "lift: weight onto the right foot, the left knee up and across, the body dipping right a touch (the wind-up)"
+pelvis = { pos = [-0.06, 0.895, 0.03], yaw = -10, pitch = 13, roll = -5 }
+chest = { yaw = -12, pitch = 10, roll = -10 }
+head = { yaw = -6, pitch = 26 }
+foot_l = { pos = [-0.07, 0.24, 0.10], yaw = -25, pitch = 5, knee = [-0.4, 0.3, 1] }
+hand_l = { swing = 30, abduct = 5, bend = 55 }
+hand_r = { swing = -15, abduct = 40, bend = 35 }
+
+[[key]]
+t = 0.25
+label = "the foot comes round the inside of the ball"
+foot_l = { pos = [-0.21, 0.31, 0.34], yaw = -15, pitch = 5, knee = [-0.2, 0.4, 1] }
+
+[[key]]
+t = 0.35
+label = "contact: over the front of the ball, the hips swivelling left, the left shoulder starting to drop"
+pelvis = { pos = [0.04, 0.875, 0.06], yaw = 16, pitch = 14, roll = 5 }
+chest = { yaw = 10, pitch = 12, roll = 16 }
+head = { yaw = 14, pitch = 30, roll = 4 }
+foot_l = { pos = [0.04, 0.33, 0.56], yaw = 20, pitch = 0, knee = [0.3, 0.5, 1] }
+foot_r = { pos = [-0.13, 0.002, 0.06], yaw = -2, knee = [-0.1, 0, 1], ease = 1 }
+hand_l = { swing = -5, abduct = 50, bend = 35, trail = 90 }
+hand_r = { swing = 45, abduct = -10, bend = 60 }
+
+[[key]]
+t = 0.48
+label = "round the outside"
+foot_l = { pos = [0.32, 0.18, 0.46], yaw = 28, pitch = 0, knee = [0.6, 0.2, 1] }
+
+[[key]]
+t = 0.65
+label = "release: the left foot plants wide to the outside, shoulder dropped, everything sold to the left"
+pelvis = { pos = [0.21, 0.825, 0.10], yaw = 30, pitch = 14, roll = 12 }
+chest = { yaw = 12, pitch = 16, roll = 30 }
+head = { yaw = 26, pitch = 22, roll = 12 }
+foot_l = { pos = [0.42, 0.002, 0.30], yaw = 28, pitch = 0, knee = [0.6, 0, 1], ease = 1 }
+foot_r = { pos = [-0.13, 0.002, 0.06], yaw = 6, ease = 1 }
+hand_l = { swing = -20, abduct = 62, bend = 30, trail = 100 }
+hand_r = { swing = 60, abduct = -22, bend = 65 }
+
+[[key]]
+t = 0.8
+label = "the weight comes back: pushing off the left foot to the right"
+pelvis = { pos = [0.04, 0.87, 0.14], yaw = 0, pitch = 14, roll = -6 }
+chest = { yaw = -10, pitch = 12, roll = -10 }
+head = { yaw = -10, pitch = 22, roll = 0 }
+hand_l = { swing = 30, abduct = 25, bend = 60 }
+hand_r = { swing = -10, abduct = 45, bend = 45 }
+foot_r = { pos = [-0.15, 0.05, 0.12], yaw = -10, pitch = -10, toe = 10, knee = [-0.3, 0.1, 1] }
+
+[[key]]
+t = 1.0
+ease = 0.0
+label = "end: away to the right, the right foot stepping out right-forward"
+pelvis = { pos = [-0.12, 0.90, 0.24], yaw = -28, pitch = 14, roll = -6 }
+chest = { yaw = -6, pitch = 8, roll = -4 }
+head = { yaw = -8, pitch = 14 }
+foot_l = { pos = [0.42, 0.002, 0.30], yaw = 28, pitch = -12, toe = 15, ease = 1 }
+foot_r = { pos = [-0.32, 0.06, 0.42], yaw = -35, pitch = 6, knee = [-0.5, 0.1, 1] }
+hand_l = { swing = 25, abduct = 12, bend = 80 }
+hand_r = { swing = -20, abduct = 18, bend = 80 }

@@ -1,0 +1,6372 @@
+{
+  "version": 1,
+  "seed": 1,
+  "attacker_id": "striker_a",
+  "keeper_id": "the_wall",
+  "scenario_id": "edge_of_box",
+  "tuning_hash": "77dc5e0f77d68c4c",
+  "players_per_tick": 2,
+  "intents": [
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 1,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994314,
+      "mz": -0.010665364,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994314,
+      "mz": -0.010659966,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994326,
+      "mz": -0.010654549,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994326,
+      "mz": -0.010649113,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.9999434,
+      "mz": -0.010643658,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994344,
+      "mz": -0.010638183,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.9999435,
+      "mz": -0.010632689,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994355,
+      "mz": -0.010627172,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994355,
+      "mz": -0.010621644,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.9999436,
+      "mz": -0.010616104,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.9999437,
+      "mz": -0.010610552,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994373,
+      "mz": -0.010604987,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.9999438,
+      "mz": -0.010599411,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994385,
+      "mz": -0.010593822,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.9999439,
+      "mz": -0.010588221,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994403,
+      "mz": -0.010582609,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994403,
+      "mz": -0.010576983,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994415,
+      "mz": -0.010571347,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994415,
+      "mz": -0.010565696,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.9999442,
+      "mz": -0.010560036,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.9999443,
+      "mz": -0.010554364,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.9999444,
+      "mz": -0.010548679,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994445,
+      "mz": -0.010542983,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994445,
+      "mz": -0.010537274,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994457,
+      "mz": -0.010531554,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": true,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    }
+  ],
+  "tick_count": 318
+}

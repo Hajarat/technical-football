@@ -1,0 +1,208 @@
+# Attacker (outfield player) locomotion clip list: a feasibility spike for driving his stride from motion capture.
+# Same keys as clips.toml; retarget onto game/assets/characters/player.glb into game/assets/anim/attacker/:
+#
+#   python3 tools/anim/cmu.py --config tools/anim/attacker_clips.toml
+#   uv run --with numpy python3 tools/anim/retarget.py --config tools/anim/attacker_clips.toml \
+#       --model game/assets/characters/player.glb --out game/assets/anim/attacker
+#
+# contact_speed (default 0.35 m/s): the foot speed under which a low foot counts as planted; a running foot needs more
+# (tools/anim/retarget.py label_contacts). contact_tolerance_cm is as in clips.toml.
+# No "frames": every clip is its whole trial (they are 0.6 to 4 s long). "set" names the kind of movement; nothing in the game reads it.
+
+[[clip]]
+name = "walk_16_47"
+trial = "16_47"
+set = "walk"
+side = "none"
+loop = false
+notes = "straight walk, about 1.3 m/s (subject 16)"
+
+[[clip]]
+name = "walk_brisk_16_21"
+trial = "16_21"
+set = "walk"
+side = "none"
+loop = false
+notes = "straight walk, about 1.7 m/s (subject 16)"
+
+[[clip]]
+name = "jog_16_36"
+trial = "16_36"
+set = "jog"
+side = "none"
+loop = false
+notes = "run/jog, straight, about 2.7 m/s (subject 16)"
+
+[[clip]]
+name = "run_09_01"
+trial = "09_01"
+set = "run"
+side = "none"
+loop = false
+contact_speed = 1.5
+notes = "run, straight, about 3.6 m/s (subject 9)"
+
+[[clip]]
+name = "run_16_46"
+trial = "16_46"
+set = "run"
+side = "none"
+loop = false
+contact_speed = 1.5
+notes = "run/jog, straight, about 4.1 m/s (subject 16)"
+
+[[clip]]
+name = "run_104_48"
+trial = "104_48"
+set = "run"
+side = "none"
+loop = false
+contact_speed = 1.5
+notes = "run through, straight, about 4.1 m/s (subject 104)"
+
+[[clip]]
+name = "run_78_12"
+trial = "78_12"
+set = "run"
+side = "none"
+loop = false
+contact_speed = 1.5
+notes = "running without a ball, straight, about 4.5 m/s (basketball session, subject 78)"
+
+[[clip]]
+name = "veer_jog_left_16_37"
+trial = "16_37"
+set = "turn"
+side = "left"
+loop = false
+notes = "jog veering left about 45 degrees (subject 16)"
+
+[[clip]]
+name = "veer_jog_right_16_39"
+trial = "16_39"
+set = "turn"
+side = "right"
+loop = false
+notes = "jog veering right about 45 degrees (subject 16)"
+
+[[clip]]
+name = "turn90_jog_left_16_42"
+trial = "16_42"
+set = "turn"
+side = "left"
+loop = false
+notes = "jog with a 90 degree left turn (subject 16)"
+
+[[clip]]
+name = "turn90_jog_right_16_44"
+trial = "16_44"
+set = "turn"
+side = "right"
+loop = false
+notes = "jog with a 90 degree right turn (subject 16)"
+
+[[clip]]
+name = "veer_run_left_16_48"
+trial = "16_48"
+set = "turn"
+side = "left"
+loop = false
+contact_speed = 1.5
+notes = "run veering left about 45 degrees, about 4 m/s (subject 16)"
+
+[[clip]]
+name = "turn90_run_right_16_54"
+trial = "16_54"
+set = "turn"
+side = "right"
+loop = false
+notes = "run with a 90 degree right turn (subject 16)"
+
+[[clip]]
+name = "stop_run_104_56"
+trial = "104_56"
+set = "stop"
+side = "none"
+loop = false
+notes = "run to a stop (subject 104)"
+
+[[clip]]
+name = "stop_run_127_05"
+trial = "127_05"
+set = "stop"
+side = "none"
+loop = false
+notes = "run to a quick stop, turning (subject 127; the keeper's trial)"
+
+[[clip]]
+name = "start_run_104_53"
+trial = "104_53"
+set = "start"
+side = "none"
+loop = false
+notes = "standing start into a run (subject 104)"
+
+[[clip]]
+name = "start_jog_104_06"
+trial = "104_06"
+set = "start"
+side = "none"
+loop = false
+notes = "standing start into a jog (subject 104)"
+
+[[clip]]
+name = "sidestep_run_127_13"
+trial = "127_13"
+set = "sidestep"
+side = "left"
+loop = false
+notes = "run with a side step to his left (subject 127; the keeper's trial)"
+
+[[clip]]
+name = "kick_soccer_11_01"
+trial = "11_01"
+set = "kick"
+side = "none"
+loop = false
+notes = "soccer: walk up and kick the ball (subject 11)"
+
+[[clip]]
+name = "kick_soccer_10_02"
+trial = "10_02"
+set = "kick"
+side = "none"
+loop = false
+notes = "soccer: walk up and kick the ball (subject 10)"
+
+# ---- stride cycles (tools/anim/cycles.py -> game/assets/anim/attacker/cycles/) ----
+# One stride of a clip above, from a foot strike to the same foot's next strike (60 Hz frames of the retargeted clip, the end frame
+# being the next stride's first), made seamless and annotated with each foot's strike and toe-off. blend_speed (m/s) is where the
+# game shows that cycle alone; between two it blends them by the speed (src/FootballSim.Anim/CycleMotion.cs).
+
+[[cycle]]
+name = "cycle_walk"
+clip = "walk_brisk_16_21"
+frames = [17, 76]
+blend_speed = 1.8
+notes = "brisk walk, 1.8 m/s on the model"
+
+[[cycle]]
+name = "cycle_jog"
+clip = "jog_16_36"
+frames = [39, 86]
+blend_speed = 4.0
+notes = "relaxed jog, 2.9 m/s; with the walk in close control (2.6 m/s), with the upright run at the game's jog (4.85 m/s)"
+
+[[cycle]]
+name = "cycle_run"
+clip = "run_16_46"
+frames = [10, 51]
+blend_speed = 5.8
+notes = "upright run, 4.5 m/s; half of the game's jog, half of its sprint"
+
+[[cycle]]
+name = "cycle_sprint"
+clip = "run_78_12"
+frames = [7, 46]
+blend_speed = 10.0
+notes = "athletic run (lean, knee lift, arm drive), 5.2 m/s; takes over toward the sprint (40 per cent of it at 7.4 m/s), its stance shortened above its own step"

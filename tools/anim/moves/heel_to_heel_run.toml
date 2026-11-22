@@ -1,0 +1,181 @@
+# Heel-to-heel at a run, the right foot leading (mirror: the left). The right foot swings through past the ball on its right and
+# comes in in front of it; its heel knocks the ball back and across between the feet, the right foot steps out beside it, and the
+# inside of the trailing left foot, turned out behind the ball, pushes it on ahead as he leans into the exit. Hips and shoulders stay
+# about square to the run, arms out. Straight ahead, so the clips are named by the leading foot: heel_to_heel_right and its mirror
+# heel_to_heel_left (the standing version is heel_to_heel.toml, same events). Conventions as in ball_roll.toml.
+#
+# Authored to the core (SkillMoves.cs, ActionKind.HeelToHeel): the heel's contact at the start + 0.117 s, the inside's at + 0.217 s,
+# the end (release) at + 0.35 s, so the spans play at the core's pace. The ball against the player's position (the clip's root) as
+# the replays show it: at the heel's contact 0.39 m ahead at a jog, 0.52 m at a sprint, 0.45 m from a walk, 0.05-0.11 m to the
+# leading foot's side; the heel carries it 0.15 m back toward him by the second contact; the flick sends it on at 1.3 x his speed
+# (at least 5 m/s). The clip's own ball sits between those, so the pins on the live ball move the boots only a few centimetres.
+
+name = "heel_to_heel"
+move = "heel_to_heel"
+side = "none"
+foot = "right"
+entry = "run"
+entry_speed = 3.0
+notes = "heel-to-heel at a run: lead foot past the ball, its heel knocks it back 0.15 m between the feet, the trailing inside flicks it on"
+
+[sim]
+move_s = 0.35
+contact_s = 0.117                 # the leading heel knocks the ball back ...
+knock_back_m = 0.15
+contact2_s = 0.217                # ... and the trailing foot's inside flicks it forward
+flick_speed = "1.3 x his speed, at least 5 m/s"
+entry_speed = 3.0
+ball_at_contact = [-0.09, 0.11, 0.45]   # against the root
+ball_radius = 0.11
+
+[events]
+start = 0.0
+contact = 0.2483                  # the leading heel meets the ball
+contact2 = 0.4611                 # the trailing foot's inside meets it
+release = 0.7447                  # the core's end tick: the ball is away
+end = 1.0
+
+[[variant]]
+suffix = "_run"
+spans = [0.1167, 0.1, 0.1333, 0.12]
+
+[ball]
+radius = 0.11
+touch = { contact = "right", contact2 = "left" }
+
+[[key]]
+t = 0
+label = "start: running, the left foot down under him, the right swinging through"
+pelvis = { pos = [0, 0.9, 0], yaw = 0, pitch = 12 }
+chest = { yaw = -4, pitch = 6 }
+head = { pitch = 24 }
+foot_l = { pos = [0.1, 0.002, 0.12], yaw = 4, pitch = 0, toe = 0, knee = [0.1, 0, 1], ease = 1 }
+foot_r = { pos = [-0.13, 0.15, 0.05], yaw = -6, pitch = -15, toe = 5, knee = [-0.1, 0, 1] }
+hand_l = { swing = 25, abduct = 15, bend = 75 }
+hand_r = { swing = -25, abduct = 15, bend = 75 }
+ball = { pos = [-0.07, 0.11, 0.58], ease = [1, 1, 0] }
+
+[[key]]
+t = 0.0957
+label = "the left foot rolls onto its toes"
+foot_l = { pos = [0.1, 0.002, 0.12], yaw = 4, pitch = 0, toe = 0, ease = 1 }
+
+[[key]]
+t = 0.1277
+label = "the right foot swings through high, to the right of the ball"
+pelvis = { pos = [0, 0.86, 0.31], yaw = 6, pitch = 13 }
+foot_r = { pos = [-0.21, 0.24, 0.6], yaw = -8, pitch = -12, toe = 0, knee = [-0.2, 0.8, 1] }
+hand_l = { swing = 15, abduct = 35, bend = 50 }
+hand_r = { swing = -5, abduct = 35, bend = 50 }
+
+[[key]]
+t = 0.1702
+label = "the left foot pushes off"
+foot_l = { pos = [0.1, 0.03, 0.1], yaw = 4, pitch = -30, toe = 30 }
+
+[[key]]
+t = 0.1915
+label = "the right boot past the ball on its right, coming in in front of it"
+foot_r = { pos = [-0.27, 0.17, 1.04], yaw = -12, pitch = -8, toe = 0, knee = [-0.2, 0.6, 1] }
+
+[[key]]
+t = 0.2483
+label = "contact: the right boot past the ball, its heel on the front of it, knocking it back and across"
+pelvis = { pos = [0, 0.8, 0.5868], yaw = 12, pitch = 14, roll = -2 }
+chest = { yaw = -8, pitch = 14, roll = 2 }
+head = { yaw = 4, pitch = 38 }
+foot_r = { pos = [-0.135, -0.05, 0.285], frame = "ball", yaw = -15, pitch = 10, toe = 0, knee = [-0.2, 0.2, 1], ease = 0 }
+foot_l = { pos = [0.09, 0.16, 0.1368], yaw = 10, pitch = -45, toe = 10, knee = [0.1, 0, 1] }
+hand_l = { swing = 15, abduct = 58, bend = 35 }
+hand_r = { swing = 5, abduct = 58, bend = 35 }
+ball = { pos = [-0.09, 0.11, 0.9168], ease = [1, 1, 0] }
+
+[[key]]
+t = 0.3085
+label = "the right foot steps out to the right of the ball"
+foot_r = { pos = [-0.3, 0.09, 1.12], yaw = -12, pitch = -12, knee = [-0.3, 0.4, 1] }
+
+[[key]]
+t = 0.3511
+label = "and plants beside it, the ball between the feet"
+pelvis = { pos = [0, 0.81, 0.77], yaw = 7, pitch = 15 }
+foot_r = { pos = [-0.28, 0.002, 1.16], yaw = -10, pitch = 0, knee = [-0.3, 0, 1], ease = 1 }
+foot_l = { pos = [0.07, 0.1, 0.61], yaw = 30, pitch = -10, toe = 0, knee = [0.3, 0.1, 1] }
+
+[[key]]
+t = 0.4611
+label = "contact2: the left foot turned out behind the ball, its inside pushing it on"
+pelvis = { pos = [0, 0.82, 0.9468], yaw = 3, pitch = 15, roll = 0 }
+chest = { yaw = -2, pitch = 15, roll = 0 }
+head = { yaw = 0, pitch = 34 }
+foot_l = { pos = [0.05, -0.08, -0.15], frame = "ball", yaw = 55, pitch = 0, knee = [0.5, 0.2, 1], ease = 0 }
+hand_l = { swing = 0, abduct = 55, bend = 40 }
+hand_r = { swing = 25, abduct = 50, bend = 40 }
+ball = { pos = [-0.09, 0.11, 1.1968], ease = [1, 1, 0] }
+
+[[key]]
+t = 0.5
+label = "the right foot still down beside the ball's path"
+foot_r = { pos = [-0.28, 0.002, 1.16], yaw = -10, pitch = 0, toe = 0, ease = 1 }
+
+[[key]]
+t = 0.5319
+label = "the left foot follows the ball through"
+foot_l = { pos = [0.04, 0.06, 1.17], yaw = 35, pitch = 0, knee = [0.4, 0.2, 1] }
+ball = { pos = [-0.09, 0.11, 1.42], ease = [1, 1, 0] }
+
+[[key]]
+t = 0.5638
+label = "the right heel comes up"
+foot_r = { pos = [-0.28, 0.03, 1.14], yaw = -10, pitch = -30, toe = 30 }
+
+[[key]]
+t = 0.617
+label = "the left foot lands ahead, leaning into the exit"
+pelvis = { pos = [0, 0.85, 1.2], yaw = 0, pitch = 20 }
+foot_l = { pos = [0.08, 0.002, 1.32], yaw = 10, pitch = 0, toe = 0, knee = [0.15, 0, 1], ease = 1 }
+
+[[key]]
+t = 0.6383
+label = "the right foot leaves the ground"
+foot_r = { pos = [-0.17, 0.13, 1.24], yaw = -8, pitch = -30, toe = 10, knee = [-0.1, 0, 1] }
+
+[[key]]
+t = 0.7447
+label = "release: the ball away ahead; he drives after it, the right leg coming through"
+pelvis = { pos = [0.01, 0.87, 1.42], pitch = 21 }
+chest = { yaw = 2, pitch = 19 }
+head = { pitch = 18 }
+foot_r = { pos = [-0.12, 0.08, 1.82], yaw = -6, pitch = 0, toe = 0, knee = [-0.1, 0.1, 1] }
+hand_l = { swing = 35, abduct = 20, bend = 80 }
+hand_r = { swing = -35, abduct = 20, bend = 80 }
+ball = { pos = [-0.09, 0.11, 2.12], ease = [1, 1, 0] }
+
+[[key]]
+t = 0.7872
+label = "the left heel comes up"
+foot_l = { pos = [0.08, 0.002, 1.32], yaw = 10, pitch = 0, toe = 0, ease = 1 }
+
+[[key]]
+t = 0.8511
+label = "the right foot reaches forward"
+foot_r = { pos = [-0.11, 0.05, 2.02], yaw = -6, pitch = 5, knee = [-0.1, 0, 1] }
+foot_l = { pos = [0.08, 0.03, 1.3], yaw = 8, pitch = -30, toe = 30, knee = [0.1, 0, 1] }
+
+[[key]]
+t = 0.9362
+label = "and lands"
+foot_r = { pos = [-0.11, 0.002, 2.14], yaw = -6, pitch = 0, knee = [-0.1, 0, 1], ease = 1 }
+
+[[key]]
+t = 1
+ease = 0
+label = "end: running on after the ball, the trunk leaning into the burst"
+pelvis = { pos = [0, 0.89, 1.88], yaw = 0, pitch = 20 }
+chest = { yaw = -3, pitch = 16 }
+head = { pitch = 12 }
+foot_l = { pos = [0.1, 0.12, 1.63], yaw = 6, pitch = -40, toe = 10, knee = [0.1, 0, 1] }
+foot_r = { pos = [-0.11, 0.002, 2.14], yaw = -6, pitch = 0, ease = 1 }
+hand_l = { swing = 45, abduct = 12, bend = 90 }
+hand_r = { swing = -45, abduct = 12, bend = 90 }
+ball = { pos = [-0.09, 0.11, 2.78], ease = [1, 1, 0] }
