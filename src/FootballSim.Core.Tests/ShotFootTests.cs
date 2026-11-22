@@ -4,18 +4,19 @@ using FootballSim.Core;
 namespace FootballSim.Core.Tests;
 
 /// <summary>
-/// The striking foot and the angle a shot is struck at: the foot chooser's zones (strong foot only across the body, weak foot
-/// only beyond the strong foot's limit, both scored in between, the outside of the foot with the trait), its timing terms, the
-/// body-angle and goal-mouth terms, the weak-foot and outside-foot terms, and the foot and aim locked in the world.
+/// The striking foot and the angle a shot is struck at: the foot rules (the strong foot across the body, its outside toward its
+/// own side up to the cap, the weak foot beyond, the foot on the ball's side for a wide shot, the far-post rule, the contact
+/// check), the body-angle and goal-mouth terms, the weak-foot and outside-foot terms, and the foot and aim locked in the world.
 /// </summary>
 public class ShotFootTests
 {
     static readonly Tuning T = new();
     static readonly Pitch P = new(new PitchSpec(), T.Frame);
     const float Deg = MathF.PI / 180f;
+    static readonly ShotType[] Types = { ShotType.Power, ShotType.Driven, ShotType.Finesse, ShotType.LowFinesse, ShotType.Chip };
 
-    /// <summary>striker_a's ratings (curve 72), with the weak foot, preferred foot and trait under test.</summary>
-    static PlayerSheet Sheet(int weakFoot, bool trait, Foot preferred = Foot.Right)
+    /// <summary>striker_a's ratings (curve 72: a 57 degree cap), with the weak foot, preferred foot and trait under test.</summary>
+    static PlayerSheet Sheet(int weakFoot = 50, bool trait = false, Foot preferred = Foot.Right)
     {
         var s = TestData.Player("striker_a").Clone();
         s.WeakFoot = weakFoot;
@@ -24,118 +25,290 @@ public class ShotFootTests
         return s;
     }
 
-    /// <summary>The choice for a ball straight ahead of a player at the origin facing +X, leaving <paramref name="yawDeg"/> to his right.</summary>
-    static StrikeChoice Choose(PlayerSheet s, float yawDeg, ShotType type = ShotType.Power, int right = 0, int left = 0, float ballRight = 0f, Tuning? t = null) =>
-        ShotModel.ChooseStrike(s, Vector3.Zero, 0f, new Vector3(0.5f, T.Ball.Radius, ballRight), yawDeg * Deg, type, t ?? T, right, left);
+    static Foot Other(Foot f) => f == Foot.Right ? Foot.Left : Foot.Right;
 
-    [Theory]
-    [InlineData(3, false)]
-    [InlineData(3, true)]
-    [InlineData(1, false)]
-    [InlineData(1, true)]
-    public void TheFootZonesOfARightFootedPlayerAndTheirMirrorForALeftFootedOne(int weakFoot, bool trait)
+    /// <summary>
+    /// The choice for a player on the penalty spot facing the goal (+X), the ball leaving <paramref name="yawDeg"/> to his right.
+    /// On the centre line he is on neither flank, so the far-post rule is off.
+    /// </summary>
+    static StrikeChoice Choose(PlayerSheet s, float yawDeg, ShotType type = ShotType.Power, int right = 0, int left = 0)
     {
-        var k = T.Shot;
-        // The weak foot's own cost against the strong foot's opening cost: where the weak foot takes over without the outside.
-        float weakCost = k.WWeak * (5 - weakFoot) / 4f;
-        float takeover = k.OutsideMinDeg + (k.OpenMaxDeg - k.OutsideMinDeg) * weakCost / k.WOpen;
-        Assert.Equal(weakFoot == 3 ? 42.75f : 63f, takeover, 2);
-        foreach (Foot strong in new[] { Foot.Right, Foot.Left })
+        var spot = new Vector3(P.GoalLineX - 11f, 0f, 0f);
+        return ShotModel.ChooseStrike(s, spot, 0f, new Vector3(spot.X + 0.5f, T.Ball.Radius, 0f), yawDeg * Deg, type, P, T, right, left);
+    }
+
+    /// <summary>
+    /// The choice for a player at (<paramref name="outM"/> metres from the goal line, <paramref name="z"/>) with the ball at his
+    /// feet, aiming at <paramref name="aimZ"/> on the goal line, that aim <paramref name="thetaDeg"/> to his right.
+    /// </summary>
+    static StrikeChoice ChooseAt(PlayerSheet s, float outM, float z, float aimZ, float thetaDeg, ShotType type = ShotType.Power)
+    {
+        var pos = new Vector3(P.GoalLineX - outM, 0f, z);
+        var ball = new Vector3(pos.X, T.Ball.Radius, pos.Z);
+        float yaw = MathF.Atan2(aimZ - z, outM);
+        return ShotModel.ChooseStrike(s, pos, yaw - thetaDeg * Deg, ball, yaw, type, P, T);
+    }
+
+    /// <summary>Each case for a right-footed player and, mirrored, for a left-footed one: <paramref name="check"/> gets the strong foot and the sign of his own side.</summary>
+    static void BothFeet(Action<Foot, float> check)
+    {
+        check(Foot.Right, 1f);
+        check(Foot.Left, -1f);
+    }
+
+    [Fact]
+    public void AcrossTheBodyTheStrongFootStrikesWhateverTheWeakFootIsWorth()
+    {
+        BothFeet((strong, own) =>
         {
-            var s = Sheet(weakFoot, trait, strong);
-            Foot weak = strong == Foot.Right ? Foot.Left : Foot.Right;
-            float cap = ShotModel.OutsideMaxDeg(s, ShotType.Power, T);
-            Assert.InRange(cap, 56f, 58f);                         // curve 72: about 57 degrees
-            for (float open = -90f; open <= 90f; open += 2.5f)
+            foreach (int wf in new[] { 1, 99 })
+                foreach (float across in new[] { 2f, 30f, 90f, 149f })
+                    Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), Choose(Sheet(wf, false, strong), -own * across));
+        });
+    }
+
+    [Fact]
+    public void TowardHisOwnSideTheOutsideOfTheStrongFootStrikesUpToTheCapAndTheWeakFootBeyond()
+    {
+        BothFeet((strong, own) =>
+        {
+            var plain = Sheet(50, false, strong);
+            var trait = Sheet(50, true, strong);
+            Assert.InRange(ShotModel.OutsideCapDeg(plain, ShotType.Power, T), 56.5f, 57.5f);     // curve 72: about 57 degrees
+            Assert.Equal(67.5f, ShotModel.OutsideCapDeg(trait, ShotType.Power, T), 3);           // + 12, held at the ceiling
+            // Everyone has the outside, with or without the trait.
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Outside), Choose(plain, own * 40f));
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Outside), Choose(trait, own * 40f));
+            // Beyond his cap the weak foot strikes with the type's own surface; the trait's wider cap still covers 60 degrees.
+            Assert.Equal(new StrikeChoice(Other(strong), FootSurface.Laces), Choose(plain, own * 60f));
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Outside), Choose(trait, own * 60f));
+            Assert.Equal(new StrikeChoice(Other(strong), FootSurface.Laces), Choose(trait, own * 70f));
+            Assert.Equal(new StrikeChoice(Other(strong), FootSurface.Inside), Choose(plain, own * 60f, ShotType.Finesse));
+            // The weak foot's rating has no say in the choice.
+            foreach (int wf in new[] { 1, 99 })
             {
-                // 'open' is toward the strong foot's own side; a left-footed player's is his left.
-                var c = Choose(s, strong == Foot.Right ? open : -open);
-                string id = $"{strong}-footed, weak foot {weakFoot}, trait {trait}, {open} degrees to the strong side";
-                bool outside = trait && open > k.OutsideMinDeg && open <= cap;
-                if (open > k.OpenMaxDeg) Assert.True(c.Foot == weak, $"{id}: beyond the strong foot's limit only the weak foot strikes");
-                else if (open < -k.OpenMaxDeg) Assert.True(c.Foot == strong, $"{id}: across the body beyond the weak foot's limit only the strong foot strikes");
-                else if (outside) Assert.True(c.Foot == strong, $"{id}: the outside of the strong foot");
-                else if (open < takeover - 1f) Assert.True(c.Foot == strong, $"{id}: the strong foot is cheaper");
-                else if (open > takeover + 1f) Assert.True(c.Foot == weak, $"{id}: the weak foot is cheaper than opening the hips");
-                Assert.True((c.Surface == FootSurface.Outside) == (outside && c.Foot == strong), $"{id}: surface {c.Surface}");
-                if (c.Surface != FootSurface.Outside) Assert.Equal(FootSurface.Laces, c.Surface);
+                Assert.Equal(strong, Choose(Sheet(wf, false, strong), own * 40f).Foot);
+                Assert.Equal(Other(strong), Choose(Sheet(wf, false, strong), own * 60f).Foot);
             }
-        }
+        });
     }
 
     [Fact]
-    public void TheOutsideOfTheFootNeedsTheTrait()
+    public void TheCapComesFromTheCurveRatingTheTraitWidensItAndTheShotTypeCeilsIt()
     {
-        foreach (var type in new[] { ShotType.Power, ShotType.Driven, ShotType.Finesse, ShotType.LowFinesse, ShotType.Chip })
-            for (float yaw = -180f; yaw <= 180f; yaw += 5f)
-                foreach (int wf in new[] { 1, 3, 5 })
-                    Assert.NotEqual(FootSurface.Outside, Choose(Sheet(wf, trait: false), yaw, type).Surface);
-        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Outside), Choose(Sheet(3, trait: true), 45f));
-        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Outside), Choose(Sheet(3, trait: true, Foot.Left), -45f));
-        // The band ends at the curve rating's cap: a poor curler's outside reaches less far.
-        var poor = Sheet(3, trait: true);
-        poor.Curve = 1;
-        Assert.Equal(30f, ShotModel.OutsideMaxDeg(poor, ShotType.Power, T), 3);
-        Assert.Equal(FootSurface.Outside, Choose(poor, 28f).Surface);
-        Assert.NotEqual(FootSurface.Outside, Choose(poor, 32f).Surface);
+        var s = Sheet();
+        s.Curve = 1;
+        Assert.Equal(30f, ShotModel.OutsideCapDeg(s, ShotType.Power, T), 3);
+        s.Traits = PlayerTrait.OutsideFoot;
+        Assert.Equal(42f, ShotModel.OutsideCapDeg(s, ShotType.Power, T), 3);
+        s.Curve = 99;
+        foreach (var type in Types)
+            Assert.Equal(type is ShotType.Finesse or ShotType.LowFinesse ? 79f : 67.5f, ShotModel.OutsideCapDeg(s, type, T), 3);
+        s.Traits = PlayerTrait.None;
+        Assert.Equal(67.5f, ShotModel.OutsideCapDeg(s, ShotType.Finesse, T), 3);
+        // A finesse reaches further for a curler with the trait: 75 degrees is still his strong foot's.
+        s.Traits = PlayerTrait.OutsideFoot;
+        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Laces), Choose(s, 75f, ShotType.Power));
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Outside), Choose(s, 75f, ShotType.Finesse));
+        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Inside), Choose(s, 80f, ShotType.Finesse));
     }
 
     [Fact]
-    public void ATieGoesToTheStrongFootAndStraightBehindIsAcrossTheBodyForIt()
+    public void AnAngleOnALimitCountsAsInsideIt()
+    {
+        BothFeet((strong, own) =>
+        {
+            foreach (int curve in new[] { 1, 40, 72, 99 })
+            {
+                var s = Sheet(50, false, strong);
+                s.Curve = curve;
+                float cap = ShotModel.OutsideCapDeg(s, ShotType.Power, T);
+                Assert.Equal(new StrikeChoice(strong, FootSurface.Outside), Choose(s, own * cap));
+                Assert.Equal(new StrikeChoice(Other(strong), FootSurface.Laces), Choose(s, own * (cap + 0.1f)));
+            }
+            var p = Sheet(50, false, strong);
+            // At foot_by_side_deg itself the shot is not wide yet: the general rule still holds either way.
+            Assert.Equal(150f, T.Shot.FootBySideDeg);
+            Assert.Equal(new StrikeChoice(Other(strong), FootSurface.Laces), Choose(p, own * 150f));
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), Choose(p, -own * 150f));
+            // Dead ahead (within dead_ahead_deg) is the strong foot's own surface, not its outside.
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), Choose(p, 0f));
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), Choose(p, own * T.Shot.DeadAheadDeg));
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Outside), Choose(p, own * (T.Shot.DeadAheadDeg + 0.1f)));
+            Assert.Equal(22.5f, T.Shot.DeadAheadDeg);
+        });
+    }
+
+    [Fact]
+    public void AWideShotIsStruckByTheFootOnTheSideTheBallLeaves()
     {
         foreach (Foot strong in new[] { Foot.Right, Foot.Left })
+            foreach (int wf in new[] { 1, 99 })
+                foreach (bool trait in new[] { false, true })
+                    foreach (var type in Types)
+                    {
+                        var s = Sheet(wf, trait, strong);
+                        foreach (float wide in new[] { 150.1f, 160f, 179f })
+                        {
+                            Assert.Equal(new StrikeChoice(Foot.Right, ShotModel.SurfaceFor(type)), Choose(s, wide, type));
+                            Assert.Equal(new StrikeChoice(Foot.Left, ShotModel.SurfaceFor(type)), Choose(s, -wide, type));
+                        }
+                    }
+    }
+
+    [Fact]
+    public void DeadAheadAndStraightBehindGoToTheStrongFoot()
+    {
+        BothFeet((strong, own) =>
         {
-            Assert.Equal(strong, Choose(Sheet(5, false, strong), 0f).Foot);     // five stars: both feet cost nothing straight on
-            Assert.Equal(strong, Choose(Sheet(3, false, strong), 180f).Foot);
-            Assert.Equal(strong, Choose(Sheet(3, false, strong), -180f).Foot);
-            Assert.Equal(strong, Choose(Sheet(3, false, strong), 179.9f).Foot);
+            var s = Sheet(50, false, strong);
+            // Straight behind is never "wide", from either side of the wrap-around.
+            foreach (float yaw in new[] { 0f, 180f, -180f, 179.9f, -179.9f, 179.6f, -179.6f, 540f, -540f })
+                Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), Choose(s, yaw));
+        });
+        // Just short of straight behind the side decides again.
+        Assert.Equal(Foot.Left, Choose(Sheet(), -179f).Foot);
+        Assert.Equal(Foot.Right, Choose(Sheet(50, false, Foot.Left), 179f).Foot);
+    }
+
+    [Fact]
+    public void TheSameShotGivesTheSameStrikeAndNoOutsideAcrossTheBody()
+    {
+        foreach (var type in Types)
+            for (float yaw = -180f; yaw <= 180f; yaw += 2.5f)
+            {
+                var s = Sheet(50, true);
+                var c = Choose(s, yaw, type);
+                Assert.Equal(c, Choose(s, yaw, type));
+                Assert.Equal(c, Choose(Sheet(1, true), yaw, type));        // the weak foot's rating never decides
+                float cap = ShotModel.OutsideCapDeg(s, type, T);
+                Assert.Equal(yaw > T.Shot.DeadAheadDeg && yaw <= cap, c.Surface == FootSurface.Outside);
+                if (c.Surface != FootSurface.Outside) Assert.Equal(ShotModel.SurfaceFor(type), c.Surface);
+            }
+    }
+
+    [Fact]
+    public void AnInvertedShooterCurlsAFarPostShotWithHisNormalSurface()
+    {
+        // A right-footer on the left flank (Z below 0), 16 m out, aiming at the far post 30 degrees to his right: within his
+        // cap, where the general rule gives the outside of the foot, the far-post rule keeps the type's own surface.
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), ChooseAt(Sheet(), 16f, -6f, 3f, 30f));
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Inside), ChooseAt(Sheet(), 16f, -6f, 3f, 30f, ShotType.Finesse));
+        // On his natural flank the same far-post aim to his right (he faces away from goal) is the outside as usual.
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Outside), ChooseAt(Sheet(), 16f, 6f, -3f, 30f));
+        // The mirror: a left-footer on the right flank, the far post to his left.
+        var lefty = Sheet(50, false, Foot.Left);
+        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Laces), ChooseAt(lefty, 16f, 6f, -3f, -30f));
+        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Outside), ChooseAt(lefty, 16f, -6f, 3f, -30f));
+        // Only that one case changes: beyond the cap it is the weak foot, across the body the strong foot, a near-post aim the outside.
+        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Laces), ChooseAt(Sheet(), 16f, -6f, 3f, 60f));
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), ChooseAt(Sheet(), 16f, -6f, 3f, -30f));
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Outside), ChooseAt(Sheet(), 16f, -6f, -3f, 30f));
+        // With the trait the wider cap covers 60 degrees, and the far-post rule with it.
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), ChooseAt(Sheet(50, true), 16f, -6f, 3f, 60f));
+    }
+
+    [Fact]
+    public void OnTheCentreLineOrAimedAtTheCentreTheFarPostRuleStaysOff()
+    {
+        var s = Sheet();
+        float flank = T.Shot.FarPostFlankMinM;
+        Assert.Equal(0.3f, flank);
+        // Within far_post_flank_min_m of the centre line he is on neither flank, whichever side of it he stands.
+        foreach (float z in new[] { 0f, 0.1f, -0.1f, flank - 0.01f, -(flank - 0.01f) })
+            foreach (float aimZ in new[] { 3f, -3f })
+                Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Outside), ChooseAt(s, 16f, z, aimZ, 30f));
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), ChooseAt(s, 16f, -(flank + 0.01f), 3f, 30f));
+        // An aim at the centre of the goal is at neither post.
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Outside), ChooseAt(s, 16f, -6f, 0f, 30f));
+        var ball = new Vector3(P.GoalLineX - 16f, T.Ball.Radius, -6f);
+        Assert.False(ShotModel.FarPostApplies(ShotType.Power, ball, 0f, ball, P, T));
+        Assert.False(ShotModel.FarPostApplies(ShotType.Power, ball, 0.0005f, ball, P, T));
+        Assert.True(ShotModel.FarPostApplies(ShotType.Power, ball, 0.5f, ball, P, T));
+        Assert.False(ShotModel.FarPostApplies(ShotType.Power, ball, -0.5f, ball, P, T));
+        Assert.True(ShotModel.Inverted(Foot.Right, ball) && !ShotModel.Inverted(Foot.Left, ball));
+        var centre = new Vector3(ball.X, 0f, 0f);
+        Assert.False(ShotModel.Inverted(Foot.Right, centre) || ShotModel.Inverted(Foot.Left, centre));
+    }
+
+    [Fact]
+    public void TheFarPostRuleHoldsOnlyInsideTheShotTypesDistanceBand()
+    {
+        var s = Sheet();
+        // A chip only within 2.5 m of the goal centre: from 16 m the general rule stands.
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Outside), ChooseAt(s, 16f, -6f, 3f, 30f, ShotType.Chip));
+        // From 1.6 m off the goal line and 1.2 m off centre (2 m from the goal centre) it is on.
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Inside), ChooseAt(s, 1.6f, -1.2f, 2f, 30f, ShotType.Chip));
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Outside), ChooseAt(s, 2.4f, -1.2f, 2f, 30f, ShotType.Chip));
+        // Power and driven up to 50 m, finesse and low finesse at any distance.
+        foreach (var type in Types)
+        {
+            var b = T.Shot.FarPostBand.For(type);
+            Assert.True(b.Min < 0f);
+            Assert.Equal(type switch { ShotType.Chip => 2.5f, ShotType.Power or ShotType.Driven => 50f, _ => -1f }, b.Max);
         }
-    }
-
-    [Fact]
-    public void AFinesseShotOpensFurtherThanAPowerShot()
-    {
-        Assert.Equal(67.5f, ShotModel.OpenMaxDeg(ShotType.Power, T));
-        Assert.Equal(67.5f, ShotModel.OpenMaxDeg(ShotType.Chip, T));
-        Assert.Equal(79f, ShotModel.OpenMaxDeg(ShotType.Finesse, T));
-        Assert.Equal(79f, ShotModel.OpenMaxDeg(ShotType.LowFinesse, T));
-        // With a weak foot too costly to choose, 75 degrees is still the weak foot's for a power shot, the strong foot's for a finesse.
+        var near = new Vector3(P.GoalLineX - 49f, T.Ball.Radius, -6f);
+        var far = new Vector3(P.GoalLineX - 51f, T.Ball.Radius, -6f);
+        foreach (var type in new[] { ShotType.Power, ShotType.Driven })
+        {
+            Assert.True(ShotModel.FarPostApplies(type, near, 3f, near, P, T));
+            Assert.False(ShotModel.FarPostApplies(type, far, 3f, far, P, T));
+        }
+        foreach (var type in new[] { ShotType.Finesse, ShotType.LowFinesse })
+            Assert.True(ShotModel.FarPostApplies(type, far, 3f, far, P, T));
+        // A lower end too, when a band has one.
         var t = new Tuning();
-        t.Shot.WWeak = 5f;
-        var s = Sheet(1, false);
-        Assert.Equal(Foot.Left, Choose(s, 75f, ShotType.Power, t: t).Foot);
-        Assert.Equal(Foot.Right, Choose(s, 75f, ShotType.Finesse, t: t).Foot);
-        Assert.Equal(Foot.Left, Choose(s, 80f, ShotType.Finesse, t: t).Foot);
+        t.Shot.FarPostBand.Power = new[] { 20f, 30f };
+        Assert.False(ShotModel.FarPostApplies(ShotType.Power, new Vector3(P.GoalLineX - 16f, 0f, -6f), 3f, near, P, t));
+        Assert.True(ShotModel.FarPostApplies(ShotType.Power, new Vector3(P.GoalLineX - 25f, 0f, -6f), 3f, near, P, t));
     }
 
     [Fact]
-    public void TheBallOnTheOtherFootsSideCountsAgainstAFoot()
+    public void OnOrBehindTheGoalLineTheFarPostRuleIsStillAPureFunctionOfThePositions()
     {
-        // 0.4 m to the left of a right-footed player: a three-star weak foot takes it, a one-star player still uses his right.
-        Assert.Equal(Foot.Left, Choose(Sheet(3, false), 0f, ballRight: -0.4f).Foot);
-        Assert.Equal(Foot.Right, Choose(Sheet(1, false), 0f, ballRight: -0.4f).Foot);
-        Assert.Equal(Foot.Right, Choose(Sheet(3, false), 0f, ballRight: -0.1f).Foot);
-        Assert.Equal(Foot.Right, Choose(Sheet(3, false), 0f, ballRight: 0.4f).Foot);
+        var s = Sheet();
+        foreach (float dx in new[] { 0f, -0.5f, -3f })
+            foreach (float z in new[] { -6f, -5f, 5f, 6f })
+                foreach (float yawDeg in new[] { -170f, -90f, -30f, 0f, 30f, 90f, 170f })
+                    foreach (var type in Types)
+                    {
+                        var pos = new Vector3(P.GoalLineX - dx, 0f, z);
+                        var ball = new Vector3(pos.X, T.Ball.Radius, pos.Z);
+                        float yaw = yawDeg * Deg, aimZ = ShotModel.AimZ(ball, yaw, P, T);
+                        Assert.True(float.IsFinite(aimZ) && MathF.Abs(aimZ) <= T.Shot.MaxTargetZ);
+                        bool far = ShotModel.FarPostApplies(type, ball, aimZ, pos, P, T);
+                        Assert.Equal(far, ShotModel.FarPostApplies(type, ball, aimZ, pos, P, T));
+                        // The distance to the goal centre still sets the band, and the halves of the pitch the rest.
+                        var (_, max) = T.Shot.FarPostBand.For(type);
+                        bool inBand = max < 0f || ShotModel.GoalDistance(ball, P) <= max;
+                        Assert.Equal(inBand && MathF.Abs(aimZ) >= 1e-3f && MathF.Sign(aimZ) != MathF.Sign(z), far);
+                        var c = ShotModel.ChooseStrike(s, pos, 0f, ball, yaw, type, P, T);
+                        Assert.Equal(c, ShotModel.ChooseStrike(s, pos, 0f, ball, yaw, type, P, T));
+                    }
     }
 
     [Fact]
-    public void TheWaitForAFootsSwingCountsAndAFootTooLateOrWithoutAContactIsPassedOver()
+    public void AChosenFootWithNoContactHandsTheShotToTheOtherAndTheStrideNeverChoosesOtherwise()
     {
-        var s3 = Sheet(3, false);
-        var s1 = Sheet(1, false);
-        // Straight on, the strong foot's swing 15 ticks (0.125 s) later: worth the wait. 20 ticks (0.167 s): not for three stars.
-        Assert.Equal(Foot.Right, Choose(s3, 0f, right: 95, left: 80).Foot);
-        Assert.Equal(Foot.Left, Choose(s3, 0f, right: 100, left: 80).Foot);
-        Assert.Equal(Foot.Right, Choose(s1, 0f, right: 100, left: 80).Foot);
-        // More than foot_wait_max_s later: not waited for, even by a one-star weak foot.
-        Assert.Equal(Foot.Left, Choose(s1, 0f, right: 120, left: 80).Foot);
-        // ... unless the other foot cannot open that far: across the body the strong foot is waited for.
-        Assert.Equal(Foot.Right, Choose(s3, -80f, right: 120, left: 80).Foot);
-        // A foot with no contact at all gives way to the other, whatever the angle; with none for either the angle decides.
-        Assert.Equal(Foot.Right, Choose(s3, 80f, right: 90, left: -1).Foot);
-        Assert.Equal(Foot.Left, Choose(s3, -80f, right: -1, left: 90).Foot);
-        Assert.Equal(Foot.Left, Choose(s3, 80f, right: -1, left: -1).Foot);
-        Assert.Equal(Foot.Right, Choose(s3, -80f, right: -1, left: -1).Foot);
+        var s = Sheet();
+        // Across the body the geometry gives the right foot. With no contact for it and one for the left, the left strikes.
+        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Laces), Choose(s, -30f, right: -1, left: 30));
+        // With no contact for either the choice stands.
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), Choose(s, -30f, right: -1, left: -1));
+        // However much later the chosen foot's swing comes, it is waited for.
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), Choose(s, -30f, right: 400, left: 30));
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), Choose(s, -30f, right: 30, left: -1));
+        // An outside-of-the-foot choice handed over is struck with the type's own surface.
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Outside), Choose(s, 40f, right: 90, left: 30));
+        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Laces), Choose(s, 40f, right: -1, left: 30));
+        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Inside), Choose(s, 40f, ShotType.Finesse, right: -1, left: 30));
+        // A weak-foot choice (beyond the cap) hands over to the strong foot the same way.
+        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Laces), Choose(s, 80f, right: 30, left: 90));
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), Choose(s, 80f, right: 30, left: -1));
+        // A wide shot too.
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), Choose(s, -160f, right: 30, left: -1));
+        // Both ticks zero: no timing at all.
+        Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), Choose(s, -30f, right: 0, left: 0));
     }
 
     static PlayerState Shooter(float facing = 0f, float x = 41f, float z = 0f, PlayerSheet? sheet = null)
@@ -212,27 +385,68 @@ public class ShotFootTests
     }
 
     [Fact]
-    public void AWeakFootStrikeLosesPowerAndCurlByItsStars()
+    public void AWeakFootStrikeLosesAccuracyPowerAndCurlByItsRating()
     {
-        foreach (int wf in new[] { 1, 3, 5 })
+        foreach (int wf in new[] { 1, 26, 50, 75, 99 })
         {
             var s = TestData.Sheet(60);
             s.WeakFoot = wf;
             var strong = ShotModel.Compute(Ctx(Shooter(sheet: s), type: ShotType.Finesse, foot: Foot.Right), P, T, new SimRng(1));
             var weak = ShotModel.Compute(Ctx(Shooter(sheet: s), type: ShotType.Finesse, foot: Foot.Left), P, T, new SimRng(1));
-            float power = T.Shot.WeakFootPower.Evaluate(wf), curl = T.Shot.WeakFootCurl.Evaluate(wf);
+            float spread = T.Shot.WeakFootAccuracy.Evaluate(wf), power = T.Shot.WeakFootPower.Evaluate(wf), curl = T.Shot.WeakFootCurl.Evaluate(wf);
+            Assert.Equal(1f, strong.Factor("foot"));
             Assert.Equal(1f, strong.SpeedFactor("weak_foot"));
             Assert.Equal(1f, strong.CurlFactor);
+            Assert.Equal(spread, weak.Factor("foot"), 4);
+            Assert.Equal(strong.SigmaH * spread, weak.SigmaH, 3);
             Assert.Equal(power, weak.SpeedFactor("weak_foot"), 4);
             Assert.Equal(curl, weak.CurlFactor, 4);
             Assert.Equal(strong.Speed * power, weak.Speed, 2);
             // Spin grows with speed, so the weak foot's is the strong foot's times both.
             Assert.Equal(strong.Spin.Length() * power * curl, weak.Spin.Length(), 1);
         }
+        Assert.Equal(1.72f, T.Shot.WeakFootAccuracy.Evaluate(1f), 4);
+        Assert.Equal(1f, T.Shot.WeakFootAccuracy.Evaluate(99f), 4);
         Assert.Equal(0.85f, T.Shot.WeakFootPower.Evaluate(1f), 4);
-        Assert.Equal(1f, T.Shot.WeakFootPower.Evaluate(5f), 4);
+        Assert.Equal(1f, T.Shot.WeakFootPower.Evaluate(99f), 4);
         Assert.Equal(0.6f, T.Shot.WeakFootCurl.Evaluate(1f), 4);
-        Assert.Equal(1f, T.Shot.WeakFootCurl.Evaluate(5f), 4);
+        Assert.Equal(1f, T.Shot.WeakFootCurl.Evaluate(99f), 4);
+        Assert.Equal(1.4f, T.Touch.WeakFootError.Evaluate(1f), 4);
+        Assert.Equal(1f, T.Touch.WeakFootError.Evaluate(99f), 4);
+        // The ratings 1, 26, 50, 75 and 99 stand where one to five stars stood: the same numbers within half a rating point.
+        int[] ratings = { 1, 26, 50, 75, 99 };
+        for (int stars = 1; stars <= 5; stars++)
+        {
+            float r = ratings[stars - 1];
+            Assert.Equal(1f + 0.18f * (5 - stars), T.Shot.WeakFootAccuracy.Evaluate(r), 0.0045f);
+            Assert.Equal(0.85f + 0.15f * (stars - 1) / 4f, T.Shot.WeakFootPower.Evaluate(r), 0.001f);
+            Assert.Equal(0.6f + 0.4f * (stars - 1) / 4f, T.Shot.WeakFootCurl.Evaluate(r), 0.0025f);
+            Assert.Equal(1f + 0.10f * (5 - stars), T.Touch.WeakFootError.Evaluate(r), 0.0025f);
+        }
+    }
+
+    [Fact]
+    public void RunningSpeedScalesTheLaunchSpeed()
+    {
+        var s = TestData.Sheet(60);
+        float top = Movement.TopSpeed(s, T);
+        float At(float share)
+        {
+            var p = Shooter(sheet: s);
+            p.Velocity = new Vector3(top * share, 0f, 0f);
+            var r = ShotModel.Compute(Ctx(p, foot: Foot.Right), P, T, new SimRng(1));
+            Assert.Equal(T.Shot.RunSpeedPower.Evaluate(share), r.SpeedFactor("run_speed"), 4);
+            return r.Speed / r.SpeedFactor("run_speed");
+        }
+        float still = At(0f);
+        foreach (float share in new[] { 0.25f, 0.5f, 0.75f, 1f }) Assert.Equal(still, At(share), 2);   // the same seed: only the factor moves it
+        Assert.Equal(0.97f, T.Shot.RunSpeedPower.Evaluate(0f), 4);
+        Assert.Equal(1f, T.Shot.RunSpeedPower.Evaluate(0.5f), 4);
+        Assert.Equal(1.03f, T.Shot.RunSpeedPower.Evaluate(1f), 4);
+        // Faster than his top speed counts as flat out.
+        var fast = Shooter(sheet: s);
+        fast.Velocity = new Vector3(top * 1.5f, 0f, 0f);
+        Assert.Equal(1.03f, ShotModel.Compute(Ctx(fast, foot: Foot.Right), P, T, new SimRng(1)).SpeedFactor("run_speed"), 4);
     }
 
     [Fact]
@@ -283,7 +497,7 @@ public class ShotFootTests
         var back = TestData.Scenario("back_to_goal");
         var facing = TestData.Scenario("back_to_goal");
         facing.Attacker = new StartSpot { X = back.Ball.X - 0.6f, Z = 0f, FacingDeg = 0f };
-        ShotResult Shoot(Scenario sc, out int pressToStrike)
+        ShotResult Shoot(Scenario sc, out int pressToStrike, out float rightDeg)
         {
             var w = new World(new Tuning(), sc, TestData.Player("striker_a"), TestData.Player("the_wall"), 5);
             w.Begin();
@@ -291,26 +505,31 @@ public class ShotFootTests
             int press = w.Tick;
             for (int i = 0; i < 12; i++) Step(w, new TickIntent { ShootHeld = true });
             Step(w, Dir(0f));                                   // released with the stick at the goal
+            // How far to his right the locked aim is from where he faces at the release, degrees.
+            rightDeg = Movement.WrapAngle(w.Attacker.Action!.AimYaw - w.Attacker.Facing) / Deg;
             for (int i = 0; i < 400 && w.Shots.Count == 0; i++) Step(w, default);
             Assert.Single(w.Shots);
             pressToStrike = w.Shots[0].Tick - press;
             return w.Shots[0];
         }
-        var b = Shoot(back, out int tb);
-        var f = Shoot(facing, out int tf);
+        var b = Shoot(back, out int tb, out float side);
+        var f = Shoot(facing, out int tf, out _);
         Assert.True(f.BodyAngleDeg < 30f && b.BodyAngleDeg > 150f, $"body angles {f.BodyAngleDeg} and {b.BodyAngleDeg}");
         Assert.Equal(54, tf);                                                         // the 0.45 s wind-up
         Assert.True(tb - tf >= 24, $"struck {tb - tf} ticks later");                  // at least 0.2 s more
         Assert.True(b.Speed <= 0.7f * f.Speed, $"speed {b.Speed} against {f.Speed}");
         Assert.True(b.SigmaH >= 3f * f.SigmaH, $"sigma {b.SigmaH} against {f.SigmaH}");
-        Assert.Equal(Foot.Right, b.Foot);                                             // behind him is across the body: the strong foot
+        // Wide of foot_by_side_deg the foot on the side the ball leaves strikes; only straight behind is the strong foot's.
+        Assert.True(MathF.Abs(side) > T.Shot.FootBySideDeg, $"released {side} degrees round");
+        Assert.Equal(MathF.Abs(side) > 179.5f || side > 0f ? Foot.Right : Foot.Left, b.Foot);
+        Assert.Equal(Foot.Right, f.Foot);
     }
 
     [Fact]
     public void TheShotActionCarriesTheAimTheFootAndTheSurfaceFixedFromTheRelease()
     {
         // The ball at his feet out wide, facing the goal (-61 degrees); released with the stick at -20 degrees, 41 degrees to his
-        // right: striker_a has the trait, so the outside of his right foot.
+        // right, inside the cap: the outside of his right foot (he is on his natural flank).
         var w = TestData.Live("tight_angle");
         var p = w.Attacker;
         float facing = p.Facing;
@@ -341,22 +560,24 @@ public class ShotFootTests
         Assert.Equal(T.Shot.OutsideAccuracy, r.Factor("surface"), 4);
         Assert.Equal(T.Shot.OutsideSpeed, r.SpeedFactor("surface"), 4);
 
-        // The same shot by a player without the trait: no outside.
+        // The same shot by a poor curler without the trait (a 30 degree cap): beyond his cap, so his left foot.
         var plain = TestData.Player("striker_a").Clone();
         plain.Traits = PlayerTrait.None;
+        plain.Curve = 1;
         var w2 = new World(new Tuning(), TestData.Scenario("tight_angle"), plain, TestData.Player("the_wall"), 1);
         w2.Begin();
         for (int i = 0; i < 11; i++) Step(w2, new TickIntent { ShootHeld = true });
         Step(w2, Dir(-20f));
-        Assert.NotEqual(FootSurface.Outside, w2.Attacker.Action!.Surface);
+        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Laces), new StrikeChoice(w2.Attacker.Action!.Foot, w2.Attacker.Action!.Surface));
         for (int i = 0; i < 400 && w2.Shots.Count == 0; i++) Step(w2, default);
-        Assert.NotEqual(FootSurface.Outside, Assert.Single(w2.Shots).Surface);
+        var r2 = Assert.Single(w2.Shots);
+        Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Laces), new StrikeChoice(r2.Foot, r2.Surface));
     }
 
     [Fact]
     public void InADribbleTheStrikeWaitsForTheFootChosenAtTheReleaseAndNeverChangesIt()
     {
-        int shots = 0, waited = 0;
+        int shots = 0, waited = 0, byGeometry = 0, handedOver = 0;
         foreach (var (run, aim) in new[] { (0f, 0f), (0f, 60f), (0f, -60f), (0f, 100f), (0f, -100f), (30f, -40f) })
             foreach (float sprint in new[] { 0f, 1f })
                 for (ulong seed = 1; seed <= 6; seed++)
@@ -377,10 +598,16 @@ public class ShotFootTests
                     Foot foot = shot.Foot;
                     var surface = shot.Surface;
                     float aimYaw = shot.AimYaw;
-                    // What the release decided is what a fresh choice for its aim gives when the angle rules a foot out.
+                    // The release decides by the geometry: the foot differs from it only through the contact check, which
+                    // hands the shot over with the type's own surface.
+                    var geometry = w.StrikeGeometry;
                     float open = ShotModel.OpenAngleDeg(Foot.Right, Foot.Right, p.Facing, aimYaw);
-                    if (open > T.Shot.OpenMaxDeg + 5f) Assert.True(foot == Foot.Left, $"{id}: {open:F0} degrees to the right is the left foot's");
-                    if (open < -T.Shot.OpenMaxDeg - 5f) Assert.True(foot == Foot.Right, $"{id}: {open:F0} degrees to the left is the right foot's");
+                    float cap = ShotModel.OutsideCapDeg(p.Sheet, ShotType.Power, T);
+                    if (open > cap + 5f && open < 145f) Assert.True(geometry.Foot == Foot.Left, $"{id}: {open:F0} degrees to the right is the left foot's");
+                    if (open < T.Shot.DeadAheadDeg - 5f && open > -145f) Assert.True(geometry == new StrikeChoice(Foot.Right, FootSurface.Laces), $"{id}: {open:F0} degrees to the right is the right foot's laces");
+                    if (open > T.Shot.DeadAheadDeg + 5f && open < cap - 5f) Assert.True(geometry == new StrikeChoice(Foot.Right, FootSurface.Outside), $"{id}: {open:F0} degrees to the right is the outside of the right foot");
+                    if (foot == geometry.Foot) { Assert.True(surface == geometry.Surface, $"{id}: surface {surface}, by the geometry {geometry.Surface}"); byGeometry++; }
+                    else { Assert.True(surface == FootSurface.Laces, $"{id}: handed over with {surface}"); handedOver++; }
                     for (int i = 0; i < 600 && w.Shots.Count == 0; i++)
                     {
                         Step(w, Dir(run + 150f, sprint: sprint));        // the stick swung away after the release changes nothing
@@ -388,6 +615,8 @@ public class ShotFootTests
                         Assert.True(p.Action is { IsShot: true }, $"{id}: the shot was dropped");
                         Assert.True(shot.Foot == foot && p.StrikeFoot == foot, $"{id}: the foot changed after the release");
                         Assert.True(shot.Surface == surface, $"{id}: the surface changed after the release");
+                        // A choice made again once a pending touch has been played keeps the geometry of the release.
+                        Assert.True(w.StrikeGeometry == geometry, $"{id}: the geometry was decided again after the release");
                         Assert.Equal(aimYaw, shot.AimYaw);
                     }
                     var r = Assert.Single(w.Shots);
@@ -402,6 +631,7 @@ public class ShotFootTests
                     }
                 }
         Assert.Equal(72, shots);
+        Assert.True(byGeometry > 60, $"{byGeometry} strikes on the foot the geometry gave, {handedOver} handed over");
         Assert.True(waited > 30, $"{waited} strikes on the chosen foot's swing");
     }
 

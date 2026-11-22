@@ -111,7 +111,8 @@ public class KeeperBrainTests
         double MeanDepth(bool onLine, float? offLine)
         {
             double sum = 0; int n = 0;
-            for (ulong seed = 1; seed <= 30; seed++)
+            // Enough rounds that 25 reach a strike: in about three in ten the keeper takes the ball before one comes.
+            for (ulong seed = 1; seed <= 60; seed++)
             {
                 var sc = TestData.Scenario("breakaway");
                 sc.KeeperOnLine = onLine; sc.KeeperOffLine = offLine;

@@ -104,9 +104,9 @@ public static class TouchModel
     /// <summary>First contact: fraction of the relative ball velocity kept as unwanted extra velocity, lerp(0.45, 0.05) by first_touch.</summary>
     public static float FirstTouchSpeedKept(PlayerSheet s, Tuning t) => t.Touch.FirstTouchSpeedKept.ForRating(s.FirstTouch);
 
-    /// <summary>Error multiplier for a foot: 1 for the preferred foot, (1 + 0.10 * (5 - weak_foot)) for the other.</summary>
+    /// <summary>Error multiplier for a foot: 1 for the preferred foot, weak_foot_error by the weak_foot rating for the other.</summary>
     public static float FootErrorFactor(PlayerSheet s, Foot foot, Tuning t) =>
-        foot == s.PreferredFoot ? 1f : 1f + t.Touch.WeakFootErrorStep * (5 - s.WeakFoot);
+        foot == s.PreferredFoot ? 1f : MathF.Max(0f, t.Touch.WeakFootError.Evaluate(s.WeakFoot));
 
     /// <summary>
     /// The foot for a ball at <paramref name="ballPosition"/> from a player at <paramref name="feet"/> facing

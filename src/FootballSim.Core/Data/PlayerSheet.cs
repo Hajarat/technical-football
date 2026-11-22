@@ -8,11 +8,11 @@ namespace FootballSim.Core;
 public enum PlayerTrait
 {
     None = 0,
-    /// <summary><c>outside_foot</c>: strikes with the outside of his strong foot toward that foot's side (see ShotModel.ChooseStrike).</summary>
+    /// <summary><c>outside_foot</c>: the outside of his strong foot reaches further toward that foot's side (see ShotModel.OutsideCapDeg).</summary>
     OutsideFoot = 1,
 }
 
-/// <summary>A player's ratings and body. Ratings are integers 1 to 99; <see cref="WeakFoot"/> is 1 to 5 stars.</summary>
+/// <summary>A player's ratings and body. Ratings are integers 1 to 99.</summary>
 public sealed class PlayerSheet
 {
     /// <summary>Names of the integer rating fields, in file order.</summary>
@@ -48,8 +48,11 @@ public sealed class PlayerSheet
     public int ShotPower { get; set; } = RatingDefault;
     public int Curve { get; set; } = RatingDefault;
     public int Composure { get; set; } = RatingDefault;
-    /// <summary>1 to 5 stars.</summary>
-    public int WeakFoot { get; set; } = 3;
+    /// <summary>
+    /// How good the weaker foot is, 1 to 99 like every rating: a strike or touch with it is the wider, slower and flatter the
+    /// lower this is, and costs nothing at 99.
+    /// </summary>
+    public int WeakFoot { get; set; } = RatingDefault;
     public int Reflexes { get; set; } = RatingDefault;
     public int Diving { get; set; } = RatingDefault;
     public int Reach { get; set; } = RatingDefault;
@@ -81,7 +84,7 @@ public sealed class PlayerSheet
     /// <summary>Sets a rating by its file name (clamped to its range). Throws for an unknown name.</summary>
     public void SetRating(string name, int value)
     {
-        int v = name == "weak_foot" ? Math.Clamp(value, 1, 5) : Math.Clamp(value, 1, 99);
+        int v = Math.Clamp(value, 1, 99);
         switch (name)
         {
             case "acceleration": Acceleration = v; break;

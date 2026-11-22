@@ -59,7 +59,7 @@ public sealed class ShotResult
     public float ChargeMissDeg { get; init; }
     /// <summary>The multipliers that make up M, by name: speed, angle, mouth, foot, surface, pressure, power, air, type.</summary>
     public IReadOnlyList<ShotFactor> Factors { get; init; } = Array.Empty<ShotFactor>();
-    /// <summary>The multipliers on the intended launch speed, by name: angle, weak_foot, surface.</summary>
+    /// <summary>The multipliers on the intended launch speed, by name: angle, weak_foot, surface, run_speed.</summary>
     public IReadOnlyList<ShotFactor> SpeedFactors { get; init; } = Array.Empty<ShotFactor>();
     /// <summary>The multiplier on the side spin (below 1 for a weak-foot strike).</summary>
     public float CurlFactor { get; init; } = 1f;
@@ -101,7 +101,7 @@ public sealed class ShotResult
 
 /// <summary>
 /// The shot model: charge, target from the stick, aim assist, the striking foot and surface, the spread and speed multipliers
-/// (body angle, goal mouth, weak foot), the five shot types, the ideal charge, the error draw, launch velocity and spin.
+/// (body angle, goal mouth, weak foot, running speed), the five shot types, the ideal charge, the error draw, launch velocity and spin.
 /// </summary>
 public static class ShotModel
 {
@@ -149,7 +149,7 @@ public static class ShotModel
     /// <summary>
     /// The ball-out angle for a foot, degrees: how far the intended direction <paramref name="yaw"/> is from the facing, positive
     /// toward that foot's own side (a right foot's is the player's right, +Z when he faces +X). Straight behind counts as across
-    /// the body for the strong foot.
+    /// the body for the strong foot. For reports and checks; <see cref="ChooseStrike"/> reads the signed angle itself.
     /// </summary>
     public static float OpenAngleDeg(Foot foot, Foot preferred, float facing, float yaw)
     {
@@ -165,73 +165,95 @@ public static class ShotModel
     public static float ExtraWindupSeconds(float facing, float yaw, Tuning t) =>
         MathF.Max(0f, t.Shot.AngleExtraWindupS.Evaluate(BodyAngleDeg(facing, yaw)));
 
-    /// <summary>How far toward its own side a foot can strike the shot type, degrees.</summary>
-    public static float OpenMaxDeg(ShotType type, Tuning t) =>
-        type is ShotType.Finesse or ShotType.LowFinesse ? t.Shot.FinesseOpenMaxDeg : t.Shot.OpenMaxDeg;
-
-    /// <summary>How far toward the strong foot's side its outside may strike, degrees: by the curve rating, never past the foot's limit.</summary>
-    public static float OutsideMaxDeg(PlayerSheet s, ShotType type, Tuning t) =>
-        MathF.Min(OpenMaxDeg(type, t), t.Shot.OutsideMaxDeg.ForRating(s.Curve));
+    /// <summary>
+    /// The outside cap, degrees: how far toward his strong foot's side a player still strikes with that foot's outside. By the
+    /// curve rating (outside_max_deg), wider by outside_foot_bonus_deg with the outside_foot trait, never past the shot type's
+    /// ceiling (open_max_deg; finesse_open_max_deg for a finesse or low finesse).
+    /// </summary>
+    public static float OutsideCapDeg(PlayerSheet s, ShotType type, Tuning t) =>
+        MathF.Min(type is ShotType.Finesse or ShotType.LowFinesse ? t.Shot.FinesseOpenMaxDeg : t.Shot.OpenMaxDeg,
+            t.Shot.OutsideMaxDeg.ForRating(s.Curve) + (s.Has(PlayerTrait.OutsideFoot) ? t.Shot.OutsideFootBonusDeg : 0f));
 
     /// <summary>
-    /// The striking foot and surface, decided once for a shot (at the release). Each foot is scored and the cheaper one strikes
-    /// (the strong foot on a tie):
-    /// <list type="bullet">
-    /// <item>A foot cannot strike a ball leaving further toward its own side than its limit (<see cref="OpenMaxDeg"/>): beyond
-    /// that only the other foot can; across the body a foot reaches all the way round.</item>
-    /// <item>Opening the hips toward its own side costs, from outside_min_deg up to the limit (w_open).</item>
-    /// <item>With the outside_foot trait the strong foot strikes that band with its outside instead, up to
-    /// <see cref="OutsideMaxDeg"/>, for the flat cost w_outside.</item>
-    /// <item>The ball on the other foot's side of the body costs (w_ball), and so does the weak foot, by its stars (w_weak).</item>
+    /// The point on the goal line (Z) a ball leaving <paramref name="ball"/> along <paramref name="yaw"/> is aimed at, clamped
+    /// like any aim (see <see cref="RawTargetZ"/>).
+    /// </summary>
+    public static float AimZ(Vector3 ball, float yaw, Pitch pitch, Tuning t) =>
+        RawTargetZ(new Vector2(MathF.Cos(yaw), MathF.Sin(yaw)), yaw, ball, pitch, t);
+
+    /// <summary>
+    /// The far-post rule: true for a shot inside its type's distance band (far_post_band, metres from the ball to the goal
+    /// centre) aimed at the half of the pitch across the centre line from the shooter. A shooter within far_post_flank_min_m of
+    /// the centre line is on neither flank, and an aim at the centre is at neither post: the rule is off for both.
+    /// </summary>
+    public static bool FarPostApplies(ShotType type, Vector3 ball, float aimZ, Vector3 position, Pitch pitch, Tuning t)
+    {
+        float d = GoalDistance(ball, pitch);
+        var (min, max) = t.Shot.FarPostBand.For(type);
+        if (min >= 0f && d < min) return false;
+        if (max >= 0f && d > max) return false;
+        if (MathF.Abs(position.Z) < t.Shot.FarPostFlankMinM || MathF.Abs(aimZ) < 1e-3f) return false;
+        return MathF.Sign(aimZ) != MathF.Sign(position.Z);
+    }
+
+    /// <summary>True for a shooter on the flank opposite his strong foot: a right-footer on the left (Z below 0), a left-footer on the right.</summary>
+    public static bool Inverted(Foot strong, Vector3 position) =>
+        strong == Foot.Right ? position.Z < 0f : position.Z > 0f;
+
+    /// <summary>
+    /// The striking foot and surface, decided once for a shot (at the release) from where the ball is to leave: the angle from
+    /// the facing to the intended direction <paramref name="yaw"/>, positive toward the player's right. "Own side" is the
+    /// strong foot's side. The same facing, aim and positions give the same strike every time; nothing here is weighed or drawn.
+    /// <list type="number">
+    /// <item>Straight behind (within half a degree of 180): the strong foot, the shot type's own surface.</item>
+    /// <item>Wider than foot_by_side_deg either way: the foot on the side the ball leaves, the type's own surface.</item>
+    /// <item>The far-post rule (<see cref="FarPostApplies"/>) for an inverted shooter (<see cref="Inverted"/>) aiming toward his
+    /// own side within the cap (<see cref="OutsideCapDeg"/>): the strong foot, the type's own surface.</item>
+    /// <item>Otherwise: across the body or dead ahead (within dead_ahead_deg) the strong foot with the type's own surface;
+    /// toward his own side up to the cap the outside of the strong foot; beyond the cap the weak foot, the type's own surface.</item>
     /// <item>In a dribble, <paramref name="rightTick"/> and <paramref name="leftTick"/> are each foot's earliest strike tick
-    /// (negative: that foot has none): waiting longer for a foot than for the other costs (w_wait), a foot more than
-    /// foot_wait_max_s later is passed over while the other can strike, and a foot with no contact is taken only when neither
-    /// has one. Both zero (the default): no timing, as for a ball at the feet.</item>
+    /// (negative: that foot has none). A chosen foot with no contact while the other has one hands the shot to the other foot,
+    /// with the type's own surface (see <see cref="WithContact"/>). Both zero (the default): no timing, as for a ball at the
+    /// feet.</item>
     /// </list>
     /// </summary>
     public static StrikeChoice ChooseStrike(PlayerSheet sheet, Vector3 position, float facing, Vector3 ball, float yaw, ShotType type,
-        Tuning t, int rightTick = 0, int leftTick = 0)
+        Pitch pitch, Tuning t, int rightTick = 0, int leftTick = 0) =>
+        WithContact(ChooseByGeometry(sheet, position, facing, ball, yaw, type, pitch, t), type, rightTick, leftTick);
+
+    // An angle on a limit counts as inside it (at the cap: still the outside; at foot_by_side_deg: not yet wide). Angles reach
+    // here through radians, so "on" is within this of the limit, degrees.
+    const float OnTheLimitDeg = 1e-3f;
+
+    /// <summary>The foot and surface by the geometry alone: <see cref="ChooseStrike"/> without its contact check.</summary>
+    public static StrikeChoice ChooseByGeometry(PlayerSheet sheet, Vector3 position, float facing, Vector3 ball, float yaw, ShotType type,
+        Pitch pitch, Tuning t)
     {
         var k = t.Shot;
         Foot strong = sheet.PreferredFoot, weak = strong == Foot.Right ? Foot.Left : Foot.Right;
-        float costStrong = Cost(strong, out var surfStrong), costWeak = Cost(weak, out var surfWeak);
-        return costWeak < costStrong ? new StrikeChoice(weak, surfWeak) : new StrikeChoice(strong, surfStrong);
-
-        float Cost(Foot f, out FootSurface surface)
-        {
-            surface = SurfaceFor(type);
-            float s = OpenAngleDeg(f, strong, facing, yaw);
-            float max = OpenMaxDeg(type, t), free = MathF.Min(k.OutsideMinDeg, max);
-            float cost = k.WOpen * (max > free ? Math.Clamp((s - free) / (max - free), 0f, 1f) : s > free ? 1f : 0f);
-            if (f == strong && sheet.Has(PlayerTrait.OutsideFoot) && s > free && s <= OutsideMaxDeg(sheet, type, t))
-            {
-                cost = k.WOutside;
-                surface = FootSurface.Outside;
-            }
-            var right = new Vector2(-MathF.Sin(facing), MathF.Cos(facing));
-            float lateral = Vector2.Dot(new Vector2(ball.X - position.X, ball.Z - position.Z), right);
-            float otherSide = f == Foot.Right ? -lateral : lateral;
-            cost += k.WBall * Math.Clamp((otherSide - k.FootBallFreeM) / MathF.Max(1e-3f, k.FootBallSpanM), 0f, 1f);
-            if (f == weak) cost += k.WWeak * (5 - sheet.WeakFoot) / 4f;
-            if (s > max) cost += CannotOpen;
-            if (rightTick != 0 || leftTick != 0)
-            {
-                int mine = f == Foot.Right ? rightTick : leftTick, other = f == Foot.Right ? leftTick : rightTick;
-                if (mine < 0) cost += NoContact;
-                else if (other >= 0 && mine > other)
-                {
-                    float wait = (mine - other) * t.Dt;
-                    cost += k.WWait * wait / MathF.Max(1e-3f, k.FootWaitMaxS);
-                    if (wait > k.FootWaitMaxS) cost += TooLate;
-                }
-            }
-            return cost;
-        }
+        FootSurface normal = SurfaceFor(type);
+        float signed = Movement.WrapAngle(yaw - facing) * 180f / MathF.PI, theta = MathF.Abs(signed);
+        if (theta > 179.5f) return new StrikeChoice(strong, normal);
+        if (theta > k.FootBySideDeg + OnTheLimitDeg) return new StrikeChoice(signed > 0f ? Foot.Right : Foot.Left, normal);
+        bool ownSide = (strong == Foot.Right ? signed > 0f : signed < 0f) && theta > k.DeadAheadDeg + OnTheLimitDeg;
+        if (!ownSide) return new StrikeChoice(strong, normal);
+        if (theta > OutsideCapDeg(sheet, type, t) + OnTheLimitDeg) return new StrikeChoice(weak, normal);
+        bool farPost = Inverted(strong, position) && FarPostApplies(type, ball, AimZ(ball, yaw, pitch, t), position, pitch, t);
+        return new StrikeChoice(strong, farPost ? normal : FootSurface.Outside);
     }
 
-    // What rules a foot out, as costs above any the weights add up to: a foot with no contact at all is the last resort, then a
-    // foot that cannot open that far, then a foot whose swing comes too late.
-    const float NoContact = 1000f, CannotOpen = 100f, TooLate = 10f;
+    /// <summary>
+    /// The contact check on a choice made by the geometry: with either tick set (not both zero), a chosen foot with no contact
+    /// (a negative tick) while the other has one gives way to the other foot, struck with the type's own surface. Stride timing
+    /// never changes the foot otherwise.
+    /// </summary>
+    public static StrikeChoice WithContact(StrikeChoice choice, ShotType type, int rightTick, int leftTick)
+    {
+        if (rightTick == 0 && leftTick == 0) return choice;
+        int mine = choice.Foot == Foot.Right ? rightTick : leftTick, other = choice.Foot == Foot.Right ? leftTick : rightTick;
+        if (mine >= 0 || other < 0) return choice;
+        return new StrikeChoice(choice.Foot == Foot.Right ? Foot.Left : Foot.Right, SurfaceFor(type));
+    }
 
     /// <summary>
     /// How open the goal mouth is from the ball, 0 to 1: the angle between the posts as a share of the angle they would make
@@ -331,7 +353,7 @@ public static class ShotModel
         float mAngle = MathF.Max(0f, k.AngleAccuracy.Evaluate(BodyAngleDeg(p.Facing, shotYaw)));
         float mMouth = MathF.Max(0f, k.GoalMouthAccuracy.Evaluate(GoalMouthOpen(c.BallPosition, pitch)));
 
-        float mFoot = strike.Foot == p.Sheet.PreferredFoot ? 1f : 1f + k.WeakFootStep * (5 - p.Sheet.WeakFoot);
+        float mFoot = strike.Foot == p.Sheet.PreferredFoot ? 1f : MathF.Max(0f, k.WeakFootAccuracy.Evaluate(p.Sheet.WeakFoot));
         float mSurface = strike.Surface == FootSurface.Outside ? k.OutsideAccuracy : 1f;
 
         float mPressure = 1f;
@@ -368,7 +390,8 @@ public static class ShotModel
 
     /// <summary>
     /// The multipliers on the intended launch speed, each by name: angle (the body angle through angle_power), weak_foot (a
-    /// weak-foot strike, by its stars) and surface (the outside of the foot).
+    /// weak-foot strike, by the weak_foot rating), surface (the outside of the foot) and run_speed (his running speed as a share
+    /// of his top speed, through run_speed_power).
     /// </summary>
     public static ShotFactor[] SpeedMultipliers(PlayerState p, StrikeChoice strike, float shotYaw, Tuning t)
     {
@@ -376,13 +399,18 @@ public static class ShotModel
         float angle = MathF.Max(0f, k.AnglePower.Evaluate(BodyAngleDeg(p.Facing, shotYaw)));
         float weak = strike.Foot == p.Sheet.PreferredFoot ? 1f : MathF.Max(0f, k.WeakFootPower.Evaluate(p.Sheet.WeakFoot));
         float surface = strike.Surface == FootSurface.Outside ? k.OutsideSpeed : 1f;
-        return new[] { new ShotFactor("angle", angle), new ShotFactor("weak_foot", weak), new ShotFactor("surface", surface) };
+        float run = MathF.Max(0f, k.RunSpeedPower.Evaluate(Math.Clamp(p.Speed / Movement.TopSpeed(p.Sheet, t), 0f, 1f)));
+        return new[]
+        {
+            new ShotFactor("angle", angle), new ShotFactor("weak_foot", weak), new ShotFactor("surface", surface),
+            new ShotFactor("run_speed", run),
+        };
     }
 
     /// <summary>The strike a context asks for: its own foot and surface when decided, else chosen here without timing.</summary>
-    static StrikeChoice StrikeFor(in ShotContext c, float yaw, Tuning t) => c.Foot is Foot f
+    static StrikeChoice StrikeFor(in ShotContext c, float yaw, Pitch pitch, Tuning t) => c.Foot is Foot f
         ? new StrikeChoice(f, c.Surface ?? SurfaceFor(c.Type))
-        : ChooseStrike(c.Shooter.Sheet, c.Shooter.Position, c.Shooter.Facing, c.BallPosition, yaw, c.Type, t);
+        : ChooseStrike(c.Shooter.Sheet, c.Shooter.Position, c.Shooter.Facing, c.BallPosition, yaw, c.Type, pitch, t);
 
     /// <summary>
     /// Computes a strike: target, foot, multipliers, error draw, launch velocity and spin. All randomness comes from
@@ -397,7 +425,7 @@ public static class ShotModel
         float yaw0 = IntendedYaw(c, pitch, t, out float targetZ);
         float dx = pitch.GoalLineX - ball.X;
 
-        var strike = StrikeFor(c, yaw0, t);
+        var strike = StrikeFor(c, yaw0, pitch, t);
         Foot foot = strike.Foot;
         float distance = new Vector2(pitch.GoalLineX - ball.X, ball.Z).Length();
         var factors = Multipliers(c, strike, yaw0, pitch, t);
@@ -521,7 +549,7 @@ public static class ShotModel
         float yaw0 = IntendedYaw(c, pitch, t, out float targetZ);
         float distance = new Vector2(pitch.GoalLineX - c.BallPosition.X, c.BallPosition.Z).Length();
         float m = 1f;
-        foreach (var f in Multipliers(c, StrikeFor(c, yaw0, t), yaw0, pitch, t)) m *= f.Value;
+        foreach (var f in Multipliers(c, StrikeFor(c, yaw0, pitch, t), yaw0, pitch, t)) m *= f.Value;
         float sigmaH = SigmaH(SkillR01(c.Shooter.Sheet, distance, t), m, t);
         return new ShotPreview(c.BallPosition, yaw0, targetZ, sigmaH);
     }

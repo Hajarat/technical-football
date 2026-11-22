@@ -91,9 +91,22 @@ public class ShotClipTests
             Assert.Equal(bin, p.Clip.BinDeg);
         }
         // beyond the strong foot's own side there is no bin at all: the nearest one (45 open)
-        var far = lib.Pick("power", true, 1, 120f)!.Value;
+        var far = lib.Pick("power", true, 1, 100f)!.Value;
         Assert.True(far.Fallback);
         Assert.Equal(45f, far.Clip.BinDeg);
+        // a wide shot, struck behind him by the foot on the side the ball leaves: the bin behind him holds it from that side too
+        foreach (int foot in new[] { 0, 1 })
+            foreach (bool run in new[] { false, true })
+                foreach (float a in new[] { 160f, 170f, 179f, 180f })
+                {
+                    var wide = lib.Pick("power", run, foot, a)!.Value;
+                    Assert.False(wide.Fallback);
+                    Assert.Equal(-180f, wide.Clip.BinDeg);
+                }
+        // just short of that bin it is still the nearest one
+        var nearly = lib.Pick("power", true, 1, 152f)!.Value;
+        Assert.True(nearly.Fallback);
+        Assert.Equal(-180f, nearly.Clip.BinDeg);
     }
 
     [Fact]

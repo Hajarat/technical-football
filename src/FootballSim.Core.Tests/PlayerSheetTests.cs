@@ -7,7 +7,7 @@ public class PlayerSheetTests
 {
     const string Full = """
     { "id": "x", "name": "X", "acceleration": 60, "sprint_speed": 61, "agility": 62, "balance": 63, "dribbling": 64, "ball_control": 65,
-      "first_touch": 66, "finishing": 67, "long_shots": 68, "shot_power": 69, "curve": 70, "composure": 71, "weak_foot": 4,
+      "first_touch": 66, "finishing": 67, "long_shots": 68, "shot_power": 69, "curve": 70, "composure": 71, "weak_foot": 64,
       "reflexes": 72, "diving": 73, "reach": 74, "positioning": 75, "handling": 76, "rushing_out": 77,
       "height_m": 1.85, "weight_kg": 80, "preferred_foot": "left" }
     """;
@@ -19,7 +19,7 @@ public class PlayerSheetTests
         Assert.True(r.Ok);
         Assert.Empty(r.Warnings);
         var s = r.Value!;
-        Assert.Equal(67, s.Finishing); Assert.Equal(77, s.RushingOut); Assert.Equal(4, s.WeakFoot);
+        Assert.Equal(67, s.Finishing); Assert.Equal(77, s.RushingOut); Assert.Equal(64, s.WeakFoot);
         Assert.Equal(1.85f, s.HeightM); Assert.Equal(80f, s.WeightKg); Assert.Equal(Foot.Left, s.PreferredFoot);
     }
 
@@ -58,10 +58,10 @@ public class PlayerSheetTests
     [Fact]
     public void OutOfRangeValuesAreClamped()
     {
-        var r = DataLoader.ParsePlayer("""{ "finishing": 150, "diving": 0, "weak_foot": 9, "height_m": 3.0, "weight_kg": 10, "reach": -4 }""", "bad.json");
+        var r = DataLoader.ParsePlayer("""{ "finishing": 150, "diving": 0, "weak_foot": 150, "height_m": 3.0, "weight_kg": 10, "reach": -4 }""", "bad.json");
         Assert.True(r.Ok);
         var s = r.Value!;
-        Assert.Equal(99, s.Finishing); Assert.Equal(1, s.Diving); Assert.Equal(5, s.WeakFoot); Assert.Equal(1, s.Reach);
+        Assert.Equal(99, s.Finishing); Assert.Equal(1, s.Diving); Assert.Equal(99, s.WeakFoot); Assert.Equal(1, s.Reach);
         Assert.Equal(2.05f, s.HeightM); Assert.Equal(55f, s.WeightKg);
         foreach (var f in new[] { "finishing", "diving", "weak_foot", "height_m", "weight_kg", "reach" })
             Assert.Contains(r.Warnings, w => w.Field == f && w.File == "bad.json");
@@ -135,6 +135,49 @@ public class PlayerSheetTests
         Assert.Throws<ArgumentException>(() => s.SetRating("nonsense", 1));
         var c = s.Clone(); c.SetRating("finishing", 10);
         Assert.Equal(99, s.Finishing);
+    }
+
+    [Fact]
+    public void EveryShippedPlayerHasAWeakFootRatingOnTheOneToNinetyNineScale()
+    {
+        // weak_foot was once one to five stars: a file left unconverted would load as a near-useless weak foot.
+        var files = Directory.GetFiles(Path.Combine(TestData.DataDir, "players"), "*.json");
+        Assert.NotEmpty(files);
+        foreach (var file in files)
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(file));
+            Assert.True(doc.RootElement.TryGetProperty("weak_foot", out var wf), $"{file}: no weak_foot");
+            Assert.True(wf.GetInt32() > 5 && wf.GetInt32() <= 99, $"{file}: weak_foot {wf.GetInt32()} is not on the 1-99 scale");
+            var r = DataLoader.LoadPlayer(file);
+            Assert.True(r.Ok, r.Error);
+            Assert.DoesNotContain(r.Warnings, w => w.Field == "weak_foot");
+            Assert.Equal(wf.GetInt32(), r.Value!.WeakFoot);
+        }
+        Assert.Equal(50, new PlayerSheet().WeakFoot);
+        Assert.Equal(50, DataLoader.ParsePlayer("""{ "id": "none" }""", "none.json").Value!.WeakFoot);
+    }
+
+    [Fact]
+    public void TheFootRuleTuningIsValidatedOnLoad()
+    {
+        foreach (var (json, field) in new[]
+        {
+            ("""{ "shot": { "weak_foot_accuracy": [] } }""", "shot.weak_foot_accuracy"),
+            ("""{ "shot": { "run_speed_power": [[1, 1], [0, 1]] } }""", "shot.run_speed_power"),
+            ("""{ "touch": { "weak_foot_error": [] } }""", "touch.weak_foot_error"),
+            ("""{ "shot": { "far_post_band": { "chip": [1] } } }""", "shot.far_post_band: chip"),
+            ("""{ "shot": { "far_post_band": { "power": [30, 20] } } }""", "shot.far_post_band: power"),
+        })
+        {
+            var r = DataLoader.ParseTuning(json, "t.json");
+            Assert.NotNull(r.Error);
+            Assert.Contains(field, r.Error);
+        }
+        var ok = DataLoader.ParseTuning("""{ "shot": { "far_post_band": { "chip": [1, 4] }, "foot_by_side_deg": 140 } }""", "t.json");
+        Assert.True(ok.Ok, ok.Error);
+        Assert.Equal((1f, 4f), ok.Value!.Shot.FarPostBand.For(ShotType.Chip));
+        Assert.Equal((-1f, 50f), ok.Value.Shot.FarPostBand.For(ShotType.Power));
+        Assert.Equal(140f, ok.Value.Shot.FootBySideDeg);
     }
 
     // ---- tuning and scenario files ----

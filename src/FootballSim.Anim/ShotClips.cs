@@ -123,16 +123,26 @@ public sealed class ShotClipLibrary
     /// <summary>
     /// The clip of <paramref name="kind"/> for the entry and striking foot whose bin holds <paramref name="angleDeg"/> (the ball-out
     /// angle against his facing, positive toward the striking foot's own side). The captured kicks count as the power kick's
-    /// 0-degree bin. When the kind has no clip for that angle (or none at all), the power kick's bin nearest the angle stands in
+    /// 0-degree bin. A bin that reaches straight behind (-180) holds the same angles from the other side too: a ball leaving
+    /// 170 degrees toward the foot's own side is the kick struck behind him, as one 170 degrees across is. When the kind has no
+    /// clip for that angle (or none at all), the power kick's bin nearest the angle stands in
     /// (<see cref="ShotPick.Fallback"/>), then the other entry's; null only when the foot has no clip at all.
     /// </summary>
     public ShotPick? Pick(string kind, bool run, int foot, float angleDeg)
     {
         angleDeg = Math.Clamp(angleDeg, -180f, 180f);
+        // How far the angle is outside a clip's bin, degrees (0 inside), the bin behind him counted from either side.
+        float Outside(ShotClip c)
+        {
+            float d = angleDeg < c.BinLo ? c.BinLo - angleDeg : angleDeg > c.BinHi ? angleDeg - c.BinHi : 0f;
+            if (c.BinLo > -180f) return d;
+            float m = -angleDeg;
+            return MathF.Min(d, m < c.BinLo ? c.BinLo - m : m > c.BinHi ? m - c.BinHi : 0f);
+        }
         ShotClip? In(string k, bool r)
         {
             foreach (var c in Clips)
-                if (c.Foot == foot && c.Run == r && Is(c, k) && angleDeg >= c.BinLo && angleDeg <= c.BinHi) return c;
+                if (c.Foot == foot && c.Run == r && Is(c, k) && Outside(c) <= 0f) return c;
             return null;
         }
         ShotClip? Nearest(bool r)
@@ -142,7 +152,7 @@ public sealed class ShotClipLibrary
             foreach (var c in Clips)
             {
                 if (c.Foot != foot || c.Run != r || !Is(c, Power)) continue;
-                float d = angleDeg < c.BinLo ? c.BinLo - angleDeg : angleDeg > c.BinHi ? angleDeg - c.BinHi : 0f;
+                float d = Outside(c);
                 if (d < bestD) { bestD = d; best = c; }
             }
             return best;

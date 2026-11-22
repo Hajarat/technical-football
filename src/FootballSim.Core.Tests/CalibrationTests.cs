@@ -234,14 +234,17 @@ public class CalibrationTests
     /// strike taking the place of the next touch (2026-11-19: on whichever foot is swinging, about half of the run-in strikes
     /// on the weak foot, and the keeper reading the strike estimate from the press) halfway run measured 24.2%; its band is five
     /// points either side. With a weak-foot strike losing speed by its stars (2026-11-22: weak_foot_power, on about three
-    /// quarters of halfway run's strikes) it measured 18.4% (21.7% without that term); its band was moved to 16-26.
+    /// quarters of halfway run's strikes) it measured 18.4% (21.7% without that term); its band was moved to 16-26. With the
+    /// striking foot decided by the geometry alone (2026-11-22: the stride no longer picks the foot, so a run-in strike waits
+    /// for the strong foot, 0.71 s from the press against 0.50 s, about a metre closer to a keeper who has come out further)
+    /// halfway run measured 7.6%, most of the rest parried; its band is five points either side. The other bands held.
     /// </summary>
     [Theory]
     [InlineData("penalty", 72.0, 80.0)]
     [InlineData("edge_of_box", 6.0, 14.0)]
     [InlineData("tight_angle", 2.0, 8.0)]
     [InlineData("breakaway", 7.0, 17.0)]
-    [InlineData("halfway_run", 16.0, 26.0)]
+    [InlineData("halfway_run", 3.0, 13.0)]
     [InlineData("angled_run", 27.0, 37.0)]
     [InlineData("keeper_rush", 35.0, 45.0)]
     public void ScoringRateStaysInItsBand(string scenario, double lo, double hi)

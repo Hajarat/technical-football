@@ -57,6 +57,7 @@ static class ShotReplays
         float a = c.Heading * MathF.PI / 180f;
         ShotResult? shot = null;
         float angle = float.NaN;
+        bool farPost = false;
         int after = 0;
         for (int tick = 1; tick <= press + 6 * tuning.TickRate && w.State != RoundState.Report && after < tuning.TickRate; tick++)
         {
@@ -66,12 +67,14 @@ static class ShotReplays
             if (tick <= press) { it.MoveX = MathF.Cos(a); it.MoveZ = MathF.Sin(a); }
             else if (tick <= press + hold + 1) { it.MoveX = toGoal.X; it.MoveZ = toGoal.Y; it.ShootHeld = tick <= press + hold; }
             float facing = p.Facing;
+            Vector3 ball = w.Ball.Position, feet = p.Position;
             buf[0] = it;
             w.Step(buf);
             if (shot == null && w.Shots.Count > 0)
             {
                 shot = w.Shots[0];
                 angle = ShotModel.OpenAngleDeg(shot.Foot, attacker.PreferredFoot, facing, shot.IntendedYaw);
+                farPost = ShotModel.FarPostApplies(shot.Type, ball, ShotModel.AimZ(ball, shot.IntendedYaw, w.Pitch, tuning), feet, w.Pitch, tuning);
             }
             if (shot != null) after++;
         }
@@ -80,7 +83,7 @@ static class ShotReplays
         if (strong != c.StrongFoot || shot.Surface != c.Surface || angle < c.Lo || angle > c.Hi) return false;
         rec.Replay.Save(path);
         Console.WriteLine($"wrote {path} ({rec.Replay.TickCount} ticks): pressed at tick {press + 1}, struck at {shot.Tick} with the {(strong ? "strong" : "weak")} foot's {shot.Surface.ToString().ToLowerInvariant()}, " +
-                          $"{shot.Type}, ball-out angle {angle:F0} degrees, body angle {shot.BodyAngleDeg:F0}, speed {shot.Speed:F1} m/s");
+                          $"{shot.Type}, ball-out angle {angle:F0} degrees, body angle {shot.BodyAngleDeg:F0}, far_post {(farPost ? "yes" : "no")}, run_speed {shot.SpeedFactor("run_speed"):F3}, speed {shot.Speed:F1} m/s");
         return true;
     }
 }

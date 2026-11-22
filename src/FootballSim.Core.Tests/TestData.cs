@@ -41,7 +41,7 @@ static class TestData
     public static PlayerSheet Sheet(int rating = 50, float height = 1.80f, float weight = 75f)
     {
         var s = new PlayerSheet { Id = "t", Name = "t", HeightM = height, WeightKg = weight };
-        foreach (var n in PlayerSheet.RatingNames) s.SetRating(n, n == "weak_foot" ? 3 : rating);
+        foreach (var n in PlayerSheet.RatingNames) s.SetRating(n, n == "weak_foot" ? 50 : rating);
         return s;
     }
 

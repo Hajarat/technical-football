@@ -4,7 +4,7 @@
   "attacker_id": "striker_a",
   "keeper_id": "the_wall",
   "scenario_id": "edge_of_box",
-  "tuning_hash": "77dc5e0f77d68c4c",
+  "tuning_hash": "3fb1be6fee41185f",
   "players_per_tick": 2,
   "intents": [
     {

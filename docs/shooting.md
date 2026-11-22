@@ -12,7 +12,7 @@ before the strike (the gamepad's low shot) counts as driven held.
 | Low finesse | Finesse curl kept low (1-4 degrees) | Inside |
 | Chip | High loft with backspin | Inside |
 
-Any of them is struck with the outside of the foot instead when the foot chooser picks it (below): 15% wider spread, 8% slower
+Any of them is struck with the outside of the foot instead when the foot rules give it (below): 15% wider spread, 8% slower
 (`outside_accuracy`, `outside_speed`), and a finesse then curls the other way.
 
 - Charge fills 0 to 1 in 0.3 s while shoot is held and is frozen at the release (or at 1). The strike comes no sooner than
@@ -31,23 +31,36 @@ Any of them is struck with the outside of the foot instead when the foot chooser
   The soft touch leaves the ball rolling along the shooter's velocity.
 - The striking foot and the part of it are chosen once (`ShotModel.ChooseStrike`): at the press for the aim the stick has
   then, so the strike is forecast on that foot from the press, and again at the release for the aim it locks. From the
-  release the foot does not change. (One exception, before the strike is committed: a foot chosen while a dribble touch was
-  still to be played, or with the ball held at the feet and then lost from them, is chosen once more when each foot's next
-  contact is known.) Each foot is scored on the ball-out angle, the intended direction against where he faces, counted
-  toward that foot's own side, and the cheaper foot strikes, the strong foot on a tie:
-  - A foot cannot strike a ball leaving more than `open_max_deg` (67.5 degrees; `finesse_open_max_deg`, 79, for a finesse or
-    low finesse) toward its own side: beyond that only the other foot can. Across the body a foot reaches all the way round
-    to 180 degrees. So for a right-footed player a shot more than 67.5 degrees to his right is the left foot's, and one more
-    than 67.5 degrees to his left is the right foot's.
-  - In between both feet are scored: opening the hips toward the foot's own side from `outside_min_deg` (22.5) up to its
-    limit (`w_open`), the ball lying on the other foot's side of the body (`w_ball`, from `foot_ball_free_m` over
-    `foot_ball_span_m`), the weak foot by its stars (`w_weak` at one star, nothing at five), and in a dribble the wait for
-    that foot's swing beyond the other's (`w_wait` per `foot_wait_max_s`; a foot more than `foot_wait_max_s` later is not
-    waited for while the other can strike, and a foot with no contact at all gives way to the other). With a three-star weak
-    foot the weak foot takes over at about 43 degrees open, with a one-star at about 63.
-  - A player with the `outside_foot` trait strikes the band from `outside_min_deg` to `outside_max_deg` (by the `curve`
-    rating: 30 degrees at 1, 67.5 at 99) toward his strong foot's side with the outside of that foot, for the flat cost
-    `w_outside`. Nobody else ever uses the outside for a shot.
+  release the foot does not change, with one exception below. The choice is geometry: the angle from where he faces to the
+  intended direction, positive toward his right, and where he and the ball are. The same facing, aim and positions give the
+  same foot and surface every time; nothing is weighed, and the weak foot's rating has no say. "Own side" is his strong
+  foot's side, and the type's own surface is the one in the table above. In order:
+  1. Straight behind (within half a degree of 180): the strong foot, the type's own surface.
+  2. A wide shot, more than `foot_by_side_deg` (150 degrees) either way: the foot on the side the ball leaves, the type's
+     own surface, whatever his preference.
+  3. Across his body, or dead ahead (within `dead_ahead_deg`, 22.5 degrees, toward his own side): the strong foot, the
+     type's own surface.
+  4. Toward his own side up to his outside cap: the outside of the strong foot. Beyond the cap: the weak foot, the type's
+     own surface.
+  - The outside cap (`ShotModel.OutsideCapDeg`) is `outside_max_deg` by the `curve` rating (30 degrees at 1, 67.5 at 99; 57
+    at 72), wider by `outside_foot_bonus_deg` (12) with the `outside_foot` trait, never past the type's ceiling
+    (`open_max_deg`, 67.5; `finesse_open_max_deg`, 79, for a finesse or low finesse). Everyone has one.
+  - The far-post rule changes one case of step 4: an inverted shooter (a right-footer on the left flank, Z below 0, or a
+    left-footer on the right) aiming at the far half of the goal line toward his own side within his cap keeps the type's
+    own surface instead of the outside, the cut-in curl with the instep. It holds inside the type's distance band from the
+    ball to the goal centre (`far_post_band`: power and driven up to 50 m, a chip within 2.5 m, finesse and low finesse at
+    any distance; -1 means no limit). The aimed point is the intended direction cast from the ball to the goal line,
+    clamped to `max_target_z`; it must lie across the centre line (Z = 0) from the shooter. A shooter within
+    `far_post_flank_min_m` (0.3 m) of the centre line is on neither flank and an aim at the centre is at neither post: the
+    rule is off for both.
+  - An angle on a limit counts as inside it: at the cap it is still the outside, at 150 degrees it is not yet wide.
+  - The contact check, in a dribble only: when the chosen foot has no strike contact at all and the other has one, the
+    other foot strikes, with the type's own surface. The stride never chooses the foot otherwise: a strike waits for the
+    chosen foot however much sooner the other would swing.
+  - The exception: a foot chosen while a dribble touch was still to be played, or with the ball held at the feet and then
+    lost from them, goes through the contact check once more when each foot's next contact is known, unless the strike is
+    already committed. After the release the geometry decided there stands (`World.StrikeGeometry`), so this can change the
+    foot only through the contact check; while shoot is still held the choice is a forecast and is made afresh.
 - The angle a shot is struck at costs it. The body angle (the intended direction against where he faces, 0 to 180 degrees)
   multiplies the spread (`angle_accuracy`: free to 30 degrees, 1.5 at 60, 2.4 at 90, 3.4 at 120, 4.5 with his back
   to the shot), scales the launch speed down (`angle_power`: free to 45 degrees, 0.82 at 90, 0.55 at 180) and, as it stands
@@ -56,8 +69,12 @@ Any of them is struck with the outside of the foot instead when the foot chooser
 - A closed goal mouth costs accuracy too (`goal_mouth_accuracy`): by the angle between the posts seen from the ball, as a
   share of the angle they would make seen square on from the same distance (1 in front of goal at any distance, about 0.56
   in the tight-angle scenario, toward 0 along the goal line; on or behind the goal line it counts as the tightest).
-- A weak-foot strike has a wider spread (`weak_foot_step` per star below five), less speed (`weak_foot_power`: 0.85 at one
-  star) and less curl (`weak_foot_curl`: 0.6 at one star).
+- A weak-foot strike has a wider spread, less speed and less curl, each a curve over the `weak_foot` rating (1 to 99, like
+  every rating; 50 when a player file leaves it out): `weak_foot_accuracy` multiplies the spread (1.72 at 1, 1.36 at 50, 1 at
+  99), `weak_foot_power` the launch speed (0.85 at 1) and `weak_foot_curl` the side spin (0.6 at 1). A weak-foot dribble
+  touch is less accurate the same way (`touch.weak_foot_error`: 1.4 at 1).
+- Running speed scales the launch speed (`run_speed_power` over speed / top speed: 0.97 standing, 1 at half speed, 1.03
+  flat out), the last of the speed factors: angle, weak_foot, surface, run_speed.
 - The attacker publishes `StrikeEta` and `StrikeFoot` from the press on, as the best estimate: the later of the earliest
   strike tick (while shoot is held, as if it were let go on the next tick with the aim as it is) and the controller's
   forecast contact on the chosen foot, then the committed strike; once published it may move later (by whole steps, while
@@ -83,5 +100,6 @@ Any of them is struck with the outside of the foot instead when the foot chooser
   0.12, drawn from its own generator seeded from the round's seed.
 - `--probe shots --scenario <id>` prints, for the scripted attacker's shots, how they ended, the share on target (the ball as
   struck, flying free of the keeper, goes in), the launch speed, the time from the press to the strike, the body angle, the
-  foot and surface, and every spread and speed factor by name.
+  foot and surface, how often the far-post rule applied (`far_post`), the `run_speed` factor, and every spread and speed
+  factor by name.
 - Every number is in the `shot` section of `data/tuning/default.json`.

@@ -65,7 +65,8 @@ the rest, so the kick itself is the same kick along the ball's flight; the tool 
 
 The clip is picked (`ShotClipLibrary.Pick`, `src/FootballSim.Anim/ShotClips.cs`) by the kind of kick (the outside of the foot when the core
 chose it, else a chip, a finesse for finesse and low finesse, a power kick for power and driven), the entry, the striking foot and the bin
-holding the ball-out angle: the core's aim (`BallAction.AimYaw`) against his facing. A kind with no clip for that angle is drawn with the
+holding the ball-out angle: the core's aim (`BallAction.AimYaw`) against his facing. The bin behind him (180 across) holds the same angles
+from the foot's own side too, so a wide shot struck by the foot on the side the ball leaves is drawn with it. A kind with no clip for that angle is drawn with the
 power kick's nearest bin and logged `SHOT_CLIP fallback`. While shoot is held the aim follows the stick, so the pick is made again when the
 kind, foot or bin changes, and once more on the release, which fixes them; the core does not change the foot after the release, and if it
 ever does `SHOT_CLIP foot_changed` is logged as an error and the shot drawn again on that foot. The standing and the running clip of the

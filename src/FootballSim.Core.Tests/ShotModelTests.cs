@@ -103,10 +103,11 @@ public class ShotModelTests
         var s = TestData.Sheet(60);
         s.PreferredFoot = Foot.Right; s.WeakFoot = 1;
         var p = TestData.Outfield(s, 41f, 0f, 0f);
-        // A one-star weak foot is never the cheaper foot for a ball in front of him, whichever side it is on.
+        // A ball in front of him aimed straight on is the strong foot's, whichever side of him it lies (see ShotFootTests for
+        // the whole choice).
         Assert.Equal(Foot.Right, Shot(Ctx(p, new Vector3(41.5f, 0.11f, 0.4f))).Foot);
         Assert.Equal(Foot.Right, Shot(Ctx(p, new Vector3(41.5f, 0.11f, -0.4f))).Foot);
-        // Struck with it all the same (the foot decided beforehand): the weak-foot penalty 1 + 0.18 * (5 - 1).
+        // Struck with the weak foot all the same (the foot decided beforehand): weak_foot_accuracy at a rating of 1.
         var c = Ctx(p, new Vector3(41.5f, 0.11f, -0.3f));
         c.Foot = Foot.Left;
         var left = Shot(c);
@@ -116,13 +117,11 @@ public class ShotModelTests
         var right = Shot(c);
         Assert.Equal(Foot.Right, right.Foot);
         Assert.Equal(1f, right.Factor("foot"), 3);
-
-        // Three stars: a ball well to the other side goes to the other foot (see ShotFootTests for the whole choice).
-        s.WeakFoot = 3;
-        Assert.Equal(Foot.Left, Shot(Ctx(p, new Vector3(41.5f, 0.11f, -0.4f))).Foot);
-        s.PreferredFoot = Foot.Left;
-        Assert.Equal(Foot.Right, Shot(Ctx(p, new Vector3(41.5f, 0.11f, 0.4f))).Foot);
-        Assert.Equal(Foot.Left, Shot(Ctx(p, new Vector3(41.5f, 0.11f, 0.1f))).Foot);
+        s.WeakFoot = 50;
+        c.Foot = Foot.Left;
+        Assert.Equal(1.36f, Shot(c).Factor("foot"), 3);
+        s.WeakFoot = 99;
+        Assert.Equal(1f, Shot(c).Factor("foot"), 3);
     }
 
     [Fact]
@@ -193,14 +192,14 @@ public class ShotModelTests
             Assert.InRange(ShotModel.ElevationDeg(ShotType.LowFinesse, c, T), 1f, 4f);
         }
         // Launch speed averages to the intended speed (noise is 4%) for every type but the chip, at the ideal charge (a
-        // chip's speed also carries its charge miss).
+        // chip's speed also carries its charge miss), times run_speed_power for a shooter standing still.
         var ball = new Vector3(41.5f, T.Ball.Radius, 0f);
         float ideal = ShotModel.IdealCharge(ShotModel.GoalDistance(ball, P), T);
         foreach (var type in new[] { ShotType.Power, ShotType.Finesse, ShotType.Chip, ShotType.Driven, ShotType.LowFinesse })
         {
             double sum = 0; int n = 600;
             for (ulong i = 0; i < (ulong)n; i++) sum += Shot(Ctx(p, ball, charge: ideal, type: type), i).Speed;
-            Assert.InRange(sum / n / ShotModel.IntendedSpeed(p.Sheet, type, ideal, T), 0.99, 1.01);
+            Assert.InRange(sum / n / (ShotModel.IntendedSpeed(p.Sheet, type, ideal, T) * k.RunSpeedPower.Evaluate(0f)), 0.99, 1.01);
         }
     }
 
@@ -290,7 +289,8 @@ public class ShotModelTests
         Assert.True(under < atIdeal - 0.5f, $"under {under} vs ideal {atIdeal}");
         // The miss adds its own speed factor on top of the charge's speed.
         double mean = Enumerable.Range(0, 400).Average(i => Shot(Ctx(p, ball, ideal + 0.15f, ShotType.Chip), (ulong)i).Speed);
-        double expected = ShotModel.IntendedSpeed(p.Sheet, ShotType.Chip, ideal + 0.15f, T) * (1f + T.Shot.ChipChargeMissSpeed * 0.15f);
+        // (He stands still: run_speed_power at 0 scales it too.)
+        double expected = ShotModel.IntendedSpeed(p.Sheet, ShotType.Chip, ideal + 0.15f, T) * (1f + T.Shot.ChipChargeMissSpeed * 0.15f) * T.Shot.RunSpeedPower.Evaluate(0f);
         Assert.InRange(mean / expected, 0.99, 1.01);
     }
 
@@ -411,7 +411,7 @@ public class ShotModelTests
     {
         var r = Shot(Ctx(Shooter()));
         Assert.Equal(new[] { "speed", "angle", "mouth", "foot", "surface", "pressure", "power", "air", "type" }, r.Factors.Select(f => f.Name).ToArray());
-        Assert.Equal(new[] { "angle", "weak_foot", "surface" }, r.SpeedFactors.Select(f => f.Name).ToArray());
+        Assert.Equal(new[] { "angle", "weak_foot", "surface", "run_speed" }, r.SpeedFactors.Select(f => f.Name).ToArray());
         Assert.True(r.Speed > 0 && r.Distance > 0);
     }
 }

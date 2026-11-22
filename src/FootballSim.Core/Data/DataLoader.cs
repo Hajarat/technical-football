@@ -74,9 +74,7 @@ public static class DataLoader
             {
                 // skill_moves came later than the other ratings: a sheet without it uses its dribbling, without a warning.
                 if (n == "skill_moves" && !root.TryGetProperty(n, out _)) { s.SkillMoves = s.Dribbling; continue; }
-                bool star = n == "weak_foot";
-                int lo = 1, hi = star ? 5 : 99, def = star ? 3 : PlayerSheet.RatingDefault;
-                s.SetRating(n, (int)MathF.Round(ReadNumber(root, n, fileLabel, warnings, def, lo, hi)));
+                s.SetRating(n, (int)MathF.Round(ReadNumber(root, n, fileLabel, warnings, PlayerSheet.RatingDefault, 1, 99)));
             }
             s.HeightM = ReadNumber(root, "height_m", fileLabel, warnings, 1.80f, PlayerSheet.HeightMin, PlayerSheet.HeightMax);
             s.WeightKg = ReadNumber(root, "weight_kg", fileLabel, warnings, 75f, PlayerSheet.WeightMin, PlayerSheet.WeightMax);
@@ -218,14 +216,15 @@ public static class DataLoader
             foreach (var (field, curve) in new[] { ("ball.drag_curve", t.Ball.DragCurve), ("ball.lift_curve", t.Ball.LiftCurve), ("ball.restitution_curve", t.Ball.RestitutionCurve), ("ball.bounce_friction_curve", t.Ball.BounceFrictionCurve),
                 ("movement.accel_by_speed_jog", t.Movement?.AccelBySpeedJog), ("movement.accel_by_speed_sprint", t.Movement?.AccelBySpeedSprint),
                 ("movement.decel_by_speed", t.Movement?.DecelBySpeed), ("movement.turn_angle_mult", t.Movement?.TurnAngleMult), ("movement.sharp_turn_cost", t.Movement?.SharpTurnCost),
-                ("touch.early_execution", t.Touch.EarlyExecution), ("touch.execution_time", t.Touch.ExecutionTime), ("skill.ball_roll_distance", t.Skill.BallRollDistance),
+                ("touch.early_execution", t.Touch.EarlyExecution), ("touch.weak_foot_error", t.Touch.WeakFootError), ("touch.execution_time", t.Touch.ExecutionTime), ("skill.ball_roll_distance", t.Skill.BallRollDistance),
                 ("skill.ball_roll_run_blend", t.Skill.BallRollRunBlend), ("skill.ball_roll_keep", t.Skill.BallRollKeep),
                 ("skill.step_over_run_blend", t.Skill.StepOverRunBlend), ("skill.step_over_run_keep", t.Skill.StepOverRunKeep),
                 ("skill.heel_to_heel_run_blend", t.Skill.HeelToHeelRunBlend), ("skill.elastico_run_blend", t.Skill.ElasticoRunBlend), ("skill.spin_run_blend", t.Skill.SpinRunBlend), ("skill.mcgeady_run_blend", t.Skill.McGeadyRunBlend),
                 ("skill.sided_exit_burst", t.Skill.SidedExitBurst), ("skill.straight_exit_burst", t.Skill.StraightExitBurst),
                 ("shot.ideal_charge", t.Shot.IdealCharge), ("shot.angle_accuracy", t.Shot.AngleAccuracy), ("shot.angle_power", t.Shot.AnglePower),
                 ("shot.angle_extra_windup_s", t.Shot.AngleExtraWindupS), ("shot.goal_mouth_accuracy", t.Shot.GoalMouthAccuracy),
-                ("shot.weak_foot_power", t.Shot.WeakFootPower), ("shot.weak_foot_curl", t.Shot.WeakFootCurl),
+                ("shot.weak_foot_accuracy", t.Shot.WeakFootAccuracy), ("shot.weak_foot_power", t.Shot.WeakFootPower), ("shot.weak_foot_curl", t.Shot.WeakFootCurl),
+                ("shot.run_speed_power", t.Shot.RunSpeedPower),
                 ("keeper.arc_depth", t.Keeper?.ArcDepth), ("keeper.arc_depth_bearing", t.Keeper?.ArcDepthBearing), ("keeper.near_post_bias", t.Keeper?.NearPostBias),
                 ("keeper.rush_margin", t.Keeper?.RushMargin), ("keeper.difficulty_low", t.Keeper?.DifficultyLow),
                 ("keeper.difficulty_mid", t.Keeper?.DifficultyMid), ("keeper.difficulty_high", t.Keeper?.DifficultyHigh),
@@ -237,6 +236,8 @@ public static class DataLoader
                 string? bad = curve == null ? "must be an array of [x, y] pairs" : curve.Validate();
                 if (bad != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: {field}: {bad} (default tuning in use)" };
             }
+            string? badBand = t.Shot.FarPostBand == null ? "must be an object" : t.Shot.FarPostBand.Validate();
+            if (badBand != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: shot.far_post_band: {badBand} (default tuning in use)" };
             string? badProfile = t.Touch.Profiles == null ? "must be an object" : t.Touch.Profiles.Validate();
             if (badProfile != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: touch.profiles.{badProfile} (default tuning in use)" };
             var w = new List<LoadWarning>();

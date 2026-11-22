@@ -547,8 +547,8 @@ public sealed class TouchTuning
     /// <summary>Touch errors scale by (base + slope * speed fraction).</summary>
     public float ErrorSpeedBase { get; set; } = 0.4f;
     public float ErrorSpeedSlope { get; set; } = 0.6f;
-    /// <summary>A weak-foot touch multiplies its errors by (1 + this * (5 - weak_foot stars)).</summary>
-    public float WeakFootErrorStep { get; set; } = 0.10f;
+    /// <summary>A weak-foot touch's error multiplier, by the weak_foot rating (1 to 99).</summary>
+    public Curve WeakFootError { get; set; } = new((1f, 1.4f), (99f, 1f));
     /// <summary>The ball must be this far past the body's centreline on the other side to be touched with the other foot, metres.</summary>
     public float FootSideOffset { get; set; } = 0.15f;
 
@@ -691,11 +691,14 @@ public sealed class ShotTuning
     /// would make seen square on from the same distance (1 in front of goal, toward 0 along the goal line).
     /// </summary>
     public Curve GoalMouthAccuracy { get; set; } = new((0.1f, 2.2f), (0.2f, 1.8f), (0.4f, 1.35f), (0.6f, 1.2f), (0.85f, 1.05f), (1f, 1f));
-    public float WeakFootStep { get; set; } = 0.18f;
-    /// <summary>A weak-foot strike's launch speed multiplier, by weak-foot stars (1 to 5).</summary>
-    public Curve WeakFootPower { get; set; } = new((1f, 0.85f), (5f, 1f));
-    /// <summary>A weak-foot strike's side-spin multiplier, by weak-foot stars (1 to 5).</summary>
-    public Curve WeakFootCurl { get; set; } = new((1f, 0.6f), (5f, 1f));
+    /// <summary>A weak-foot strike's spread multiplier, by the weak_foot rating (1 to 99).</summary>
+    public Curve WeakFootAccuracy { get; set; } = new((1f, 1.72f), (99f, 1f));
+    /// <summary>A weak-foot strike's launch speed multiplier, by the weak_foot rating (1 to 99).</summary>
+    public Curve WeakFootPower { get; set; } = new((1f, 0.85f), (99f, 1f));
+    /// <summary>A weak-foot strike's side-spin multiplier, by the weak_foot rating (1 to 99).</summary>
+    public Curve WeakFootCurl { get; set; } = new((1f, 0.6f), (99f, 1f));
+    /// <summary>Launch speed multiplier by the shooter's running speed as a share of his top speed (0 standing, 1 flat out).</summary>
+    public Curve RunSpeedPower { get; set; } = new((0f, 0.97f), (0.5f, 1f), (1f, 1.03f));
     public float PressureSlope { get; set; } = 0.6f;
     public float PressureFarMetres { get; set; } = 4f;
     public float PressureNearMetres { get; set; } = 1f;
@@ -750,35 +753,27 @@ public sealed class ShotTuning
 
     // ---- the striking foot (see ShotModel.ChooseStrike) ----
     /// <summary>
-    /// A foot strikes a ball leaving up to this far toward its own side of where the shooter faces, degrees; further round only
-    /// the other foot can (across the body a foot reaches all the way to 180).
+    /// A ball leaving more than this far from where the shooter faces, degrees, either way, is struck by the foot on the side
+    /// it leaves, whatever his preference.
     /// </summary>
+    public float FootBySideDeg { get; set; } = 150f;
+    /// <summary>A ball leaving within this of where he faces counts as dead ahead, degrees: the strong foot, the type's own surface.</summary>
+    public float DeadAheadDeg { get; set; } = 22.5f;
+    /// <summary>The ceiling of the outside cap (see <see cref="OutsideMaxDeg"/>), degrees ...</summary>
     public float OpenMaxDeg { get; set; } = 67.5f;
-    /// <summary>... and this far for a finesse or low finesse shot.</summary>
+    /// <summary>... and for a finesse or low finesse shot.</summary>
     public float FinesseOpenMaxDeg { get; set; } = 79f;
     /// <summary>
-    /// Up to this far toward its own side a foot strikes without opening the hips, degrees; from here to the limit the opening
-    /// costs (<see cref="WOpen"/>), and the outside of the strong foot may be used instead (the outside_foot trait).
+    /// The outside cap, degrees (curve rating): how far toward his strong foot's side a player still strikes with that foot's
+    /// outside; further round the weak foot strikes. Never past the ceiling.
     /// </summary>
-    public float OutsideMinDeg { get; set; } = 22.5f;
-    /// <summary>How far toward the strong foot's side its outside may strike, degrees (curve rating), never past the foot's limit.</summary>
     public RatingRange OutsideMaxDeg { get; set; } = new(30f, 67.5f);
-    /// <summary>Foot cost: opening the hips all the way to the foot's limit.</summary>
-    public float WOpen { get; set; } = 1f;
-    /// <summary>Foot cost: the ball fully on the other foot's side of the body.</summary>
-    public float WBall { get; set; } = 0.8f;
-    /// <summary>Foot cost: a one-star weak foot (nothing at five stars).</summary>
-    public float WWeak { get; set; } = 0.9f;
-    /// <summary>Foot cost: waiting <see cref="FootWaitMaxS"/> longer for this foot's swing than for the other's.</summary>
-    public float WWait { get; set; } = 0.7f;
-    /// <summary>Foot cost of striking with the outside of the strong foot, in place of the opening cost.</summary>
-    public float WOutside { get; set; } = 0.15f;
-    /// <summary>A foot whose swing comes more than this later than the other's is not waited for, seconds.</summary>
-    public float FootWaitMaxS { get; set; } = 0.25f;
-    /// <summary>The ball this far to the other foot's side of the body costs nothing, metres ...</summary>
-    public float FootBallFreeM { get; set; } = 0.10f;
-    /// <summary>... and the full <see cref="WBall"/> this much further.</summary>
-    public float FootBallSpanM { get; set; } = 0.30f;
+    /// <summary>The outside_foot trait widens the outside cap by this, degrees (still never past the ceiling).</summary>
+    public float OutsideFootBonusDeg { get; set; } = 12f;
+    /// <summary>The far-post rule's distance band for each shot type (see ShotModel.FarPostApplies).</summary>
+    public FarPostBands FarPostBand { get; set; } = new();
+    /// <summary>A shooter within this of the pitch's centre line (Z = 0) is on neither flank, metres: no far-post rule.</summary>
+    public float FarPostFlankMinM { get; set; } = 0.3f;
     /// <summary>A strike with the outside of the foot: spread multiplier ...</summary>
     public float OutsideAccuracy { get; set; } = 1.15f;
     /// <summary>... and launch speed multiplier.</summary>
@@ -1552,4 +1547,43 @@ public sealed class Tuning
 
     /// <summary>Seconds per tick.</summary>
     public float Dt => 1f / TickRate;
+}
+
+/// <summary>
+/// The far-post rule's distance band per shot type: [min, max] metres from the ball to the goal centre, a negative end meaning
+/// no limit on that side.
+/// </summary>
+public sealed class FarPostBands
+{
+    public float[] Power { get; set; } = { -1f, 50f };
+    public float[] Driven { get; set; } = { -1f, 50f };
+    public float[] Chip { get; set; } = { -1f, 2.5f };
+    public float[] Finesse { get; set; } = { -1f, -1f };
+    public float[] LowFinesse { get; set; } = { -1f, -1f };
+
+    /// <summary>The band for a shot type.</summary>
+    public (float Min, float Max) For(ShotType type)
+    {
+        var b = type switch
+        {
+            ShotType.Driven => Driven,
+            ShotType.Chip => Chip,
+            ShotType.Finesse => Finesse,
+            ShotType.LowFinesse => LowFinesse,
+            _ => Power,
+        };
+        return (b[0], b[1]);
+    }
+
+    /// <summary>Null when every band is a [min, max] pair of finite numbers; otherwise the field at fault and what is wrong.</summary>
+    public string? Validate()
+    {
+        foreach (var (name, b) in new[] { ("power", Power), ("driven", Driven), ("chip", Chip), ("finesse", Finesse), ("low_finesse", LowFinesse) })
+        {
+            if (b == null || b.Length != 2) return $"{name}: must be [min, max]";
+            if (!float.IsFinite(b[0]) || !float.IsFinite(b[1])) return $"{name}: must be finite numbers";
+            if (b[0] >= 0f && b[1] >= 0f && b[0] > b[1]) return $"{name}: min is above max";
+        }
+        return null;
+    }
 }
