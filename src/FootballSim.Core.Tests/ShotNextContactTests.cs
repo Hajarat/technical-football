@@ -19,7 +19,7 @@ public class ShotNextContactTests
     static World Lab(ulong seed, int dribbling)
     {
         var s = TestData.Sheet(75);
-        s.Dribbling = dribbling;
+        s.CloseDribbling = s.SprintDribbling = dribbling;
         var sc = new Scenario
         {
             Id = "lab",

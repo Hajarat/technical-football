@@ -129,7 +129,7 @@ static class DribbleProbe
             // ticks; --steps-only prints only the per-run summary).
             var probe = Probes.First(x => x.Name == dtName);
             var sheet = baseSheet.Clone();
-            sheet.Dribbling = ratings[0];
+            sheet.CloseDribbling = sheet.SprintDribbling = ratings[0];
             int from = opts.TryGetValue("from", out var fs) ? int.Parse(fs, CultureInfo.InvariantCulture) : 0;
             int to = opts.TryGetValue("to", out var ts) ? int.Parse(ts, CultureInfo.InvariantCulture) : -1;
             int first = opts.TryGetValue("index", out var ix0) ? int.Parse(ix0, CultureInfo.InvariantCulture) : 0;
@@ -161,7 +161,7 @@ static class DribbleProbe
             foreach (int rating in ratings)
             {
                 var sheet = baseSheet.Clone();
-                sheet.Dribbling = rating;
+                sheet.CloseDribbling = sheet.SprintDribbling = rating;
                 var st = new Stats();
                 for (int i = 0; i < seeds; i++) RunOne(probe, tuning, sheet, keeper, seed0 + (ulong)i, i, st);
                 allKept &= st.Kept == st.Runs;
@@ -252,7 +252,7 @@ static class DribbleProbe
         var touchTicks = new List<int>();
         bool gained = false, lost = false;
         var p = w.Attacker;
-        float jogWithBall = t.Movement.JogSpeed * t.Touch.TopSpeedWithBall.Close.ForRating(sheet.Dribbling);
+        float jogWithBall = t.Movement.JogSpeed * t.Touch.TopSpeedWithBall.Close.ForRating(sheet.CloseDribbling);
         float execRad = t.Touch.ExecutionAngle * MathF.PI / 180f;
         float stickRef = float.NaN;
         int turnFrom = -1;

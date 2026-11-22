@@ -22,7 +22,7 @@ public class TouchControllerTests
     static World Lab(ulong seed, Tuning? t = null, int dribbling = 70, float x = 2f)
     {
         var s = TestData.Sheet(75);
-        s.Dribbling = dribbling;
+        s.CloseDribbling = s.SprintDribbling = dribbling;
         var sc = new Scenario
         {
             Id = "lab",

@@ -116,7 +116,7 @@ static class ShotProbe
     static World Setup(Case c, int rating, ulong seed, int index, Tuning t, string dataDir, PlayerSheet keeper, out SpeedSteps steps)
     {
         var sheet = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", "striker_a.json")).Value!;
-        sheet.Dribbling = rating;
+        sheet.CloseDribbling = sheet.SprintDribbling = rating;
         var sc = new Scenario
         {
             Id = "probe",

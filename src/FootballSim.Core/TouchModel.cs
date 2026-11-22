@@ -38,16 +38,17 @@ public static class TouchModel
 
     /// <summary>
     /// Steps of the stride clock between two dribble touches in a mode, at least 1: the close style's and the speed (sprint)
-    /// style's each by dribbling, on its own range; a jog's the same for every player.
+    /// style's by close dribbling and the speed (sprint) style's by sprint dribbling, each on its own range; a jog's the same
+    /// for every player.
     /// </summary>
     public static int StepsPerTouch(PlayerSheet s, TouchMode mode, Tuning t)
     {
         var k = t.Touch.StepsPerTouch;
         float v = mode switch
         {
-            TouchMode.CloseControl => k.Close.ForRating(s.Dribbling),
+            TouchMode.CloseControl => k.Close.ForRating(s.CloseDribbling),
             TouchMode.Jog => k.Jog,
-            _ => k.Sprint.ForRating(s.Dribbling),
+            _ => k.Sprint.ForRating(s.SprintDribbling),
         };
         return Math.Max(1, (int)MathF.Round(v, MidpointRounding.AwayFromZero));
     }
@@ -70,28 +71,45 @@ public static class TouchModel
         };
     }
 
-    /// <summary>Rated launch angle of a touch, degrees: its profile's launch angle by dribbling (before any flattening).</summary>
-    public static float LiftDeg(PlayerSheet s, ActionKind kind, TouchMode mode, Tuning t) =>
-        Profile(kind, mode, t).LaunchAngle.ForRating(s.Dribbling);
+    /// <summary>
+    /// The dribbling rating a touch is rated by (its launch angle, touch boost and speed error): sprint dribbling for a touch
+    /// with the sprint or the knock-on profile, close dribbling for every other (see <see cref="Profile"/>).
+    /// </summary>
+    public static int DribblingFor(PlayerSheet s, ActionKind kind, TouchMode mode) => kind switch
+    {
+        ActionKind.KnockOn => s.SprintDribbling,
+        ActionKind.Heavy or ActionKind.TrapLow or ActionKind.TrapMid or ActionKind.TrapHigh => s.CloseDribbling,
+        _ => mode == TouchMode.Sprint ? s.SprintDribbling : s.CloseDribbling,
+    };
 
-    /// <summary>Touch boost factor: 1 + touch_boost (dribbling) + the turn extra, linear in the turn angle up to its full angle.</summary>
-    public static float TouchBoostFactor(PlayerSheet s, float turnDeg, Tuning t)
+    /// <summary>Rated launch angle of a touch, degrees: its profile's launch angle by its dribbling rating (before any flattening).</summary>
+    public static float LiftDeg(PlayerSheet s, ActionKind kind, TouchMode mode, Tuning t) =>
+        Profile(kind, mode, t).LaunchAngle.ForRating(DribblingFor(s, kind, mode));
+
+    /// <summary>
+    /// Touch boost factor: 1 + touch_boost (the touch's dribbling rating, see <see cref="DribblingFor"/>) + the turn extra,
+    /// linear in the turn angle up to its full angle.
+    /// </summary>
+    public static float TouchBoostFactor(int dribbling, float turnDeg, Tuning t)
     {
         var k = t.Touch;
         float ramp = k.TouchBoostTurnFullDeg > 0f ? Math.Clamp(turnDeg / k.TouchBoostTurnFullDeg, 0f, 1f) : 1f;
-        return 1f + k.TouchBoost.ForRating(s.Dribbling) + k.TouchBoostTurnExtra * ramp;
+        return 1f + k.TouchBoost.ForRating(dribbling) + k.TouchBoostTurnExtra * ramp;
     }
 
-    /// <summary>Seconds after a knock-on at which the chasing player is planned to meet the ball (dribbling).</summary>
-    public static float KnockOnCatchTime(PlayerSheet s, Tuning t) => t.Touch.KnockOnCatchTime.ForRating(s.Dribbling);
+    /// <summary>Seconds after a knock-on at which the chasing player is planned to meet the ball (sprint dribbling).</summary>
+    public static float KnockOnCatchTime(PlayerSheet s, Tuning t) => t.Touch.KnockOnCatchTime.ForRating(s.SprintDribbling);
 
     /// <summary>Error scale for a speed fraction: base + slope * fraction (0.4 + 0.6 * f).</summary>
     public static float ErrorSpeedScale(float speedFrac, Tuning t) =>
         t.Touch.ErrorSpeedBase + t.Touch.ErrorSpeedSlope * Math.Clamp(speedFrac, 0f, 1f);
 
-    /// <summary>Standard deviation of the touch speed factor: lerp(0.10, 0.02) by dribbling times the speed scale.</summary>
-    public static float SpeedSigma(PlayerSheet s, float speedFrac, Tuning t) =>
-        t.Touch.SpeedError.ForRating(s.Dribbling) * ErrorSpeedScale(speedFrac, t);
+    /// <summary>
+    /// Standard deviation of the touch speed factor: lerp(0.10, 0.02) by the touch's dribbling rating (see
+    /// <see cref="DribblingFor"/>) times the speed scale.
+    /// </summary>
+    public static float SpeedSigma(int dribbling, float speedFrac, Tuning t) =>
+        t.Touch.SpeedError.ForRating(dribbling) * ErrorSpeedScale(speedFrac, t);
 
     /// <summary>Standard deviation of the touch direction, degrees: lerp(7, 1) by ball_control times the speed scale.</summary>
     public static float DirectionSigmaDeg(PlayerSheet s, float speedFrac, Tuning t) =>

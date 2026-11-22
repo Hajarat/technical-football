@@ -14,7 +14,7 @@ public class PossessionTests
     static PlayerSheet Sheet(int dribbling = 75, int firstTouch = 75)
     {
         var s = TestData.Sheet(75);
-        s.Dribbling = dribbling;
+        s.CloseDribbling = s.SprintDribbling = dribbling;
         s.FirstTouch = firstTouch;
         return s;
     }

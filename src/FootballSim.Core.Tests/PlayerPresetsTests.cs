@@ -179,7 +179,7 @@ public class PlayerPresetsTests
             .Concat(PlayerSheet.TraitNames.Select(t => t.Name))
             .Concat(new[] { "height_m", "weight_kg" });
         Assert.Equal(expected, rows.Select(r => r.Name));
-        Assert.Equal(14, rows.Count(r => r.Kind == PlayerEditKind.Rating));
+        Assert.Equal(15, rows.Count(r => r.Kind == PlayerEditKind.Rating));
         Assert.Equal(Enum.GetValues<PlayerTrait>().Length - 1, rows.Count(r => r.Kind == PlayerEditKind.Trait));
     }
 
@@ -229,7 +229,7 @@ public class PlayerPresetsTests
     public void ARoundWithACustomSheetReplaysExactlyFromItsEmbeddedSheet()
     {
         var custom = PlayerPresets.AsCustom(Odd(9));
-        custom.SetRating("dribbling", 97); custom.SetRating("finishing", 3); custom.HeightM = 1.97f; custom.WeightKg = 61f;
+        custom.SetRating("close_dribbling", 97); custom.SetRating("finishing", 3); custom.HeightM = 1.97f; custom.WeightKg = 61f;
         var original = RoundRunner.RunToReport(new Tuning(), TestData.Scenario("breakaway"), custom, TestData.Player("the_wall"), 4242, out var replay);
         Assert.Equal("custom", replay.AttackerId);
         replay.SetAttackerSheet(custom);

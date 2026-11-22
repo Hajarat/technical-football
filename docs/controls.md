@@ -98,7 +98,7 @@ There is no driven-shot key: as on the pad, the low shot is shoot pressed twice.
 
 ## Player editor
 
-A menu over the stopped game for setting every field of the attacker's sheet: the 14 outfield ratings (1 to 99; the rows are the
+A menu over the stopped game for setting every field of the attacker's sheet: the 15 outfield ratings (1 to 99; the rows are the
 code's `PlayerSheet.RatingNames` minus the keeper ratings, so a new rating gets a row by itself), preferred foot, each trait on or
 off, height (1.60 to 2.05 m, steps of 0.01) and weight (55 to 100 kg). Values are clamped as a player file's are. It opens with
 Y / Triangle while paused, or T on the keyboard while paused, in Setup or at the report; play input is ignored while it is open.

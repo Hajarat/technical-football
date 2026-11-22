@@ -17,7 +17,7 @@ public class DribbleFixTests
     static World Lab(ulong seed, int dribbling = 70)
     {
         var s = TestData.Sheet(75);
-        s.Dribbling = dribbling;
+        s.CloseDribbling = s.SprintDribbling = dribbling;
         var sc = new Scenario
         {
             Id = "lab",
@@ -146,7 +146,7 @@ public class DribbleFixTests
         static World Field(ulong seed, int dribbling)
         {
             var sheet = TestData.Player("striker_a").Clone();
-            sheet.Dribbling = dribbling;
+            sheet.CloseDribbling = sheet.SprintDribbling = dribbling;
             var sc = new Scenario
             {
                 Id = "field",

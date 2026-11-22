@@ -1088,10 +1088,10 @@ public static class TouchPlanner
 
     /// <summary>
     /// The early execution fraction for a turn of <paramref name="turnDeg"/> (the stick against the ball's travel): the share
-    /// of the normal cadence a turn may cut it to, early_execution at the angle times the dribbling multiplier.
+    /// of the normal cadence a turn may cut it to, early_execution at the angle times the close dribbling multiplier.
     /// </summary>
-    static float EarlyFraction(PlayerState p, float turnDeg, Tuning t) =>
-        t.Touch.EarlyExecution.Evaluate(turnDeg) * t.Touch.EarlyExecutionDribbling.ForRating(p.Sheet.Dribbling);
+    internal static float EarlyFraction(PlayerState p, float turnDeg, Tuning t) =>
+        t.Touch.EarlyExecution.Evaluate(turnDeg) * t.Touch.EarlyExecutionDribbling.ForRating(p.Sheet.CloseDribbling);
 
     static void Install(PlayerState p, BallAction a, int tick, Tuning t)
     {
@@ -1206,15 +1206,16 @@ public static class TouchPlanner
     // ---- contact ----
 
     /// <summary>The rated errors for a touch: speed-factor and direction standard deviations.</summary>
-    static (float SigmaSpeed, float SigmaDir) Sigmas(PlayerState p, Foot foot, ActionKind kind, Tuning t)
+    static (float SigmaSpeed, float SigmaDir) Sigmas(PlayerState p, Foot foot, ActionKind kind, TouchMode mode, Tuning t)
     {
+        int dribbling = TouchModel.DribblingFor(p.Sheet, kind, mode);
         float top = Movement.TopSpeed(p.Sheet, t);
         float frac = Math.Clamp(p.Speed / top, 0f, 1f);
         float footK = TouchModel.FootErrorFactor(p.Sheet, foot, t);
         if (kind == ActionKind.KnockOn)
-            return (TouchModel.SpeedSigma(p.Sheet, 1f, t) * footK * t.Touch.KnockOnErrorScale,
+            return (TouchModel.SpeedSigma(dribbling, 1f, t) * footK * t.Touch.KnockOnErrorScale,
                     TouchModel.DirectionSigmaDeg(p.Sheet, 1f, t) * footK * t.Touch.KnockOnErrorScale);
-        return (TouchModel.SpeedSigma(p.Sheet, frac, t) * footK, TouchModel.DirectionSigmaDeg(p.Sheet, frac, t) * footK);
+        return (TouchModel.SpeedSigma(dribbling, frac, t) * footK, TouchModel.DirectionSigmaDeg(p.Sheet, frac, t) * footK);
     }
 
     /// <summary>
@@ -1401,7 +1402,7 @@ public static class TouchPlanner
     }
 
     /// <summary>
-    /// <see cref="SolvePush"/> at the touch's rated launch angle (its profile's, by dribbling), flattened until the solved arc's
+    /// <see cref="SolvePush"/> at the touch's rated launch angle (its profile's, by its dribbling rating), flattened until the solved arc's
     /// peak stays under the profile's peak height cap, falling back to the lowest angle of the profile's range and then to a
     /// ground pass when that angle cannot land the ball on the target (a gap in reachable distances).
     /// </summary>
@@ -1409,7 +1410,7 @@ public static class TouchPlanner
         float hi, Tuning t, out Vector3 dir, out bool @short, out float liftDeg)
     {
         var prof = TouchModel.Profile(kind, mode, t);
-        liftDeg = prof.LaunchAngle.ForRating(p.Sheet.Dribbling);
+        liftDeg = prof.LaunchAngle.ForRating(TouchModel.DribblingFor(p.Sheet, kind, mode));
         float u = SolvePush(ball, target, ticks, liftDeg, lo, hi, t, out dir, out @short, out float residual);
         // A launch whose arc would rise over the cap is flattened to the angle that peaks at the cap for the solved speed, and
         // solved again (a flatter launch needs a little more speed, so a few rounds).
@@ -1529,7 +1530,7 @@ public static class TouchPlanner
         if (immediate && kind is not (ActionKind.Soft or ActionKind.First or ActionKind.TrapLow or ActionKind.TrapMid or ActionKind.TrapHigh))
             kind = p.KnockOnRequested ? ActionKind.KnockOn : !stickActive ? ActionKind.Stop : ModeKind(mode);
         Foot foot = a.Foot;
-        var (sigmaS, sigmaD) = Sigmas(p, foot, kind, t);
+        var (sigmaS, sigmaD) = Sigmas(p, foot, kind, mode, t);
         if (far) { sigmaS *= FarStretchErrorScale; sigmaD *= FarStretchErrorScale; }
         Vector3 v, spin = Vector3.Zero;
         float errDeg = 0f, turnSign = 0f;
@@ -1576,7 +1577,7 @@ public static class TouchPlanner
                 if (settle > 0f)
                 {
                     var toward = stickActive ? Vector3.Normalize(new Vector3(intent.Move.X, 0f, intent.Move.Y)) : TouchModel.StopDirection(p);
-                    float lift = prof.LaunchAngle.ForRating(p.Sheet.Dribbling) * MathF.PI / 180f;
+                    float lift = prof.LaunchAngle.ForRating(p.Sheet.CloseDribbling) * MathF.PI / 180f;
                     v += toward * (settle * MathF.Cos(lift));
                     // (it pops up no higher than the trap's cap)
                     float rise = MathF.Max(0f, prof.PeakHeightCap - ball.Position.Y);
@@ -1661,7 +1662,7 @@ public static class TouchPlanner
                 {
                     p.TouchBoostFrom = now;
                     p.TouchBoostUntil = now + k.TouchBoostDuration;
-                    p.TouchBoostFactor = TouchModel.TouchBoostFactor(p.Sheet, turnDeg, t);
+                    p.TouchBoostFactor = TouchModel.TouchBoostFactor(TouchModel.DribblingFor(p.Sheet, kind, mode), turnDeg, t);
                     SkillMoves.ApplyExitBurst(p, now);
                 }
                 // A reversal at speed (the stick turned back past feet_turn_deg) is a hook: the ball is turned onto the stick's

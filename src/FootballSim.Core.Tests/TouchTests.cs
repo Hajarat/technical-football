@@ -29,12 +29,12 @@ public class TouchTests
         t.Touch.StepsPerTouch.Close = new RatingRange(3f, 1f);
         t.Touch.StepsPerTouch.Sprint = new RatingRange(5f, 2f);
         var s = TestData.Sheet(50);
-        s.Dribbling = 1;
+        s.CloseDribbling = s.SprintDribbling = 1;
         Assert.Equal(3, TouchModel.StepsPerTouch(s, TouchMode.CloseControl, t));
         Assert.Equal(5, TouchModel.StepsPerTouch(s, TouchMode.Sprint, t));
-        s.Dribbling = 50;
+        s.CloseDribbling = s.SprintDribbling = 50;
         Assert.Equal(2, TouchModel.StepsPerTouch(s, TouchMode.CloseControl, t));
-        s.Dribbling = 99;
+        s.CloseDribbling = s.SprintDribbling = 99;
         Assert.Equal(1, TouchModel.StepsPerTouch(s, TouchMode.CloseControl, t));
         Assert.Equal(2, TouchModel.StepsPerTouch(s, TouchMode.Sprint, t));
         // the jog's is the same for every player
@@ -48,14 +48,14 @@ public class TouchTests
         Assert.Equal(TouchMode.CloseControl, TouchModel.ModeFor(new TickIntent { CloseControl = true, Sprint = 1 }, T));
         Assert.Equal(TouchMode.Sprint, TouchModel.ModeFor(new TickIntent { Sprint = 0.8f }, T));
         Assert.Equal(TouchMode.Jog, TouchModel.ModeFor(new TickIntent { Sprint = 0.1f }, T));
-        Assert.Equal((int)MathF.Round(T.Touch.StepsPerTouch.Close.ForRating(s.Dribbling), MidpointRounding.AwayFromZero),
+        Assert.Equal((int)MathF.Round(T.Touch.StepsPerTouch.Close.ForRating(s.CloseDribbling), MidpointRounding.AwayFromZero),
             TouchModel.StepsPerTouch(s, TouchMode.CloseControl, T));
         Assert.Equal(2, TouchModel.StepsPerTouch(s, TouchMode.Jog, T));
-        s.Dribbling = 1; Assert.Equal(4, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
-        s.Dribbling = 50; Assert.Equal(3, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
-        s.Dribbling = 99; Assert.Equal(2, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
+        s.CloseDribbling = s.SprintDribbling = 1; Assert.Equal(4, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
+        s.CloseDribbling = s.SprintDribbling = 50; Assert.Equal(3, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
+        s.CloseDribbling = s.SprintDribbling = 99; Assert.Equal(2, TouchModel.StepsPerTouch(s, TouchMode.Sprint, T));
         Assert.Equal(T.Touch.Profiles.Jog.LaunchAngle.At99, TouchModel.LiftDeg(s, ActionKind.Jog, TouchMode.Jog, T), 4);
-        s.Dribbling = 1; Assert.Equal(T.Touch.Profiles.Sprint.LaunchAngle.At1, TouchModel.LiftDeg(s, ActionKind.Sprint, TouchMode.Sprint, T), 4);
+        s.CloseDribbling = s.SprintDribbling = 1; Assert.Equal(T.Touch.Profiles.Sprint.LaunchAngle.At1, TouchModel.LiftDeg(s, ActionKind.Sprint, TouchMode.Sprint, T), 4);
         Assert.Equal(T.Touch.Profiles.KnockOn.LaunchAngle.At1, TouchModel.LiftDeg(s, ActionKind.KnockOn, TouchMode.Jog, T), 4);
         Assert.Equal(12f, TouchModel.LiftDeg(s, ActionKind.Heavy, TouchMode.Sprint, T), 4);
     }
@@ -78,13 +78,13 @@ public class TouchTests
     public void TouchBoostGrowsWithDribblingAndTheTurn()
     {
         var s = TestData.Sheet(50);
-        s.Dribbling = 1;
-        Assert.Equal(1.15f, TouchModel.TouchBoostFactor(s, 0f, T), 3);
-        s.Dribbling = 99;
-        Assert.Equal(1.35f, TouchModel.TouchBoostFactor(s, 0f, T), 3);
-        Assert.Equal(1.50f, TouchModel.TouchBoostFactor(s, 45f, T), 3);
-        Assert.Equal(1.65f, TouchModel.TouchBoostFactor(s, 90f, T), 3);
-        Assert.Equal(1.65f, TouchModel.TouchBoostFactor(s, 170f, T), 3);
+        s.CloseDribbling = s.SprintDribbling = 1;
+        Assert.Equal(1.15f, TouchModel.TouchBoostFactor(s.CloseDribbling, 0f, T), 3);
+        s.CloseDribbling = s.SprintDribbling = 99;
+        Assert.Equal(1.35f, TouchModel.TouchBoostFactor(s.CloseDribbling, 0f, T), 3);
+        Assert.Equal(1.50f, TouchModel.TouchBoostFactor(s.CloseDribbling, 45f, T), 3);
+        Assert.Equal(1.65f, TouchModel.TouchBoostFactor(s.CloseDribbling, 90f, T), 3);
+        Assert.Equal(1.65f, TouchModel.TouchBoostFactor(s.CloseDribbling, 170f, T), 3);
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class TouchTests
         // The first push from a standstill is solved the same with or without errors, so the speed ratio is the drawn factor.
         double Spread(int dribbling, out double meanRatio)
         {
-            var s = TestData.Sheet(60); s.Dribbling = dribbling;
+            var s = TestData.Sheet(60); s.CloseDribbling = s.SprintDribbling = dribbling;
             var exact = new Tuning();
             exact.Touch.SpeedError = new RatingRange(0f, 0f);
             exact.Touch.DirectionErrorDeg = new RatingRange(0f, 0f);

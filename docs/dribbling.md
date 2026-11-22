@@ -3,10 +3,16 @@
 Every number is in the `movement` and `touch` sections of `data/tuning/default.json`; where reference data gives one it is used.
 
 
+- Two dribbling ratings: `close_dribbling` rates touches at the feet and turns (the close style's cadence and top speed,
+  the early touch after a turn, the braking arc's rotation, and the launch angle, touch boost and speed error of every touch
+  that is not a sprint push or a knock-on); `sprint_dribbling` rates touches at speed (the sprint cadence, the speed style's
+  top speed, the knock-on's catch time, and the launch angle, touch boost and speed error of touches with the sprint or the
+  knock-on profile). A player file from before the split, with one `dribbling` rating, loads with both set to it and a
+  warning.
 - Speeds: a jog is 5.3 m/s for every player (`jog_speed`, from reference data), a sprint 6.8-8.5 m/s by `sprint_speed`
   (from reference data); with the ball both are lowered by dribbling, each dribbling style on its own range
-  (`top_speed_with_ball.close` for a dribble with no sprint input: close control, a walk, a jog; `top_speed_with_ball.speed`
-  at a full sprint; the sprint input blends the one into the other, so the cap never steps), and close control runs at 0.35
+  (`top_speed_with_ball.close`, by close dribbling, for a dribble with no sprint input: close control, a walk, a jog;
+  `top_speed_with_ball.speed`, by sprint dribbling, at a full sprint; the sprint input blends the one into the other, so the cap never steps), and close control runs at 0.35
   of the close style's lowered top speed.
 - Turning: with the ball up to 450 degrees per second by agility (from reference data), less with weight and halved
   at top speed; a heading change smaller than the rate covers in `turn_ease` (0.05 s) eases in instead of snapping, so the
@@ -20,9 +26,9 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   `reverse_turn_deg` (135) from the facing above `reverse_min_speed` plants the runner: `reverse_speed_loss` (0.65) of his
   speed is shed while he turns about.
 - Touches: the stick pushed no further than `walk_max_input` (0.7, from reference data) dribbles with
-  walking touches, played as close control (the close style's cadence, `steps_per_touch.close` by dribbling: a touch every
+  walking touches, played as close control (the close style's cadence, `steps_per_touch.close` by close dribbling: a touch every
   step from about 26, every second step below). A jog pushes the ball two steps on, and every
-  `foot_switch_every`-th (4th) push takes one step more so the other foot takes over; a sprint 4 steps at dribbling 1, 3 from
+  `foot_switch_every`-th (4th) push takes one step more so the other foot takes over; a sprint 4 steps at sprint dribbling 1, 3 from
   about 27 and 2 from about 71 (`steps_per_touch.sprint`, 4 to 1.8 by rating). While the stick turns smoothly faster than
   `turning_stick_rate_deg` a push goes at most `turning_max_steps` steps on (2 at a jog, 3 at a sprint), and so does a sprint
   push within 0.35 s of the stick changing by more than 10 degrees or of sprint pressed or let go. No push is solved for
@@ -42,7 +48,7 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   correcting within `reach_tolerance` (0.08 m) of the contact point; the foot reaches the rest.
 - A demand (the stick turned past the execution angle off the ball's travel and off the run, the stick released for a stop,
   a skill gesture waiting, a shot's strike) shortens the cooldown to `early_execution` of the cadence (by the angle and
-  dribbling), never sooner than `early_min_interval` (0.22 s); the go-get-it legs then take over when they play the ball a few
+  close dribbling), never sooner than `early_min_interval` (0.22 s); the go-get-it legs then take over when they play the ball a few
   ticks sooner, and the stride may be quickened by up to a quarter to bring a step's window onto the ball.
 - Commit: its execution time before its contact (`execution_time`, by the ball's speed relative to the player: the `windup`,
   0.12 s, for a ball up to 4 m/s relative to him, down to 0.05 s at 8 m/s, so a fast ball coming at or across him is met by a
@@ -73,7 +79,7 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   already committed along his run plays it on no faster than he runs), and from the turn or cut touch that hooks it toward
   where his predicted path comes round (slowly enough to meet it there) he brakes at `turn_arc_brake` (13.5 m/s^2) to
   `turn_arc_keep` (40%) of the speed he had when the stick turned, never below `turn_arc_min_speed` (2.4 m/s), and holds that
-  speed (no other balance loss) while his body comes round at `turn_arc_rotation` (600 deg/s at dribbling 1 to 900 at 99) or
+  speed (no other balance loss) while his body comes round at `turn_arc_rotation` (600 deg/s at close dribbling 1 to 900 at 99) or
   faster, until he faces within `turn_arc_done_deg` (15 degrees) of the stick (or, within 45 degrees of it, of the ball's
   line), or the ball he goes after runs away from him faster than that speed; then he speeds up along the stick, at first no
   faster than `turn_arc_brake`.

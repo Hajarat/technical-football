@@ -19,7 +19,7 @@ public sealed class PlayerSheet
     public static readonly IReadOnlyList<string> RatingNames = new[]
     {
         "acceleration", "sprint_speed", "agility", "balance",
-        "dribbling", "ball_control", "first_touch", "skill_moves",
+        "close_dribbling", "sprint_dribbling", "ball_control", "first_touch", "skill_moves",
         "finishing", "long_shots", "shot_power", "curve", "composure", "weak_foot",
         "reflexes", "diving", "reach", "positioning", "handling", "rushing_out",
     };
@@ -38,10 +38,13 @@ public sealed class PlayerSheet
     public int SprintSpeed { get; set; } = RatingDefault;
     public int Agility { get; set; } = RatingDefault;
     public int Balance { get; set; } = RatingDefault;
-    public int Dribbling { get; set; } = RatingDefault;
+    /// <summary>Dribbling at the feet: the close style's cadence and top speed, turns, the early touch after a turn, and every touch that is not a sprint push or a knock-on.</summary>
+    public int CloseDribbling { get; set; } = RatingDefault;
+    /// <summary>Dribbling at speed: the sprint cadence, the speed style's top speed, sprint pushes and knock-ons.</summary>
+    public int SprintDribbling { get; set; } = RatingDefault;
     public int BallControl { get; set; } = RatingDefault;
     public int FirstTouch { get; set; } = RatingDefault;
-    /// <summary>Skill moves: their exit burst and how much survives a chain. A file without it uses <see cref="Dribbling"/>.</summary>
+    /// <summary>Skill moves: their exit burst and how much survives a chain. A file without it uses <see cref="CloseDribbling"/>.</summary>
     public int SkillMoves { get; set; } = RatingDefault;
     public int Finishing { get; set; } = RatingDefault;
     public int LongShots { get; set; } = RatingDefault;
@@ -73,7 +76,8 @@ public sealed class PlayerSheet
     public int GetRating(string name) => name switch
     {
         "acceleration" => Acceleration, "sprint_speed" => SprintSpeed, "agility" => Agility, "balance" => Balance,
-        "dribbling" => Dribbling, "ball_control" => BallControl, "first_touch" => FirstTouch, "skill_moves" => SkillMoves,
+        "close_dribbling" => CloseDribbling, "sprint_dribbling" => SprintDribbling,
+        "ball_control" => BallControl, "first_touch" => FirstTouch, "skill_moves" => SkillMoves,
         "finishing" => Finishing, "long_shots" => LongShots, "shot_power" => ShotPower, "curve" => Curve,
         "composure" => Composure, "weak_foot" => WeakFoot,
         "reflexes" => Reflexes, "diving" => Diving, "reach" => Reach, "positioning" => Positioning,
@@ -91,7 +95,8 @@ public sealed class PlayerSheet
             case "sprint_speed": SprintSpeed = v; break;
             case "agility": Agility = v; break;
             case "balance": Balance = v; break;
-            case "dribbling": Dribbling = v; break;
+            case "close_dribbling": CloseDribbling = v; break;
+            case "sprint_dribbling": SprintDribbling = v; break;
             case "ball_control": BallControl = v; break;
             case "first_touch": FirstTouch = v; break;
             case "skill_moves": SkillMoves = v; break;

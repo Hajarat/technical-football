@@ -70,10 +70,20 @@ public static class DataLoader
             var s = new PlayerSheet();
             s.Id = ReadString(root, "id", fileLabel, warnings, defaultId ?? "unknown", warn: false);
             s.Name = ReadString(root, "name", fileLabel, warnings, s.Id, warn: false);
+            // A file from before dribbling was split has one dribbling rating: both ratings take it, with one warning.
+            bool legacy = root.TryGetProperty(LegacyDribbling, out _)
+                && !root.TryGetProperty("close_dribbling", out _) && !root.TryGetProperty("sprint_dribbling", out _);
+            if (legacy)
+            {
+                int d = (int)MathF.Round(ReadNumber(root, LegacyDribbling, fileLabel, warnings, PlayerSheet.RatingDefault, 1, 99));
+                s.CloseDribbling = s.SprintDribbling = d;
+                warnings.Add(new LoadWarning(fileLabel, LegacyDribbling, $"replaced by close_dribbling and sprint_dribbling; both set to {d}"));
+            }
             foreach (var n in PlayerSheet.RatingNames)
             {
-                // skill_moves came later than the other ratings: a sheet without it uses its dribbling, without a warning.
-                if (n == "skill_moves" && !root.TryGetProperty(n, out _)) { s.SkillMoves = s.Dribbling; continue; }
+                if (legacy && n is ("close_dribbling" or "sprint_dribbling")) continue;
+                // skill_moves came later than the other ratings: a sheet without it uses its close dribbling, without a warning.
+                if (n == "skill_moves" && !root.TryGetProperty(n, out _)) { s.SkillMoves = s.CloseDribbling; continue; }
                 s.SetRating(n, (int)MathF.Round(ReadNumber(root, n, fileLabel, warnings, PlayerSheet.RatingDefault, 1, 99)));
             }
             s.HeightM = ReadNumber(root, "height_m", fileLabel, warnings, 1.80f, PlayerSheet.HeightMin, PlayerSheet.HeightMax);
@@ -102,6 +112,9 @@ public static class DataLoader
             return new LoadResult<PlayerSheet> { Value = s, Warnings = warnings };
         }
     }
+
+    /// <summary>The one dribbling rating of player files written before it was split into close and sprint dribbling.</summary>
+    const string LegacyDribbling = "dribbling";
 
     static string ReadString(JsonElement root, string field, string file, List<LoadWarning> w, string def, bool warn)
     {

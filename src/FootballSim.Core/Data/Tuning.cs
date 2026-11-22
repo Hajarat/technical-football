@@ -251,7 +251,7 @@ public sealed class SpeedRange
 }
 
 /// <summary>
-/// Top speed with the ball as a fraction of top speed, per dribbling style (dribbling rating). The sprint input blends the
+/// Top speed with the ball as a fraction of top speed, per dribbling style (the close style by close dribbling, the speed style by sprint dribbling). The sprint input blends the
 /// close style (no sprint: close control, walking touches, the jog) into the speed style (a full sprint).
 /// </summary>
 public sealed class TopSpeedWithBallTuning
@@ -266,14 +266,14 @@ public sealed class TopSpeedWithBallTuning
 public sealed class StepsPerTouchTuning
 {
     /// <summary>
-    /// The close style (close control, walking touches), by dribbling rating (rounded to whole steps: 2 up to about 25, a
+    /// The close style (close control, walking touches), by close dribbling rating (rounded to whole steps: 2 up to about 25, a
     /// touch on every step from about 26).
     /// </summary>
     public RatingRange Close { get; set; } = new(1.7f, 0.9f);
     public float Jog { get; set; } = 2f;
     /// <summary>
-    /// At a sprint, by dribbling rating (rounded to whole steps: 4 at 1, 3 from about 27 to 70, 2 from about 71; the 1.8 at 99
-    /// moves the two-step band down so a dribbling-72 sprinter's turns meet the latency targets).
+    /// At a sprint, by sprint dribbling rating (rounded to whole steps: 4 at 1, 3 from about 27 to 70, 2 from about 71; the 1.8 at 99
+    /// moves the two-step band down so a sprint-dribbling-72 sprinter's turns meet the latency targets).
     /// </summary>
     public RatingRange Sprint { get; set; } = new(4f, 1.8f);
 }
@@ -294,7 +294,7 @@ public sealed class TurningStepsTuning
 /// </summary>
 public class TouchProfile
 {
-    /// <summary>Launch angle above the ground, degrees, by dribbling rating.</summary>
+    /// <summary>Launch angle above the ground, degrees, by the touch's dribbling rating (see TouchModel.DribblingFor).</summary>
     public RatingRange LaunchAngle { get; set; } = new(8f, 3f);
     /// <summary>Highest the ball centre may rise on the solved arc, metres (a steeper launch is flattened to keep under it).</summary>
     public float PeakHeightCap { get; set; } = 1f;
@@ -420,7 +420,7 @@ public sealed class TouchTuning
     public float ReachPerHeight { get; set; } = 0.30f;
     public float HeightMin { get; set; } = 1.60f;
     public float HeightSpan { get; set; } = 0.40f;
-    /// <summary>Top speed with the ball as a fraction of top speed, per dribbling style (dribbling rating).</summary>
+    /// <summary>Top speed with the ball as a fraction of top speed, per dribbling style (the close style by close dribbling, the speed style by sprint dribbling).</summary>
     public TopSpeedWithBallTuning TopSpeedWithBall { get; set; } = new();
     /// <summary>Sprint input at or above this counts as sprinting (touch mode).</summary>
     public float SprintThreshold { get; set; } = 0.5f;
@@ -464,7 +464,7 @@ public sealed class TouchTuning
     /// <see cref="EarlyExecutionDribbling"/>.
     /// </summary>
     public Curve EarlyExecution { get; set; } = new((10f, 1.0f), (30f, 0.6f), (60f, 0.35f), (90f, 0.25f));
-    /// <summary>Multiplier on <see cref="EarlyExecution"/> by the dribbling rating.</summary>
+    /// <summary>Multiplier on <see cref="EarlyExecution"/> by the close dribbling rating.</summary>
     public RatingRange EarlyExecutionDribbling { get; set; } = new(1.15f, 0.85f);
     /// <summary>Touches are at least this far apart (from the previous touch), seconds.</summary>
     public float EarlyMinInterval { get; set; } = 0.22f;
@@ -525,7 +525,7 @@ public sealed class TouchTuning
     public float TurnArcDoneDeg { get; set; } = 15f;
     /// <summary>The braking arc brakes at this, m/s^2.</summary>
     public float TurnArcBrake { get; set; } = 13.5f;
-    /// <summary>While the braking arc brakes, his body turns at least this fast, deg/s, by dribbling rating.</summary>
+    /// <summary>While the braking arc brakes, his body turns at least this fast, deg/s, by close dribbling rating.</summary>
     public RatingRange TurnArcRotation { get; set; } = new(600f, 900f);
     /// <summary>The steering correction changes by at most this, m/s^2 (0: at once), so it never steps the velocity.</summary>
     public float SteerAccel { get; set; } = 6f;
@@ -540,7 +540,7 @@ public sealed class TouchTuning
     /// The fastest push of a skill move's hook (a fake cut), m/s. Touches take theirs from their profile (see <see cref="Profiles"/>).
     /// </summary>
     public float MaxPush { get; set; } = 12f;
-    /// <summary>Standard deviation of the touch speed factor (dribbling), before the speed scaling.</summary>
+    /// <summary>Standard deviation of the touch speed factor (the touch's dribbling rating), before the speed scaling.</summary>
     public RatingRange SpeedError { get; set; } = new(0.10f, 0.02f);
     /// <summary>Standard deviation of the touch direction, degrees (ball_control), before the speed scaling.</summary>
     public RatingRange DirectionErrorDeg { get; set; } = new(7f, 1f);
@@ -561,7 +561,7 @@ public sealed class TouchTuning
 
     /// <summary>
     /// After a dribble, turn or cut touch the acceleration (its cap and its soft landing) is multiplied by (1 + this + the turn extra) for the boost
-    /// duration, so the player accelerates harder out of the touch (dribbling rating).
+    /// duration, so the player accelerates harder out of the touch (the touch's dribbling rating).
     /// </summary>
     public RatingRange TouchBoost { get; set; } = new(0.15f, 0.35f);
     /// <summary>How long the touch boost lasts after the touch, seconds.</summary>
@@ -573,7 +573,7 @@ public sealed class TouchTuning
 
     /// <summary>
     /// A knock-on is planned so the player, chasing at full top speed, meets the ball this long after the touch, seconds
-    /// (dribbling rating).
+    /// (sprint dribbling rating).
     /// </summary>
     public RatingRange KnockOnCatchTime { get; set; } = new(1.8f, 1.3f);
     /// <summary>A knock-on's speed and direction errors are the sprint ones (full speed fraction) times this.</summary>

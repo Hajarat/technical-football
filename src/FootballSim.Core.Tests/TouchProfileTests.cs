@@ -87,7 +87,7 @@ public class TouchProfileTests
             Attacker = new StartSpot { X = 2.0f },
         };
         var s = TestData.Sheet(60);
-        s.Dribbling = dribbling;
+        s.CloseDribbling = s.SprintDribbling = dribbling;
         var w = new World(new Tuning(), sc, s, TestData.Sheet(50), seed);
         w.Begin();
         return w;

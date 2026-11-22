@@ -23,7 +23,7 @@ public class PlannedTouchTests
     static PlayerSheet Sheet(int dribbling = 75)
     {
         var s = TestData.Sheet(75);
-        s.Dribbling = dribbling;
+        s.CloseDribbling = s.SprintDribbling = dribbling;
         return s;
     }
 
@@ -149,7 +149,7 @@ public class PlannedTouchTests
                     p.LastTouchTime = now;
                     p.TouchBoostFrom = now;
                     p.TouchBoostUntil = now + t.Touch.TouchBoostDuration;
-                    p.TouchBoostFactor = TouchModel.TouchBoostFactor(s, 0f, t);
+                    p.TouchBoostFactor = TouchModel.TouchBoostFactor(s.CloseDribbling, 0f, t);
                 }
                 now += t.Dt;
                 Movement.Step(p, go, t.Dt, now, false, t, null);

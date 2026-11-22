@@ -279,7 +279,7 @@ public class MovementTests
         var k = T.Touch.TopSpeedWithBall;
         foreach (int rating in new[] { 1, 99 })
         {
-            s.Dribbling = rating;
+            s.CloseDribbling = s.SprintDribbling = rating;
             Assert.Equal(top * k.Close.ForRating(rating), Movement.TopSpeedWithBall(s, 0f, T), 3);
             Assert.Equal(top * k.Speed.ForRating(rating), Movement.TopSpeedWithBall(s, 1f, T), 3);
         }
@@ -294,12 +294,12 @@ public class MovementTests
         t.Touch.TopSpeedWithBall.Speed = new RatingRange(0.80f, 1.00f);
         var s = TestData.Sheet(50);
         float top = Movement.TopSpeed(s, t);
-        s.Dribbling = 1;
+        s.CloseDribbling = s.SprintDribbling = 1;
         // the style follows the intent: close control and no sprint are the close style, a full sprint the speed style
         Assert.Equal(top * 0.60f, Movement.TopSpeedWithBall(s, new TickIntent { MoveX = 1f, Sprint = 1f, CloseControl = true }, t), 3);
         Assert.Equal(top * 0.60f, Movement.TopSpeedWithBall(s, new TickIntent { MoveX = 1f }, t), 3);
         Assert.Equal(top * 0.80f, Movement.TopSpeedWithBall(s, new TickIntent { MoveX = 1f, Sprint = 1f }, t), 3);
-        s.Dribbling = 99;
+        s.CloseDribbling = s.SprintDribbling = 99;
         Assert.Equal(top * 0.90f, Movement.TopSpeedWithBall(s, new TickIntent { MoveX = 1f }, t), 3);
         Assert.Equal(top * 1.00f, Movement.TopSpeedWithBall(s, new TickIntent { MoveX = 1f, Sprint = 1f }, t), 3);
     }
@@ -310,7 +310,7 @@ public class MovementTests
         var t = new Tuning();
         t.Touch.TopSpeedWithBall.Close = new RatingRange(0.60f, 0.90f);
         t.Touch.TopSpeedWithBall.Speed = new RatingRange(0.80f, 1.00f);
-        var s = TestData.Sheet(50); s.Dribbling = 30;
+        var s = TestData.Sheet(50); s.CloseDribbling = s.SprintDribbling = 30;
         // The pace the legs aim for (cap times mode fraction) rises with the sprint input without a step anywhere, the
         // sprint threshold (where the touch mode changes) included.
         float Pace(float sprint)

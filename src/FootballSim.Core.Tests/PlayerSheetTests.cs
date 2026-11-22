@@ -6,7 +6,7 @@ namespace FootballSim.Core.Tests;
 public class PlayerSheetTests
 {
     const string Full = """
-    { "id": "x", "name": "X", "acceleration": 60, "sprint_speed": 61, "agility": 62, "balance": 63, "dribbling": 64, "ball_control": 65,
+    { "id": "x", "name": "X", "acceleration": 60, "sprint_speed": 61, "agility": 62, "balance": 63, "close_dribbling": 64, "sprint_dribbling": 64, "ball_control": 65,
       "first_touch": 66, "finishing": 67, "long_shots": 68, "shot_power": 69, "curve": 70, "composure": 71, "weak_foot": 64,
       "reflexes": 72, "diving": 73, "reach": 74, "positioning": 75, "handling": 76, "rushing_out": 77,
       "height_m": 1.85, "weight_kg": 80, "preferred_foot": "left" }

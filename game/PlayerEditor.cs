@@ -288,7 +288,7 @@ public partial class PlayerEditor : PanelContainer
         _confirm.Text = _message;
     }
 
-    /// <summary>"edited from striker_a: dribbling 72 → 84, ..." against the Base attacker, or "same as striker_a".</summary>
+    /// <summary>"edited from striker_a: close_dribbling 72 → 84, ..." against the Base attacker, or "same as striker_a".</summary>
     string DiffLine()
     {
         var b = _shipped.Find(s => s.Id == BaseId);

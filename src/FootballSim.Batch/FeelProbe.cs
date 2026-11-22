@@ -165,8 +165,8 @@ static class FeelProbe
         {
             foreach (string r in rs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                sheet.Dribbling = int.Parse(r, CultureInfo.InvariantCulture);
-                Console.WriteLine($"dribbling={sheet.Dribbling}");
+                sheet.CloseDribbling = sheet.SprintDribbling = int.Parse(r, CultureInfo.InvariantCulture);
+                Console.WriteLine($"dribbling={sheet.CloseDribbling}");
                 RunTables(tuning, sheet, keeper, attackerId, seeds);
                 Console.WriteLine();
             }

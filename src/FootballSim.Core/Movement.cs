@@ -16,7 +16,7 @@ public static class Movement
     public static float TopSpeedWithBall(PlayerSheet s, float speedShare, Tuning t)
     {
         var k = t.Touch.TopSpeedWithBall;
-        float close = k.Close.ForRating(s.Dribbling), speed = k.Speed.ForRating(s.Dribbling);
+        float close = k.Close.ForRating(s.CloseDribbling), speed = k.Speed.ForRating(s.SprintDribbling);
         return TopSpeed(s, t) * (close + (speed - close) * Math.Clamp(speedShare, 0f, 1f));
     }
 
@@ -214,7 +214,7 @@ public static class Movement
             float rate = TurnRateDeg(p.Sheet, t) * assist.TurnScale * (1f - m.TurnSpeedPenalty * Math.Clamp(speed / top, 0f, 1f))
                 * m.TurnAngleMult.Evaluate(MathF.Abs(diff) * 180f / MathF.PI) * MathF.PI / 180f;
             if (now < p.PostTurnUntil) rate = MathF.Max(rate, m.PostTurnRotationRate * MathF.PI / 180f);
-            if (arc) rate = MathF.Max(rate, t.Touch.TurnArcRotation.ForRating(p.Sheet.Dribbling) * MathF.PI / 180f);
+            if (arc) rate = MathF.Max(rate, t.Touch.TurnArcRotation.ForRating(p.Sheet.CloseDribbling) * MathF.PI / 180f);
             float maxTurn = rate * dt;
             // A small heading change eases in (time constant turn_ease) instead of snapping round at the full rate; a large
             // turn runs at the turn rate until it is within rate * turn_ease of the stick.
