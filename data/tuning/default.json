@@ -136,6 +136,14 @@
       "at99": 1
     },
     "danger_speed": [[0, 1], [1, 0.9]],
+    "composure_sprint_steps": {
+      "at1": 1.1,
+      "at99": 1
+    },
+    "composure_early": {
+      "at1": 1.1,
+      "at99": 1
+    },
     "turning_stick_rate_deg": 20,
     "turning_max_steps": {
       "jog": 2,

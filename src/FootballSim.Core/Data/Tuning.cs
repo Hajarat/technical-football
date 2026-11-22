@@ -496,6 +496,16 @@ public sealed class TouchTuning
     /// </summary>
     public Curve DangerSpeed { get; set; } = new((0f, 1f), (1f, 0.9f));
     /// <summary>
+    /// Multiplier on steps_per_touch.sprint by the composure rating, before the rounding to whole steps: a player without
+    /// composure takes his sprint touches a little further apart.
+    /// </summary>
+    public RatingRange ComposureSprintSteps { get; set; } = new(1.1f, 1f);
+    /// <summary>
+    /// Multiplier on the early-execution fraction by the composure rating (with <see cref="EarlyExecutionDribbling"/>; the
+    /// fraction stays at 1 or under): a player without composure gets less of the early touch after a turn.
+    /// </summary>
+    public RatingRange ComposureEarly { get; set; } = new(1.1f, 1f);
+    /// <summary>
     /// The stick counts as moving (a turn is likely) when its smoothed turn rate is above this, degrees per second; then, as
     /// for a touch sent more than the execution angle off the ball's travel, the push goes to a meet at most
     /// <see cref="TurningMaxSteps"/> steps away.

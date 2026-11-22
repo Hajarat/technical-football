@@ -180,12 +180,13 @@ public class TurnFatigueTests
     }
 
     [Fact]
-    public void TheEarlyFractionIsTodaysAtZeroFatigueAndTheNormalCadenceAtFullPenalty()
+    public void TheEarlyFractionIsTheRatedOneAtZeroFatigueAndTheNormalCadenceAtFullPenalty()
     {
         var t = new Tuning();
         foreach (int rating in new[] { 1, 30, 50, 72, 99 })
         {
             var p = Lab(1, rating, t).Attacker;
+            p.Sheet.Composure = 99;   // (composure's own multiplier is 1 there; see ComposureTouchTests)
             foreach (float deg in new[] { 0f, 10f, 20f, 30f, 45f, 60f, 90f, 150f })
             {
                 float today = MathF.Min(1f, t.Touch.EarlyExecution.Evaluate(deg) * t.Touch.EarlyExecutionDribbling.ForRating(rating));

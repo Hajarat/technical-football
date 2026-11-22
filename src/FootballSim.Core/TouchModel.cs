@@ -38,8 +38,8 @@ public static class TouchModel
 
     /// <summary>
     /// Steps of the stride clock between two dribble touches in a mode, at least 1: the close style's and the speed (sprint)
-    /// style's by close dribbling and the speed (sprint) style's by sprint dribbling, each on its own range; a jog's the same
-    /// for every player.
+    /// style's by close dribbling and the speed (sprint) style's by sprint dribbling, each on its own range, the sprint's
+    /// times composure_sprint_steps by composure before the rounding; a jog's the same for every player.
     /// </summary>
     public static int StepsPerTouch(PlayerSheet s, TouchMode mode, Tuning t)
     {
@@ -48,7 +48,7 @@ public static class TouchModel
         {
             TouchMode.CloseControl => k.Close.ForRating(s.CloseDribbling),
             TouchMode.Jog => k.Jog,
-            _ => k.Sprint.ForRating(s.SprintDribbling),
+            _ => k.Sprint.ForRating(s.SprintDribbling) * t.Touch.ComposureSprintSteps.ForRating(s.Composure),
         };
         return Math.Max(1, (int)MathF.Round(v, MidpointRounding.AwayFromZero));
     }

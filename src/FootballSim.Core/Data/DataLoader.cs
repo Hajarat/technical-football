@@ -254,7 +254,8 @@ public static class DataLoader
             string? badProfile = t.Touch.Profiles == null ? "must be an object" : t.Touch.Profiles.Validate();
             if (badProfile != null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: touch.profiles.{badProfile} (default tuning in use)" };
             foreach (var (field, range) in new[] { ("touch.fatigue_gain", t.Touch.FatigueGain), ("touch.fatigue_recovery", t.Touch.FatigueRecovery),
-                ("touch.danger_min_steps", t.Touch.DangerMinSteps) })
+                ("touch.danger_min_steps", t.Touch.DangerMinSteps), ("touch.composure_sprint_steps", t.Touch.ComposureSprintSteps),
+                ("touch.composure_early", t.Touch.ComposureEarly) })
             {
                 string? bad = range == null ? "must be an object with at1 and at99"
                     : !float.IsFinite(range.At1) || !float.IsFinite(range.At99) || range.At1 < 0f || range.At99 < 0f ? "at1 and at99 must be finite and not negative" : null;

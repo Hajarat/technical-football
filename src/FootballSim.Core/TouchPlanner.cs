@@ -1088,13 +1088,15 @@ public static class TouchPlanner
 
     /// <summary>
     /// The early execution fraction for a turn of <paramref name="turnDeg"/> (the stick against the ball's travel): the share
-    /// of the normal cadence a turn may cut it to, early_execution at the angle times the close dribbling multiplier, moved
-    /// back toward 1 (the normal cadence) by fatigue_penalty at his turn fatigue, and never above 1.
+    /// of the normal cadence a turn may cut it to, early_execution at the angle times the close dribbling multiplier and
+    /// composure_early by composure, moved back toward 1 (the normal cadence) by fatigue_penalty at his turn fatigue, and
+    /// never above 1.
     /// </summary>
     internal static float EarlyFraction(PlayerState p, float turnDeg, Tuning t)
     {
         var k = t.Touch;
-        float early = k.EarlyExecution.Evaluate(turnDeg) * k.EarlyExecutionDribbling.ForRating(p.Sheet.CloseDribbling);
+        float early = k.EarlyExecution.Evaluate(turnDeg) * k.EarlyExecutionDribbling.ForRating(p.Sheet.CloseDribbling)
+            * k.ComposureEarly.ForRating(p.Sheet.Composure);
         float penalty = Math.Clamp(k.FatiguePenalty.Evaluate(p.TurnFatigue), 0f, 1f);
         return MathF.Min(1f, early + (1f - early) * penalty);
     }

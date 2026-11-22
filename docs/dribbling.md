@@ -9,6 +9,8 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   top speed, the knock-on's catch time, and the launch angle, touch boost and speed error of touches with the sprint or the
   knock-on profile). A player file from before the split, with one `dribbling` rating, loads with both set to it and a
   warning.
+- Composure in touches is a light extra on the sprint cadence and on the early touch after a turn (both below). It is the
+  static rating: nothing in a 1v1 knocks a player, so there is no live composure that drops and recovers.
 - Speeds: a jog is 5.3 m/s for every player (`jog_speed`, from reference data), a sprint 6.8-8.5 m/s by `sprint_speed`
   (from reference data); with the ball both are lowered by dribbling, each dribbling style on its own range
   (`top_speed_with_ball.close`, by close dribbling, for a dribble with no sprint input: close control, a walk, a jog;
@@ -29,7 +31,9 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   walking touches, played as close control (the close style's cadence, `steps_per_touch.close` by close dribbling: a touch every
   step from about 26, every second step below). A jog pushes the ball two steps on, and every
   `foot_switch_every`-th (4th) push takes one step more so the other foot takes over; a sprint 4 steps at sprint dribbling 1, 3 from
-  about 27 and 2 from about 71 (`steps_per_touch.sprint`, 4 to 1.8 by rating). While the stick turns smoothly faster than
+  about 27 and 2 from about 71 (`steps_per_touch.sprint`, 4 to 1.8 by rating), times `composure_sprint_steps` by composure
+  (1.1 at 1, 1 at 99) before the rounding, so a player just inside a band takes a step more without composure (a sprint
+  dribbling of 72 keeps its two steps from composure 61). While the stick turns smoothly faster than
   `turning_stick_rate_deg` a push goes at most `turning_max_steps` steps on (2 at a jog, 3 at a sprint), and so does a sprint
   push within 0.35 s of the stick changing by more than 10 degrees or of sprint pressed or let go. No push is solved for
   more than 1.2 s (one cut short there is solved for the last step inside it that keeps the foot its steps would have
@@ -48,7 +52,7 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   correcting within `reach_tolerance` (0.08 m) of the contact point; the foot reaches the rest.
 - A demand (the stick turned past the execution angle off the ball's travel and off the run, the stick released for a stop,
   a skill gesture waiting, a shot's strike) shortens the cooldown to `early_execution` of the cadence (by the angle and
-  close dribbling), never sooner than `early_min_interval` (0.22 s); the go-get-it legs then take over when they play the ball a few
+  close dribbling, times `composure_early` by composure: 1.1 at 1, 1 at 99; capped at the normal cadence), never sooner than `early_min_interval` (0.22 s); the go-get-it legs then take over when they play the ball a few
   ticks sooner, and the stride may be quickened by up to a quarter to bring a step's window onto the ball.
 - A sprint push near the keeper is cut short. When a sprint push (not a turn, a cut or a first touch) is solved, the walk
   along his predicted run checks every tick, once `danger_min_steps` steps have begun (2 at sprint dribbling 1, 1 from 51),
