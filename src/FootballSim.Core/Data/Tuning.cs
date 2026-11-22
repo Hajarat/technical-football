@@ -759,6 +759,11 @@ public sealed class ShotTuning
     public float FootBySideDeg { get; set; } = 150f;
     /// <summary>A ball leaving within this of where he faces counts as dead ahead, degrees: the strong foot, the type's own surface.</summary>
     public float DeadAheadDeg { get; set; } = 22.5f;
+    /// <summary>
+    /// The dead-ahead swap, seconds: in a dribble, a shot aimed dead ahead goes to the weak foot when its swing comes at least
+    /// this much sooner than the strong foot's (see ShotModel.WithContact). Counted in whole ticks.
+    /// </summary>
+    public float DeadAheadSwapS { get; set; } = 0.1f;
     /// <summary>The ceiling of the outside cap (see <see cref="OutsideMaxDeg"/>), degrees ...</summary>
     public float OpenMaxDeg { get; set; } = 67.5f;
     /// <summary>... and for a finesse or low finesse shot.</summary>

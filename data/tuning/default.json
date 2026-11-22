@@ -391,6 +391,7 @@
     "strike_max_height": 0.6,
     "foot_by_side_deg": 150,
     "dead_ahead_deg": 22.5,
+    "dead_ahead_swap_s": 0.1,
     "open_max_deg": 67.5,
     "finesse_open_max_deg": 79,
     "outside_max_deg": {

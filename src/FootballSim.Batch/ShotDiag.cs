@@ -6,8 +6,8 @@ using FootballSim.Core;
 /// Diagnostic for the scoring calibration (<c>--probe shots --scenario &lt;id&gt; [--n N --seed S]</c>): plays the scripted rounds
 /// like the batch run and, per round, reads the state at the strike (distance to the goal, the attacker's speed, the charge
 /// against the ideal, the ball's offset from the striking foot's contact point and from the feet, the shot's accuracy and speed
-/// factors, its foot and surface, whether the far-post rule applied, the body angle, the launch speed and the time from the
-/// press to the strike) and how the round
+/// factors, its foot and surface, the rule of the foot choice that decided it (fixed from the release) and whether the
+/// contact check handed it to the other foot, the body angle, the launch speed and the time from the press to the strike) and how the round
 /// ended, then prints means and shares (on target = the shots that, flying free of the keeper, go in), the reasons wide shots went
 /// wide, and why rounds had no shot.
 /// </summary>
@@ -27,7 +27,8 @@ static class ShotDiag
         var factors = new Dictionary<string, List<float>>();
         var launch = new List<float>(); var pressToStrike = new List<float>(); var bodyAngle = new List<float>();
         var feet = new Dictionary<string, int>();
-        int onTarget = 0, farPost = 0;
+        var rules = new Dictionary<StrikeRule, int>();
+        int onTarget = 0, farPost = 0, swapped = 0, noContact = 0;
         var ends = new Dictionary<string, int>();
         var noShot = new Dictionary<string, int>();
         int wide = 0, wideAimOut = 0, wideError = 0;
@@ -76,7 +77,12 @@ static class ShotDiag
             if (pressTick >= 0) pressToStrike.Add((s.Tick - pressTick) * tuning.Dt);
             string how = (s.Foot == att.PreferredFoot ? "strong " : "weak ") + s.Surface.ToString().ToLowerInvariant();
             feet[how] = feet.GetValueOrDefault(how) + 1;
-            if (ShotModel.FarPostApplies(s.Type, ballPrev, ShotModel.AimZ(ballPrev, s.IntendedYaw, w.Pitch, tuning), posPrev, w.Pitch, tuning)) farPost++;
+            // The decision of the release still stands at the strike. A foot that differs from it was handed over: by the
+            // dead-ahead swap when Ahead decided, otherwise because the chosen foot had no contact.
+            var decision = w.StrikeGeometry;
+            rules[decision.Rule] = rules.GetValueOrDefault(decision.Rule) + 1;
+            if (decision.Rule == StrikeRule.FarPost) farPost++;
+            if (s.Foot != decision.Choice.Foot) { if (decision.Rule == StrikeRule.Ahead) swapped++; else noContact++; }
             var res = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed0 + (ulong)r);
             ends[res.End.ToString()] = ends.GetValueOrDefault(res.End.ToString()) + 1;
             if (res.End == ShotEnd.Wide)
@@ -93,6 +99,8 @@ static class ShotDiag
         Console.WriteLine($"  on target: {(dist.Count == 0 ? "-" : $"{100.0 * onTarget / dist.Count:F1}% of the shots")}   launch speed m/s: {F(launch)}   press to strike s: {F(pressToStrike)}");
         Console.WriteLine($"  body angle deg: {F(bodyAngle)}   struck with: {string.Join(", ", feet.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} {100.0 * kv.Value / Math.Max(1, dist.Count):F1}%"))}");
         Console.WriteLine($"  far_post: {(dist.Count == 0 ? "-" : $"yes {100.0 * farPost / dist.Count:F1}%, no {100.0 * (dist.Count - farPost) / dist.Count:F1}%")}   run_speed factor: {(factors.TryGetValue("speed x run_speed", out var rs) ? F(rs) : "-")}");
+        Console.WriteLine($"  rule: {(dist.Count == 0 ? "-" : string.Join(", ", Enum.GetValues<StrikeRule>().Select(r => $"{r.ToString().ToLowerInvariant()} {100.0 * rules.GetValueOrDefault(r) / dist.Count:F1}%")))}");
+        Console.WriteLine($"  handed over: {(dist.Count == 0 ? "-" : $"swap {100.0 * swapped / dist.Count:F1}%, no contact {100.0 * noContact / dist.Count:F1}%")}");
         Console.WriteLine($"  no shot: {(noShot.Count == 0 ? "none" : string.Join(", ", noShot.Select(kv => $"{kv.Key} {kv.Value}")))}");
         Console.WriteLine($"  distance to goal at strike m: {F(dist)}");
         Console.WriteLine($"  attacker speed at strike m/s: {F(speed)}");

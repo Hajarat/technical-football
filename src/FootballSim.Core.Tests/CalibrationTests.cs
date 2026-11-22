@@ -237,14 +237,17 @@ public class CalibrationTests
     /// quarters of halfway run's strikes) it measured 18.4% (21.7% without that term); its band was moved to 16-26. With the
     /// striking foot decided by the geometry alone (2026-11-22: the stride no longer picks the foot, so a run-in strike waits
     /// for the strong foot, 0.71 s from the press against 0.50 s, about a metre closer to a keeper who has come out further)
-    /// halfway run measured 7.6%, most of the rest parried; its band is five points either side. The other bands held.
+    /// halfway run measured 7.6%, most of the rest parried; its band was five points either side. With the dead-ahead swap
+    /// (2026-11-22: aimed within dead_ahead_deg of his facing, a weak foot that swings at least dead_ahead_swap_s, 0.1 s,
+    /// sooner takes the shot; 83% of halfway run's strikes, 0.50 s from the press again) halfway run measured 19.6%; its band
+    /// is back at 16-26. The other bands held.
     /// </summary>
     [Theory]
     [InlineData("penalty", 72.0, 80.0)]
     [InlineData("edge_of_box", 6.0, 14.0)]
     [InlineData("tight_angle", 2.0, 8.0)]
     [InlineData("breakaway", 7.0, 17.0)]
-    [InlineData("halfway_run", 3.0, 13.0)]
+    [InlineData("halfway_run", 16.0, 26.0)]
     [InlineData("angled_run", 27.0, 37.0)]
     [InlineData("keeper_rush", 35.0, 45.0)]
     public void ScoringRateStaysInItsBand(string scenario, double lo, double hi)

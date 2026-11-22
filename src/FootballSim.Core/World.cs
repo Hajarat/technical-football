@@ -43,7 +43,7 @@ public sealed class World
     bool _shotAtFoot;          // shoot pressed with the ball at the feet: struck at the earliest strike tick if strikable then
     Foot _strikeFoot;          // the striking foot chosen for the shot under way: at the press for the aim then, final at the release
     FootSurface _strikeSurface; // ... and the part of it (the outside of the foot, or the shot type's own)
-    StrikeChoice _strikeGeometry; // what the geometry alone gave at the last choice, before the contact check; stands from the release
+    StrikeDecision _strikeGeometry; // what the geometry alone gave at the last choice, before the contact check; stands from the release
     float _aimYaw;             // the shot's intended yaw: follows the stick while shoot is held, fixed at the release
     bool _strikeUntimed;       // the foot was chosen in a dribble without each foot's contact tick (a touch was still to be played, or the ball left the feet): chosen once more when they are known
     int _strikeEstMax = -1;    // the latest strike tick published for the shot under way (the estimate never moves earlier)
@@ -199,7 +199,7 @@ public sealed class World
         _lastPushedStick = default; _lastPushedTick = int.MinValue / 2;
         _pending = default; _outcomeLeft = 0f;
         _liveSeconds = 0f; _endTick = 0; _endClock = 0f; _lastShot = null;
-        _controller = null; _awayFor = 0f; _softPending = false; _ballPlayed = Scenario.BallLoose; _shotAtFoot = false; _strikeFoot = Foot.Right; _strikeSurface = FootSurface.Laces; _strikeGeometry = new StrikeChoice(Foot.Right, FootSurface.Laces); _aimYaw = 0f; _strikeUntimed = false;
+        _controller = null; _awayFor = 0f; _softPending = false; _ballPlayed = Scenario.BallLoose; _shotAtFoot = false; _strikeFoot = Foot.Right; _strikeSurface = FootSurface.Laces; _strikeGeometry = new StrikeDecision(new StrikeChoice(Foot.Right, FootSurface.Laces), StrikeRule.Ahead); _aimYaw = 0f; _strikeUntimed = false;
         _shotStartTick = -1; _shotCancelled = false; _strikeEstMax = -1; _fakeTick = -1; _fake = default;
 
         float r = Tuning.Ball.Radius;
@@ -600,10 +600,11 @@ public sealed class World
     }
 
     /// <summary>
-    /// What the geometry alone gave for the shot under way at its last choice (see <see cref="ShotModel.ChooseByGeometry"/>),
-    /// fixed from the release. The foot that strikes differs from it only when the contact check handed the shot over.
+    /// What the geometry alone gave for the shot under way at its last choice, and the rule that gave it (see
+    /// <see cref="ShotModel.ChooseByGeometry"/>), fixed from the release. The foot that strikes differs from it only when the
+    /// contact check handed the shot over (see <see cref="ShotModel.WithContact"/>).
     /// </summary>
-    public StrikeChoice StrikeGeometry => _strikeGeometry;
+    public StrikeDecision StrikeGeometry => _strikeGeometry;
 
     /// <summary>The part of the foot the shot under way is struck with: the outside if that was chosen, else the type's own.</summary>
     FootSurface SurfaceNow(ShotType type) => _strikeSurface == FootSurface.Outside ? FootSurface.Outside : ShotModel.SurfaceFor(type);
@@ -613,7 +614,8 @@ public sealed class World
     /// yaw <see cref="_aimYaw"/>: by the geometry as it stands now, or, with <paramref name="keepGeometry"/>, by the geometry
     /// of the last choice. In a dribble (in possession, the ball not held at the feet, no touch still to be played first) each
     /// foot's earliest strike contact from <paramref name="earliestTick"/> on is checked: a chosen foot with no contact gives
-    /// way to the other. The touch controller then plans the strike on the chosen foot's swings only. With a touch still to be
+    /// way to the other, and a choice made fresh (not with <paramref name="keepGeometry"/>) may take the dead-ahead swap (see
+    /// <see cref="ShotModel.WithContact"/>). The touch controller then plans the strike on the chosen foot's swings only. With a touch still to be
     /// played first the feet's contacts are not known yet (the touch moves the ball): the foot is chosen without them and
     /// checked once more when the touch has been played (see <see cref="ChooseStrikeTimed"/>). Draws no random numbers.
     /// </summary>
@@ -630,7 +632,7 @@ public sealed class World
             left = TouchPlanner.StrikeTickFor(p, Ball, Foot.Left, earliestTick, notBefore, Tick, SimTime, Tuning, Pitch);
         }
         if (!keepGeometry) _strikeGeometry = ShotModel.ChooseByGeometry(p.Sheet, p.Position, p.Facing, Ball.Position, _aimYaw, type, Pitch, Tuning);
-        var choice = ShotModel.WithContact(_strikeGeometry, type, right, left);
+        var choice = ShotModel.WithContact(_strikeGeometry, type, right, left, allowSwap: !keepGeometry, Tuning);
         _strikeFoot = choice.Foot;
         _strikeSurface = choice.Surface;
         p.StrikeFoot = choice.Foot;
@@ -653,8 +655,9 @@ public sealed class World
     /// <summary>
     /// A foot chosen in a dribble without the feet's contact ticks is checked once more as soon as they are known (the touch
     /// committed before the press has been played, or a ball held at the feet got away), unless the strike is already
-    /// committed: from its commit the foot is fixed. After the release the geometry decided there stands, so this can change
-    /// the foot only through the contact check; while shoot is still held the choice is a forecast and is made afresh. This
+    /// committed: from its commit the foot is fixed. After the release the geometry decided there stands and the dead-ahead
+    /// swap is no longer taken, so this can change the foot only when the chosen foot has no contact; while shoot is still
+    /// held the choice is a forecast and is made afresh. This
     /// runs before the touch controller, which then forecasts the strike on the foot chosen here.
     /// </summary>
     void ChooseStrikeTimed(PlayerState p)

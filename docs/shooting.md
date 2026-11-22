@@ -32,20 +32,24 @@ Any of them is struck with the outside of the foot instead when the foot rules g
 - The striking foot and the part of it are chosen once (`ShotModel.ChooseStrike`): at the press for the aim the stick has
   then, so the strike is forecast on that foot from the press, and again at the release for the aim it locks. From the
   release the foot does not change, with one exception below. The choice is geometry: the angle from where he faces to the
-  intended direction, positive toward his right, and where he and the ball are. The same facing, aim and positions give the
-  same foot and surface every time; nothing is weighed, and the weak foot's rating has no say. "Own side" is his strong
-  foot's side, and the type's own surface is the one in the table above. In order:
-  1. Straight behind (within half a degree of 180): the strong foot, the type's own surface.
-  2. A wide shot, more than `foot_by_side_deg` (150 degrees) either way: the foot on the side the ball leaves, the type's
-     own surface, whatever his preference.
-  3. Across his body, or dead ahead (within `dead_ahead_deg`, 22.5 degrees, toward his own side): the strong foot, the
-     type's own surface.
-  4. Toward his own side up to his outside cap: the outside of the strong foot. Beyond the cap: the weak foot, the type's
+  intended direction, positive toward his right, and where he and the ball are. The same facing, aim, positions and (in a
+  dribble) contact ticks give the same foot and surface every time; nothing is weighed, and the weak foot's rating has no
+  say. "Own side" is his strong foot's side, and the type's own surface is the one in the table above. The geometry
+  (`ShotModel.ChooseByGeometry`) gives the foot, the surface and the rule that decided (`StrikeRule`); the first that
+  holds, in order:
+  1. Behind: straight behind (within half a degree of 180): the strong foot, the type's own surface.
+  2. Wide: more than `foot_by_side_deg` (150 degrees) either way: the foot on the side the ball leaves, the type's own
+     surface, whatever his preference.
+  3. Ahead: dead ahead, within `dead_ahead_deg` (22.5 degrees) of where he faces, either way: the strong foot, the type's
      own surface.
+  4. Across: across his body: the strong foot, the type's own surface.
+  5. Weak: toward his own side beyond his outside cap: the weak foot, the type's own surface.
+  6. FarPost: within the cap, where the far-post rule below applies: the strong foot, the type's own surface.
+  7. Outside: within the cap otherwise: the outside of the strong foot.
   - The outside cap (`ShotModel.OutsideCapDeg`) is `outside_max_deg` by the `curve` rating (30 degrees at 1, 67.5 at 99; 57
     at 72), wider by `outside_foot_bonus_deg` (12) with the `outside_foot` trait, never past the type's ceiling
     (`open_max_deg`, 67.5; `finesse_open_max_deg`, 79, for a finesse or low finesse). Everyone has one.
-  - The far-post rule changes one case of step 4: an inverted shooter (a right-footer on the left flank, Z below 0, or a
+  - The far-post rule changes one case: an inverted shooter (a right-footer on the left flank, Z below 0, or a
     left-footer on the right) aiming at the far half of the goal line toward his own side within his cap keeps the type's
     own surface instead of the outside, the cut-in curl with the instep. It holds inside the type's distance band from the
     ball to the goal centre (`far_post_band`: power and driven up to 50 m, a chip within 2.5 m, finesse and low finesse at
@@ -53,14 +57,21 @@ Any of them is struck with the outside of the foot instead when the foot rules g
     clamped to `max_target_z`; it must lie across the centre line (Z = 0) from the shooter. A shooter within
     `far_post_flank_min_m` (0.3 m) of the centre line is on neither flank and an aim at the centre is at neither post: the
     rule is off for both.
-  - An angle on a limit counts as inside it: at the cap it is still the outside, at 150 degrees it is not yet wide.
-  - The contact check, in a dribble only: when the chosen foot has no strike contact at all and the other has one, the
-    other foot strikes, with the type's own surface. The stride never chooses the foot otherwise: a strike waits for the
-    chosen foot however much sooner the other would swing.
+  - An angle on a limit counts as inside it: at the cap it is still the outside, at 150 degrees it is not yet wide, at
+    22.5 degrees it is still dead ahead.
+  - The contact check (`ShotModel.WithContact`), in a dribble only, hands the shot to the other foot, with the type's own
+    surface, in two cases. No contact: the chosen foot has no strike contact at all and the other has one. The dead-ahead
+    swap: the Ahead rule decided (either foot is natural there), both feet have a contact, and the weak foot's comes at
+    least `dead_ahead_swap_s` (0.1 s, counted in whole ticks: 12) sooner than the strong foot's. The weak foot's rating
+    does not gate the swap; its weak-foot spread, speed and curl apply as on any weak-foot strike. The stride never chooses
+    the foot otherwise: outside the dead-ahead zone a strike waits for the chosen foot however much sooner the other would
+    swing.
+  - The swap is taken only when the foot is chosen fresh: the forecast while shoot is held, and the choice at the release.
   - The exception: a foot chosen while a dribble touch was still to be played, or with the ball held at the feet and then
     lost from them, goes through the contact check once more when each foot's next contact is known, unless the strike is
-    already committed. After the release the geometry decided there stands (`World.StrikeGeometry`), so this can change the
-    foot only through the contact check; while shoot is still held the choice is a forecast and is made afresh.
+    already committed. After the release the decision made there stands (`World.StrikeGeometry`, the geometry's choice and
+    its rule) and the swap is no longer taken, so this can change the foot only in the no-contact case; while shoot is
+    still held the choice is a forecast and is made afresh.
 - The angle a shot is struck at costs it. The body angle (the intended direction against where he faces, 0 to 180 degrees)
   multiplies the spread (`angle_accuracy`: free to 30 degrees, 1.5 at 60, 2.4 at 90, 3.4 at 120, 4.5 with his back
   to the shot), scales the launch speed down (`angle_power`: free to 45 degrees, 0.82 at 90, 0.55 at 180) and, as it stands
@@ -100,6 +111,9 @@ Any of them is struck with the outside of the foot instead when the foot rules g
   0.12, drawn from its own generator seeded from the round's seed.
 - `--probe shots --scenario <id>` prints, for the scripted attacker's shots, how they ended, the share on target (the ball as
   struck, flying free of the keeper, goes in), the launch speed, the time from the press to the strike, the body angle, the
-  foot and surface, how often the far-post rule applied (`far_post`), the `run_speed` factor, and every spread and speed
-  factor by name.
+  foot and surface, how often the far-post rule decided the strike (`far_post`: yes only for the FarPost rule), the
+  `run_speed` factor, the share of strikes each rule decided (`rule:`, read at the strike from `World.StrikeGeometry`), the
+  share handed to the other foot (`handed over:` `swap`, the Ahead rule decided and the other foot struck; `no contact`,
+  the foot differs for any other reason), and every spread and speed factor by name. `--write-shot-replays` prints the
+  rule and `far_post` for each replay it writes.
 - Every number is in the `shot` section of `data/tuning/default.json`.

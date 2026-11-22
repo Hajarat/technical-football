@@ -6,7 +6,7 @@ namespace FootballSim.Core.Tests;
 /// <summary>
 /// The striking foot and the angle a shot is struck at: the foot rules (the strong foot across the body, its outside toward its
 /// own side up to the cap, the weak foot beyond, the foot on the ball's side for a wide shot, the far-post rule, the contact
-/// check), the body-angle and goal-mouth terms, the weak-foot and outside-foot terms, and the foot and aim locked in the world.
+/// check and its dead-ahead swap), the body-angle and goal-mouth terms, the weak-foot and outside-foot terms, and the foot and aim locked in the world.
 /// </summary>
 public class ShotFootTests
 {
@@ -41,12 +41,27 @@ public class ShotFootTests
     /// The choice for a player at (<paramref name="outM"/> metres from the goal line, <paramref name="z"/>) with the ball at his
     /// feet, aiming at <paramref name="aimZ"/> on the goal line, that aim <paramref name="thetaDeg"/> to his right.
     /// </summary>
-    static StrikeChoice ChooseAt(PlayerSheet s, float outM, float z, float aimZ, float thetaDeg, ShotType type = ShotType.Power)
+    static StrikeChoice ChooseAt(PlayerSheet s, float outM, float z, float aimZ, float thetaDeg, ShotType type = ShotType.Power, int right = 0, int left = 0)
     {
         var pos = new Vector3(P.GoalLineX - outM, 0f, z);
         var ball = new Vector3(pos.X, T.Ball.Radius, pos.Z);
         float yaw = MathF.Atan2(aimZ - z, outM);
-        return ShotModel.ChooseStrike(s, pos, yaw - thetaDeg * Deg, ball, yaw, type, P, T);
+        return ShotModel.ChooseStrike(s, pos, yaw - thetaDeg * Deg, ball, yaw, type, P, T, right, left);
+    }
+
+    /// <summary>The geometry's decision for <see cref="Choose"/>'s player on the spot.</summary>
+    static StrikeDecision Decide(PlayerSheet s, float yawDeg, ShotType type = ShotType.Power)
+    {
+        var spot = new Vector3(P.GoalLineX - 11f, 0f, 0f);
+        return ShotModel.ChooseByGeometry(s, spot, 0f, new Vector3(spot.X + 0.5f, T.Ball.Radius, 0f), yawDeg * Deg, type, P, T);
+    }
+
+    /// <summary>The geometry's decision for <see cref="ChooseAt"/>'s player.</summary>
+    static StrikeDecision DecideAt(PlayerSheet s, float outM, float z, float aimZ, float thetaDeg, ShotType type = ShotType.Power)
+    {
+        var pos = new Vector3(P.GoalLineX - outM, 0f, z);
+        float yaw = MathF.Atan2(aimZ - z, outM);
+        return ShotModel.ChooseByGeometry(s, pos, yaw - thetaDeg * Deg, new Vector3(pos.X, T.Ball.Radius, pos.Z), yaw, type, P, T);
     }
 
     /// <summary>Each case for a right-footed player and, mirrored, for a left-footed one: <paramref name="check"/> gets the strong foot and the sign of his own side.</summary>
@@ -309,6 +324,96 @@ public class ShotFootTests
         Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), Choose(s, -160f, right: 30, left: -1));
         // Both ticks zero: no timing at all.
         Assert.Equal(new StrikeChoice(Foot.Right, FootSurface.Laces), Choose(s, -30f, right: 0, left: 0));
+    }
+
+    [Fact]
+    public void DeadAheadAWeakFootThatSwingsSoonEnoughTakesTheShot()
+    {
+        Assert.Equal(12, ShotModel.SwapLeadTicks(T));           // 0.1 s in whole ticks
+        BothFeet((strong, own) =>
+        {
+            var s = Sheet(preferred: strong);
+            Foot weak = Other(strong);
+            // Each foot's earliest strike tick, as (right, left).
+            StrikeChoice At(float yawDeg, int strongTick, int weakTick) =>
+                strong == Foot.Right ? Choose(s, yawDeg, right: strongTick, left: weakTick) : Choose(s, yawDeg, right: weakTick, left: strongTick);
+            foreach (float yaw in new[] { 10f, -10f, 0f, T.Shot.DeadAheadDeg, -T.Shot.DeadAheadDeg })
+            {
+                // The weak foot 0.1 s sooner: it strikes, with the type's own surface. A tick less than that: the strong foot.
+                Assert.Equal(new StrikeChoice(weak, FootSurface.Laces), At(yaw, 40, 28));
+                Assert.Equal(new StrikeChoice(weak, FootSurface.Laces), At(yaw, 400, 28));
+                Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), At(yaw, 40, 29));
+                Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), At(yaw, 28, 40));
+                // A foot with no contact: the other one, as anywhere (the contact check).
+                Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), At(yaw, 40, -1));
+                Assert.Equal(new StrikeChoice(weak, FootSurface.Laces), At(yaw, -1, 40));
+                Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), At(yaw, -1, -1));
+                // Both ticks zero: no timing, no swap.
+                Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), At(yaw, 0, 0));
+            }
+            Assert.Equal(new StrikeChoice(weak, FootSurface.Inside), strong == Foot.Right
+                ? Choose(s, 10f, ShotType.Finesse, right: 40, left: 28) : Choose(s, 10f, ShotType.Finesse, right: 28, left: 40));
+            // However poor the weak foot is, the swap is taken.
+            var poor = Sheet(1, preferred: strong);
+            Assert.Equal(weak, (strong == Foot.Right ? Choose(poor, 10f, right: 40, left: 28) : Choose(poor, 10f, right: 28, left: 40)).Foot);
+
+            // Outside the dead-ahead zone the same ticks change nothing: across the body, the outside, the weak foot beyond the
+            // cap, wide either way, straight behind.
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), At(-own * 30f, 40, 28));
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Outside), At(own * 40f, 40, 28));
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Outside), At(own * (T.Shot.DeadAheadDeg + 0.1f), 40, 28));
+            Assert.Equal(new StrikeChoice(weak, FootSurface.Laces), At(own * 60f, 28, 40));
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), At(own * 160f, 40, 28));
+            Assert.Equal(new StrikeChoice(weak, FootSurface.Laces), At(-own * 160f, 28, 40));
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), At(180f, 40, 28));
+            // ... and the far-post case (an inverted shooter, 30 degrees toward his own side).
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), strong == Foot.Right
+                ? ChooseAt(s, 16f, -6f, 3f, 30f, right: 40, left: 28) : ChooseAt(s, 16f, 6f, -3f, -30f, right: 28, left: 40));
+
+            // The swap is only for a foot chosen fresh: without it the decision stands, but for a foot with no contact.
+            var ahead = Decide(s, own * 10f);
+            int r = strong == Foot.Right ? 40 : 28, l = strong == Foot.Right ? 28 : 40;
+            Assert.Equal(new StrikeChoice(weak, FootSurface.Laces), ShotModel.WithContact(ahead, ShotType.Power, r, l, allowSwap: true, T));
+            Assert.Equal(new StrikeChoice(strong, FootSurface.Laces), ShotModel.WithContact(ahead, ShotType.Power, r, l, allowSwap: false, T));
+            Assert.Equal(new StrikeChoice(weak, FootSurface.Laces),
+                ShotModel.WithContact(ahead, ShotType.Power, strong == Foot.Right ? -1 : 40, strong == Foot.Right ? 40 : -1, allowSwap: false, T));
+        });
+
+        // The lead is dead_ahead_swap_s in whole ticks.
+        var t = new Tuning();
+        t.Shot.DeadAheadSwapS = 0.2f;
+        Assert.Equal(24, ShotModel.SwapLeadTicks(t));
+        var d = Decide(Sheet(), 10f);
+        Assert.Equal(Foot.Right, ShotModel.WithContact(d, ShotType.Power, 40, 17, allowSwap: true, t).Foot);
+        Assert.Equal(Foot.Left, ShotModel.WithContact(d, ShotType.Power, 40, 16, allowSwap: true, t).Foot);
+    }
+
+    [Fact]
+    public void TheGeometryNamesTheRuleThatDecided()
+    {
+        BothFeet((strong, own) =>
+        {
+            var s = Sheet(preferred: strong);
+            Foot weak = Other(strong);
+            StrikeDecision D(Foot foot, FootSurface surface, StrikeRule rule) => new(new StrikeChoice(foot, surface), rule);
+            Assert.Equal(D(strong, FootSurface.Laces, StrikeRule.Behind), Decide(s, 180f));
+            Assert.Equal(D(strong, FootSurface.Laces, StrikeRule.Behind), Decide(s, -179.8f));
+            Assert.Equal(D(strong, FootSurface.Laces, StrikeRule.Wide), Decide(s, own * 160f));
+            Assert.Equal(D(weak, FootSurface.Laces, StrikeRule.Wide), Decide(s, -own * 160f));
+            // Dead ahead on both sides of the facing, up to and on dead_ahead_deg; just past it, the outside or across.
+            foreach (float yaw in new[] { 0f, 10f, -10f, T.Shot.DeadAheadDeg, -T.Shot.DeadAheadDeg })
+                Assert.Equal(D(strong, FootSurface.Laces, StrikeRule.Ahead), Decide(s, yaw));
+            Assert.Equal(D(strong, FootSurface.Outside, StrikeRule.Outside), Decide(s, own * (T.Shot.DeadAheadDeg + 0.1f)));
+            Assert.Equal(D(strong, FootSurface.Laces, StrikeRule.Across), Decide(s, -own * (T.Shot.DeadAheadDeg + 0.1f)));
+            Assert.Equal(D(strong, FootSurface.Laces, StrikeRule.Across), Decide(s, -own * 90f));
+            Assert.Equal(D(strong, FootSurface.Outside, StrikeRule.Outside), Decide(s, own * 40f));
+            Assert.Equal(D(weak, FootSurface.Laces, StrikeRule.Weak), Decide(s, own * 60f));
+            Assert.Equal(D(weak, FootSurface.Inside, StrikeRule.Weak), Decide(s, own * 80f, ShotType.Finesse));
+            // The far-post rule for an inverted shooter; on his natural flank the same aim is the outside's.
+            Assert.Equal(D(strong, FootSurface.Laces, StrikeRule.FarPost), DecideAt(s, 16f, -own * 6f, own * 3f, own * 30f));
+            Assert.Equal(D(strong, FootSurface.Outside, StrikeRule.Outside), DecideAt(s, 16f, own * 6f, -own * 3f, own * 30f));
+            Assert.Equal(D(weak, FootSurface.Laces, StrikeRule.Weak), DecideAt(s, 16f, -own * 6f, own * 3f, own * 60f));
+        });
     }
 
     static PlayerState Shooter(float facing = 0f, float x = 41f, float z = 0f, PlayerSheet? sheet = null)
@@ -577,7 +682,7 @@ public class ShotFootTests
     [Fact]
     public void InADribbleTheStrikeWaitsForTheFootChosenAtTheReleaseAndNeverChangesIt()
     {
-        int shots = 0, waited = 0, byGeometry = 0, handedOver = 0;
+        int shots = 0, waited = 0, byGeometry = 0, handedOver = 0, swapped = 0;
         foreach (var (run, aim) in new[] { (0f, 0f), (0f, 60f), (0f, -60f), (0f, 100f), (0f, -100f), (30f, -40f) })
             foreach (float sprint in new[] { 0f, 1f })
                 for (ulong seed = 1; seed <= 6; seed++)
@@ -598,16 +703,26 @@ public class ShotFootTests
                     Foot foot = shot.Foot;
                     var surface = shot.Surface;
                     float aimYaw = shot.AimYaw;
-                    // The release decides by the geometry: the foot differs from it only through the contact check, which
-                    // hands the shot over with the type's own surface.
-                    var geometry = w.StrikeGeometry;
+                    // The release decides by the geometry: the foot differs from it only through the contact check (a chosen
+                    // foot with no contact, or the dead-ahead swap), which hands the shot over with the type's own surface.
+                    var decision = w.StrikeGeometry;
+                    var geometry = decision.Choice;
                     float open = ShotModel.OpenAngleDeg(Foot.Right, Foot.Right, p.Facing, aimYaw);
                     float cap = ShotModel.OutsideCapDeg(p.Sheet, ShotType.Power, T);
                     if (open > cap + 5f && open < 145f) Assert.True(geometry.Foot == Foot.Left, $"{id}: {open:F0} degrees to the right is the left foot's");
                     if (open < T.Shot.DeadAheadDeg - 5f && open > -145f) Assert.True(geometry == new StrikeChoice(Foot.Right, FootSurface.Laces), $"{id}: {open:F0} degrees to the right is the right foot's laces");
                     if (open > T.Shot.DeadAheadDeg + 5f && open < cap - 5f) Assert.True(geometry == new StrikeChoice(Foot.Right, FootSurface.Outside), $"{id}: {open:F0} degrees to the right is the outside of the right foot");
                     if (foot == geometry.Foot) { Assert.True(surface == geometry.Surface, $"{id}: surface {surface}, by the geometry {geometry.Surface}"); byGeometry++; }
-                    else { Assert.True(surface == FootSurface.Laces, $"{id}: handed over with {surface}"); handedOver++; }
+                    else
+                    {
+                        Assert.True(surface == FootSurface.Laces, $"{id}: handed over with {surface}");
+                        handedOver++;
+                        // Only a shot the Ahead rule decided is handed over for the stride's sake, and here, at the release:
+                        // the loop below holds the foot fixed from now to the strike.
+                        if (decision.Rule == StrikeRule.Ahead) { Assert.True(foot == Foot.Left, $"{id}: swapped to the {foot} foot"); swapped++; }
+                    }
+                    if (MathF.Abs(open) <= T.Shot.DeadAheadDeg - 1f) Assert.True(decision.Rule == StrikeRule.Ahead, $"{id}: {open:F0} degrees decided by {decision.Rule}");
+                    if (MathF.Abs(open) > T.Shot.DeadAheadDeg + 1f) Assert.True(decision.Rule != StrikeRule.Ahead, $"{id}: {open:F0} degrees decided by Ahead");
                     for (int i = 0; i < 600 && w.Shots.Count == 0; i++)
                     {
                         Step(w, Dir(run + 150f, sprint: sprint));        // the stick swung away after the release changes nothing
@@ -616,12 +731,13 @@ public class ShotFootTests
                         Assert.True(shot.Foot == foot && p.StrikeFoot == foot, $"{id}: the foot changed after the release");
                         Assert.True(shot.Surface == surface, $"{id}: the surface changed after the release");
                         // A choice made again once a pending touch has been played keeps the geometry of the release.
-                        Assert.True(w.StrikeGeometry == geometry, $"{id}: the geometry was decided again after the release");
+                        Assert.True(w.StrikeGeometry == decision, $"{id}: the geometry was decided again after the release");
                         Assert.Equal(aimYaw, shot.AimYaw);
                     }
                     var r = Assert.Single(w.Shots);
                     shots++;
                     Assert.True(r.Foot == foot, $"{id}: struck with the {r.Foot} foot, chosen {foot}");
+                    Assert.True(w.StrikeGeometry == decision, $"{id}: the decision changed at the strike");
                     Assert.Equal(surface, r.Surface);
                     Assert.Equal(foot, shot.Foot);
                     if (!atFoot && p.IsStepping)
@@ -631,7 +747,9 @@ public class ShotFootTests
                     }
                 }
         Assert.Equal(72, shots);
-        Assert.True(byGeometry > 60, $"{byGeometry} strikes on the foot the geometry gave, {handedOver} handed over");
+        // Dead ahead about half the strikes go to the foot that swings sooner; everywhere else the geometry's foot strikes.
+        Assert.True(byGeometry + swapped > 60, $"{byGeometry} strikes on the foot the geometry gave, {handedOver} handed over, {swapped} of them by the dead-ahead swap");
+        Assert.True(swapped > 5, $"{swapped} strikes handed over by the dead-ahead swap");
         Assert.True(waited > 30, $"{waited} strikes on the chosen foot's swing");
     }
 

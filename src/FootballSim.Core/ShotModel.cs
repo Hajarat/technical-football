@@ -12,6 +12,12 @@ public readonly record struct ShotPreview(Vector3 Origin, float IntendedYaw, flo
 /// <summary>The foot and the part of it a shot is struck with (see <see cref="ShotModel.ChooseStrike"/>).</summary>
 public readonly record struct StrikeChoice(Foot Foot, FootSurface Surface);
 
+/// <summary>Which case of the foot rule decided a strike (see <see cref="ShotModel.ChooseByGeometry"/>), in the order they are tried.</summary>
+public enum StrikeRule { Behind, Wide, Ahead, Across, Outside, FarPost, Weak }
+
+/// <summary>What the geometry gave for a strike and the rule that gave it (see <see cref="ShotModel.ChooseByGeometry"/>).</summary>
+public readonly record struct StrikeDecision(StrikeChoice Choice, StrikeRule Rule);
+
 /// <summary>One named multiplier that fed a shot's spread or its speed.</summary>
 public readonly record struct ShotFactor(string Name, float Value);
 
@@ -203,56 +209,74 @@ public static class ShotModel
     /// <summary>
     /// The striking foot and surface, decided once for a shot (at the release) from where the ball is to leave: the angle from
     /// the facing to the intended direction <paramref name="yaw"/>, positive toward the player's right. "Own side" is the
-    /// strong foot's side. The same facing, aim and positions give the same strike every time; nothing here is weighed or drawn.
-    /// <list type="number">
-    /// <item>Straight behind (within half a degree of 180): the strong foot, the shot type's own surface.</item>
-    /// <item>Wider than foot_by_side_deg either way: the foot on the side the ball leaves, the type's own surface.</item>
-    /// <item>The far-post rule (<see cref="FarPostApplies"/>) for an inverted shooter (<see cref="Inverted"/>) aiming toward his
-    /// own side within the cap (<see cref="OutsideCapDeg"/>): the strong foot, the type's own surface.</item>
-    /// <item>Otherwise: across the body or dead ahead (within dead_ahead_deg) the strong foot with the type's own surface;
-    /// toward his own side up to the cap the outside of the strong foot; beyond the cap the weak foot, the type's own surface.</item>
-    /// <item>In a dribble, <paramref name="rightTick"/> and <paramref name="leftTick"/> are each foot's earliest strike tick
-    /// (negative: that foot has none). A chosen foot with no contact while the other has one hands the shot to the other foot,
-    /// with the type's own surface (see <see cref="WithContact"/>). Both zero (the default): no timing, as for a ball at the
-    /// feet.</item>
-    /// </list>
+    /// strong foot's side. The same facing, aim, positions and contact ticks give the same strike every time; nothing here is
+    /// weighed or drawn. The geometry decides first (<see cref="ChooseByGeometry"/>), then the feet's contacts are checked
+    /// (<see cref="WithContact"/>, with its dead-ahead swap allowed): in a dribble, <paramref name="rightTick"/> and
+    /// <paramref name="leftTick"/> are each foot's earliest strike tick (negative: that foot has none). Both zero (the
+    /// default): no timing, as for a ball at the feet.
     /// </summary>
     public static StrikeChoice ChooseStrike(PlayerSheet sheet, Vector3 position, float facing, Vector3 ball, float yaw, ShotType type,
         Pitch pitch, Tuning t, int rightTick = 0, int leftTick = 0) =>
-        WithContact(ChooseByGeometry(sheet, position, facing, ball, yaw, type, pitch, t), type, rightTick, leftTick);
+        WithContact(ChooseByGeometry(sheet, position, facing, ball, yaw, type, pitch, t), type, rightTick, leftTick, allowSwap: true, t);
 
-    // An angle on a limit counts as inside it (at the cap: still the outside; at foot_by_side_deg: not yet wide). Angles reach
-    // here through radians, so "on" is within this of the limit, degrees.
+    // An angle on a limit counts as inside it (at the cap: still the outside; at foot_by_side_deg: not yet wide; at
+    // dead_ahead_deg: still dead ahead). Angles reach here through radians, so "on" is within this of the limit, degrees.
     const float OnTheLimitDeg = 1e-3f;
 
-    /// <summary>The foot and surface by the geometry alone: <see cref="ChooseStrike"/> without its contact check.</summary>
-    public static StrikeChoice ChooseByGeometry(PlayerSheet sheet, Vector3 position, float facing, Vector3 ball, float yaw, ShotType type,
+    /// <summary>
+    /// The foot and surface by the geometry alone (<see cref="ChooseStrike"/> without its contact check), with the rule that
+    /// gave them. The first case that holds decides:
+    /// <list type="number">
+    /// <item>Behind: straight behind (within half a degree of 180): the strong foot, the shot type's own surface.</item>
+    /// <item>Wide: wider than foot_by_side_deg either way: the foot on the side the ball leaves, the type's own surface.</item>
+    /// <item>Ahead: within dead_ahead_deg of the facing, either way: the strong foot, the type's own surface.</item>
+    /// <item>Across: across the body (away from the strong foot's side): the strong foot, the type's own surface.</item>
+    /// <item>Weak: toward his own side beyond the cap (<see cref="OutsideCapDeg"/>): the weak foot, the type's own surface.</item>
+    /// <item>FarPost: within the cap, an inverted shooter (<see cref="Inverted"/>) the far-post rule applies to
+    /// (<see cref="FarPostApplies"/>): the strong foot, the type's own surface.</item>
+    /// <item>Outside: within the cap otherwise: the outside of the strong foot.</item>
+    /// </list>
+    /// </summary>
+    public static StrikeDecision ChooseByGeometry(PlayerSheet sheet, Vector3 position, float facing, Vector3 ball, float yaw, ShotType type,
         Pitch pitch, Tuning t)
     {
         var k = t.Shot;
         Foot strong = sheet.PreferredFoot, weak = strong == Foot.Right ? Foot.Left : Foot.Right;
         FootSurface normal = SurfaceFor(type);
         float signed = Movement.WrapAngle(yaw - facing) * 180f / MathF.PI, theta = MathF.Abs(signed);
-        if (theta > 179.5f) return new StrikeChoice(strong, normal);
-        if (theta > k.FootBySideDeg + OnTheLimitDeg) return new StrikeChoice(signed > 0f ? Foot.Right : Foot.Left, normal);
-        bool ownSide = (strong == Foot.Right ? signed > 0f : signed < 0f) && theta > k.DeadAheadDeg + OnTheLimitDeg;
-        if (!ownSide) return new StrikeChoice(strong, normal);
-        if (theta > OutsideCapDeg(sheet, type, t) + OnTheLimitDeg) return new StrikeChoice(weak, normal);
-        bool farPost = Inverted(strong, position) && FarPostApplies(type, ball, AimZ(ball, yaw, pitch, t), position, pitch, t);
-        return new StrikeChoice(strong, farPost ? normal : FootSurface.Outside);
+        StrikeDecision By(Foot foot, FootSurface surface, StrikeRule rule) => new(new StrikeChoice(foot, surface), rule);
+        if (theta > 179.5f) return By(strong, normal, StrikeRule.Behind);
+        if (theta > k.FootBySideDeg + OnTheLimitDeg) return By(signed > 0f ? Foot.Right : Foot.Left, normal, StrikeRule.Wide);
+        if (theta <= k.DeadAheadDeg + OnTheLimitDeg) return By(strong, normal, StrikeRule.Ahead);
+        if (strong == Foot.Right ? signed < 0f : signed > 0f) return By(strong, normal, StrikeRule.Across);
+        if (theta > OutsideCapDeg(sheet, type, t) + OnTheLimitDeg) return By(weak, normal, StrikeRule.Weak);
+        if (Inverted(strong, position) && FarPostApplies(type, ball, AimZ(ball, yaw, pitch, t), position, pitch, t))
+            return By(strong, normal, StrikeRule.FarPost);
+        return By(strong, FootSurface.Outside, StrikeRule.Outside);
     }
 
+    /// <summary>The dead-ahead swap's lead in whole ticks (dead_ahead_swap_s; 0.1 s is exactly 12 ticks at 120 a second).</summary>
+    public static int SwapLeadTicks(Tuning t) => (int)MathF.Round(t.Shot.DeadAheadSwapS * t.TickRate);
+
     /// <summary>
-    /// The contact check on a choice made by the geometry: with either tick set (not both zero), a chosen foot with no contact
-    /// (a negative tick) while the other has one gives way to the other foot, struck with the type's own surface. Stride timing
-    /// never changes the foot otherwise.
+    /// The contact check on a decision made by the geometry. With both ticks zero there is no timing and the decision stands.
+    /// Otherwise a chosen foot with no contact (a negative tick) while the other has one gives way to the other foot, struck
+    /// with the type's own surface. And, with <paramref name="allowSwap"/> (the foot chosen fresh: the forecast while shoot is
+    /// held, and the release), a shot the Ahead rule decided, where either foot is natural, goes to the weak foot when both
+    /// feet have a contact and the weak foot's comes at least dead_ahead_swap_s sooner (<see cref="SwapLeadTicks"/>); whatever
+    /// the weak foot is rated, its quality curves apply as on any weak-foot strike. Stride timing never changes the foot
+    /// otherwise.
     /// </summary>
-    public static StrikeChoice WithContact(StrikeChoice choice, ShotType type, int rightTick, int leftTick)
+    public static StrikeChoice WithContact(StrikeDecision decision, ShotType type, int rightTick, int leftTick, bool allowSwap, Tuning t)
     {
+        var choice = decision.Choice;
         if (rightTick == 0 && leftTick == 0) return choice;
         int mine = choice.Foot == Foot.Right ? rightTick : leftTick, other = choice.Foot == Foot.Right ? leftTick : rightTick;
-        if (mine >= 0 || other < 0) return choice;
-        return new StrikeChoice(choice.Foot == Foot.Right ? Foot.Left : Foot.Right, SurfaceFor(type));
+        var handed = new StrikeChoice(choice.Foot == Foot.Right ? Foot.Left : Foot.Right, SurfaceFor(type));
+        if (mine < 0 && other >= 0) return handed;
+        // Decided by Ahead the chosen foot is the strong one, so the other is the weak one.
+        if (allowSwap && decision.Rule == StrikeRule.Ahead && mine >= 0 && other >= 0 && mine - other >= SwapLeadTicks(t)) return handed;
+        return choice;
     }
 
     /// <summary>
