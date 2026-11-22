@@ -14,6 +14,8 @@ public static class ReportText
     {
         Outcome.Goal => "GOAL",
         Outcome.Held => "SAVED (held)",
+        Outcome.Dispossessed => "DISPOSSESSED",
+        Outcome.Foul => "FOUL",
         _ when r.Keeper.Action == KeeperResult.Parried => "SAVED (parried, ball was live)",
         Outcome.Wide => "WIDE",
         Outcome.Over => "OVER",
@@ -41,8 +43,31 @@ public static class ReportText
                 ? "Keeper: no dive needed"
                 : $"Keeper: reacted in {F(k.ReactionS, 2)} s, needed {F(k.NeededM, 1)} m, reach {F(k.ReachM, 1)} m, margin {F(k.MarginM, 1)} m");
         }
+        if (r.Defender is { } d) lines.Add(DefenderLine(r, d));
         lines.Add(Footer);
         return lines.ToArray();
+    }
+
+    /// <summary>What the defender did, in a round with one.</summary>
+    static string DefenderLine(RoundReport r, DefenderReport d)
+    {
+        var parts = new List<string>();
+        if (r.Outcome == Outcome.Foul) parts.Add("fouled the attacker");
+        else if (d.Collected)
+            parts.Add(d.WonBy switch
+            {
+                TackleKind.Auto => "took the ball off his feet and kept it",
+                TackleKind.Lunge => "won the ball with a standing tackle and kept it",
+                TackleKind.Slide => "won the ball with a slide tackle and kept it",
+                _ => "picked up the loose ball",
+            });
+        int tackles = d.AutoWon + d.LungesWon + d.SlidesWon;
+        if (!d.Collected && tackles > 0) parts.Add(tackles == 1 ? "won the ball once but lost it again" : $"won the ball {tackles} times but lost it again");
+        int missed = d.LungesTried - d.LungesWon + d.SlidesTried - d.SlidesWon;
+        if (missed > 0) parts.Add(missed == 1 ? "missed one tackle" : $"missed {missed} tackles");
+        if (d.Blocks > 0) parts.Add(d.Blocks == 1 ? "blocked a shot" : $"blocked {d.Blocks} shots");
+        if (d.BargesWon > 0) parts.Add("barged the attacker off the ball");
+        return parts.Count == 0 ? "Defender: never got to the ball" : "Defender: " + string.Join(", ", parts);
     }
 
     /// <summary>Z is measured from the goal centre. The camera stands on the +Z side, so +Z is the near post.</summary>

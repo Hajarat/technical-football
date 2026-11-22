@@ -34,8 +34,8 @@ The bot is in one of three modes (`DefenderBot.Mode`):
   least `bump_steer_deg` off the line to the attacker.
 - **Buttons.** With the attacker within `tackle_max_distance_m` and the ball between them (the direction attacker to ball
   within `tackle_max_angle_deg` of the direction ball to defender) he presses a tackle button for `tackle_hold_s`: the lunge,
-  or the slide if a roll made once per press came up (`slide_preference` by slide_tackle). Otherwise, every `barge_roll_s`,
-  with an attacker running alongside he may press barge (`barge_preference` by strength).
+  or the slide if a roll made once per press came up (`slide_preference` by slide_tackle). Holding or pressing, every
+  `barge_roll_s` with an attacker running alongside he may press barge (`barge_preference` by strength).
 - **Back to Hold.** After `active_max_s` of pressing (3 s at awareness 1, 5 s at 50, 8 s at 99), or once he is further from the
   goal centre than the attacker by `overshoot_m`, or when the attacker no longer has the ball, he holds again with a new
   offset and a new wait.
@@ -90,6 +90,8 @@ and `ActionSide`; `TackleFoot`, `TackleContactTime`, `BlockReach`, `Jockeying`, 
   `block.lift_deg`, and stays in play; one that goes into his own goal is a goal.
 - **Bodies.** Attacker and defender are discs of `body_radius_m`. Overlapping, they are pushed apart along the line between
   them, the lighter one further, inside the boards, and each loses the part of his velocity into the other.
+
+The game draws these with poses over the outfield figure; see [animation.md](animation.md#the-defender).
 
 ## How a round ends
 

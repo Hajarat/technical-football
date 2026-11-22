@@ -27,8 +27,8 @@ public sealed class DefenderBot
     bool _offsetDrawn;
     bool _slideRolled, _slideThisSpell;
     float _buttonLeft;
-    int _button;                // 0 none, 1 tackle, 2 slide, 3 barge
-    float _bargeRollIn;
+    int _button;                // 0 none, 1 tackle, 2 slide
+    float _bargeRollIn, _bargeLeft;
 
     /// <summary>What he is at this tick.</summary>
     public DefenderMode Mode { get; private set; }
@@ -105,7 +105,9 @@ public sealed class DefenderBot
             TimeActive += dt;
             if (!hasBall || _activeFor >= k.ActiveMaxS.Evaluate(awareness) || dSelf > dOpp + k.OvershootM) EnterHold();
         }
-        return Mode == DefenderMode.Press ? Press(w, d, a, dp, ap, bp) : Hold(w, d, dp, bp);
+        var intent = Mode == DefenderMode.Press ? Press(w, d, a, dp, ap, bp) : Hold(w, d, dp, bp);
+        intent.Barge = BargeButton(w, d);
+        return intent;
     }
 
     void EnterHold()
@@ -209,25 +211,29 @@ public sealed class DefenderBot
                 _button = _slideThisSpell ? 2 : 1;
                 _buttonLeft = k.TackleHoldS;
             }
-            else
-            {
-                _bargeRollIn -= dt;
-                if (_bargeRollIn <= 0f)
-                {
-                    _bargeRollIn = k.BargeRollS;
-                    if (Defending.Free(d, now) && now >= d.Def.BargeCooldownUntil && Defending.BargeTarget(d, w.Teams[0], t) != null
-                        && _rng.NextFloat() < k.BargePreference.ForRating(d.Sheet.Strength))
-                    {
-                        _button = 3;
-                        _buttonLeft = k.TackleHoldS;
-                    }
-                }
-            }
         }
         it.Tackle = _button == 1;
         it.Slide = _button == 2;
-        it.Barge = _button == 3;
         return it;
+    }
+
+    /// <summary>
+    /// The barge, in any mode but collecting: every barge_roll_s, with an opponent running alongside (see
+    /// <see cref="Defending.BargeTarget"/>), a roll against barge_preference presses the button for tackle_hold_s.
+    /// </summary>
+    bool BargeButton(World w, PlayerState d)
+    {
+        var t = w.Tuning;
+        var k = t.Defender;
+        float now = w.SimTime;
+        if (_bargeLeft > 0f) { _bargeLeft -= t.Dt; return true; }
+        _bargeRollIn -= t.Dt;
+        if (_bargeRollIn > 0f) return false;
+        _bargeRollIn = k.BargeRollS;
+        if (_buttonLeft > 0f || !Defending.Free(d, now) || now < d.Def.BargeCooldownUntil || Defending.BargeTarget(d, w.Teams[0], t) == null
+            || _rng.NextFloat() >= k.BargePreference.ForRating(d.Sheet.Strength)) return false;
+        _bargeLeft = k.TackleHoldS;
+        return true;
     }
 
     /// <summary>Just after a body contact he steers at least bump_steer_deg off the line to the player he bumped, on the side he already leans to.</summary>

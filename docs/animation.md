@@ -127,6 +127,18 @@ toward the figure's foot when it is out of reach. A fake cut
 whose hook is the outside of the foot (the cut toward the shooting foot's side) has no clip and is drawn procedurally, as everything is with
 `--skill-anim procedural` or `--attacker-anim procedural`. Build steps, asset list and licences: `game/assets/characters/SOURCES.md`.
 
+## The defender
+
+In a round with a defender the game draws him with the outfield figure in blue (`Match.Defender`, a `PlayerView`): his
+running, jockeying steps and standing come from the same stride clock and run cycles as the attacker's body without the
+ball. His defending actions are poses laid over that body by `game/PlayerFigure.Defender.cs`, from what the core publishes
+(`FigureFrame.Defender`: the action, its seconds, its side, the leading foot of a lunge or slide, the leg reach while set): a
+crouch for the jockey, the leading foot put out to the core's foot for the lunge, feet first along the ground for the
+slide, lying and getting up after it, a leg out for the block, a lean for the barge and a pitched, wobbling trunk for the
+stumble. Each eases in and out by its own weight, and while one shows the motion-captured trunk and arms give way to it by
+that weight. The attacker's figure takes the stumble pose while the core says he stumbles. These poses are procedural:
+there are no motion-captured defending clips yet.
+
 ## Players
 
 Attacker and keeper are the rigged bodies above. `PlayerFigure` (`game/PlayerFigure.cs`) computes every joint procedurally from the simulation's state and events only (run cycle with planted stance feet, dribble touches, shot wind-up, strike and follow-through, keeper set stance, dive and hold); the procedural pose is the fallback (`--figure procedural` draws the primitive-mesh figure) and the base that the motion clips are laid over.

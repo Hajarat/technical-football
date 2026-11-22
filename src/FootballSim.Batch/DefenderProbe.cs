@@ -212,7 +212,7 @@ static class DefenderProbe
             ("lunge-miss", "skill", (r, seen) => r.Defender!.LungesTried > r.Defender.LungesWon && r.Defender.Fouls == 0),
             ("slide", "cut", (r, seen) => r.Defender!.SlidesWon > 0),
             ("barge", "cut", (r, seen) => r.Defender!.BargesWon > 0),
-            ("block", "straight", (r, seen) => r.Defender!.Blocks > 0),
+            ("block", "shoot", (r, seen) => r.Defender!.Blocks > 0 && r.Shots.Count == 1),
             ("collect", "straight", (r, seen) => r.Outcome == Outcome.Dispossessed && seen.Contains(DefenderAction.Collect)),
             ("foul", "cut", (r, seen) => r.Outcome == Outcome.Foul),
         };

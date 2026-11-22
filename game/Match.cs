@@ -13,6 +13,8 @@ public partial class Match : Node3D
     public BallView Ball { get; private set; } = null!;
     public PlayerView Attacker { get; private set; } = null!;
     public KeeperView Keeper { get; private set; } = null!;
+    /// <summary>The defender's figure; hidden in a round without a defender.</summary>
+    public PlayerView Defender { get; private set; } = null!;
     public CameraRig Camera { get; private set; } = null!;
     public Hud Hud { get; private set; } = null!;
     public DebugOverlay Overlay { get; private set; } = null!;
@@ -50,6 +52,7 @@ public partial class Match : Node3D
         Ball = new BallView { Name = "Ball" }; AddChild(Ball);
         Attacker = new PlayerView { Name = "Attacker" }; AddChild(Attacker);
         Keeper = new KeeperView { Name = "Keeper" }; AddChild(Keeper);
+        Defender = new PlayerView { Name = "Defender" }; AddChild(Defender);
         Overlay = new DebugOverlay { Name = "Overlay" }; AddChild(Overlay);
         Camera = new CameraRig { Name = "Camera" }; AddChild(Camera);
         Hud = new Hud { Name = "Hud" }; AddChild(Hud);
@@ -65,6 +68,12 @@ public partial class Match : Node3D
         Attacker.Figure.ShotAnimMode = _args.ShotAnim;
         Attacker.Figure.SkillStarted += LogSkill;
         Keeper.Figure.Stats = FootStats; Keeper.Figure.StatsName = "keeper";
+        // The defender: the outfield figure in the keeper's side's colours, with measurements of his own (they are not printed).
+        Defender.SetTeamColor(new Color(0.12f, 0.25f, 0.75f));
+        Defender.Figure.Stats = new FigureStats(); Defender.Figure.StatsName = "defender";
+        Defender.Figure.AttackerAnimMode = _args.AttackerAnim;
+        Defender.Figure.AttackerLocoMode = _args.AttackerLoco;
+        Defender.Visible = false;
         Overlay.Enabled = true; // default on for now
         if (_args.TopCam) Camera.UseTopDown();
         else if (_args.CloseCam) Camera.UseCloseUp();
@@ -88,7 +97,7 @@ public partial class Match : Node3D
     /// <summary>--clip-gallery: motion clips (the keeper's unless --clip-folder / --clip-model say otherwise) play on a body of their own; the match figures, ball, overlay and HUD stay out of the shots.</summary>
     void StartClipGallery()
     {
-        Attacker.Visible = false; Keeper.Visible = false; Ball.Visible = false; Hud.Visible = false;
+        Attacker.Visible = false; Keeper.Visible = false; Defender.Visible = false; Ball.Visible = false; Hud.Visible = false;
         Overlay.Enabled = false;
         _clipGallery = new ClipGallery(this, _args.ClipGalleryDir!, _args.Video, _args.ClipOnly, World.Pitch.GoalLineX, _args.ClipFolder, _args.ClipModel);
     }
@@ -110,6 +119,7 @@ public partial class Match : Node3D
         if (!Attacker.Figure.TryUseSkinned("res://assets/characters/player.glb", out string e1)) problems.Add(e1);
         if (!Keeper.Figure.TryUseSkinned("res://assets/characters/keeper.glb", out string e2)
             && !Keeper.Figure.TryUseSkinned("res://assets/characters/player.glb", out _)) problems.Add(e2);
+        if (!Defender.Figure.TryUseSkinned("res://assets/characters/player.glb", out string e3)) problems.Add(e3);
         if (problems.Count == 0) return;
         _figureWarning = "Skinned figures unavailable, using procedural: " + string.Join("; ", problems);
         GD.PushWarning(_figureWarning);
@@ -168,6 +178,7 @@ public partial class Match : Node3D
                 if (moment == "skill") SkillShots();
                 else if (moment == "shot") ShotShots();
                 else if (moment == "keeper") KeeperShots();
+                else if (moment == "defender") DefenderShots();
                 else if (MomentReached(moment)) _shots.Request(moment);
             }
         }
@@ -190,6 +201,19 @@ public partial class Match : Node3D
         string dive = k.KeeperDive == FootballSim.Core.KeeperDive.None ? "" : "_" + k.KeeperDive;
         _shots!.Request($"keeper{_keeperShotN++:D3}_{k.KeeperAction}{dive}_t{_tick:D4}");
         _keeperBurstLeft--; _keeperBurstNext = _tick + 8;
+    }
+
+    FootballSim.Core.DefenderAction? _defenderSeen;
+    int _defenderBurstLeft, _defenderBurstNext, _defenderShotN;
+
+    /// <summary>--shot-on defender: a burst of four frames (every 8 ticks) whenever the defender's action changes, named defender000_Action_tNNNN.</summary>
+    void DefenderShots()
+    {
+        if (World.Defender is not { } d) return;
+        if (_defenderSeen != d.DefenderAction) { _defenderSeen = d.DefenderAction; _defenderBurstLeft = 4; _defenderBurstNext = _tick; }
+        if (_defenderBurstLeft <= 0 || _tick < _defenderBurstNext) return;
+        _shots!.Request($"defender{_defenderShotN++:D3}_{d.DefenderAction}_t{_tick:D4}");
+        _defenderBurstLeft--; _defenderBurstNext = _tick + 8;
     }
 
     /// <summary>--shot-on skill: six frames evenly across the move (skill0..skill5) and one just after it ends (skill6).</summary>
