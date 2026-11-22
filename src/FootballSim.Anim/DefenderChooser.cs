@@ -82,13 +82,15 @@ public static class DefenderChooser
 
     /// <summary>
     /// A set's labels: a tackle, a block and the slide count down to their "contact" with the reaching foot and are entered before
-    /// it; a get-up counts down to "up"; a fall is entered before its "landing".
+    /// it; a get-up counts down to "up"; a fall is entered before its "landing", a stumble and a barged clip before their "recover"
+    /// (where he starts to catch himself), so none is entered as it ends.
     /// </summary>
     public static PoseSetOptions? OptionsFor(string set) => set switch
     {
         Lunge or Block or Slide => new PoseSetOptions("contact", ContactLimb.ReachingFoot, SearchUntil: "contact"),
         GetUp => new PoseSetOptions("up", SearchUntil: "up"),
         Fall => new PoseSetOptions(SearchUntil: "landing"),
+        Stumble or Barged => new PoseSetOptions(SearchUntil: "recover"),
         _ => null,
     };
 }

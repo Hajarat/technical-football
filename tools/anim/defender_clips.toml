@@ -13,7 +13,8 @@
 #   barge    a shoulder into a runner alongside
 #   slide    the slide tackle: no CMU trial has one, so it is the keeper's baked slide (file_from)
 #   getup    from the ground after a slide; "up" as in clips.toml
-#   stumble, barged, fall   the attacker's: losing his balance, pushed sideways, brought down ("landing" as in clips.toml)
+#   stumble, barged, fall   the attacker's: losing his balance, pushed sideways, brought down ("landing" as in clips.toml);
+#            a stumble's and a barged clip's "recover" is where he starts to catch himself: the clip is entered before it
 #
 # Keys beyond clips.toml's:
 #   fps        the trial's own frame rate when it is not 120 (subject 77 was recorded at 60)
@@ -280,6 +281,7 @@ set = "stumble"
 side = "none"
 contact_speed = 0.6
 contact_tolerance_cm = 4
+events = { recover = 120 }
 verdict = "keep"
 loop = false
 notes = "trips forward, arms flung out, catches himself and goes on"
@@ -291,6 +293,7 @@ frames = [1, 150]
 set = "stumble"
 side = "none"
 contact_tolerance_cm = 4
+events = { recover = 40 }
 verdict = "keep"
 loop = false
 notes = "pitched forward low, catches himself over three steps"
@@ -303,6 +306,7 @@ set = "barged"
 side = "left"
 contact_speed = 0.6
 contact_tolerance_cm = 4
+events = { recover = 290 }
 verdict = "keep"
 loop = false
 notes = "staggers sideways with an arm thrown up, then recovers"

@@ -141,6 +141,8 @@ public sealed class DefenderAnimator
             _moving = DefenderChooser.Moving(new Vector2(f.Velocity.X, f.Velocity.Z).Length(), _moving);
             set = d.Reaction != Reaction.None ? DefenderChooser.SetFor(d.Reaction) : DefenderChooser.SetFor(d.Action, d.Jockeying, _moving);
         }
+        // (no kept clip of being pushed sideways: he stumbles, the push itself carries him)
+        if (set == DefenderChooser.Barged && _db?.Set(DefenderChooser.Barged) == null) set = DefenderChooser.Stumble;
         if (set != _set) { _set = set; _setTime = 0f; } else _setTime += dt;
 
         var input = new MotionInput

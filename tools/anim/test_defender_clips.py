@@ -8,7 +8,7 @@ import retarget as R
 HERE = Path(__file__).resolve().parent
 OUT = HERE.parent.parent / "game/assets/anim/defender"
 SETS = {"jockey", "set", "lunge", "block", "barge", "slide", "getup", "stumble", "barged", "fall"}   # DefenderChooser's
-NEEDS = {"lunge": "contact", "block": "contact", "getup": "up", "fall": "landing"}                     # the event each set is timed by
+NEEDS = {"lunge": "contact", "block": "contact", "getup": "up", "fall": "landing", "stumble": "recover", "barged": "recover"}                     # the event each set is timed by
 
 
 def clips():

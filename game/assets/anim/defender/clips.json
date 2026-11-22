@@ -1769,7 +1769,9 @@
    "side": "none",
    "kind": "",
    "loop": false,
-   "events": {},
+   "events": {
+    "recover": 30
+   },
    "fps": 60,
    "frame_count": 86,
    "seconds": 1.433,
@@ -1831,7 +1833,9 @@
    "side": "none",
    "kind": "",
    "loop": false,
-   "events": {},
+   "events": {
+    "recover": 20
+   },
    "fps": 60,
    "frame_count": 75,
    "seconds": 1.25,
@@ -1893,7 +1897,9 @@
    "side": "left",
    "kind": "",
    "loop": false,
-   "events": {},
+   "events": {
+    "recover": 30
+   },
    "fps": 60,
    "frame_count": 96,
    "seconds": 1.6,
