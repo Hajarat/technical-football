@@ -2,13 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using FootballSim.Core;
 using Godot;
 
 namespace FootballSim.Game;
 
 /// <summary>
 /// One folder per launch under sessions/ at the repo root: session.jsonl (one JSON object per line, flushed after every
-/// line) plus a replay file per finished round. Game layer only; timestamps are the game's own clock and never reach the core.
+/// line) plus a replay file per finished, unfinished or captured round. Captures are also indexed across sessions in
+/// sessions/captures.jsonl (see <see cref="CaptureIndex"/>). Game layer only; timestamps are the game's own clock and never reach the core.
 /// </summary>
 public sealed class SessionLog : IDisposable
 {
@@ -17,6 +19,10 @@ public sealed class SessionLog : IDisposable
     bool _closed;
 
     public string Dir { get; }
+    /// <summary>The session folder's name (<c>yyyyMMdd-HHmmss</c>).</summary>
+    public string Name => Path.GetFileName(Dir);
+    /// <summary>sessions/captures.jsonl, beside the session folders.</summary>
+    public string CaptureIndexPath => Path.Combine(Path.GetDirectoryName(Dir) ?? Dir, CaptureIndex.FileName);
 
     SessionLog(string dir, StreamWriter w) { Dir = dir; _writer = w; }
 
@@ -58,6 +64,26 @@ public sealed class SessionLog : IDisposable
         try { replay.Save(Path.Combine(Dir, fileName)); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { GD.PrintErr("Replay save failed: " + e.Message); }
         return fileName;
+    }
+
+    /// <summary>The next capture id from the index (C1 when it is missing); a line it cannot read is skipped with a warning.</summary>
+    public string NextCaptureId()
+    {
+        string id = CaptureIndex.NextIdFromFile(CaptureIndexPath, out var warnings);
+        foreach (var w in warnings)
+        {
+            GD.PushWarning(w);
+            Write("warning", ("file", CaptureIndex.FileName), ("field", ""), ("message", w));
+        }
+        return id;
+    }
+
+    /// <summary>Appends a capture to the index, with this session's name and the replay's path relative to sessions/.</summary>
+    public void AppendCapture(CaptureEntry entry, string fileName)
+    {
+        entry.Session = Name;
+        entry.File = Name + "/" + fileName;
+        if (CaptureIndex.Append(CaptureIndexPath, entry) is { } err) GD.PrintErr("Capture index not written: " + err);
     }
 
     public void Dispose()

@@ -64,6 +64,15 @@ public sealed class Replay
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? AttackerSheet { get; set; }
+    /// <summary>
+    /// True for a round cut short: a capture taken before the report, or a round that began but was quit or abandoned. It holds
+    /// every tick up to that moment and has no report. Left out of the file when false, so a finished round is written as before.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Partial { get; set; }
+    /// <summary>The capture this file was written for (id, tag, note, when); null for a plain round replay, and left out of the file then.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ReplayCapture? Capture { get; set; }
     /// <summary>Intents per tick: both teams' players, team 0 first.</summary>
     public int PlayersPerTick { get; set; } = 2;
     /// <summary>Flat list: tick 0's players, then tick 1's, and so on.</summary>
@@ -138,10 +147,11 @@ public sealed class Replay
     }
 
     /// <summary>
-    /// Plays the replay in a fresh world: Begin, then each recorded tick, then idle ticks until the report (capped).
-    /// The sheets and scenario must be the ones named in the replay.
+    /// Plays the recorded ticks in a fresh world (Begin, then each tick) and returns the world after the last of them, with no idle
+    /// tail: a partial replay ends where it was cut. <paramref name="afterStep"/>, when given, sees the world after every step with
+    /// the attacker's intent of that tick. The sheets and scenario must be the ones named in the replay.
     /// </summary>
-    public RoundReport Run(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper)
+    public World Play(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, Action<World, TickIntent>? afterStep = null)
     {
         var world = new World(tuning, scenario, attacker, keeper, Seed);
         world.Begin();
@@ -153,12 +163,51 @@ public sealed class Replay
             Array.Clear(buf);
             for (int p = 0; p < n && p < per; p++) buf[p] = Intents[tick * per + p].ToIntent();
             world.Step(buf);
+            afterStep?.Invoke(world, buf[0]);
         }
-        Array.Clear(buf);
-        int cap = (int)((tuning.Round.MaxSeconds + tuning.Round.OutcomeSeconds + 5f) * tuning.TickRate);
+        return world;
+    }
+
+    /// <summary>The idle ticks that may follow the recording before a round must have reached its report.</summary>
+    public static int TailCap(Tuning tuning) => (int)((tuning.Round.MaxSeconds + tuning.Round.OutcomeSeconds + 5f) * tuning.TickRate);
+
+    /// <summary>
+    /// Plays the replay in a fresh world: Begin, then each recorded tick (<see cref="Play"/>), then idle ticks until the report
+    /// (capped). The sheets and scenario must be the ones named in the replay.
+    /// </summary>
+    public RoundReport Run(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper)
+    {
+        var world = Play(tuning, scenario, attacker, keeper);
+        var buf = new TickIntent[world.PlayerCount];
+        int cap = TailCap(tuning);
         for (int i = 0; i < cap && world.State != RoundState.Report; i++) world.Step(buf);
         return world.Report ?? throw new InvalidOperationException("Replay did not reach a report");
     }
+
+    /// <summary>A copy that shares nothing mutable with this replay: the intents list is new (its records are never changed).</summary>
+    public Replay Copy() => new()
+    {
+        Version = Version, Seed = Seed, AttackerId = AttackerId, KeeperId = KeeperId, ScenarioId = ScenarioId, TuningHash = TuningHash,
+        AttackerSheet = AttackerSheet, Partial = Partial, Capture = Capture?.Copy(), PlayersPerTick = PlayersPerTick,
+        Intents = new List<IntentRecord>(Intents),
+    };
+}
+
+/// <summary>The capture block of a captured round's replay: which capture, what the person said about it, and when it was taken.</summary>
+public sealed class ReplayCapture
+{
+    /// <summary><c>C&lt;n&gt;</c>, unique across sessions (see <see cref="CaptureIndex"/>).</summary>
+    public string Id { get; set; } = "";
+    public string Tag { get; set; } = "";
+    public string Note { get; set; } = "";
+    /// <summary>The world tick the capture was taken at (ticks from Begin).</summary>
+    public int Tick { get; set; }
+    /// <summary>The round clock then, seconds.</summary>
+    public float Clock { get; set; }
+    /// <summary>Local wall time of the capture, <c>yyyy-MM-ddTHH:mm:ss</c>.</summary>
+    public string Wall { get; set; } = "";
+
+    public ReplayCapture Copy() => (ReplayCapture)MemberwiseClone();
 }
 
 /// <summary>Collects the intents of each simulated tick. Attach to <see cref="World.Recorder"/> before <see cref="World.Begin"/>.</summary>
@@ -191,4 +240,7 @@ public sealed class ReplayRecorder
 
     /// <summary>The recording so far.</summary>
     public Replay Replay => _replay;
+
+    /// <summary>A copy of the recording so far, which later ticks do not change (see <see cref="Replay.Copy"/>).</summary>
+    public Replay Snapshot() => _replay.Copy();
 }

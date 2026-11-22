@@ -41,7 +41,7 @@ The table uses Xbox names.
 | D-pad left / right | Previous / next start spot |
 | D-pad up / down | Next attacker / next keeper |
 | Right stick click | Toggle the debug overlay (shot wedge, aimed and landed markers, keeper reach) |
-| View / Share / Back | Flag the most recent finished round (a `flag` line in the session log) |
+| View / Share / Back | Capture the round: opens the capture panel, in any state (see [Round capture](#round-capture)) |
 | Menu / Options / Start | Pause |
 | Y / Triangle while paused | Open the player editor (see [Player editor](#player-editor)) |
 | Keyboard `B` | Swap face buttons (A with B, X with Y) for the active pad. On by default for Nintendo / Switch / Pro Controller pads; the choice is saved per pad name |
@@ -88,7 +88,7 @@ Works alongside a gamepad (the larger stick value wins) and when none is detecte
 | Left / Right arrow | Previous / next start spot (the pad's D-pad) |
 | Up / Down arrow | Next attacker / next keeper (the pad's D-pad) |
 | O | Toggle the debug overlay |
-| M | Flag the most recent finished round |
+| M | Capture the round (see [Round capture](#round-capture)) |
 | P or Esc | Pause |
 | B | Swap the pad's face buttons (see above) |
 | H | Show or hide the controls panel |
@@ -96,12 +96,35 @@ Works alongside a gamepad (the larger stick value wins) and when none is detecte
 
 There is no driven-shot key: as on the pad, the low shot is shoot pressed twice.
 
+## Round capture
+
+When something in play feels wrong, View / Share / Back on the pad (`-` on Nintendo) or M on the keyboard opens the capture
+panel at any moment: in Setup, during a round, at its outcome or at the report, paused or not (never while the player editor is
+open, and the editor does not open while the panel is). The game stays frozen while the panel is open and carries on as it was
+when it closes.
+
+- During a round, or at its outcome before the report, the capture holds the round so far: every tick up to the press, marked
+  partial; the round then carries on. In Setup or at the report it holds the last finished round, whole. With no round played
+  yet the toast reads "Nothing to capture".
+- Pick one of eight tags with the D-pad up / down (Up / Down arrow): wrong foot, bad aim, shot power / accuracy, touch / dribble,
+  keeper, skill move, animation, other. The first is selected on opening.
+- Type a note on the keyboard if you want one (up to 200 characters; Backspace deletes). The pad never types.
+- A / Cross (Enter) saves with the tag and the note; B / Circle (Esc) saves with the tag and no note. There is no cancel: a press
+  is always a capture. The button that saved does nothing in play until it is let go.
+- The toast shows the id and tag for 3 seconds, such as "Captured C14 · wrong foot". The id counts across every session, so "C14"
+  names one capture. The files are described in [tools.md](tools.md#session-logs).
+
+Quitting while the panel is open saves the capture with the note typed so far. A round that began and got no report (the game
+quit or its window closed, or the round set up again over it, as when closing the player editor with a change) is saved as
+unfinished too.
+
 ## Player editor
 
 A menu over the stopped game for setting every field of the attacker's sheet: the 15 outfield ratings (1 to 99; the rows are the
 code's `PlayerSheet.RatingNames` minus the keeper ratings, so a new rating gets a row by itself), preferred foot, each trait on or
 off, height (1.60 to 2.05 m, steps of 0.01) and weight (55 to 100 kg). Values are clamped as a player file's are. It opens with
 Y / Triangle while paused, or T on the keyboard while paused, in Setup or at the report; play input is ignored while it is open.
+It does not open while the capture panel is open.
 
 The edited player is **Custom**. Opening the editor with Custom selected edits it; with a shipped attacker selected, Custom is
 first replaced by a copy of that attacker (when Custom holds edits that match no preset and no shipped attacker, that takes a
@@ -110,14 +133,19 @@ Custom (a second press when edits would be lost). The line under the rows lists 
 
 | Pad (Xbox names) | Keyboard | Action |
 | --- | --- | --- |
-| D-pad up / down | Up / Down arrow | Pick a row or slot (held, it repeats) |
+| D-pad up / down | Up / Down arrow | Pick a row (stats column) or a slot (presets column); held, it repeats |
 | D-pad left / right | Left / Right arrow | Change the value by 1; held, it repeats after 0.35 s and speeds up to 20 steps a second |
 | LB / RB | Shift + Left / Right arrow | Change the value by 10 |
 | Y | Tab | Switch between the stats and the presets column |
-| A | Enter | Presets: load the slot into Custom |
-| X | S | Presets: save Custom into the slot (a filled slot: press again within 2 s to overwrite) |
-| View | Delete | Presets: clear the slot (press again within 2 s) |
+| X | S | Save Custom into the marked slot, from either column (a filled slot: press again within 2 s to overwrite) |
+| A | Enter | Load the marked slot into Custom, from either column (when Custom holds edits that match no preset and no shipped attacker and the slot differs: press again within 2 s) |
+| View | Delete | Clear the marked slot, from either column (press again within 2 s) |
 | B or Menu | Esc or T | Close |
+
+Save, load and clear act on the marked slot whichever column has focus, so a player can be saved straight from the stats column
+into slot 1 (the slot the editor opens on). The marked slot shows `▸` while the presets column has focus and a hollow `▹` while
+the stats column has it. Every press says what happened on the line under the rows (saved, overwritten, loaded, cleared, empty,
+or press again to confirm: "Load slot 3: unsaved edits will be lost: press load again"), and writes a `player_editor` line to the session log.
 
 Closing applies: if the sheet changed, Custom becomes the attacker and the round is set up again with the same start spot and
 seed (a live round is abandoned, and the pause is lifted). Closing without a change sets nothing up again. Custom then stays the

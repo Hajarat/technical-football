@@ -59,6 +59,8 @@ public sealed class ToolArgs
     public string? BakeDir;
     /// <summary>--player-editor: start with the player editor open (for screenshots).</summary>
     public bool PlayerEditor;
+    /// <summary>--capture-panel: start with the capture panel open (for screenshots).</summary>
+    public bool CapturePanel;
 
     /// <summary>A person playing: a window, and no replay, screenshot, gallery, bake or quit option.</summary>
     public bool Interactive => DisplayServer.GetName() != "headless" && ReplayPath == null && ShotDir == null && ShotTicks.Count == 0 && ShotOn.Count == 0
@@ -136,6 +138,7 @@ public sealed class ToolArgs
                     break;
                 case "--bake-keeper-pose": a.BakeDir = Next(); break;
                 case "--player-editor": a.PlayerEditor = true; break;
+                case "--capture-panel": a.CapturePanel = true; break;
                 case "--shots": a.ShotDir = Next(); break;
                 case "--shot-ticks":
                     foreach (var s in (Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))

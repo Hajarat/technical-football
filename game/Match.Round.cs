@@ -20,7 +20,6 @@ public partial class Match
     int _scenarioIndex;
     ulong _seed;
     int _round;                       // number of the round being set up or played; a retry is a new number
-    int _lastFinishedRound;
     string _lastInputMode = "";
     bool _controlsOn;
     string _lastPadName = "";
@@ -101,6 +100,7 @@ public partial class Match
         else LoadEditorStore();
         if (!SetUpRound(reload: false, newRound: true)) return false;
         if (_args.PlayerEditor && _replay == null) OpenEditor(force: true);
+        if (_args.CapturePanel && !_editor.IsOpen) OpenCapture(force: true);
         return true;
     }
 
@@ -140,10 +140,12 @@ public partial class Match
     /// <summary>
     /// Re-reads the data files and builds a fresh world in Setup, then teleports the views to it.
     /// <paramref name="newRound"/> advances the round number (first round, next round, retry); changing the start spot or
-    /// players while still in Setup rebuilds the same round. <paramref name="retryOf"/> is the round being retried, or 0.
+    /// players while still in Setup rebuilds the same round. <paramref name="retryOf"/> is the round being retried, or 0. A round
+    /// that began and has no report is saved as unfinished first, with <paramref name="abandon"/> as the reason.
     /// </summary>
-    bool SetUpRound(bool reload = true, bool newRound = false, int retryOf = 0)
+    bool SetUpRound(bool reload = true, bool newRound = false, int retryOf = 0, string abandon = "setup")
     {
+        SaveUnfinished(abandon);
         if (reload) _data.Reload();
         LogWarnings();
         // Selections that no longer exist (file deleted or renamed) fall back to something that does.
@@ -171,8 +173,26 @@ public partial class Match
     }
 
     /// <summary>One physics tick of game logic: buttons, then at most one world step.</summary>
-    void Tick(in PadSnapshot pad)
+    void Tick(in PadSnapshot input)
     {
+        var pad = input;
+        if (_capture.IsOpen)
+        {
+            // the world stays frozen and gameplay input is ignored while the capture panel is open
+            var (device, kind, _) = ShownDevice();
+            _capture.SetDevice(device, kind);
+            var choice = _capture.Step(pad.Capture);
+            if (choice != CaptureChoice.None) SaveCapture(withNote: choice == CaptureChoice.Save);
+            UpdateNotices();
+            UpdateHudText();
+            return;
+        }
+        if (_holdAfterCapture)
+        {
+            // the button that saved (B is also shoot, A also cancel) does nothing in play until it is let go
+            if (!pad.ShootHeld && !pad.Cancel) _holdAfterCapture = false;
+            else { pad.ShootHeld = false; pad.Cancel = false; }
+        }
         if (_editor.IsOpen)
         {
             // gameplay input is ignored while the editor is open
@@ -186,7 +206,8 @@ public partial class Match
             return;
         }
         if (pad.OverlayToggle) Overlay.Enabled = !Overlay.Enabled;
-        if (pad.Flag) Flag();
+        if (pad.OpenCapture) OpenCapture();
+        if (_capture.IsOpen) { UpdateNotices(); UpdateHudText(); return; }
         if (pad.ControlsToggle) _controlsOn = !_controlsOn;
         if (pad.Pause)
         {
@@ -258,7 +279,7 @@ public partial class Match
     void UpdateNotices()
     {
         Pad.KeyboardEnabled = _replay == null;
-        if (_editor.IsOpen) Hud.SetNotice("");
+        if (_editor.IsOpen || _capture.IsOpen) Hud.SetNotice("");
         else if (_paused) Hud.SetNotice("Paused");
         else if (_replay == null && !Pad.GamepadConnected && !_controlsOn && _args.ControlsPanel == null) Hud.SetNotice(NoPadNotice);
         else Hud.SetNotice("");
@@ -287,7 +308,7 @@ public partial class Match
         bool forced = _args.ControlsPanel != null;
         if (forced) swapped = false;
         Hud.SetControlsHint(device == InputDevice.Gamepad ? $"{Bindings.Pad.Pause.Label(kind)}: controls" : $"{Bindings.Controls.Label}: controls");
-        bool show = ((forced && !_args.ControlsHintOnly) || _paused || _controlsOn) && !_editor.IsOpen;
+        bool show = ((forced && !_args.ControlsHintOnly) || _paused || _controlsOn) && !_editor.IsOpen && !_capture.IsOpen;
         if (show) Hud.Controls.Open(device, kind, padName, swapped);
         else Hud.Controls.Close();
     }
@@ -318,24 +339,109 @@ public partial class Match
     /// <summary>The round reached Report: save its replay into the session folder, log it, print one console line.</summary>
     void FinishRound()
     {
-        _lastFinishedRound = _round;
         Hud.SetStaleBuild("");
         var report = World.Report!;
         string outcome = World.Outcome.Label().ToLowerInvariant();
         string file = $"round-{_round:D3}-{_scenarioId}-{outcome}.json";
         if (_log != null && World.Recorder != null) _log.SaveReplay(World.Recorder.Replay, file);
+        if (World.Recorder != null)
+            _lastFinished = new CaptureSource(_round, World.Recorder.Snapshot(), false, World.Tick, report.Clock, World.Outcome.Label().ToLowerInvariant());
         _log?.Write("round_end", ("round", _round), ("outcome", World.Outcome.Label()), ("clock", Math.Round(report.Clock, 3)),
             ("report", JsonDocument.Parse(report.ToJson()).RootElement.Clone()), ("replay", _log != null ? file : null));
         GD.Print($"ROUND {_round} {World.Outcome.Label()} {_scenarioId}");
     }
 
-    void Flag()
+    // ---- capture and unfinished rounds ----
+
+    /// <summary>What a capture holds: the round, a copy of its replay, whether it was cut short, and where it stood.</summary>
+    sealed record CaptureSource(int Round, Replay Replay, bool Partial, int Tick, float Clock, string Outcome);
+
+    CaptureSource? _lastFinished;     // the last round that reached its report
+    CaptureSource? _captureSource;    // what the open capture panel will save
+    bool _holdAfterCapture;
+
+    /// <summary>
+    /// What a capture taken now holds: during a round (or at its outcome, before the report) the round so far, partial; in Setup
+    /// or at the report the last finished round, whole. Null with no round played yet.
+    /// </summary>
+    CaptureSource? CaptureSourceNow()
     {
-        if (_lastFinishedRound == 0) { Hud.Toast("No finished round to flag yet"); return; }
-        _log?.Write("flag", ("round", _lastFinishedRound));
-        Hud.Toast($"Flagged round {_lastFinishedRound}");
-        GD.Print($"FLAG round {_lastFinishedRound}");
+        if (World.State is not (RoundState.Setup or RoundState.Report) && World.Recorder != null)
+            return new CaptureSource(_round, World.Recorder.Snapshot(), true, World.Tick, World.Clock, "");
+        return _lastFinished is { } f ? f with { Replay = f.Replay.Copy() } : null;
     }
+
+    /// <summary>
+    /// Opens the capture panel, which freezes the game until it is saved. With nothing to capture (or no session folder to write
+    /// to) it only says so; <paramref name="force"/> (--capture-panel, for screenshots) opens it anyway.
+    /// </summary>
+    void OpenCapture(bool force = false)
+    {
+        var src = CaptureSourceNow();
+        if (!force && (src == null || _log == null))
+        {
+            Hud.Toast(src == null ? "Nothing to capture" : "Nothing to capture: no session log (replay mode: add --session-log)");
+            return;
+        }
+        _captureSource = src;
+        string title = src == null ? "Capture" : $"Capture · round {src.Round}";
+        string detail = src == null ? "Nothing to capture yet: play a round first."
+            : src.Partial ? $"The round so far, up to {src.Clock.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s (tick {src.Tick}). It carries on after the capture."
+            : $"Round {src.Round} as it finished: {src.Outcome}.";
+        _capture.Open(title, detail);
+        var (device, kind, _) = ShownDevice();
+        _capture.SetDevice(device, kind);
+        Pad.TextEntry = true;
+    }
+
+    /// <summary>
+    /// Closes the panel and writes the capture: its replay (with the capture block, and partial mid-round) into the session folder,
+    /// a capture line in session.jsonl and one line in sessions/captures.jsonl, then the toast.
+    /// </summary>
+    void SaveCapture(bool withNote)
+    {
+        var src = _captureSource;
+        string tag = _capture.Tag, note = withNote ? _capture.Note : "";
+        _capture.Close();
+        _captureSource = null;
+        Pad.TextEntry = false;
+        _holdAfterCapture = true;
+        if (src == null || _log == null) { Hud.Toast("Nothing to capture"); return; }
+
+        string id = _log.NextCaptureId();
+        var r = src.Replay;
+        string wall = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+        r.Partial = src.Partial;
+        r.Capture = new ReplayCapture { Id = id, Tag = tag, Note = note, Tick = src.Tick, Clock = (float)Math.Round(src.Clock, 3), Wall = wall };
+        string file = _log.SaveReplay(r, CaptureIndex.ReplayFileName(id, r.ScenarioId, tag));
+        _log.Write("capture", ("id", id), ("round", src.Round), ("tag", tag), ("note", note), ("tick", src.Tick),
+            ("clock", Math.Round(src.Clock, 3)), ("partial", src.Partial), ("replay", file));
+        _log.AppendCapture(new CaptureEntry
+        {
+            Id = id, Round = src.Round, Wall = wall, Scenario = r.ScenarioId, Attacker = r.AttackerId, Keeper = r.KeeperId,
+            Tag = tag, Note = note, Tick = src.Tick, Clock = (float)Math.Round(src.Clock, 3), Partial = src.Partial,
+        }, file);
+        Hud.Toast($"Captured {id} · {tag}", 3f);
+        GD.Print($"CAPTURE {id} round {src.Round} {tag}{(src.Partial ? " partial" : "")}");
+    }
+
+    /// <summary>
+    /// Saves the round under way as round-NNN-&lt;scenario&gt;-unfinished.json (partial) and logs a round_abandoned line, when it
+    /// began and has no report: on quit, and before a round is set up over it (closing the player editor with a change, for one).
+    /// </summary>
+    void SaveUnfinished(string reason)
+    {
+        if (_log == null || World is null || World.Recorder == null || World.State is RoundState.Setup or RoundState.Report) return;
+        var r = World.Recorder.Snapshot();
+        r.Partial = true;
+        string file = _log.SaveReplay(r, $"round-{_round:D3}-{r.ScenarioId}-unfinished.json");
+        _log.Write("round_abandoned", ("round", _round), ("reason", reason), ("tick", World.Tick), ("clock", Math.Round(World.Clock, 3)), ("replay", file));
+        GD.Print($"ROUND {_round} UNFINISHED {r.ScenarioId} ({reason})");
+    }
+
+    /// <summary>A player_editor line for every preset save, load and clear: the slot (1-based), the column it came from and the outcome.</summary>
+    void LogPresetAction(PresetResult r) => _log?.Write("player_editor", ("action", r.Action), ("slot", r.Slot + 1),
+        ("column", r.FromPresets ? "presets" : "stats"), ("outcome", r.OutcomeName));
 
     // ---- player editor ----
 
@@ -431,7 +537,7 @@ public partial class Match
             _attackerId = PlayerPresets.CustomId;
             _log?.Write("selection", ("what", "editor"), ("attacker", _attackerId), ("applies_now", true), ("abandoned", live));
             // a finished round keeps its number (its replay is saved under it); a set-up or abandoned one is rebuilt under the same number
-            SetUpRound(newRound: atReport);
+            SetUpRound(newRound: atReport, abandon: "player_editor");
             if (_paused) { _paused = false; _log?.Write("pause", ("paused", false)); }
         }
         WriteEditorStore();

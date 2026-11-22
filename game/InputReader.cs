@@ -23,6 +23,22 @@ public struct EditorInput
     };
 }
 
+/// <summary>
+/// The capture panel's input for one tick, pad and keyboard merged; every field is a press, true only on the tick the button went
+/// down. The note is typed on the keyboard and read by the panel itself, never from the pad.
+/// </summary>
+public struct CaptureInput
+{
+    public bool Up, Down;        // D-pad / arrow keys: the tag
+    public bool Save;            // A / Cross, Enter: save with the tag and the note
+    public bool SaveNoNote;      // B / Circle, Esc: save with the tag and no note
+
+    public static CaptureInput Merge(in CaptureInput a, in CaptureInput b) => new()
+    {
+        Up = a.Up || b.Up, Down = a.Down || b.Down, Save = a.Save || b.Save, SaveNoNote = a.SaveNoNote || b.SaveNoNote,
+    };
+}
+
 /// <summary>One physics tick of gamepad state. Mirrors the core's TickIntent for the continuous fields.</summary>
 public struct PadSnapshot
 {
@@ -45,12 +61,14 @@ public struct PadSnapshot
     public bool NextAttacker, NextKeeper; // D-pad up / down
     public bool Confirm;           // A / Cross
     public bool Retry;             // Y / Triangle
-    public bool Flag;              // View / Share / Back
+    public bool OpenCapture;       // View / Share / Back, keyboard M: open the capture panel
     public bool Pause;             // Menu / Options / Start
     public bool ControlsToggle;    // keyboard H: show or hide the controls panel
     public bool OpenEditor;        // keyboard T: open the player editor (the pad opens it with Y while paused, read from Retry)
     /// <summary>The player editor's reading of the same tick; Match uses it instead of the rest while the editor is open.</summary>
     public EditorInput Editor;
+    /// <summary>The capture panel's reading of the same tick; Match uses it instead of the rest while the panel is open.</summary>
+    public CaptureInput Capture;
 
     /// <summary>The shield button under the core's name for it (<see cref="FootballSim.Core.TickIntent.CloseControl"/>).</summary>
     public readonly bool CloseControl => Shield;
@@ -80,6 +98,8 @@ public partial class InputReader : Node
     public bool GamepadConnected => Input.GetConnectedJoypads().Count > 0;
     /// <summary>False in replay mode: the keyboard must not affect a replay.</summary>
     public bool KeyboardEnabled = true;
+    /// <summary>True while the capture panel takes typed text: letter keys type the note, so the face-swap key does nothing.</summary>
+    public bool TextEntry;
     /// <summary>Which device last produced a meaningful input event: "gamepad", "keyboard", or "none" until something is touched.</summary>
     public string Source { get; private set; } = "none";
     /// <summary>The device the person is using: <see cref="Source"/>, or the pad when one is connected and nothing was touched yet.</summary>
@@ -212,7 +232,8 @@ public partial class InputReader : Node
     public PadSnapshot Poll()
     {
         TrackPad();
-        if (KeyboardEnabled && Pressed(Bindings.SwapFace)) ToggleSwap();
+        // (the key's edge is read every poll, so a B typed into a note does not toggle the swap when the panel closes)
+        if (KeyboardEnabled && Pressed(Bindings.SwapFace) && !TextEntry) ToggleSwap();
         var pad = PollPad();
         if (!KeyboardEnabled) return HoldKnockOn(pad);
         return HoldKnockOn(Merge(pad, PollKeyboard()));
@@ -237,9 +258,10 @@ public partial class InputReader : Node
         if (b.SkillKey != FootballSim.Core.SkillKey.None) m.SkillKey = b.SkillKey;
         m.OverlayToggle |= b.OverlayToggle; m.NextSpot |= b.NextSpot; m.PrevSpot |= b.PrevSpot;
         m.NextAttacker |= b.NextAttacker; m.NextKeeper |= b.NextKeeper;
-        m.Confirm |= b.Confirm; m.Retry |= b.Retry; m.Flag |= b.Flag; m.Pause |= b.Pause; m.ControlsToggle |= b.ControlsToggle;
+        m.Confirm |= b.Confirm; m.Retry |= b.Retry; m.OpenCapture |= b.OpenCapture; m.Pause |= b.Pause; m.ControlsToggle |= b.ControlsToggle;
         m.OpenEditor |= b.OpenEditor;
         m.Editor = EditorInput.Merge(a.Editor, b.Editor);
+        m.Capture = CaptureInput.Merge(a.Capture, b.Capture);
         return m;
     }
 
@@ -271,7 +293,7 @@ public partial class InputReader : Node
             NextKeeper = Pressed(Bindings.NextKeeper),
             Confirm = Pressed(Bindings.Confirm),
             Retry = Pressed(Bindings.Retry),
-            Flag = Pressed(Bindings.Flag),
+            OpenCapture = Pressed(Bindings.CaptureOpen),
             Pause = Pressed(Bindings.Pause),
             ControlsToggle = Pressed(Bindings.Controls),
             OpenEditor = Pressed(Bindings.EditorOpen),
@@ -282,6 +304,11 @@ public partial class InputReader : Node
                 Big = Bindings.Chip.Held(),
                 Column = Pressed(Bindings.Editor.Column), Load = Pressed(Bindings.Editor.Load), Save = Pressed(Bindings.Editor.Save),
                 Clear = Pressed(Bindings.Editor.Clear), Close = Pressed(Bindings.Editor.Close),
+            },
+            Capture = new CaptureInput
+            {
+                Up = Pressed(Bindings.CaptureKeys.Up), Down = Pressed(Bindings.CaptureKeys.Down),
+                Save = Pressed(Bindings.CaptureKeys.Save), SaveNoNote = Pressed(Bindings.CaptureKeys.SaveNoNote),
             },
         };
     }
@@ -326,7 +353,7 @@ public partial class InputReader : Node
             NextKeeper = Input.IsActionJustPressed(Bindings.Pad.NextKeeper.Action),
             Confirm = Input.IsActionJustPressed(Bindings.Pad.Confirm.Action),
             Retry = Input.IsActionJustPressed(Bindings.Pad.Retry.Action),
-            Flag = Input.IsActionJustPressed(Bindings.Pad.Flag.Action),
+            OpenCapture = Input.IsActionJustPressed(Bindings.Pad.Capture.Action),
             Pause = Input.IsActionJustPressed(Bindings.Pad.Pause.Action),
             Editor = new EditorInput
             {
@@ -336,8 +363,13 @@ public partial class InputReader : Node
                 Column = Input.IsActionJustPressed(Bindings.Pad.Retry.Action),
                 Load = Input.IsActionJustPressed(Bindings.Pad.Confirm.Action),
                 Save = Input.IsActionJustPressed(Bindings.Pad.EditorSave.Action),
-                Clear = Input.IsActionJustPressed(Bindings.Pad.Flag.Action),
+                Clear = Input.IsActionJustPressed(Bindings.Pad.Capture.Action),
                 Close = Input.IsActionJustPressed(Bindings.Pad.Shoot.Action) || Input.IsActionJustPressed(Bindings.Pad.Pause.Action),
+            },
+            Capture = new CaptureInput
+            {
+                Up = Input.IsActionJustPressed(Bindings.Pad.NextAttacker.Action), Down = Input.IsActionJustPressed(Bindings.Pad.NextKeeper.Action),
+                Save = Input.IsActionJustPressed(Bindings.Pad.Confirm.Action), SaveNoNote = Input.IsActionJustPressed(Bindings.Pad.Shoot.Action),
             },
         };
     }

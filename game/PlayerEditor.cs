@@ -11,17 +11,17 @@ public enum EditorResult { None, StoreChanged, Close }
 /// <summary>
 /// The player editor: two columns over the paused game. The stats column is a Base row (the shipped attacker Custom was copied
 /// from) and one row per <see cref="PlayerEditRow"/>; the presets column is the store's ten slots. It edits a working copy, which
-/// <see cref="Match"/> applies when it closes. Driven one physics tick at a time by <see cref="Step"/>; it never reads input itself.
+/// <see cref="Match"/> applies when it closes. Save, load and clear act on the highlighted slot from either column (the column, slot
+/// and confirmation rules are <see cref="PresetActions"/>). Driven one physics tick at a time by <see cref="Step"/>; it never reads
+/// input itself.
 /// </summary>
 public partial class PlayerEditor : PanelContainer
 {
     const int FontSize = 15;
     /// <summary>Seconds a direction is held before it repeats, the repeat rate it starts at and the one it speeds up to (steps per second).</summary>
     const float RepeatDelay = 0.35f, RepeatStartRate = 6f, RepeatMaxRate = 20f, RepeatRampSeconds = 1f;
-    /// <summary>Seconds within which a second press confirms an overwrite, a clear or a Base change that loses edits.</summary>
-    const float ConfirmSeconds = 2f;
     static readonly Color Heading = new(1f, 0.85f, 0.3f), Dim = new(0.65f, 0.65f, 0.65f), Value = new(0.6f, 0.9f, 1f),
-        Selected = new(1f, 0.95f, 0.55f), Warn = new(1f, 0.6f, 0.3f);
+        Selected = new(1f, 0.95f, 0.55f), Marked = new(0.85f, 0.8f, 0.55f), Warn = new(1f, 0.6f, 0.3f);
 
     readonly IReadOnlyList<PlayerEditRow> _rows = PlayerEditRow.All();
     readonly List<(Label Name, Label Value)> _statLabels = new();
@@ -29,12 +29,11 @@ public partial class PlayerEditor : PanelContainer
     Label _title = null!, _diff = null!, _confirm = null!, _hint1 = null!, _hint2 = null!, _presetsHead = null!;
 
     PlayerPresets _store = null!;
+    readonly PresetActions _actions = new(new PlayerPresets());
     List<PlayerSheet> _shipped = new();
     PlayerSheet _atOpen = new();
-    bool _presets;            // the presets column has focus
-    int _row, _slot;          // row 0 is Base
+    int _row;                 // row 0 is Base
     float _time;
-    string _pendingAction = ""; int _pendingSlot = -1; string _pendingBase = ""; float _pendingUntil;
     string _message = "";
     string _hintKey = "";
     readonly Repeater _up = new(), _down = new(), _left = new(), _right = new();
@@ -46,6 +45,8 @@ public partial class PlayerEditor : PanelContainer
     public string BaseId { get; private set; } = "";
     /// <summary>True when the sheet differs from what it was when the editor opened.</summary>
     public bool Dirty => !PlayerPresets.SameValues(Work, _atOpen);
+    /// <summary>Raised for every save, load and clear press with its slot and outcome (Match logs it).</summary>
+    public event System.Action<PresetResult>? PresetAction;
 
     public override void _Ready()
     {
@@ -117,8 +118,9 @@ public partial class PlayerEditor : PanelContainer
         BaseId = baseId;
         _shipped = shipped.ToList();
         _store = store;
-        _presets = false; _row = 1; _slot = 0;
-        _pendingAction = ""; _message = "";
+        _actions.Reset(store);
+        _row = 1;
+        _message = "";
         _up.Reset(); _down.Reset(); _left.Reset(); _right.Reset();
         IsOpen = true;
         Visible = true;
@@ -140,14 +142,14 @@ public partial class PlayerEditor : PanelContainer
         if (device == InputDevice.Gamepad)
         {
             string B(PadBind p) => p.Label(kind);
-            _hint1.Text = $"↑↓ row   ←→ −1/+1 (hold repeats)   {B(Bindings.Pad.Chip)}/{B(Bindings.Pad.Finesse)} −10/+10   {B(Bindings.Pad.Retry)} presets   {B(Bindings.Pad.Shoot)}/{B(Bindings.Pad.Pause)} close";
-            _hint2.Text = $"presets: {B(Bindings.Pad.Confirm)} load   {B(Bindings.Pad.EditorSave)} save (twice to overwrite)   {B(Bindings.Pad.Flag)} clear (twice)";
+            _hint1.Text = $"↑↓ row or slot   ←→ −1/+1 (hold repeats)   {B(Bindings.Pad.Chip)}/{B(Bindings.Pad.Finesse)} −10/+10   {B(Bindings.Pad.Retry)} column   {B(Bindings.Pad.Shoot)}/{B(Bindings.Pad.Pause)} close";
+            _hint2.Text = $"marked slot, either column: {B(Bindings.Pad.EditorSave)} save (twice to overwrite)   {B(Bindings.Pad.Confirm)} load (twice if edits would be lost)   {B(Bindings.Pad.Capture)} clear (twice)";
             _presetsHead.Text = $"Presets ({PlayerPresets.SlotCount})   {B(Bindings.Pad.Retry)}: switch column";
         }
         else
         {
-            _hint1.Text = $"↑↓ row   ←→ −1/+1 (hold repeats)   {Bindings.Chip.Label}+←→ −10/+10   {Bindings.Editor.Column.Label} presets   {Bindings.Editor.Close.Label} close";
-            _hint2.Text = $"presets: {Bindings.Editor.Load.Label} load   {Bindings.Editor.Save.Label} save (twice to overwrite)   {Bindings.Editor.Clear.Label} clear (twice)";
+            _hint1.Text = $"↑↓ row or slot   ←→ −1/+1 (hold repeats)   {Bindings.Chip.Label}+←→ −10/+10   {Bindings.Editor.Column.Label} column   {Bindings.Editor.Close.Label} close";
+            _hint2.Text = $"marked slot, either column: {Bindings.Editor.Save.Label} save (twice to overwrite)   {Bindings.Editor.Load.Label} load (twice if edits would be lost)   {Bindings.Editor.Clear.Label} clear (twice)";
             _presetsHead.Text = $"Presets ({PlayerPresets.SlotCount})   {Bindings.Editor.Column.Label}: switch column";
         }
     }
@@ -157,23 +159,20 @@ public partial class PlayerEditor : PanelContainer
     {
         if (!IsOpen) return EditorResult.None;
         _time += dt;
-        if (_pendingAction.Length > 0 && _time > _pendingUntil) { _pendingAction = ""; _message = ""; }
+        if (_actions.Expire(_time)) _message = "";
         if (input.Close) return EditorResult.Close;
         var result = EditorResult.None;
-        if (input.Column) { _presets = !_presets; ClearPending(); }
+        if (input.Column) { DropPending(); _actions.ToggleColumn(); }
 
         int vertical = _down.Steps(input.Down, dt) - _up.Steps(input.Up, dt);
         int lefts = _left.Steps(input.Left, dt), rights = _right.Steps(input.Right, dt);
-        if (_presets)
+        if (_actions.PresetsFocus)
         {
-            if (vertical != 0) { _slot = Wrap(_slot + vertical, PlayerPresets.SlotCount); ClearPending(); }
-            if (input.Load) Load();
-            if (input.Save && Save()) result = EditorResult.StoreChanged;
-            if (input.Clear && Clear()) result = EditorResult.StoreChanged;
+            if (vertical != 0) { DropPending(); _actions.MoveSlot(vertical); }
         }
         else
         {
-            if (vertical != 0) { _row = Wrap(_row + vertical, _rows.Count + 1); ClearPending(); }
+            if (vertical != 0) { _row = Wrap(_row + vertical, _rows.Count + 1); DropPending(); }
             int steps = (rights - lefts) * (input.Big ? 10 : 1) + (input.Plus10 ? 10 : 0) - (input.Minus10 ? 10 : 0);
             if (_row == 0)
             {
@@ -187,6 +186,10 @@ public partial class PlayerEditor : PanelContainer
                 _message = "";
             }
         }
+        // Save, load and clear act on the highlighted slot whichever column has focus.
+        if (input.Load) Act(_actions.Load(Work, WouldLose(), _time, out var loaded), loaded);
+        if (input.Save && Act(_actions.Save(Work, BaseId, System.DateTime.Now, _time))) result = EditorResult.StoreChanged;
+        if (input.Clear && Act(_actions.Clear(_time))) result = EditorResult.StoreChanged;
         Refresh();
         return result;
     }
@@ -201,65 +204,31 @@ public partial class PlayerEditor : PanelContainer
         if (_shipped.Count == 0) return;
         int i = _shipped.FindIndex(s => s.Id == BaseId);
         var target = _shipped[i < 0 ? (dir > 0 ? 0 : _shipped.Count - 1) : Wrap(i + dir, _shipped.Count)];
-        bool confirmed = _pendingAction == "base" && _pendingBase == target.Id;
-        if (WouldLose() && !confirmed)
+        if (WouldLose() && !_actions.ConfirmOrArm("base", -1, target.Id, _time))
         {
-            Pend("base", -1, $"Custom will be replaced by {target.Id}: press {(dir > 0 ? "→" : "←")} again");
-            _pendingBase = target.Id;
+            _message = $"Custom will be replaced by {target.Id}: press {(dir > 0 ? "→" : "←")} again";
             return;
         }
-        ClearPending();
+        _actions.ClearPending();
         Work = PlayerPresets.AsCustom(target);
         BaseId = target.Id;
         _message = $"Loaded {target.Id}";
     }
 
-    void Load()
+    /// <summary>Shows a preset action's outcome, takes a loaded sheet as the working copy, and reports it. True when the store changed.</summary>
+    bool Act(PresetResult r, PlayerSheet? loaded = null)
     {
-        ClearPending();
-        if (_store.Load(_slot) is not { } s) { _message = $"Slot {_slot + 1} is empty"; return; }
-        Work = s;
-        _message = $"Loaded slot {_slot + 1}: {_store.Slots[_slot]!.Name}";
+        if (loaded != null) Work = loaded;
+        _message = r.Message;
+        PresetAction?.Invoke(r);
+        return r.StoreChanged;
     }
 
-    bool Save()
+    /// <summary>Drops a pending confirmation, and its message with it.</summary>
+    void DropPending()
     {
-        bool filled = _store.Slots[_slot] != null;
-        if (filled && !(_pendingAction == "save" && _pendingSlot == _slot))
-        {
-            Pend("save", _slot, $"Slot {_slot + 1} is filled: press save again to overwrite");
-            return false;
-        }
-        ClearPending();
-        _store.Save(_slot, Work, BaseId, System.DateTime.Now);
-        _message = $"Saved into slot {_slot + 1}";
-        return true;
-    }
-
-    bool Clear()
-    {
-        if (_store.Slots[_slot] == null) { ClearPending(); _message = $"Slot {_slot + 1} is empty"; return false; }
-        if (!(_pendingAction == "clear" && _pendingSlot == _slot))
-        {
-            Pend("clear", _slot, $"Clear slot {_slot + 1}? Press clear again");
-            return false;
-        }
-        ClearPending();
-        _store.Clear(_slot);
-        _message = $"Cleared slot {_slot + 1}";
-        return true;
-    }
-
-    void Pend(string action, int slot, string line)
-    {
-        _pendingAction = action; _pendingSlot = slot; _pendingUntil = _time + ConfirmSeconds;
-        _message = line;
-    }
-
-    void ClearPending()
-    {
-        if (_pendingAction.Length > 0) _message = "";
-        _pendingAction = ""; _pendingSlot = -1; _pendingBase = "";
+        if (_actions.Pending.Length > 0) _message = "";
+        _actions.ClearPending();
     }
 
     static int Wrap(int i, int n) => ((i % n) + n) % n;
@@ -271,7 +240,7 @@ public partial class PlayerEditor : PanelContainer
         for (int i = 0; i < _statLabels.Count; i++)
         {
             var (name, value) = _statLabels[i];
-            bool sel = !_presets && i == _row;
+            bool sel = !_actions.PresetsFocus && i == _row;
             string v = i == 0 ? (BaseId.Length > 0 ? BaseId : "none") : _rows[i - 1].Value(Work);
             value.Text = sel ? $"◂ {v} ▸" : v;
             Colour(name, sel ? Selected : Colors.White);
@@ -280,9 +249,10 @@ public partial class PlayerEditor : PanelContainer
         for (int i = 0; i < _slotLabels.Count; i++)
         {
             var p = _store.Slots[i];
-            bool sel = _presets && i == _slot;
-            _slotLabels[i].Text = $"{(sel ? "▸ " : "   ")}{i + 1,2}  {(p == null ? "empty" : p.Name)}";
-            Colour(_slotLabels[i], sel ? Selected : p == null ? Dim : Colors.White);
+            // the highlighted slot stays marked while the stats column has focus (save, load and clear still act on it), hollow then
+            bool marked = i == _actions.Slot, sel = marked && _actions.PresetsFocus;
+            _slotLabels[i].Text = $"{(sel ? "▸ " : marked ? "▹ " : "   ")}{i + 1,2}  {(p == null ? "empty" : p.Name)}";
+            Colour(_slotLabels[i], sel ? Selected : marked ? Marked : p == null ? Dim : Colors.White);
         }
         _diff.Text = DiffLine();
         _confirm.Text = _message;

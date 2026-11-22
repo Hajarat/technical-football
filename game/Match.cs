@@ -20,6 +20,7 @@ public partial class Match : Node3D
 
     ToolArgs _args = null!;
     PlayerEditor _editor = null!;
+    CapturePanel _capture = null!;
     ShotTool? _shots;
     int _tick;
     double _frameSum, _frameWorst;
@@ -55,6 +56,8 @@ public partial class Match : Node3D
         Hud = new Hud { Name = "Hud" }; AddChild(Hud);
         Pad = new InputReader { Name = "Input" }; AddChild(Pad);
         _editor = new PlayerEditor { Name = "PlayerEditor" }; Hud.AddChild(_editor);
+        _editor.PresetAction += LogPresetAction;
+        _capture = new CapturePanel { Name = "CapturePanel" }; Hud.AddChild(_capture);
 
         Attacker.SetTeamColor(new Color(0.85f, 0.1f, 0.1f));
         if (_args.Figure == "skinned") UseSkinnedFigures();
@@ -264,9 +267,15 @@ public partial class Match : Node3D
         GetTree().Quit(0);
     }
 
+    /// <summary>
+    /// The last lines of a session: a capture panel still open is saved with the note typed so far, a round that began but has no
+    /// report is saved as unfinished, then the quit line. Runs once (the log is closed after it).
+    /// </summary>
     void LogQuit(string reason)
     {
         if (_log == null) return;
+        if (_capture != null && _capture.IsOpen) SaveCapture(withNote: true);
+        SaveUnfinished(reason);
         _log.Write("quit", ("reason", reason), ("rounds", _round), ("ticks", _tick));
         _log.Dispose();
         _log = null;

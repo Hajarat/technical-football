@@ -6,7 +6,10 @@ using FootballSim.Core;
 // Batch runner: scripted shots through the real world, many seeds, one table and one CSV.
 //   dotnet run -c Release --project src/FootballSim.Batch -- --scenario penalty --attacker striker_a --keeper the_wall \
 //     --sweep finishing=40,50,60,70,80,90 --n 10000 --seed 1
-//   ... --replay replays/<file>.json            re-runs a replay and prints its report
+//   ... --replay replays/<file>.json            re-runs a replay and prints its report (a partial one: its ticks and shots so far)
+//   ... --shot-audit <file|dir> [--capture C14]  one line per shot at its release: position, facing, stick, aim, the foot rule and
+//                                               the geometry's choice, the aimed Z, the ball's offset, then the strike (a folder is
+//                                               searched with its subfolders; --capture picks one capture through captures.jsonl)
 //   ... --save-replay <file>                    plays one scripted round (use --seed) and saves its replay
 //   ... --dump-tuning                           prints the built-in tuning as JSON (the format of data/tuning/default.json)
 //   ... --probe dribble [--seeds 50] [--ratings 1,50,99] [--exact 1] [--only straight_jog,...]
@@ -64,6 +67,8 @@ static class Cli
         var tuning = tr.Value!;
 
         if (opts.TryGetValue("replay", out var replayPath)) return RunReplay(replayPath, dataDir, tuning);
+        if (opts.TryGetValue("shot-audit", out var auditPath))
+            return ShotAuditCli.Run(auditPath, opts.TryGetValue("capture", out var capId) ? capId : null, dataDir, tuning);
         if (opts.ContainsKey("skill-probe")) return SkillProbe.Run(opts, dataDir, tuning);
         if (opts.ContainsKey("keeper-probe")) return KeeperProbe.Run(opts, dataDir, tuning);
         if (opts.TryGetValue("write-probe-replays", out var probeDir)) return KeeperProbe.WriteReplays(probeDir, dataDir, tuning);
@@ -194,6 +199,22 @@ static class Cli
         if (sc == null || att == null || kee == null) return 1;
         if (!replay.MatchesTuning(tuning))
             Console.WriteLine("Tuning has changed since this replay, so the result may differ.");
+        if (replay.Partial)
+        {
+            // a capture or an unfinished round: the recorded ticks, then the shots so far (there is no report)
+            var world = replay.Play(tuning, sc, att, kee);
+            Console.WriteLine($"replay {path}: scenario={replay.ScenarioId} attacker={replay.AttackerId} keeper={replay.KeeperId} seed={replay.Seed} ticks={replay.TickCount}");
+            if (replay.Capture is { } c) Console.WriteLine($"capture {c.Id}: {c.Tag}{(c.Note.Length > 0 ? " · " + c.Note : "")}");
+            Console.WriteLine($"partial: {replay.TickCount} ticks, no report");
+            for (int i = 0; i < world.Shots.Count; i++)
+            {
+                var s = world.Shots[i];
+                Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"shot{i} {s.Type} {s.Foot}/{s.Surface} charge {s.Charge:F2} aimed z {s.Aimed.X:F2} h {s.Aimed.Y:F2} landed z {s.Landed.X:F2} h {s.Landed.Y:F2}"));
+            }
+            if (world.Shots.Count == 0) Console.WriteLine("no shots");
+            return 0;
+        }
         var report = replay.Run(tuning, sc, att, kee);
         Console.WriteLine($"replay {path}: scenario={replay.ScenarioId} attacker={replay.AttackerId} keeper={replay.KeeperId} seed={replay.Seed} ticks={replay.TickCount}");
         Console.WriteLine(report.ToJson());
