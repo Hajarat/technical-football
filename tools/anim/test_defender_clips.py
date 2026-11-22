@@ -43,7 +43,16 @@ def test_a_tackle_or_block_says_which_leg_leads():
 
 def test_every_set_has_a_kept_clip():
     kept = {c["set"] for c in clips() if R.verdict(c) != "reject"}
-    assert SETS - kept <= {"barge"}   # a rejected barge keeps the figure's own lean
+    # a rejected barge keeps the figure's own lean; a barged attacker with no clip plays the stumble set
+    assert SETS - kept == {"barge", "barged"}
+
+
+def test_the_auditions_verdicts():
+    rejected = {c["name"] for c in clips() if R.verdict(c) == "reject"}
+    assert rejected == {"jockey_back_crouch_136_12", "lunge_kick_144_05", "lunge_stepkick_135_04", "barge_sidestep_127_14",
+                        "barged_lurch_104_13", "fall_slip_90_17"}
+    trimmed = {c["name"]: c["frames"] for c in clips() if R.verdict(c) == "trim"}
+    assert trimmed == {"jockey_close_left_78_25": [60, 300], "jockey_close_right_78_27": [50, 250], "set_low_78_26": [200, 300]}
 
 
 def test_the_committed_folder_is_the_list():

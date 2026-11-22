@@ -158,7 +158,7 @@ landed, the chest kept square to his facing in the stance sets). The tackling fo
 (`TackleFoot`) by leg IK, its weight rising over the last 0.2 s before the contact, held while the foot is live and let go
 over 0.2 s; the blocking foot goes out to the side by the core's leg reach the same way. The attacker's figure has the same
 layer for his reactions (`FigureDefender.Reaction`): `stumble` while the core says he stumbles, `barged` when a barge's
-push carries him (the clip of the side he is pushed to; with no kept clip in that set, the stumble clips), `fall` when the
+push carries him (the audition kept no clip of that, so he plays the stumble clips while the push carries him), `fall` when the
 round ended in a foul. A set with no kept clip
 keeps the procedural pose. `--defender-anim-log` prints a `DEFENDER_MM` line at every switch (who, action, set, clip, frame,
 rate); `--defender-anim-drop-set a,b` leaves sets empty to check the fallback. The clips, their sources and the audition's

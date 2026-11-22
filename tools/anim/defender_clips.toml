@@ -21,7 +21,7 @@
 #   file_from  for source = "baked": the .kclip is copied from this path (relative to game/assets/anim) instead of being baked here
 #
 # Frame ranges and events were read off each trial's motion (pelvis height and path against its facing, foot reach from the pelvis),
-# as for the keeper's list. Every clip has verdict "keep" until the audition says otherwise.
+# as for the keeper's list. The verdicts are the audition's of 2026-11-22 (the user sent the recommended picks unchanged).
 
 # ---- jockey: basketball defensive slides (subject 78), backpedals -------------------------------------------------------------
 
@@ -81,32 +81,32 @@ set = "jockey"
 side = "none"
 tags = ["back"]
 contact_tolerance_cm = 4
-verdict = "keep"
+verdict = "reject"
 loop = false
 notes = "walking backwards crouched (slow)"
 
 [[clip]]
 name = "jockey_close_left_78_25"
 trial = "78_25"
-frames = [1, 356]
+frames = [60, 300]
 set = "jockey"
 side = "left"
 tags = ["close"]
 contact_speed = 1.2
 contact_tolerance_cm = 4
-verdict = "keep"
+verdict = "trim"
 loop = false
 notes = "closing down forward and to his left, then stopping low"
 
 [[clip]]
 name = "jockey_close_right_78_27"
 trial = "78_27"
-frames = [1, 296]
+frames = [50, 250]
 set = "jockey"
 side = "right"
 tags = ["close"]
 contact_speed = 1.2
-verdict = "keep"
+verdict = "trim"
 loop = false
 notes = "closing down forward and to his right, then stopping low"
 
@@ -115,11 +115,11 @@ notes = "closing down forward and to his right, then stopping low"
 [[clip]]
 name = "set_low_78_26"
 trial = "78_26"
-frames = [200, 326]
+frames = [200, 300]
 set = "set"
 side = "none"
 tags = ["idle"]
-verdict = "keep"
+verdict = "trim"
 loop = false
 notes = "low defensive stance after closing down: knees bent, arms out, small weight shifts"
 
@@ -166,7 +166,7 @@ frames = [320, 440]
 set = "lunge"
 side = "right"
 events = { contact = 366 }
-verdict = "keep"
+verdict = "reject"
 loop = false
 notes = "front kick with the right foot from a guard stance (hands up), foot at waist height"
 
@@ -177,7 +177,7 @@ frames = [289, 480]
 set = "lunge"
 side = "right"
 events = { contact = 371 }
-verdict = "keep"
+verdict = "reject"
 loop = false
 notes = "step forward and front kick with the right foot, landing in a long stance"
 
@@ -214,7 +214,7 @@ frames = [1, 151]
 set = "barge"
 side = "right"
 contact_speed = 1.5
-verdict = "keep"
+verdict = "reject"
 loop = false
 notes = "running, a hard step to his right (the nearest CMU has to a shoulder into a runner alongside)"
 
@@ -307,7 +307,7 @@ side = "left"
 contact_speed = 0.6
 contact_tolerance_cm = 4
 events = { recover = 290 }
-verdict = "keep"
+verdict = "reject"
 loop = false
 notes = "staggers sideways with an arm thrown up, then recovers"
 
@@ -329,7 +329,7 @@ frames = [300, 520]
 set = "fall"
 side = "none"
 events = { landing = 440 }
-verdict = "keep"
+verdict = "reject"
 loop = false
 notes = "feet slip out from under him, lands on his back"
 

@@ -57,11 +57,24 @@ public class DefenderChooserTests
     }
 
     [Fact]
-    public void EverySetButTheBargeHasAKeptClip()
+    public void EverySetButTheBargeAndTheBargedHasAKeptClip()
     {
-        // (the barge keeps the figure's lean when its clip is rejected: the chooser's set may be empty)
+        // (the audition kept no barge clip, so the barge is the figure's lean, and none of being pushed sideways, so a barged
+        // attacker plays the stumble set)
         foreach (var set in DefenderChooser.Sets)
-            if (set != DefenderChooser.Barge) Assert.True(Db.Set(set) is { FrameCount: > 0 }, set);
+        {
+            bool empty = set is DefenderChooser.Barge or DefenderChooser.Barged;
+            Assert.True(empty ? Db.Set(set) == null : Db.Set(set) is { FrameCount: > 0 }, set);
+        }
+    }
+
+    [Fact]
+    public void RejectedClipsNeverPlay()
+    {
+        string[] rejected = { "jockey_back_crouch_136_12", "lunge_kick_144_05", "lunge_stepkick_135_04", "barge_sidestep_127_14", "barged_lurch_104_13", "fall_slip_90_17" };
+        foreach (var set in Db.Sets)
+            foreach (var pc in set.Clips)
+                Assert.DoesNotContain(rejected, r => pc.Clip.Name.StartsWith(r));
     }
 
     sealed class Rig
