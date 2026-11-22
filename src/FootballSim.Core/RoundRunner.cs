@@ -24,9 +24,9 @@ public static class RoundRunner
     /// on toward the goal (a fingertip) is followed until the ball goes in (Scored) or stops heading on goal (Parried).
     /// </summary>
     public static Result RunFirstShot(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, ulong seed,
-        ScriptedAttacker? script = null, bool followUp = false)
+        ScriptedAttacker? script = null, bool followUp = false, PlayerSheet? defender = null)
     {
-        var world = new World(tuning, scenario, attacker, keeper, seed);
+        var world = new World(tuning, scenario, attacker, keeper, seed, defender);
         script ??= new ScriptedAttacker();
         world.Begin();
         var buf = new TickIntent[world.PlayerCount];
@@ -70,6 +70,8 @@ public static class RoundRunner
                 Outcome.Over => ShotEnd.Over,
                 Outcome.Out => ShotEnd.Out,
                 Outcome.TimeUp => ShotEnd.TimeUp,
+                // With a defender: a shot struck before he won the ball back or fouled was blocked or came back into play.
+                Outcome.Dispossessed or Outcome.Foul => ShotEnd.Rebound,
                 _ => ShotEnd.NoShot,
             };
         }
@@ -102,10 +104,10 @@ public static class RoundRunner
     /// optionally recording a replay.
     /// </summary>
     public static RoundReport RunToReport(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, ulong seed,
-        out Replay replay, ScriptedAttacker? script = null)
+        out Replay replay, ScriptedAttacker? script = null, PlayerSheet? defender = null)
     {
-        var world = new World(tuning, scenario, attacker, keeper, seed);
-        var rec = new ReplayRecorder(world, attacker.Id, keeper.Id, scenario.Id);
+        var world = new World(tuning, scenario, attacker, keeper, seed, defender);
+        var rec = new ReplayRecorder(world, attacker.Id, keeper.Id, scenario.Id, defender?.Id);
         world.Recorder = rec;
         script ??= new ScriptedAttacker();
         world.Begin();

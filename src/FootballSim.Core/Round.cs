@@ -81,6 +81,32 @@ public enum SaveType { None, Catch, Parry, Reflex, ReflexAttempt, FailedAttempt 
 /// <summary>How the keeper played the ball when he met it (Slide: knocked away in a slide tackle outside his area).</summary>
 public enum SaveKind { None, Catch, Parry, Block, TipOver, Fingertip, Smother, LooseReflex, Slide }
 
+/// <summary>The defender's numbers for a round (only in a scenario with a defender).</summary>
+public sealed class DefenderReport
+{
+    /// <summary>Auto tackles (no button) that took the ball.</summary>
+    public int AutoWon { get; set; }
+    /// <summary>Lunges (standing tackles) started, and those that met the ball.</summary>
+    public int LungesTried { get; set; }
+    public int LungesWon { get; set; }
+    /// <summary>Slide tackles started, and those that met the ball.</summary>
+    public int SlidesTried { get; set; }
+    public int SlidesWon { get; set; }
+    /// <summary>Shots (a struck ball in flight) that met his body, leg or foot.</summary>
+    public int Blocks { get; set; }
+    /// <summary>Shoulder barges that landed, and those he won (the attacker stumbled).</summary>
+    public int Barges { get; set; }
+    public int BargesWon { get; set; }
+    /// <summary>Lunges or slides that met the attacker's body before the ball.</summary>
+    public int Fouls { get; set; }
+    /// <summary>Seconds his bot spent pressing (active).</summary>
+    public float TimeActive { get; set; }
+    /// <summary>True if he controlled a loose ball (the round ended DISPOSSESSED).</summary>
+    public bool Collected { get; set; }
+    /// <summary>How the ball he collected was won (None when it came loose another way, or was not collected).</summary>
+    public TackleKind WonBy { get; set; }
+}
+
 /// <summary>The record of one round, available when the state reaches Report.</summary>
 public sealed class RoundReport
 {
@@ -92,6 +118,9 @@ public sealed class RoundReport
     public float Clock { get; init; }
     public IReadOnlyList<ShotResult> Shots { get; init; } = Array.Empty<ShotResult>();
     public KeeperReport Keeper { get; init; } = new();
+    /// <summary>The defender's numbers; absent (and left out of the JSON) in a scenario without one.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public DefenderReport? Defender { get; init; }
 
     /// <summary>The report as JSON, used to compare two runs exactly.</summary>
     public string ToJson() => JsonSerializer.Serialize(this, DataLoader.Options);

@@ -8,6 +8,13 @@ public readonly record struct SweepSphere(Vector3 Center, float Radius);
 /// <summary>A capsule the ball's path is tested against (the keeper's body, grown by the ball radius): segment A to B, radius.</summary>
 public readonly record struct SweepCapsule(Vector3 A, Vector3 B, float Radius);
 
+/// <summary>
+/// An extra obstacle in the ball's path that belongs to an outfield player: a capsule already grown by the ball radius (a
+/// sphere when A equals B), an id the caller knows it by, and the greatest height of the ball's centre at which it counts (a
+/// leg block reaches only so high; a contact above it is no contact).
+/// </summary>
+public readonly record struct BallObstacle(SweepCapsule Shape, int Id, float MaxY = float.PositiveInfinity);
+
 /// <summary>What happened to the ball during one step.</summary>
 public struct BallStepResult
 {
@@ -21,6 +28,13 @@ public struct BallStepResult
     public Vector3 SpherePoint;
     /// <summary>With <see cref="SphereHit"/>: the obstacle met was the body capsule, not the hands (sphere or hands capsule).</summary>
     public bool BodyHit;
+    /// <summary>
+    /// The path met one of the extra obstacles (<see cref="ObstacleId"/>) before anything else; the ball stopped at
+    /// <see cref="ObstaclePoint"/> and the caller decides what happens.
+    /// </summary>
+    public bool ObstacleHit;
+    public int ObstacleId;
+    public Vector3 ObstaclePoint;
     /// <summary>The ball met an arena board or the ceiling; the first contact of the tick is reported.</summary>
     public bool BoardHit;
     /// <summary>Ball centre at the first board contact.</summary>
@@ -158,8 +172,11 @@ public sealed class Ball
     /// Advances the ball one tick. <paramref name="pitch"/> supplies the goal frame and the arena boards (null = neither). <paramref name="sphere"/> is an
     /// extra obstacle such as the keeper's hands: the ball stops at the first contact and reports it.
     /// Movement is swept along the whole path, so a 36 m/s ball (0.3 m per tick) cannot skip a post or a hand.
+    /// <paramref name="extra"/> are outfield players' obstacles (a body, a tackling foot, a blocking leg). When one of them and
+    /// the keeper's meet the ball at the same moment, the keeper has it inside his penalty area and the outfield player outside.
     /// </summary>
-    internal BallStepResult Step(float dt, Pitch? pitch, SweepSphere? sphere, SweepCapsule? body = null, SweepCapsule? hands = null)
+    internal BallStepResult Step(float dt, Pitch? pitch, SweepSphere? sphere, SweepCapsule? body = null, SweepCapsule? hands = null,
+        IReadOnlyList<BallObstacle>? extra = null)
     {
         var result = new BallStepResult();
         ApplyForces(dt);
@@ -182,6 +199,29 @@ public sealed class Ball
             bool bodyFirst = false;
             if (hands is { } hc && SweepPointCapsule(pos, d, hc, out float th) && th < tSphere) tSphere = th;
             if (body is { } bc && SweepPointCapsule(pos, d, bc, out float tc) && tc < tSphere) { tSphere = tc; bodyFirst = true; }
+
+            if (extra != null)
+            {
+                float tExtra = float.MaxValue;
+                int id = 0;
+                for (int i = 0; i < extra.Count; i++)
+                {
+                    var o = extra[i];
+                    if (SweepPointCapsule(pos, d, o.Shape, out float te) && te < tExtra && pos.Y + d.Y * te <= o.MaxY) { tExtra = te; id = o.Id; }
+                }
+                bool keeperToo = tSphere < float.MaxValue && MathF.Abs(tSphere - tExtra) <= 1e-6f;
+                bool first = tExtra < float.MaxValue && (keeperToo ? pitch == null || !pitch.InPenaltyArea(pos + d * tExtra, _t.Radius) : tExtra < tSphere);
+                if (first && tExtra <= tFrame && tExtra <= tBoard)
+                {
+                    pos += d * tExtra;
+                    result.ObstacleHit = true;
+                    result.ObstacleId = id;
+                    result.ObstaclePoint = pos;
+                    Position = pos;
+                    Velocity = vel;
+                    return result;
+                }
+            }
 
             if (tSphere < float.MaxValue && tSphere <= tFrame && tSphere <= tBoard)
             {

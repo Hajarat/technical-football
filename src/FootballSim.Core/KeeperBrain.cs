@@ -25,6 +25,11 @@ internal readonly struct KeeperSituation
     /// <summary>The attacker's feet and velocity (closing down starts when he comes at goal with the ball).</summary>
     public Vector3 AttackerPosition { get; init; }
     public Vector3 AttackerVelocity { get; init; }
+    /// <summary>
+    /// A defender covers the ball: he is within the yield cone of the keeper's line to it, nearer to it than the keeper, on his
+    /// feet and not beaten. The keeper then neither charges nor rushes; his saves are unchanged.
+    /// </summary>
+    public bool DefenderCovers { get; init; }
 
     /// <summary>No attacker information: the keeper holds his arc and reacts to strikes only.</summary>
     public static KeeperSituation None => new() { AttackerNextTouch = float.PositiveInfinity, AttackerTouchTick = -1, StrikeIn = float.PositiveInfinity };

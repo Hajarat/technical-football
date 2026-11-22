@@ -62,6 +62,12 @@ public sealed class Scenario
     /// on his set spot. He then moves as usual.
     /// </summary>
     public float? KeeperOffLine { get; set; }
+    /// <summary>Outfield defenders on the keeper's side: 0 or 1. The defender is team 1, player 1, and is played by the defender bot.</summary>
+    public int Defenders { get; set; }
+    /// <summary>Where the defender starts. He faces the attacker.</summary>
+    public StartSpot Defender { get; set; } = new() { X = 16f, Z = 0f };
+    /// <summary>The defender's sheet when none is chosen.</summary>
+    public string DefaultDefender { get; set; } = "centre_back";
     /// <summary>Seconds of Live time before TIME_UP, or null for no clock.</summary>
     public float? ClockLimit { get; set; }
     /// <summary>Distance from the goal centre at which the scripted attacker shoots. 0 means at once.</summary>

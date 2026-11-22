@@ -215,7 +215,8 @@ public static class Movement
                 * m.TurnAngleMult.Evaluate(MathF.Abs(diff) * 180f / MathF.PI) * MathF.PI / 180f;
             if (now < p.PostTurnUntil) rate = MathF.Max(rate, m.PostTurnRotationRate * MathF.PI / 180f);
             if (arc) rate = MathF.Max(rate, t.Touch.TurnArcRotation.ForRating(p.Sheet.CloseDribbling) * MathF.PI / 180f);
-            float maxTurn = rate * dt;
+            // (an outfield player without the ball turns no faster than his sideways grip allows at his speed)
+            float maxTurn = MathF.Min(rate, assist.MaxTurnRate) * dt;
             // A small heading change eases in (time constant turn_ease) instead of snapping round at the full rate; a large
             // turn runs at the turn rate until it is within rate * turn_ease of the stick.
             if (m.TurnEase > 0f) maxTurn = MathF.Min(maxTurn, MathF.Abs(diff) * MathF.Min(1f, dt / m.TurnEase));
@@ -326,6 +327,95 @@ public static class Movement
         p.HandPosition = pos;
         Gait.Advance(p, speed, dt, t);
     }
+
+    // ---- without the ball: running and jockeying ----
+
+    /// <summary>The jockey pace, m/s: jockey_speed by jockeying, blended into sprint_jockey_speed by the sprint input.</summary>
+    public static float JockeyTopSpeed(PlayerSheet s, float sprint, Tuning t)
+    {
+        var k = t.Defending;
+        float slow = k.JockeySpeed.ForRating(s.Jockeying), fast = k.SprintJockeySpeed.ForRating(s.Jockeying);
+        return slow + (fast - slow) * Math.Clamp(sprint, 0f, 1f);
+    }
+
+    /// <summary>
+    /// Moves an outfield player who has not got the ball one tick: jockeying while the intent holds jockey (see
+    /// <see cref="StepJockey"/>), otherwise the run of <see cref="Step(PlayerState, in TickIntent, float, float, bool, Tuning, Pitch?)"/>
+    /// with its speed capped at <paramref name="cap"/>. Out of a jockey the part of his velocity off his facing dies away at
+    /// jockey_decel instead of vanishing.
+    /// </summary>
+    /// <param name="face">The point he faces while jockeying (the ball carrier), or null to face the way he steps.</param>
+    internal static void StepOffBall(PlayerState p, in TickIntent intent, Vector2? face, float cap, float dt, float now, Tuning t, Pitch? pitch)
+    {
+        var d = p.Def;
+        if (intent.Jockey) { StepJockey(p, intent, face, cap, dt, now, t, pitch); return; }
+        if (p.Jockeying)
+        {
+            var fwd = new Vector2(MathF.Cos(p.Facing), MathF.Sin(p.Facing));
+            var v = new Vector2(p.Velocity.X, p.Velocity.Z);
+            d.Carry = v - fwd * MathF.Max(0f, Vector2.Dot(v, fwd));
+            p.SteerVelocity = new Vector3(d.Carry.X, 0f, d.Carry.Y);
+            p.Jockeying = false;
+        }
+        float len = d.Carry.Length(), step = t.Defending.JockeyDecel * dt;
+        d.Carry = len <= step ? Vector2.Zero : d.Carry * ((len - step) / len);
+        float top = MathF.Min(TopSpeed(p.Sheet, t), cap);
+        // Running, he cannot swerve harder than run_turn_accel: the faster he goes, the slower his heading comes round, so a
+        // defender who dives in at speed is beaten by a cut.
+        float turn = t.Defending.RunTurnAccel.ForRating(p.Sheet.Agility) / MathF.Max(p.RunSpeed, t.Defending.RunTurnMinSpeed);
+        Step(p, intent, dt, now, new MoveAssist(top, 1f + t.Possession.OffBallTurnBonus, Vector2.Zero, HardCap: cap, TurnAbout: true, Carry: d.Carry, MaxTurnRate: turn), t, pitch);
+    }
+
+    /// <summary>
+    /// Jockeying: his velocity goes to the stick's direction at the jockey pace (whatever way he faces), speeding up no harder
+    /// than his acceleration cap and slowing at jockey_decel, and he turns to face <paramref name="face"/> at jockey_turn_deg.
+    /// </summary>
+    internal static void StepJockey(PlayerState p, in TickIntent intent, Vector2? face, float cap, float dt, float now, Tuning t, Pitch? pitch)
+    {
+        var k = t.Defending;
+        Vector2 stick = intent.Move;
+        float mag = stick.Length();
+        if (mag > 1f) { stick /= mag; mag = 1f; }
+        if (mag < t.Movement.StickDeadZone) mag = 0f;
+        float sprint = Math.Clamp(intent.Sprint, 0f, 1f);
+        float top = MathF.Min(JockeyTopSpeed(p.Sheet, sprint, t), cap);
+        Vector2 desired = mag > 0f ? stick / stick.Length() * (mag * top) : Vector2.Zero;
+        var vel = new Vector2(p.Velocity.X, p.Velocity.Z);
+        float speed0 = vel.Length();
+        float rate = desired.Length() > speed0 ? MathF.Max(AccelCap(p.Sheet, speed0, sprint, t), k.JockeyDecel) : k.JockeyDecel;
+        var dv = desired - vel;
+        float dl = dv.Length(), max = rate * dt;
+        vel = dl <= max ? desired : vel + dv * (max / dl);
+
+        float facing = p.Facing;
+        Vector2 look = face is { } f ? f - new Vector2(p.Position.X, p.Position.Z) : stick;
+        if (look.LengthSquared() > 1e-6f)
+        {
+            float diff = WrapAngle(MathF.Atan2(look.Y, look.X) - facing);
+            float turn = k.JockeyTurnDeg * MathF.PI / 180f * dt;
+            facing = WrapAngle(facing + Math.Clamp(diff, -turn, turn));
+        }
+        float speed = vel.Length();
+        p.Jockeying = true;
+        p.Def.Carry = Vector2.Zero;
+        p.SpeedDebt = 0f;
+        p.TurnRefHeading = facing;
+        p.TurnRefTime = now;
+        p.MoveTime = now;
+        p.Facing = facing;
+        p.RunSpeed = speed;
+        p.SteerVelocity = Vector3.Zero;
+        p.Velocity = new Vector3(vel.X, 0f, vel.Y);
+        Vector3 pos = p.Position + p.Velocity * dt;
+        if (pitch != null)
+        {
+            var v = p.Velocity;
+            if (pitch.ClampPlayer(ref pos, ref v)) p.Velocity = v;
+        }
+        p.Position = pos;
+        p.HandPosition = pos;
+        Gait.Advance(p, speed, dt, t);
+    }
 }
 
 /// <summary>
@@ -337,4 +427,4 @@ public static class Movement
 /// </summary>
 internal readonly record struct MoveAssist(float TopSpeed, float TurnScale, Vector2 Steer, float RunSpeed = float.NaN,
     float HardCap = float.PositiveInfinity, bool TurnAbout = false, float SteerAlong = 0f, Vector2 Carry = default,
-    Vector2 CarryFrom = default, bool ShareCarry = false, float Facing = float.NaN);
+    Vector2 CarryFrom = default, bool ShareCarry = false, float Facing = float.NaN, float MaxTurnRate = float.PositiveInfinity);

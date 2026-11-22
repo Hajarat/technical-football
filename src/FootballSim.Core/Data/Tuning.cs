@@ -1567,6 +1567,200 @@ public sealed class RoundTuning
 }
 
 /// <summary>
+/// The defender bot: where he holds, when he presses and for how long, and when he presses the tackle buttons. Values marked
+/// (ref) are read from reference data; the others are ours. Curves "by awareness" take the rating 1..99 as x.
+/// </summary>
+public sealed class DefenderTuning
+{
+    /// <summary>How far off the ball he holds, on its line to the goal centre, against the ball's distance from the goal centre, metres (ref 2.5 to 5; the distances are ours).</summary>
+    public Curve HoldDistanceM { get; set; } = new((8f, 2.5f), (20f, 5f));
+    /// <summary>The side offset of the hold spot, metres: drawn once per hold spell, uniform between these two, with a random sign; by awareness (ref at 1 and 50).</summary>
+    public Curve HoldOffsetMinM { get; set; } = new((1f, 3f), (50f, 1.5f), (99f, 0.5f));
+    public Curve HoldOffsetMaxM { get; set; } = new((1f, 4f), (50f, 2f), (99f, 1f));
+    /// <summary>Holding, he sprints to his spot from further than this, metres; nearer he jockeys (ref).</summary>
+    public float PassiveSprintDistanceM { get; set; } = 6f;
+    /// <summary>He may press only while at least this much nearer his goal's centre than the attacker, metres.</summary>
+    public float GoalSideMarginM { get; set; } = 0.5f;
+    /// <summary>Seconds he holds before he may press, by awareness (ref).</summary>
+    public Curve ToActiveAfterS { get; set; } = new((1f, 6f), (50f, 2f), (99f, 1f));
+    /// <summary>The longest a press lasts, seconds, by awareness (ref at 50 and 99).</summary>
+    public Curve ActiveMaxS { get; set; } = new((1f, 3f), (50f, 5f), (99f, 8f));
+    /// <summary>Beaten: the attacker is this much nearer the goal centre than he is, metres (ref).</summary>
+    public float OvershootM { get; set; } = 0.4f;
+    /// <summary>Pressing, he runs at where the attacker will be this many seconds on (ref).</summary>
+    public float ExtrapolateS { get; set; } = 0.5f;
+    /// <summary>Pressing, he sprints while further than this from that point, metres; nearer he runs.</summary>
+    public float PressSprintDistanceM { get; set; } = 4f;
+    /// <summary>Pressing, with the attacker within this he jockeys in, metres, with this much of the sprint input (0 the jockey pace, 1 the sprint-jockey pace).</summary>
+    public float PressJockeyDistanceM { get; set; } = 3f;
+    public float PressJockeySprint { get; set; } = 0.75f;
+    /// <summary>He lunges or slides only with the attacker within this, metres (ref).</summary>
+    public float TackleMaxDistanceM { get; set; } = 1.5f;
+    /// <summary>... and the ball between them: the direction attacker to ball within this of the direction ball to defender, degrees.</summary>
+    public float TackleMaxAngleDeg { get; set; } = 30f;
+    /// <summary>Inside the tackle distance, running straight on (facing dot move above this) he bends in from the side ... (ref)</summary>
+    public float BendDot { get; set; } = 0.7f;
+    /// <summary>... by a share of sideways movement of base + gain * (1 - distance / tackle distance) (ref).</summary>
+    public float BendWeightBase { get; set; } = 0.4f;
+    public float BendWeightGain { get; set; } = 0.6f;
+    /// <summary>After a body contact he steers at least this far off the line to the attacker, degrees, for this long, seconds (ref 20 ticks at 80 Hz).</summary>
+    public float BumpSteerDeg { get; set; } = 60f;
+    public float BumpSteerS { get; set; } = 0.25f;
+    /// <summary>He holds a tackle button this long, seconds.</summary>
+    public float TackleHoldS { get; set; } = 0.1f;
+    /// <summary>The chance, drawn once per press, that his tackle in it is a slide; by slide_tackle.</summary>
+    public RatingRange SlidePreference { get; set; } = new(0f, 0.35f);
+    /// <summary>The chance he barges an attacker running alongside, drawn every barge_roll_s; by strength.</summary>
+    public RatingRange BargePreference { get; set; } = new(0f, 0.3f);
+    public float BargeRollS { get; set; } = 0.25f;
+    /// <summary>The keeper neither charges nor rushes while the defender is within this half-angle of his line to the ball, degrees.</summary>
+    public float KeeperYieldConeDeg { get; set; } = 25f;
+    /// <summary>He controls a loose ball (the round ends DISPOSSESSED) once it has been within this of his feet, metres ...</summary>
+    public float ControlDistanceM { get; set; } = 0.6f;
+    /// <summary>... no faster than this against his own velocity, m/s ...</summary>
+    public float ControlSpeed { get; set; } = 3f;
+    /// <summary>... for this long, seconds.</summary>
+    public float ControlS { get; set; } = 0.15f;
+}
+
+/// <summary>The auto tackle: a dribbled ball that comes within an outfield player's reach is taken without a button.</summary>
+public sealed class AutoTackleTuning
+{
+    /// <summary>A dribbled ball within this of him, metres, and below max_height_m is always taken (ref).</summary>
+    public float GuaranteeM { get; set; } = 0.45f;
+    public float MaxHeightM { get; set; } = 1.0f;
+    /// <summary>The reach against his speed, m/s, running and jockeying, metres ...</summary>
+    public Curve RadiusWalkM { get; set; } = new((0f, 1.2f), (4f, 0.8f));
+    public Curve RadiusJockeyM { get; set; } = new((0f, 1.4f), (4f, 1.0f));
+    /// <summary>... times this, by stand_tackle (ref).</summary>
+    public RatingRange RadiusFactor { get; set; } = new(0.25f, 1f);
+    /// <summary>The widest angle off his facing the ball may lie at, degrees, against his speed as a share of the mode's top speed.</summary>
+    public Curve AngleDeg { get; set; } = new((0f, 90f), (1f, 45f));
+    /// <summary>Shielding: no tackle while the dribbler's body is within shield_m of the ball and within lane_half_m of the line from the tackler to it (ref).</summary>
+    public float ShieldM { get; set; } = 1.0f;
+    public float LaneHalfM { get; set; } = 0.35f;
+    /// <summary>The ball is poked away at a speed drawn between these, m/s, along the freest direction within poke_spread_deg of his facing.</summary>
+    public float PokeSpeedMin { get; set; } = 3f;
+    public float PokeSpeedMax { get; set; } = 5f;
+    public float PokeSpreadDeg { get; set; } = 45f;
+    /// <summary>Seconds between auto tackles, and after any touch of the ball by the tackler.</summary>
+    public float CooldownS { get; set; } = 1f;
+}
+
+/// <summary>The standing tackle (a lunge at the ball).</summary>
+public sealed class StandTackleTuning
+{
+    /// <summary>The lunge's reach by stand_tackle, metres (ref) ...</summary>
+    public RatingRange ReachM { get; set; } = new(0.9f, 1.5f);
+    /// <summary>... times this, against his speed, m/s ...</summary>
+    public Curve ReachSpeedFactor { get; set; } = new((0f, 0.8f), (7f, 1.2f));
+    /// <summary>... and times off_run_factor when the ball lies further than off_run_deg off his run.</summary>
+    public float OffRunDeg { get; set; } = 60f;
+    public float OffRunFactor { get; set; } = 0.5f;
+    /// <summary>The foot can meet the ball from exec_min_s to exec_max_s after the press: the first meeting with the predicted ball in that window is the one he lunges for.</summary>
+    public float ExecMinS { get; set; } = 0.15f;
+    public float ExecMaxS { get; set; } = 0.45f;
+    /// <summary>The foot's radius in the ball's path, metres (ref); a ball within certain_m of it and below certain_height_m is won outright (ref).</summary>
+    public float FootRadiusM { get; set; } = 0.20f;
+    public float CertainM { get; set; } = 0.30f;
+    public float CertainHeightM { get; set; } = 0.5f;
+    /// <summary>The foot stays out, able to win the ball (or trip the opponent), this long after its contact tick, seconds.</summary>
+    public float ActiveS { get; set; } = 0.1f;
+    /// <summary>Seconds after a lunge before the next tackle (ref).</summary>
+    public float CooldownS { get; set; } = 1.0f;
+    /// <summary>A lunge that misses stuns him this long, seconds, against his speed at the press, m/s.</summary>
+    public Curve MissStunS { get; set; } = new((0f, 0.3f), (7f, 0.8f));
+}
+
+/// <summary>The slide tackle.</summary>
+public sealed class SlideTackleTuning
+{
+    /// <summary>How far the slide carries his body, metres, by slide_tackle ...</summary>
+    public RatingRange ReachM { get; set; } = new(2.0f, 3.5f);
+    /// <summary>... with the leading foot this far ahead of it (ref).</summary>
+    public float LungeM { get; set; } = 0.8f;
+    /// <summary>The foot wins a ball within this of it, and fouls an opponent whose centre is within opponent_radius_m of it, metres (ref).</summary>
+    public float BallRadiusM { get; set; } = 0.15f;
+    public float OpponentRadiusM { get; set; } = 0.30f;
+    /// <summary>A slide starts at no less than this speed, m/s.</summary>
+    public float MinSpeed { get; set; } = 5f;
+    /// <summary>Seconds on the ground after a slide that won the ball, missed, or hit the opponent (ref) ...</summary>
+    public float RecoveryWonS { get; set; } = 0.6f;
+    public float RecoveryMissedS { get; set; } = 0.8f;
+    public float RecoveryHitS { get; set; } = 0.4f;
+    /// <summary>... then this long getting up.</summary>
+    public float GetupS { get; set; } = 0.5f;
+}
+
+/// <summary>The shoulder barge.</summary>
+public sealed class BargeTuning
+{
+    /// <summary>A barge lands on an opponent within this, metres ...</summary>
+    public float DistanceM { get; set; } = 1.2f;
+    /// <summary>... whose bearing off the barger's facing is between these, degrees (alongside) ...</summary>
+    public float BearingMinDeg { get; set; } = 80f;
+    public float BearingMaxDeg { get; set; } = 135f;
+    /// <summary>... the two facing within this of each other, degrees (ref).</summary>
+    public float FacingDeg { get; set; } = 90f;
+    /// <summary>The sideways push, m/s, times the strength ratio and the weight ratio (the stronger, heavier one pushes; the other stumbles).</summary>
+    public float Impulse { get; set; } = 1.5f;
+    /// <summary>A push dies away at this, m/s squared.</summary>
+    public float PushDecel { get; set; } = 6f;
+    /// <summary>The lean lasts this long, seconds, and the next barge waits cooldown_s.</summary>
+    public float LeanS { get; set; } = 0.35f;
+    public float CooldownS { get; set; } = 1.0f;
+}
+
+/// <summary>Blocking a shot with the body and a leg.</summary>
+public sealed class BlockTuning
+{
+    /// <summary>He sets for a shot winding up with the ball within this of him, metres, in front of him.</summary>
+    public float SetRangeM { get; set; } = 4f;
+    /// <summary>Set, his leg reach grows from the body radius to reach_m over this long, seconds, by blocking.</summary>
+    public RatingRange GrowS { get; set; } = new(0.6f, 0.25f);
+    public float ReachM { get; set; } = 0.9f;
+    /// <summary>The leg blocks a ball below this, metres (ref); the body covers the rest.</summary>
+    public float MaxHeightM { get; set; } = 0.75f;
+    /// <summary>A deflected ball keeps this share of its speed, against the speed it arrived at, m/s ...</summary>
+    public Curve ExitSpeed { get; set; } = new((5f, 0.6f), (30f, 0.35f));
+    /// <summary>... and leaves no steeper than this, degrees (ref).</summary>
+    public float LiftDeg { get; set; } = 40f;
+}
+
+/// <summary>
+/// The defending actions of any outfield player: the body, jockeying, the auto tackle, the lunge, the slide, the barge, the
+/// block, and what being tackled does. Values marked (ref) are read from reference data; the others are ours.
+/// </summary>
+public sealed class DefendingTuning
+{
+    /// <summary>An outfield player's body: a disc of this radius against other outfield players, and a capsule of it, body_height_m tall, in a struck ball's path (ref).</summary>
+    public float BodyRadiusM { get; set; } = 0.30f;
+    public float BodyHeightM { get; set; } = 1.8f;
+    /// <summary>Jockeying pace, m/s, by jockeying, and with sprint held (ref).</summary>
+    public RatingRange JockeySpeed { get; set; } = new(3.0f, 5.2f);
+    public RatingRange SprintJockeySpeed { get; set; } = new(6.0f, 7.0f);
+    /// <summary>Jockeying, he turns to face the ball carrier at this, degrees per second, and slows at jockey_decel, m/s squared (ref).</summary>
+    public float JockeyTurnDeg { get; set; } = 540f;
+    public float JockeyDecel { get; set; } = 5f;
+    /// <summary>
+    /// Running without the ball, his heading turns no faster than this sideways acceleration, m/s squared, over his speed (by
+    /// agility); below run_turn_min_speed, m/s, the limit is that of this speed.
+    /// </summary>
+    public RatingRange RunTurnAccel { get; set; } = new(5f, 9f);
+    public float RunTurnMinSpeed { get; set; } = 2f;
+    /// <summary>Tackled or barged, a player stumbles this long, seconds, by balance: no control of the ball, his speed capped at stumble_speed, m/s.</summary>
+    public RatingRange StumbleS { get; set; } = new(0.9f, 0.3f);
+    public float StumbleSpeed { get; set; } = 2f;
+    /// <summary>A tackled player cannot touch the ball for this long, seconds (ref).</summary>
+    public float TackledLockS { get; set; } = 0.5f;
+    public AutoTackleTuning Auto { get; set; } = new();
+    public StandTackleTuning Stand { get; set; } = new();
+    public SlideTackleTuning Slide { get; set; } = new();
+    public BargeTuning Barge { get; set; } = new();
+    public BlockTuning Block { get; set; } = new();
+}
+
+/// <summary>
 /// Every tunable number. Built-in defaults equal data/tuning/default.json; a file only needs the values it changes.
 /// </summary>
 public sealed class Tuning
@@ -1586,6 +1780,10 @@ public sealed class Tuning
     public KeeperTuning Keeper { get; set; } = new();
     public RoundTuning Round { get; set; } = new();
     public SkillTuning Skill { get; set; } = new();
+    /// <summary>The defender bot (see DefenderBot).</summary>
+    public DefenderTuning Defender { get; set; } = new();
+    /// <summary>The defending actions of any outfield player (see Defending).</summary>
+    public DefendingTuning Defending { get; set; } = new();
 
     /// <summary>Seconds per tick.</summary>
     public float Dt => 1f / TickRate;

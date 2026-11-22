@@ -22,9 +22,40 @@ namespace FootballSim.Core;
 /// with its composure, shooting there and then. Those choices draw from a second generator of its own, so the charge draws do
 /// not move.
 /// </para>
+/// <para>
+/// Against a defender it plays one of three styles (<see cref="Style"/>; Default ignores him): Straight runs on at goal through
+/// him; Cut, once he is in front within <see cref="CutDistance"/> of the ball, turns <see cref="CutAngleDeg"/> off the line to
+/// goal to one side until he is past or left behind; Skill, once he is within <see cref="SkillDistance"/>, plays a step-over to
+/// one side and leaves on that side the same way. The side is the one further from him, a coin from the tactics generator when
+/// he is square on. Shoot runs at him and shoots as soon as he is in front within <see cref="ShootGap"/> of the ball, through
+/// him, whatever the distance to goal.
+/// </para>
 /// </summary>
 public sealed class ScriptedAttacker
 {
+    /// <summary>How the scripted attacker takes a defender on.</summary>
+    public enum AttackStyle { Default, Straight, Cut, Skill, Shoot }
+
+    /// <summary>The style against a defender; Default ignores him (and in a scenario without one every style does).</summary>
+    public AttackStyle Style { get; set; }
+    /// <summary>Cut: the turn starts with the defender in front within this of the ball, metres ...</summary>
+    public float CutDistance { get; set; } = 4f;
+    /// <summary>... this far off the line to the goal centre, degrees.</summary>
+    public float CutAngleDeg { get; set; } = 50f;
+    /// <summary>Skill: the move is played with the defender in front within this of the ball, metres.</summary>
+    public float SkillDistance { get; set; } = 3f;
+    /// <summary>Shoot: the shot is taken with the defender in front within this of the ball, metres.</summary>
+    public float ShootGap { get; set; } = 6f;
+    /// <summary>Skill: the move asked for.</summary>
+    public SkillKey SkillMove { get; set; } = SkillKey.StepOver;
+    /// <summary>Going round the defender, close control is held (short touches) while he is within this of the ball, metres (0: never).</summary>
+    public float StyleCloseRange { get; set; }
+
+    int _styleSide;                  // going round the defender: +1 to +Z, -1 to -Z, 0 not
+    bool _skillPlayed;               // the skill move of the current approach has been asked for
+    bool _skillNow;                  // ... on this tick
+    bool _shootThrough;              // Shoot: the defender is in front and close enough: shoot now
+
     /// <summary>A fixed charge held before releasing, 0..1; null judges it like a human (see the class remarks).</summary>
     public float? Charge { get; set; }
     /// <summary>Standard deviation of the human charge error around the ideal charge.</summary>
@@ -119,6 +150,12 @@ public sealed class ScriptedAttacker
             float ang = MathF.Atan2(g.Y, g.X) + _roundSide * RoundAngleDeg * MathF.PI / 180f;
             d = new Vector2(MathF.Cos(ang), MathF.Sin(ang));
         }
+        else if (w.BallController == a && _styleSide != 0)
+        {
+            var g = new Vector2(w.Pitch.GoalLineX, 0f) - feet;
+            float ang = MathF.Atan2(g.Y, g.X) + _styleSide * CutAngleDeg * MathF.PI / 180f;
+            d = new Vector2(MathF.Cos(ang), MathF.Sin(ang));
+        }
         else if (w.BallController == a)
             d = new Vector2(w.Pitch.GoalLineX, 0f) - feet;
         else
@@ -129,6 +166,10 @@ public sealed class ScriptedAttacker
         }
         d = d.LengthSquared() > 1e-6f ? Vector2.Normalize(d) : new Vector2(1f, 0f);
         it.MoveX = d.X; it.MoveZ = d.Y; it.Sprint = RunSprint; it.CloseControl = RunCloseControl;
+        if (_skillNow) { it.SkillKey = SkillMove; _skillNow = false; }
+        if (_styleSide != 0 && w.Defender is { } def && StyleCloseRange > 0f
+            && Vector2.Distance(new Vector2(def.Position.X, def.Position.Z), new Vector2(ball.X, ball.Z)) <= StyleCloseRange)
+        { it.CloseControl = true; it.Sprint = 0f; }
         if (Counters && w.BallController == a && _roundSide == 0)
         {
             float kd = KeeperToBall(w);
@@ -186,11 +227,46 @@ public sealed class ScriptedAttacker
         return _chipWanted;
     }
 
+    /// <summary>
+    /// The style against a defender, before the run: starts going round him (and, for Skill, asks for the move) once he is in
+    /// front and close enough, and stops once he is no longer in front of the ball or is left well behind.
+    /// </summary>
+    void ReadDefender(World w)
+    {
+        if (Style is AttackStyle.Default or AttackStyle.Straight || w.Defender is not { } def) return;
+        var a = w.Attacker;
+        var b = new Vector2(w.Ball.Position.X, w.Ball.Position.Z);
+        var dp = new Vector2(def.Position.X, def.Position.Z);
+        var goal = new Vector2(w.Pitch.GoalLineX, 0f);
+        var toGoal = goal - b;
+        float len = toGoal.Length();
+        if (len < 1e-3f) return;
+        var u = toGoal / len;
+        var o = dp - b;
+        float along = Vector2.Dot(o, u), across = o.X * u.Y - o.Y * u.X;
+        bool inFront = along > 0.2f && MathF.Abs(across) < 3f;
+        float dist = o.Length();
+        if (Style == AttackStyle.Shoot)
+        {
+            if (w.BallController == a && inFront && dist <= ShootGap) _shootThrough = true;
+            return;
+        }
+        float trigger = Style == AttackStyle.Cut ? CutDistance : SkillDistance;
+        if (_styleSide == 0 && w.BallController == a && inFront && dist <= trigger)
+        {
+            // (across > 0: he is on the -Z side of the line to goal, so the open side is +Z)
+            _styleSide = MathF.Abs(across) > 0.15f ? (across > 0f ? 1 : -1) : (Tactic(w).NextFloat() < 0.5f ? -1 : 1);
+            if (Style == AttackStyle.Skill && !_skillPlayed) { _skillPlayed = true; _skillNow = true; }
+        }
+        else if (_styleSide != 0 && (!inFront || dist > trigger + 3f)) { _styleSide = 0; _skillPlayed = false; }
+    }
+
     SimRng Tactic(World w) => _tacticRng ??= new SimRng(w.Seed ^ 0x3A91C7E25B0D4F68UL);
 
     /// <summary>The intent for the attacker this tick.</summary>
     public TickIntent Next(World w)
     {
+        if (!_released && _heldFor == 0f) ReadDefender(w);
         bool chipNow = !_released && _heldFor == 0f && Counters && ReadKeeper(w);
         if (_heldFor == 0f && !_released) _chipThis = chipNow;
         var type = AttemptType;
@@ -229,8 +305,9 @@ public sealed class ScriptedAttacker
         // With an intended strike distance it presses once the ball, carried on at his speed through the time to the contact,
         // is that close at the strike.
         float pressAt = w.Scenario.StrikeDistance > 0f ? w.Scenario.StrikeDistance + a.Speed * toContact : w.Scenario.ShootDistance;
-        bool hold = _heldFor == 0f && (_roundSide != 0 || !close || running && toGoal > pressAt);
+        bool hold = _heldFor == 0f && (_roundSide != 0 || _styleSide != 0 || !close || running && toGoal > pressAt);
         if (_chipThis && (strikable || close)) hold = false;
+        if (_shootThrough && (strikable || close)) hold = false;
         if (hold)
         {
             RunOntoBall(w, ref it);

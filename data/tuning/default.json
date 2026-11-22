@@ -836,5 +836,134 @@
     "straight_exit_burst": [[0, 0.7], [90, 1], [180, 0.85]],
     "step_over_no_burst_toward_deg": 45
   },
+  "defender": {
+    "hold_distance_m": [[8, 2.5], [20, 5]],
+    "hold_offset_min_m": [[1, 3], [50, 1.5], [99, 0.5]],
+    "hold_offset_max_m": [[1, 4], [50, 2], [99, 1]],
+    "passive_sprint_distance_m": 6,
+    "goal_side_margin_m": 0.5,
+    "to_active_after_s": [[1, 6], [50, 2], [99, 1]],
+    "active_max_s": [[1, 3], [50, 5], [99, 8]],
+    "overshoot_m": 0.4,
+    "extrapolate_s": 0.5,
+    "press_sprint_distance_m": 4,
+    "press_jockey_distance_m": 3,
+    "press_jockey_sprint": 0.75,
+    "tackle_max_distance_m": 1.5,
+    "tackle_max_angle_deg": 30,
+    "bend_dot": 0.7,
+    "bend_weight_base": 0.4,
+    "bend_weight_gain": 0.6,
+    "bump_steer_deg": 60,
+    "bump_steer_s": 0.25,
+    "tackle_hold_s": 0.1,
+    "slide_preference": {
+      "at1": 0,
+      "at99": 0.35
+    },
+    "barge_preference": {
+      "at1": 0,
+      "at99": 0.3
+    },
+    "barge_roll_s": 0.25,
+    "keeper_yield_cone_deg": 25,
+    "control_distance_m": 0.6,
+    "control_speed": 3,
+    "control_s": 0.15
+  },
+  "defending": {
+    "body_radius_m": 0.3,
+    "body_height_m": 1.8,
+    "jockey_speed": {
+      "at1": 3,
+      "at99": 5.2
+    },
+    "sprint_jockey_speed": {
+      "at1": 6,
+      "at99": 7
+    },
+    "jockey_turn_deg": 540,
+    "jockey_decel": 5,
+    "run_turn_accel": {
+      "at1": 5,
+      "at99": 9
+    },
+    "run_turn_min_speed": 2,
+    "stumble_s": {
+      "at1": 0.9,
+      "at99": 0.3
+    },
+    "stumble_speed": 2,
+    "tackled_lock_s": 0.5,
+    "auto": {
+      "guarantee_m": 0.45,
+      "max_height_m": 1,
+      "radius_walk_m": [[0, 1.2], [4, 0.8]],
+      "radius_jockey_m": [[0, 1.4], [4, 1]],
+      "radius_factor": {
+        "at1": 0.25,
+        "at99": 1
+      },
+      "angle_deg": [[0, 90], [1, 45]],
+      "shield_m": 1,
+      "lane_half_m": 0.35,
+      "poke_speed_min": 3,
+      "poke_speed_max": 5,
+      "poke_spread_deg": 45,
+      "cooldown_s": 1
+    },
+    "stand": {
+      "reach_m": {
+        "at1": 0.9,
+        "at99": 1.5
+      },
+      "reach_speed_factor": [[0, 0.8], [7, 1.2]],
+      "off_run_deg": 60,
+      "off_run_factor": 0.5,
+      "exec_min_s": 0.15,
+      "exec_max_s": 0.45,
+      "foot_radius_m": 0.2,
+      "certain_m": 0.3,
+      "certain_height_m": 0.5,
+      "active_s": 0.1,
+      "cooldown_s": 1,
+      "miss_stun_s": [[0, 0.3], [7, 0.8]]
+    },
+    "slide": {
+      "reach_m": {
+        "at1": 2,
+        "at99": 3.5
+      },
+      "lunge_m": 0.8,
+      "ball_radius_m": 0.15,
+      "opponent_radius_m": 0.3,
+      "min_speed": 5,
+      "recovery_won_s": 0.6,
+      "recovery_missed_s": 0.8,
+      "recovery_hit_s": 0.4,
+      "getup_s": 0.5
+    },
+    "barge": {
+      "distance_m": 1.2,
+      "bearing_min_deg": 80,
+      "bearing_max_deg": 135,
+      "facing_deg": 90,
+      "impulse": 1.5,
+      "push_decel": 6,
+      "lean_s": 0.35,
+      "cooldown_s": 1
+    },
+    "block": {
+      "set_range_m": 4,
+      "grow_s": {
+        "at1": 0.6,
+        "at99": 0.25
+      },
+      "reach_m": 0.9,
+      "max_height_m": 0.75,
+      "exit_speed": [[5, 0.6], [30, 0.35]],
+      "lift_deg": 40
+    }
+  },
   "dt": 0.008333334
 }

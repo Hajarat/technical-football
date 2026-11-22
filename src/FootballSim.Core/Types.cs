@@ -48,6 +48,14 @@ public struct TickIntent
     /// the right-stick gesture but obeys the same gap, execution radius and chain rules.
     /// </summary>
     public SkillKey SkillKey;
+    /// <summary>Held, without the ball: jockey. He moves with the stick at the jockey pace while facing the ball carrier.</summary>
+    public bool Jockey;
+    /// <summary>Without the ball: a standing tackle (a lunge at the ball) on the tick it goes down.</summary>
+    public bool Tackle;
+    /// <summary>Without the ball: a slide tackle on the tick it goes down.</summary>
+    public bool Slide;
+    /// <summary>Without the ball: a shoulder barge on the tick it goes down, when an opponent runs alongside.</summary>
+    public bool Barge;
 
     public readonly Vector2 Move => new(MoveX, MoveZ);
     /// <summary>The right stick as a ground vector (X, Z).</summary>
