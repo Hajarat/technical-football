@@ -58,6 +58,12 @@ public sealed class Replay
     public string KeeperId { get; set; } = "";
     public string ScenarioId { get; set; } = "";
     public string TuningHash { get; set; } = "";
+    /// <summary>
+    /// The attacker's full sheet in the data/players format, written only when the attacker was the player editor's Custom player
+    /// (who has no file). When present it is used instead of looking up <see cref="AttackerId"/>; older replays have none.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? AttackerSheet { get; set; }
     /// <summary>Intents per tick: both teams' players, team 0 first.</summary>
     public int PlayersPerTick { get; set; } = 2;
     /// <summary>Flat list: tick 0's players, then tick 1's, and so on.</summary>
@@ -68,6 +74,35 @@ public sealed class Replay
 
     /// <summary>True if the replay was recorded under the same tuning.</summary>
     public bool MatchesTuning(Tuning t) => TuningHash == DataLoader.TuningHash(t);
+
+    /// <summary>Embeds the attacker's sheet (see <see cref="AttackerSheet"/>).</summary>
+    public void SetAttackerSheet(PlayerSheet sheet)
+    {
+        using var doc = JsonDocument.Parse(sheet.ToJson());
+        AttackerSheet = doc.RootElement.Clone();
+    }
+
+    /// <summary>The embedded attacker sheet parsed as a player file, or null when the replay has none.</summary>
+    public LoadResult<PlayerSheet>? ParseAttackerSheet() =>
+        AttackerSheet is { } e ? DataLoader.ParsePlayer(e.GetRawText(), "replay: attacker_sheet", AttackerId) : null;
+
+    /// <summary>
+    /// The attacker this replay was played with: the embedded sheet when there is one, otherwise <paramref name="byId"/> applied to
+    /// <see cref="AttackerId"/>. Null (with an error) when neither gives a sheet.
+    /// </summary>
+    public PlayerSheet? ResolveAttacker(Func<string, PlayerSheet?> byId, out string? error)
+    {
+        error = null;
+        if (ParseAttackerSheet() is { } r)
+        {
+            if (r.Ok) return r.Value;
+            error = r.Error;
+            return null;
+        }
+        var s = byId(AttackerId);
+        if (s == null) error = $"attacker '{AttackerId}' not found";
+        return s;
+    }
 
     /// <summary>The replay as JSON.</summary>
     public string ToJson() => JsonSerializer.Serialize(this, DataLoader.Options);

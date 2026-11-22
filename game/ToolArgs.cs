@@ -57,6 +57,8 @@ public sealed class ToolArgs
     public readonly List<string> KeeperAnimDropSets = new();
     /// <summary>--bake-keeper-pose &lt;dir&gt;: play the keeper gallery's dive, smother and slide scripts procedurally and write their bone rotations there (tools/anim/bake_procedural.py).</summary>
     public string? BakeDir;
+    /// <summary>--player-editor: start with the player editor open (for screenshots).</summary>
+    public bool PlayerEditor;
 
     /// <summary>A person playing: a window, and no replay, screenshot, gallery, bake or quit option.</summary>
     public bool Interactive => DisplayServer.GetName() != "headless" && ReplayPath == null && ShotDir == null && ShotTicks.Count == 0 && ShotOn.Count == 0
@@ -133,6 +135,7 @@ public sealed class ToolArgs
                     a.KeeperAnimDropSets.AddRange((Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                     break;
                 case "--bake-keeper-pose": a.BakeDir = Next(); break;
+                case "--player-editor": a.PlayerEditor = true; break;
                 case "--shots": a.ShotDir = Next(); break;
                 case "--shot-ticks":
                     foreach (var s in (Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))

@@ -88,9 +88,20 @@ public partial class Match
             _scenarioIndex = _data.Scenarios.FindIndex(s => s.Id == r.ScenarioId);
             if (_scenarioIndex < 0) { GD.PrintErr($"Replay scenario '{r.ScenarioId}' not found in {_data.Dir}"); return false; }
             _scenarioId = r.ScenarioId; _attackerId = r.AttackerId; _keeperId = r.KeeperId; _seed = r.Seed;
+            // A round played with the editor's Custom player carries its sheet; it plays as Custom whatever the store holds.
+            if (r.ParseAttackerSheet() is { } embedded)
+            {
+                foreach (var w in embedded.Warnings) GD.Print($"WARNING {w}");
+                if (!embedded.Ok) { GD.PrintErr(embedded.Error); return false; }
+                _data.SetCustom(embedded.Value);
+                _attackerId = PlayerPresets.CustomId;
+            }
             if (!r.MatchesTuning(_data.Tuning)) GD.Print("Tuning has changed since this replay, so the result may differ.");
         }
-        return SetUpRound(reload: false, newRound: true);
+        else LoadEditorStore();
+        if (!SetUpRound(reload: false, newRound: true)) return false;
+        if (_args.PlayerEditor && _replay == null) OpenEditor(force: true);
+        return true;
     }
 
     void LogPads()
@@ -118,7 +129,8 @@ public partial class Match
     {
         var sc = _data.Scenarios[_scenarioIndex];
         _scenarioId = sc.Id;
-        _attackerId = Pick(_data.Attackers, sc.DefaultAttacker);
+        // Custom stays the attacker across start spots; only picking another attacker ends it.
+        if (!(_attackerId == PlayerPresets.CustomId && _data.Custom != null)) _attackerId = Pick(_data.Attackers, sc.DefaultAttacker);
         _keeperId = Pick(_data.Keepers, sc.DefaultKeeper);
     }
 
@@ -150,6 +162,7 @@ public partial class Match
         // edge stops at the near boards.
         Camera.SetLimits(World.Pitch.MinX, World.Pitch.GoalLineX + World.Pitch.NetDepth + 0.5f, World.Pitch.HalfWidth);
         World.Recorder = new ReplayRecorder(World, att.Id, kee.Id, sc.Id);
+        if (att.Id == PlayerPresets.CustomId && att == _data.Custom) World.Recorder.Replay.SetAttackerSheet(att);
         _flightTicks = 0; _liveTicks = 0; _beganReplay = false;
         _log?.Write("round_setup", ("round", _round), ("scenario", sc.Id), ("attacker", att.Id), ("keeper", kee.Id),
             ("seed", _seed.ToString()), ("retry_of", retryOf > 0 ? retryOf : null));
@@ -160,6 +173,18 @@ public partial class Match
     /// <summary>One physics tick of game logic: buttons, then at most one world step.</summary>
     void Tick(in PadSnapshot pad)
     {
+        if (_editor.IsOpen)
+        {
+            // gameplay input is ignored while the editor is open
+            var (device, kind, _) = ShownDevice();
+            _editor.SetDevice(device, kind);
+            var r = _editor.Step(pad.Editor, 1f / Engine.PhysicsTicksPerSecond);
+            if (r == EditorResult.StoreChanged) WriteEditorStore();
+            else if (r == EditorResult.Close) CloseEditor();
+            UpdateNotices();
+            UpdateHudText();
+            return;
+        }
         if (pad.OverlayToggle) Overlay.Enabled = !Overlay.Enabled;
         if (pad.Flag) Flag();
         if (pad.ControlsToggle) _controlsOn = !_controlsOn;
@@ -168,10 +193,14 @@ public partial class Match
             _paused = !_paused;
             _log?.Write("pause", ("paused", _paused));
         }
+        // The editor opens only while play is stopped: T when paused, in Setup or at the report; the pad's Y while paused (Y at the
+        // report is retry).
+        bool stopped = _paused || World.State is RoundState.Setup or RoundState.Report;
+        if (_replay == null && (pad.OpenEditor && stopped || pad.Retry && _paused)) OpenEditor();
         UpdateNotices();
         Hud.SetWarning(WarningLine());
 
-        if (_paused) { UpdateHudText(); return; }
+        if (_paused || _editor.IsOpen) { UpdateHudText(); return; }
 
         // Start spot / player selection. In Setup it takes effect now, otherwise at the next Setup.
         int spot = (pad.NextSpot ? 1 : 0) - (pad.PrevSpot ? 1 : 0);
@@ -203,6 +232,7 @@ public partial class Match
                     World.Begin();
                     _beganReplay = true;
                     _log?.Write("round_begin", ("round", _round));
+                    if (World.Recorder?.Replay.AttackerSheet is { } sheet) _log?.Write("custom_sheet", ("round", _round), ("sheet", sheet));
                 }
                 break;
             case RoundState.Report:
@@ -228,7 +258,8 @@ public partial class Match
     void UpdateNotices()
     {
         Pad.KeyboardEnabled = _replay == null;
-        if (_paused) Hud.SetNotice("Paused");
+        if (_editor.IsOpen) Hud.SetNotice("");
+        else if (_paused) Hud.SetNotice("Paused");
         else if (_replay == null && !Pad.GamepadConnected && !_controlsOn && _args.ControlsPanel == null) Hud.SetNotice(NoPadNotice);
         else Hud.SetNotice("");
 
@@ -251,21 +282,24 @@ public partial class Match
     /// <summary>The corner hint, and the controls panel while paused or toggled (or forced by --controls-panel).</summary>
     void UpdateControls()
     {
-        var device = Pad.Device;
-        string padName = Pad.GamepadConnected ? Pad.ActivePadName : "";
-        var kind = PadBind.KindOf(padName);
+        var (device, kind, padName) = ShownDevice();
         bool swapped = Pad.SwapFaceButtons;
         bool forced = _args.ControlsPanel != null;
-        if (forced)
-        {
-            device = _args.ControlsPanel == "keyboard" ? InputDevice.Keyboard : InputDevice.Gamepad;
-            kind = _args.ControlsPanel switch { "playstation" => PadKind.PlayStation, "nintendo" => PadKind.Nintendo, _ => PadKind.Xbox };
-            padName = ""; swapped = false;
-        }
+        if (forced) swapped = false;
         Hud.SetControlsHint(device == InputDevice.Gamepad ? $"{Bindings.Pad.Pause.Label(kind)}: controls" : $"{Bindings.Controls.Label}: controls");
-        bool show = (forced && !_args.ControlsHintOnly) || _paused || _controlsOn;
+        bool show = ((forced && !_args.ControlsHintOnly) || _paused || _controlsOn) && !_editor.IsOpen;
         if (show) Hud.Controls.Open(device, kind, padName, swapped);
         else Hud.Controls.Close();
+    }
+
+    /// <summary>The device, pad kind and pad name the controls are shown for: the one in use, or the one --controls-panel fakes.</summary>
+    (InputDevice Device, PadKind Kind, string PadName) ShownDevice()
+    {
+        if (_args.ControlsPanel != null)
+            return (_args.ControlsPanel == "keyboard" ? InputDevice.Keyboard : InputDevice.Gamepad,
+                _args.ControlsPanel switch { "playstation" => PadKind.PlayStation, "nintendo" => PadKind.Nintendo, _ => PadKind.Xbox }, "");
+        string padName = Pad.GamepadConnected ? Pad.ActivePadName : "";
+        return (Pad.Device, PadBind.KindOf(padName), padName);
     }
 
     string Cycle(System.Collections.Generic.List<PlayerSheet> list, string current)
@@ -301,6 +335,106 @@ public partial class Match
         _log?.Write("flag", ("round", _lastFinishedRound));
         Hud.Toast($"Flagged round {_lastFinishedRound}");
         GD.Print($"FLAG round {_lastFinishedRound}");
+    }
+
+    // ---- player editor ----
+
+    const string EditorStorePath = "user://player_editor.json";
+    PlayerPresets _store = new();
+    int _editorArmedTick = -1000;     // tick of the first open press that would replace unsaved Custom edits
+    bool _editorReplacedCustom;       // this opening replaced Custom with a copy of the selected shipped attacker
+
+    /// <summary>The attackers from data/players (Custom left out): what the editor's Base row steps through.</summary>
+    System.Collections.Generic.List<PlayerSheet> ShippedAttackers() => _data.Attackers.Where(p => p != _data.Custom).ToList();
+
+    /// <summary>Reads the editor's store from the user folder; Custom joins the attackers, and is selected if it was at quit.</summary>
+    void LoadEditorStore()
+    {
+        _store = PlayerPresets.Load(ProjectSettings.GlobalizePath(EditorStorePath), out var warnings);
+        foreach (var w in warnings)
+        {
+            _log?.Write("warning", ("file", w.File), ("field", w.Field), ("message", w.Message));
+            GD.Print($"PLAYER_EDITOR {w}");
+        }
+        if (_store.Custom == null) return;
+        _data.SetCustom(_store.Custom);
+        if (_store.Active) _attackerId = PlayerPresets.CustomId;
+        LogWarnings();
+    }
+
+    /// <summary>Writes the store (temporary file, then renamed over the old one). While the editor is open Custom is its working copy.</summary>
+    void WriteEditorStore()
+    {
+        _store.Custom = _editor.IsOpen ? _editor.Work.Clone() : _data.Custom?.Clone();
+        _store.Active = _attackerId == PlayerPresets.CustomId && _data.Custom != null;
+        if (_store.Save(ProjectSettings.GlobalizePath(EditorStorePath)) is { } err)
+        {
+            GD.PrintErr("Player editor store not saved: " + err);
+            Hud.Toast("Player editor: could not save (" + err + ")", 5f);
+        }
+    }
+
+    /// <summary>
+    /// Opens the editor. With Custom selected it edits Custom; with a shipped attacker selected, Custom is first replaced by a copy of
+    /// it, which takes a second press when Custom holds edits that match no preset and no shipped attacker.
+    /// </summary>
+    void OpenEditor(bool force = false)
+    {
+        var shipped = ShippedAttackers();
+        if (shipped.Count == 0) return;
+        _editorReplacedCustom = false;
+        if (_attackerId == PlayerPresets.CustomId && _data.Custom != null)
+        {
+            _editor.Open(_data.Custom, _store.Base, shipped, _store);
+        }
+        else
+        {
+            var cur = shipped.Find(p => p.Id == _attackerId) ?? shipped[0];
+            var old = _data.Custom;
+            bool loses = old != null && !_store.MatchesAPreset(old) && !shipped.Exists(p => PlayerPresets.SameValues(p, old));
+            float window = 2f * Engine.PhysicsTicksPerSecond;
+            if (loses && !force && _tick - _editorArmedTick > window)
+            {
+                _editorArmedTick = _tick;
+                var (shownDevice, shownKind, _) = ShownDevice();
+                string again = shownDevice == InputDevice.Gamepad ? Bindings.Pad.Retry.Label(shownKind) : Bindings.EditorOpen.Label;
+                Hud.Toast($"Custom will be replaced: press {again} again", 2f);
+                return;
+            }
+            _editorArmedTick = -1000;
+            _editor.Open(cur, cur.Id, shipped, _store);
+            _editorReplacedCustom = true;
+        }
+        var (dev, kind, _) = ShownDevice();
+        _editor.SetDevice(dev, kind);
+        _log?.Write("player_editor", ("action", "open"), ("attacker", _attackerId), ("base", _editor.BaseId));
+    }
+
+    /// <summary>
+    /// Closes the editor. If the sheet changed, Custom becomes the attacker and the round is set up again with the same scenario, start
+    /// spot and seed (a live round is abandoned); without a change nothing is set up again and no seed is used.
+    /// </summary>
+    void CloseEditor()
+    {
+        bool changed = _editor.Dirty;
+        if (changed || _editorReplacedCustom)
+        {
+            _data.SetCustom(_editor.Work);
+            _store.Base = _editor.BaseId;
+        }
+        _editor.Close();
+        _log?.Write("player_editor", ("action", "close"), ("changed", changed));
+        if (changed)
+        {
+            bool live = World.State is not (RoundState.Setup or RoundState.Report);
+            bool atReport = World.State == RoundState.Report;
+            _attackerId = PlayerPresets.CustomId;
+            _log?.Write("selection", ("what", "editor"), ("attacker", _attackerId), ("applies_now", true), ("abandoned", live));
+            // a finished round keeps its number (its replay is saved under it); a set-up or abandoned one is rebuilt under the same number
+            SetUpRound(newRound: atReport);
+            if (_paused) { _paused = false; _log?.Write("pause", ("paused", false)); }
+        }
+        WriteEditorStore();
     }
 
     string WarningLine()

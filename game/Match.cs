@@ -19,6 +19,7 @@ public partial class Match : Node3D
     public InputReader Pad { get; private set; } = null!;
 
     ToolArgs _args = null!;
+    PlayerEditor _editor = null!;
     ShotTool? _shots;
     int _tick;
     double _frameSum, _frameWorst;
@@ -53,6 +54,7 @@ public partial class Match : Node3D
         Camera = new CameraRig { Name = "Camera" }; AddChild(Camera);
         Hud = new Hud { Name = "Hud" }; AddChild(Hud);
         Pad = new InputReader { Name = "Input" }; AddChild(Pad);
+        _editor = new PlayerEditor { Name = "PlayerEditor" }; Hud.AddChild(_editor);
 
         Attacker.SetTeamColor(new Color(0.85f, 0.1f, 0.1f));
         if (_args.Figure == "skinned") UseSkinnedFigures();

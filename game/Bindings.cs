@@ -121,6 +121,22 @@ public static class Bindings
     public static readonly KeyBind Pause = new("P / Esc", Key.P, Key.Escape);
     public static readonly KeyBind SwapFace = new("B", Key.B);
     public static readonly KeyBind Controls = new("H", Key.H);
+    /// <summary>Opens the player editor while play is stopped (paused, in Setup or at the report).</summary>
+    public static readonly KeyBind EditorOpen = new("T", Key.T);
+
+    /// <summary>
+    /// Keys read only while the player editor is open (gameplay input is ignored then). Separate instances from the gameplay keys on
+    /// the same physical keys, so each keeps its own pressed edge. Shift (the chip key) held makes an arrow step 10.
+    /// </summary>
+    public static class Editor
+    {
+        public static readonly KeyBind Up = new("↑", Key.Up), Down = new("↓", Key.Down), Left = new("←", Key.Left), Right = new("→", Key.Right);
+        public static readonly KeyBind Column = new("Tab", Key.Tab);
+        public static readonly KeyBind Load = new("Enter", Key.Enter, Key.KpEnter);
+        public static readonly KeyBind Save = new("S", Key.S);
+        public static readonly KeyBind Clear = new("Delete", Key.Delete);
+        public static readonly KeyBind Close = new("Esc / T", Key.Escape, Key.T);
+    }
 
     // ---- gamepad buttons (the sticks and triggers are axes) ----
     public static class Pad
@@ -132,9 +148,11 @@ public static class Bindings
         public static readonly PadBind NextSpot = new("pad_next", JoyButton.DpadRight), PrevSpot = new("pad_prev", JoyButton.DpadLeft);
         public static readonly PadBind NextAttacker = new("pad_next_attacker", JoyButton.DpadUp), NextKeeper = new("pad_next_keeper", JoyButton.DpadDown);
         public static readonly PadBind Flag = new("pad_flag", JoyButton.Back), Pause = new("pad_pause", JoyButton.Start);
+        /// <summary>X / Square: read only in the player editor (save into a preset slot); nothing during play.</summary>
+        public static readonly PadBind EditorSave = new("pad_editor_save", FaceSlot.Left);
         public static readonly PadBind[] All =
         {
-            Shoot, Confirm, Retry, Finesse, Chip, Overlay, NextSpot, PrevSpot, NextAttacker, NextKeeper, Flag, Pause,
+            Shoot, Confirm, Retry, Finesse, Chip, Overlay, NextSpot, PrevSpot, NextAttacker, NextKeeper, Flag, Pause, EditorSave,
         };
     }
 
@@ -188,10 +206,19 @@ public static class Bindings
                 new("Start spot: previous / next", $"{PrevSpot.Label} / {NextSpot.Label}", pads(Pad.PrevSpot, Pad.NextSpot)),
                 new("Attacker / keeper select", $"{NextAttacker.Label} / {NextKeeper.Label}", pads(Pad.NextAttacker, Pad.NextKeeper)),
                 new("Pause", Pause.Label, B(Pad.Pause)),
+                new("Player editor (stopped play)", $"{EditorOpen.Label} (paused, Setup or report)", $"{B(Pad.Retry)} while paused"),
                 new("Flag last round", Flag.Label, B(Pad.Flag)),
                 new("Debug overlay", Overlay.Label, B(Pad.Overlay)),
                 new("Swap face buttons", SwapFace.Label, $"keyboard {SwapFace.Label}"),
                 new("This panel", Controls.Label, $"{B(Pad.Pause)} (shown while paused)"),
+            }),
+            new("Player editor", new()
+            {
+                new("Row / change by 1 (hold repeats)", $"{Editor.Up.Label}{Editor.Down.Label} / {Editor.Left.Label}{Editor.Right.Label}", "D-pad ↑↓ / ←→"),
+                new("Change by 10", $"{Chip.Label} + {Editor.Left.Label}{Editor.Right.Label}", pads(Pad.Chip, Pad.Finesse)),
+                new("Stats / presets column", Editor.Column.Label, B(Pad.Retry)),
+                new("Preset: load / save / clear", $"{Editor.Load.Label} / {Editor.Save.Label} / {Editor.Clear.Label}", $"{B(Pad.Confirm)} / {B(Pad.EditorSave)} / {B(Pad.Flag)}"),
+                new("Close (applies the player)", Editor.Close.Label, pads(Pad.Shoot, Pad.Pause)),
             }),
         };
     }

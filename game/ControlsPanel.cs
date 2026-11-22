@@ -58,7 +58,8 @@ public partial class ControlsPanel : PanelContainer
         foreach (var c in _columns.GetChildren()) c.QueueFree();
         var groups = Bindings.Groups(kind);
         var left = Column(); var right = Column();
-        for (int i = 0; i < groups.Count; i++) AddGroup(i < 2 ? left : right, groups[i], pad);
+        // movement, shooting and the player editor on the left; skill moves and round / menu on the right
+        for (int i = 0; i < groups.Count; i++) AddGroup(i < 2 || i >= 4 ? left : right, groups[i], pad);
         _columns.AddChild(left); _columns.AddChild(right);
     }
 

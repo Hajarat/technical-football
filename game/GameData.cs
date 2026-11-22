@@ -25,6 +25,30 @@ public sealed class GameData
     public GameData(string dir) => Dir = dir;
 
     /// <summary>
+    /// The player editor's Custom attacker (id <c>custom</c>), or null. It is kept across reloads and joins <see cref="Attackers"/>
+    /// after the shipped ones; a data/players file with the same id is left out with a warning.
+    /// </summary>
+    public PlayerSheet? Custom { get; private set; }
+
+    /// <summary>Sets (a copy of) the Custom attacker, or removes it with null, and updates <see cref="Attackers"/> at once.</summary>
+    public void SetCustom(PlayerSheet? sheet)
+    {
+        Custom = sheet == null ? null : PlayerPresets.AsCustom(sheet);
+        ApplyCustom();
+    }
+
+    void ApplyCustom()
+    {
+        if (Custom == null) return;
+        foreach (var clash in Attackers.Concat(Keepers).Where(p => p.Id == PlayerPresets.CustomId && p != Custom).ToList())
+        {
+            Attackers.Remove(clash); Keepers.Remove(clash);
+            Warn(Path.Combine(Dir, "players"), "id", $"a player file uses the id '{PlayerPresets.CustomId}', which is the player editor's; the editor's Custom is used");
+        }
+        if (!Attackers.Contains(Custom)) Attackers.Add(Custom);
+    }
+
+    /// <summary>
     /// The core has no role field on a sheet, so the game decides: a player whose average goalkeeping rating
     /// (reflexes, diving, reach, positioning, handling, rushing_out) beats the average of the outfield ratings is a keeper.
     /// </summary>
@@ -67,6 +91,7 @@ public sealed class GameData
         }
         Attackers.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
         Keepers.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
+        ApplyCustom();
     }
 
     IEnumerable<string> Files(string sub)

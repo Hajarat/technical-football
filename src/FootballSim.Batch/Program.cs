@@ -187,7 +187,9 @@ static class Cli
         var replay = Replay.Load(path, out var err);
         if (replay == null) { Console.Error.WriteLine(err); return 1; }
         var sc = Load(DataLoader.LoadScenario(Path.Combine(dataDir, "scenarios", replay.ScenarioId + ".json")));
-        var att = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", replay.AttackerId + ".json")));
+        // A round played with the editor's Custom player carries its sheet; any other names a file in data/players.
+        var att = replay.ParseAttackerSheet() is { } embedded ? Load(embedded)
+            : Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", replay.AttackerId + ".json")));
         var kee = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", replay.KeeperId + ".json")));
         if (sc == null || att == null || kee == null) return 1;
         if (!replay.MatchesTuning(tuning))

@@ -2,6 +2,27 @@ using Godot;
 
 namespace FootballSim.Game;
 
+/// <summary>
+/// The player editor's input for one tick, pad and keyboard merged. Directions are held states (the editor repeats them); the
+/// rest are presses, true only on the tick the button went down.
+/// </summary>
+public struct EditorInput
+{
+    public bool Up, Down, Left, Right;   // D-pad / arrow keys, held
+    public bool Big;                     // Shift held: an arrow steps 10
+    public bool Minus10, Plus10;         // LB / RB
+    public bool Column;                  // Y / Triangle, Tab: switch between the stats and the presets
+    public bool Load, Save, Clear;       // A, X, View on the pad; Enter, S, Delete on the keyboard
+    public bool Close;                   // B or Menu; Esc or T
+
+    public static EditorInput Merge(in EditorInput a, in EditorInput b) => new()
+    {
+        Up = a.Up || b.Up, Down = a.Down || b.Down, Left = a.Left || b.Left, Right = a.Right || b.Right, Big = a.Big || b.Big,
+        Minus10 = a.Minus10 || b.Minus10, Plus10 = a.Plus10 || b.Plus10, Column = a.Column || b.Column,
+        Load = a.Load || b.Load, Save = a.Save || b.Save, Clear = a.Clear || b.Clear, Close = a.Close || b.Close,
+    };
+}
+
 /// <summary>One physics tick of gamepad state. Mirrors the core's TickIntent for the continuous fields.</summary>
 public struct PadSnapshot
 {
@@ -27,6 +48,9 @@ public struct PadSnapshot
     public bool Flag;              // View / Share / Back
     public bool Pause;             // Menu / Options / Start
     public bool ControlsToggle;    // keyboard H: show or hide the controls panel
+    public bool OpenEditor;        // keyboard T: open the player editor (the pad opens it with Y while paused, read from Retry)
+    /// <summary>The player editor's reading of the same tick; Match uses it instead of the rest while the editor is open.</summary>
+    public EditorInput Editor;
 
     /// <summary>The shield button under the core's name for it (<see cref="FootballSim.Core.TickIntent.CloseControl"/>).</summary>
     public readonly bool CloseControl => Shield;
@@ -140,7 +164,7 @@ public partial class InputReader : Node
         foreach (var p in Bindings.Pad.All) if (!IsFace(p)) Btn(p.Action, p.Button(false));
     }
 
-    static bool IsFace(PadBind p) => p == Bindings.Pad.Shoot || p == Bindings.Pad.Confirm || p == Bindings.Pad.Retry;
+    static bool IsFace(PadBind p) => p == Bindings.Pad.Shoot || p == Bindings.Pad.Confirm || p == Bindings.Pad.Retry || p == Bindings.Pad.EditorSave;
 
     /// <summary>(Re)registers the face-button actions for the current swap state.</summary>
     void BindFaceButtons()
@@ -214,6 +238,8 @@ public partial class InputReader : Node
         m.OverlayToggle |= b.OverlayToggle; m.NextSpot |= b.NextSpot; m.PrevSpot |= b.PrevSpot;
         m.NextAttacker |= b.NextAttacker; m.NextKeeper |= b.NextKeeper;
         m.Confirm |= b.Confirm; m.Retry |= b.Retry; m.Flag |= b.Flag; m.Pause |= b.Pause; m.ControlsToggle |= b.ControlsToggle;
+        m.OpenEditor |= b.OpenEditor;
+        m.Editor = EditorInput.Merge(a.Editor, b.Editor);
         return m;
     }
 
@@ -248,6 +274,15 @@ public partial class InputReader : Node
             Flag = Pressed(Bindings.Flag),
             Pause = Pressed(Bindings.Pause),
             ControlsToggle = Pressed(Bindings.Controls),
+            OpenEditor = Pressed(Bindings.EditorOpen),
+            Editor = new EditorInput
+            {
+                Up = Bindings.Editor.Up.Held(), Down = Bindings.Editor.Down.Held(),
+                Left = Bindings.Editor.Left.Held(), Right = Bindings.Editor.Right.Held(),
+                Big = Bindings.Chip.Held(),
+                Column = Pressed(Bindings.Editor.Column), Load = Pressed(Bindings.Editor.Load), Save = Pressed(Bindings.Editor.Save),
+                Clear = Pressed(Bindings.Editor.Clear), Close = Pressed(Bindings.Editor.Close),
+            },
         };
     }
 
@@ -293,6 +328,17 @@ public partial class InputReader : Node
             Retry = Input.IsActionJustPressed(Bindings.Pad.Retry.Action),
             Flag = Input.IsActionJustPressed(Bindings.Pad.Flag.Action),
             Pause = Input.IsActionJustPressed(Bindings.Pad.Pause.Action),
+            Editor = new EditorInput
+            {
+                Up = Input.IsActionPressed(Bindings.Pad.NextAttacker.Action), Down = Input.IsActionPressed(Bindings.Pad.NextKeeper.Action),
+                Left = Input.IsActionPressed(Bindings.Pad.PrevSpot.Action), Right = Input.IsActionPressed(Bindings.Pad.NextSpot.Action),
+                Minus10 = Input.IsActionJustPressed(Bindings.Pad.Chip.Action), Plus10 = Input.IsActionJustPressed(Bindings.Pad.Finesse.Action),
+                Column = Input.IsActionJustPressed(Bindings.Pad.Retry.Action),
+                Load = Input.IsActionJustPressed(Bindings.Pad.Confirm.Action),
+                Save = Input.IsActionJustPressed(Bindings.Pad.EditorSave.Action),
+                Clear = Input.IsActionJustPressed(Bindings.Pad.Flag.Action),
+                Close = Input.IsActionJustPressed(Bindings.Pad.Shoot.Action) || Input.IsActionJustPressed(Bindings.Pad.Pause.Action),
+            },
         };
     }
 

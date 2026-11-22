@@ -43,6 +43,7 @@ The table uses Xbox names.
 | Right stick click | Toggle the debug overlay (shot wedge, aimed and landed markers, keeper reach) |
 | View / Share / Back | Flag the most recent finished round (a `flag` line in the session log) |
 | Menu / Options / Start | Pause |
+| Y / Triangle while paused | Open the player editor (see [Player editor](#player-editor)) |
 | Keyboard `B` | Swap face buttons (A with B, X with Y) for the active pad. On by default for Nintendo / Switch / Pro Controller pads; the choice is saved per pad name |
 
 Skill-move directions are taken against the running direction (the facing when standing), and every side move works to
@@ -91,8 +92,41 @@ Works alongside a gamepad (the larger stick value wins) and when none is detecte
 | P or Esc | Pause |
 | B | Swap the pad's face buttons (see above) |
 | H | Show or hide the controls panel |
+| T | Open the player editor while play is stopped: paused, in Setup or at the report |
 
 There is no driven-shot key: as on the pad, the low shot is shoot pressed twice.
+
+## Player editor
+
+A menu over the stopped game for setting every field of the attacker's sheet: the 14 outfield ratings (1 to 99; the rows are the
+code's `PlayerSheet.RatingNames` minus the keeper ratings, so a new rating gets a row by itself), preferred foot, each trait on or
+off, height (1.60 to 2.05 m, steps of 0.01) and weight (55 to 100 kg). Values are clamped as a player file's are. It opens with
+Y / Triangle while paused, or T on the keyboard while paused, in Setup or at the report; play input is ignored while it is open.
+
+The edited player is **Custom**. Opening the editor with Custom selected edits it; with a shipped attacker selected, Custom is
+first replaced by a copy of that attacker (when Custom holds edits that match no preset and no shipped attacker, that takes a
+second press: "Custom will be replaced: press Y again"). The Base row steps through the shipped attackers and loads one into
+Custom (a second press when edits would be lost). The line under the rows lists what differs from the Base attacker.
+
+| Pad (Xbox names) | Keyboard | Action |
+| --- | --- | --- |
+| D-pad up / down | Up / Down arrow | Pick a row or slot (held, it repeats) |
+| D-pad left / right | Left / Right arrow | Change the value by 1; held, it repeats after 0.35 s and speeds up to 20 steps a second |
+| LB / RB | Shift + Left / Right arrow | Change the value by 10 |
+| Y | Tab | Switch between the stats and the presets column |
+| A | Enter | Presets: load the slot into Custom |
+| X | S | Presets: save Custom into the slot (a filled slot: press again within 2 s to overwrite) |
+| View | Delete | Presets: clear the slot (press again within 2 s) |
+| B or Menu | Esc or T | Close |
+
+Closing applies: if the sheet changed, Custom becomes the attacker and the round is set up again with the same start spot and
+seed (a live round is abandoned, and the pause is lifted). Closing without a change sets nothing up again. Custom then stays the
+attacker across start spots; D-pad up (Up arrow) cycles the attackers with Custom last.
+
+There are ten preset slots, named `from <base> · HH:MM` when saved. The last Custom player, whether it was the attacker at quit
+and the presets are kept in the game's user folder (`user://player_editor.json`; on macOS
+`~/Library/Application Support/Godot/app_userdata/Football Sim/`), never in the repo, and come back at the next launch. The
+data/players files are never written. A round played with Custom saves its sheet in its replay, so it replays exactly.
 
 ## Controller not detected on macOS
 
