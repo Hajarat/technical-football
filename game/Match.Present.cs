@@ -277,6 +277,7 @@ public partial class Match
     void ResetPresentation()
     {
         _hasStrike = false; _shotId = int.MinValue;
+        Trail.Clear();
         _shotsSeen = 0;
         Overlay.ClearWedge(); Overlay.ClearAimed(); Overlay.ClearLanded(); Overlay.ClearKeeperReach();
         Hud.HideReport();
@@ -289,6 +290,18 @@ public partial class Match
         Keeper.Teleport(KeeperFrame(World.Keeper));
         Camera.Snap(Ball.Position);
         UpdateHudText();
+    }
+
+    /// <summary>The shot trail's feed: a strike starts it (a touch never does); an impact event or a slow ball stops it.</summary>
+    void TrailTick(World w)
+    {
+        float speed = w.Ball.Velocity.Length();
+        Ball.SetSpin(G(w.Ball.Spin));
+        foreach (var e in w.Events)
+            if (e.Kind == EventKind.Strike) Trail.Start(speed);
+        foreach (var e in w.Events)
+            if (e.Kind is EventKind.Save or EventKind.FrameHit or EventKind.BoardHit or EventKind.Goal or EventKind.Bounce) Trail.Stop();
+        Trail.Tick(speed, w.Tuning.Dt);
     }
 
     /// <summary>Copy the world's state onto the views, HUD and overlay. Runs once per physics tick, before the camera follows.</summary>
@@ -324,6 +337,7 @@ public partial class Match
 
         if (w.State == RoundState.Flight) _flightTicks++;
         if (w.State == RoundState.Live) _liveTicks++;
+        TrailTick(w);
         foreach (var e in w.Events)
         {
             if (e.Kind == EventKind.Strike) { _strikeOrigin = e.Position; _hasStrike = true; }

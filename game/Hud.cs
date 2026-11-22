@@ -194,7 +194,7 @@ public partial class Hud : CanvasLayer
         {
             HorizontalAlignment = align,
             MouseFilter = Control.MouseFilterEnum.Ignore,
-            LabelSettings = new LabelSettings { FontSize = size, OutlineSize = Mathf.Max(3, size / 6), OutlineColor = new Color(0, 0, 0, 0.9f), FontColor = Colors.White },
+            LabelSettings = new LabelSettings { FontSize = size, OutlineSize = Mathf.Max(5, size / 4), OutlineColor = Colors.Black, FontColor = Colors.White, ShadowSize = 2, ShadowColor = new Color(0, 0, 0, 0.6f), ShadowOffset = new Vector2(1, 2) },
         };
         parent?.AddChild(l);
         return l;

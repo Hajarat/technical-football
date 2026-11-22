@@ -5,7 +5,7 @@ namespace FootballSim.Game;
 
 /// <summary>
 /// The walled arena, built in code from the simulation's arena: grass inside the outline, low boards all round (either side of
-/// the goal too), a few markings and the goal. Outside the boards a plain dark floor. The back corners are rounded (drawn as
+/// the goal too), a few markings and the goal. Outside the boards a concrete surround. The back corners are rounded (drawn as
 /// short straight pieces) and the goal-end corners cut by straight boards, matching the simulation's shape.
 /// </summary>
 public partial class Pitch : Node3D
@@ -15,6 +15,9 @@ public partial class Pitch : Node3D
     /// <summary>How far inside the boards the outline marking runs, metres.</summary>
     const float OutlineInset = 0.3f;
     const int ArcSegments = 12;
+    const float GrassTileM = 2f, StripeM = 5f, StripeAmount = 0.06f;
+    /// <summary>The cage: a post every PostSpacing metres, strands and rail sizes, all in metres.</summary>
+    const float PostSpacing = 4f, PostSize = 0.06f, RailSize = 0.07f;
 
     FootballSim.Core.Pitch? _built;
 
@@ -30,6 +33,7 @@ public partial class Pitch : Node3D
         BuildGround(p);
         BuildBoards(p);
         BuildMarkings(p);
+        BuildCage(p);
         BuildGoal(p);
     }
 
@@ -67,11 +71,29 @@ public partial class Pitch : Node3D
         return pts;
     }
 
+    static Texture2D Tex(string name) => GD.Load<Texture2D>($"res://assets/textures/{name}.jpg");
+
+    /// <summary>A lit material from a CC0 colour / normal / roughness set, projected in world metres (<paramref name="tileM"/> per repeat).</summary>
+    static StandardMaterial3D Surface(string set, Color tint, float tileM, float normalScale = 0.8f, bool colourMap = true) => new()
+    {
+        AlbedoTexture = colourMap ? Tex(set + "_color") : null, AlbedoColor = tint,
+        NormalEnabled = true, NormalTexture = Tex(set + "_normal"), NormalScale = normalScale,
+        RoughnessTexture = Tex(set + "_roughness"),
+        Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One / tileM,
+        TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
+    };
+
     void BuildGround(FootballSim.Core.Pitch p)
     {
-        // Grass: a fan over the convex outline, just above the surround floor.
-        var grass = MeshKit.Lit(new Color(0.24f, 0.52f, 0.22f));
-        grass.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+        // Grass: a fan over the convex outline, just above the surround floor. The shader tiles the CC0 grass and mows the stripes.
+        var grass = new ShaderMaterial { Shader = GD.Load<Shader>("res://grass.gdshader") };
+        grass.SetShaderParameter("albedo_tex", Tex("grass_color"));
+        grass.SetShaderParameter("normal_tex", Tex("grass_normal"));
+        grass.SetShaderParameter("rough_tex", Tex("grass_roughness"));
+        grass.SetShaderParameter("tint", new Color(0.9f, 0.9f, 0.82f));
+        grass.SetShaderParameter("tile_m", GrassTileM);
+        grass.SetShaderParameter("stripe_m", StripeM);
+        grass.SetShaderParameter("stripe_amount", StripeAmount);
         var st = MeshKit.BeginTriangles();
         var loop = Outline(p, 0f);
         var centre = new Vector3(p.GoalLineX / 2f, 0f, 0f);
@@ -81,13 +103,17 @@ public partial class Pitch : Node3D
             st.AddVertex(centre); st.AddVertex(new Vector3(a.X, 0f, a.Y)); st.AddVertex(new Vector3(b.X, 0f, b.Y));
         }
         AddMesh("Grass", st.Commit(), Vector3.Zero, grass);
-        // Plain dark floor all round, so nothing past the boards draws attention.
-        AddBox("Surround", new Vector3(400f, 0.1f, 400f), new Vector3(p.GoalLineX / 2f, -0.06f, 0), MeshKit.Lit(new Color(0.10f, 0.11f, 0.12f)), shadows: false);
+        // Concrete all round, so nothing past the boards draws attention.
+        AddBox("Surround", new Vector3(400f, 0.1f, 400f), new Vector3(p.GoalLineX / 2f, -0.06f, 0), Surround(), shadows: false);
     }
+
+    static StandardMaterial3D Surround() => Surface("surround", new Color(0.55f, 0.57f, 0.6f), 3f, 0.6f);
 
     void BuildBoards(FootballSim.Core.Pitch p)
     {
-        var mat = MeshKit.Lit(new Color(0.86f, 0.87f, 0.9f));
+        // a clean painted finish: a flat muted dark blue-grey; only the set's normal and roughness give it a faint surface
+        var mat = Surface("boards", new Color(0.20f, 0.25f, 0.32f), 1.5f, 0.3f, colourMap: false);
+        var cap = MeshKit.Lit(new Color(0.95f, 0.95f, 0.95f));
         float hgt = p.BoardHeight;
         // Board centre line half a thickness outside the playing outline, so the inner face is the simulation's wall.
         var loop = Outline(p, -BoardThickness / 2f);
@@ -103,6 +129,10 @@ public partial class Pitch : Node3D
             var mi = new MeshInstance3D { Name = $"Board{n++}", Mesh = new BoxMesh { Size = new Vector3(len + BoardThickness * 0.5f, hgt, BoardThickness) }, MaterialOverride = mat };
             mi.Transform = new Transform3D(basis, new Vector3(mid.X, hgt / 2f, mid.Y));
             AddChild(mi);
+            // a white cap along the top; the board's inner face stays the simulation's wall
+            var top = new MeshInstance3D { Name = $"BoardCap{n}", Mesh = new BoxMesh { Size = new Vector3(len + BoardThickness * 0.5f, 0.04f, BoardThickness + 0.04f) }, MaterialOverride = cap };
+            top.Transform = new Transform3D(basis, new Vector3(mid.X, hgt + 0.02f, mid.Y));
+            AddChild(top);
         }
         // The goal-end wall (the first edge) is split around the goal mouth.
         float gx = loop[0].X, mouth = p.GoalHalfWidth + p.PostRadius;
@@ -179,14 +209,114 @@ public partial class Pitch : Node3D
         // Crossbar, along Z.
         AddCylinder("Crossbar", postR, postZ * 2 + postR * 2, new(gx, barY, 0), Basis.FromEuler(new(Mathf.Pi / 2, 0, 0)), white);
 
-        // Translucent net volume behind the goal line.
-        var net = new StandardMaterial3D
+        // The net volume behind the goal line: the cage's net material on the sides, back and top.
+        float depth = p.NetDepth;
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        NetQuad(st, new Vector3(gx, 0, -postZ), new Vector3(gx + depth, 0, -postZ), barY, 0f, depth, new Vector2(0, -1));
+        NetQuad(st, new Vector3(gx, 0, postZ), new Vector3(gx + depth, 0, postZ), barY, 0f, depth, new Vector2(0, 1));
+        NetQuad(st, new Vector3(gx + depth, 0, -postZ), new Vector3(gx + depth, 0, postZ), barY, 0f, postZ * 2, new Vector2(1, 0));
+        // top: a horizontal quad (u along X, v along Z)
+        Color none = new(0.5f, 0f, 0.5f);
+        void V(float x, float z, float u, float v) { st.SetColor(none); st.SetUV(new Vector2(u, v)); st.AddVertex(new Vector3(x, barY, z)); }
+        V(gx, -postZ, 0, 0); V(gx + depth, -postZ, depth, 0); V(gx + depth, postZ, depth, postZ * 2);
+        V(gx, -postZ, 0, 0); V(gx + depth, postZ, depth, postZ * 2); V(gx, postZ, 0, postZ * 2);
+        AddCageMesh("Net", st.Commit(), NetMaterial(solid: false));
+    }
+
+    /// <summary>
+    /// A vertical net panel from (x, z) corner <paramref name="a"/> to <paramref name="b"/> (their y is ignored), between heights
+    /// <paramref name="y0"/> and <paramref name="y1"/> (either order), with u running <paramref name="u0"/> to <paramref name="u1"/> along it.
+    /// <paramref name="outward"/> is the wall's outward normal (x, z), stored in the vertex colour for the camera-side fade.
+    /// </summary>
+    static void NetQuad(SurfaceTool st, Vector3 a, Vector3 b, float y1, float y0, float uSpan, Vector2 outward, float u0 = 0f)
+    {
+        var col = new Color(outward.X * 0.5f + 0.5f, 0f, outward.Y * 0.5f + 0.5f);
+        void V(Vector3 p, float y, float u, float v) { st.SetColor(col); st.SetUV(new Vector2(u, v)); st.AddVertex(new Vector3(p.X, y, p.Z)); }
+        float u1 = u0 + uSpan;
+        V(a, y0, u0, y0); V(b, y0, u1, y0); V(b, y1, u1, y1);
+        V(a, y0, u0, y0); V(b, y1, u1, y1); V(a, y1, u0, y1);
+    }
+
+    static ShaderMaterial NetMaterial(bool solid)
+    {
+        var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://cage_net.gdshader"), RenderPriority = 0 };
+        m.SetShaderParameter("solid", solid);
+        return m;
+    }
+
+    void AddCageMesh(string name, Mesh mesh, Material mat) =>
+        AddChild(new MeshInstance3D { Name = name, Mesh = mesh, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+
+    /// <summary>
+    /// The cage on every wall from the board top up to the ceiling: a diamond net, a thin post every few metres and a rail at the
+    /// ceiling. Beside the goal the net runs to the ground-level boards; over the mouth it starts above the crossbar. No roof net.
+    /// </summary>
+    void BuildCage(FootballSim.Core.Pitch p)
+    {
+        float y0 = p.BoardHeight, y1 = p.Ceiling;
+        var loop = Outline(p, -BoardThickness / 2f);
+        var centre = new Vector2(p.GoalLineX / 2f, 0f);
+        float mouth = p.GoalHalfWidth + p.PostRadius, aboveBar = p.BarHeight + p.PostRadius;
+        var net = new SurfaceTool(); net.Begin(Mesh.PrimitiveType.Triangles);
+        var solid = new SurfaceTool(); solid.Begin(Mesh.PrimitiveType.Triangles);
+        float u = 0f, nextPost = 0f;
+        for (int i = 0; i < loop.Count; i++)
         {
-            AlbedoColor = new Color(1, 1, 1, 0.22f),
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-        };
-        AddBox("Net", new Vector3(p.NetDepth, barY, postZ * 2), new(gx + p.NetDepth / 2f, barY / 2, 0), net, shadows: false);
+            Vector2 a = loop[i], b = loop[(i + 1) % loop.Count], d = b - a;
+            float len = d.Length();
+            if (len < 1e-3f) continue;
+            var dir = d / len;
+            var n = new Vector2(dir.Y, -dir.X);
+            if (n.Dot((a + b) / 2f - centre) < 0f) n = -n;
+            Vector3 A = new(a.X, 0, a.Y), B = new(b.X, 0, b.Y);
+            if (i == 0)
+            {
+                // the goal-end wall: net beside the mouth to the board top, over the mouth from above the bar
+                Vector3 M0 = new(a.X, 0, -mouth), M1 = new(a.X, 0, mouth);
+                float sideLen = Mathf.Abs(-mouth - a.Y);
+                NetQuad(net, A, M0, y1, y0, sideLen, n, u);
+                NetQuad(net, M0, M1, y1, aboveBar, mouth * 2f, n, u + sideLen);
+                NetQuad(net, M1, B, y1, y0, Mathf.Abs(b.Y - mouth), n, u + sideLen + mouth * 2f);
+            }
+            else NetQuad(net, A, B, y1, y0, len, n, u);
+            // posts every PostSpacing metres along the whole outline, and a rail on top
+            while (nextPost <= u + len + 1e-4f)
+            {
+                var at = a + dir * Mathf.Max(0f, nextPost - u);
+                bool inMouth = i == 0 && Mathf.Abs(at.Y) < mouth - 0.01f;
+                if (!inMouth) AddOrientedBox(solid, new Vector3(at.X, y1 / 2f, at.Y), dir, y1, PostSize, n);
+                nextPost += PostSpacing;
+            }
+            AddOrientedBox(solid, new Vector3((a.X + b.X) / 2f, y1, (a.Y + b.Y) / 2f), dir, RailSize, RailSize, n, alongLen: len);
+            u += len;
+        }
+        // posts at both ends of the mouth, where the cage is held either side of it
+        foreach (float s in new[] { -1f, 1f })
+            AddOrientedBox(solid, new Vector3(loop[0].X, y1 / 2f, s * mouth), Vector2.Right, y1, PostSize, Vector2.Right);
+        AddCageMesh("CageNet", net.Commit(), NetMaterial(solid: false));
+        AddCageMesh("CagePosts", solid.Commit(), NetMaterial(solid: true));
+    }
+
+    /// <summary>
+    /// A box centred at <paramref name="c"/> whose long side along the wall is <paramref name="alongLen"/> (or <paramref name="size"/> for a post),
+    /// <paramref name="height"/> tall, <paramref name="size"/> thick; its vertex colour carries the wall's outward normal.
+    /// </summary>
+    static void AddOrientedBox(SurfaceTool st, Vector3 c, Vector2 dir, float height, float size, Vector2 outward, float alongLen = -1f)
+    {
+        float hl = (alongLen < 0f ? size : alongLen) / 2f, hw = size / 2f, hh = height / 2f;
+        var col = new Color(outward.X * 0.5f + 0.5f, 0f, outward.Y * 0.5f + 0.5f);
+        var ax = new Vector3(dir.X, 0, dir.Y) * hl; var az = new Vector3(-dir.Y, 0, dir.X) * hw; var ay = Vector3.Up * hh;
+        Vector3 P(int sx, int sy, int sz) => c + ax * sx + ay * sy + az * sz;
+        void Face(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
+        {
+            foreach (var q in new[] { p0, p1, p2, p0, p2, p3 }) { st.SetColor(col); st.SetUV(Vector2.Zero); st.AddVertex(q); }
+        }
+        Face(P(-1, -1, -1), P(1, -1, -1), P(1, 1, -1), P(-1, 1, -1));
+        Face(P(-1, -1, 1), P(1, -1, 1), P(1, 1, 1), P(-1, 1, 1));
+        Face(P(-1, -1, -1), P(-1, -1, 1), P(-1, 1, 1), P(-1, 1, -1));
+        Face(P(1, -1, -1), P(1, -1, 1), P(1, 1, 1), P(1, 1, -1));
+        Face(P(-1, 1, -1), P(1, 1, -1), P(1, 1, 1), P(-1, 1, 1));
     }
 
     void AddCylinder(string name, float r, float h, Vector3 pos, Basis basis, Material mat)
