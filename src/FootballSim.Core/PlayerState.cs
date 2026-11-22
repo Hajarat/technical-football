@@ -40,6 +40,14 @@ public sealed class PlayerState
     /// <summary>True while this player controls the ball (dribbling it). False when the ball is loose or someone else's.</summary>
     public bool InPossession { get; internal set; }
     /// <summary>
+    /// Turn fatigue, 0 to <see cref="TurnFatigueMax"/>: each touch of the touch controller adds to it by how far the ball is
+    /// pushed away from where he faces, and it drains while he has the ball (see TouchPlanner.AddTurnFatigue). It fades the
+    /// early touch after a turn back toward the normal cadence and slows nothing else. Zero whenever possession changes, after
+    /// a shot and at the start of a round.
+    /// </summary>
+    public float TurnFatigue { get; internal set; }
+    public const float TurnFatigueMax = 100f;
+    /// <summary>
     /// Seconds until this player's next expected touch of the ball: the committed touch's contact (the pending
     /// <see cref="Action"/>), else the contact the touch controller steers for (updated every tick), or NaN when none is expected.
     /// </summary>
@@ -350,7 +358,7 @@ public sealed class PlayerState
         KnockOnUntil = o.KnockOnUntil; MoveTime = o.MoveTime; SpeedDebt = o.SpeedDebt; ReverseTime = o.ReverseTime; PostTurnUntil = o.PostTurnUntil; TurnArcSpeed = o.TurnArcSpeed; TurnArcBraking = o.TurnArcBraking; TurnArcRelease = o.TurnArcRelease; TurnArcStick = o.TurnArcStick; PlannerSteer = o.PlannerSteer; SteerFacing = o.SteerFacing; SteerCarry = o.SteerCarry; TurnRefHeading = o.TurnRefHeading; TurnRefTime = o.TurnRefTime; TurnCostTaken = o.TurnCostTaken; TurnCostFrom = o.TurnCostFrom;
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed; StepBegun = o.StepBegun;
-        LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction;
+        LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction; TurnFatigue = o.TurnFatigue;
         GZone = o.GZone; GPrevZone = o.GPrevZone; GZoneStart = o.GZoneStart; GFwdLastTick = o.GFwdLastTick;
         GFwdStart = o.GFwdStart; GFwdFromNeutral = o.GFwdFromNeutral; GBackLastTick = o.GBackLastTick;
         GBackStart = o.GBackStart; GBackFromNeutral = o.GBackFromNeutral;

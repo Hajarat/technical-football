@@ -7,7 +7,8 @@ using FootballSim.Core;
 /// like the batch run and, per round, reads the state at the strike (distance to the goal, the attacker's speed, the charge
 /// against the ideal, the ball's offset from the striking foot's contact point and from the feet, the shot's accuracy and speed
 /// factors, its foot and surface, the rule of the foot choice that decided it (fixed from the release) and whether the
-/// contact check handed it to the other foot, the body angle, the launch speed and the time from the press to the strike) and how the round
+/// contact check handed it to the other foot, the body angle, the launch speed, the time from the press to the strike and his
+/// turn fatigue just before the strike) and how the round
 /// ended, then prints means and shares (on target = the shots that, flying free of the keeper, go in), the reasons wide shots went
 /// wide, and why rounds had no shot.
 /// </summary>
@@ -23,7 +24,7 @@ static class ShotDiag
         var kee = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", "the_wall.json")).Value!;
         var dist = new List<float>(); var speed = new List<float>(); var charge = new List<float>(); var chargeMiss = new List<float>();
         var offFoot = new List<float>(); var offFeet = new List<float>(); var ahead = new List<float>(); var sigmaH = new List<float>();
-        var touchesBefore = new List<float>(); var timeToShot = new List<float>();
+        var touchesBefore = new List<float>(); var timeToShot = new List<float>(); var fatigue = new List<float>();
         var factors = new Dictionary<string, List<float>>();
         var launch = new List<float>(); var pressToStrike = new List<float>(); var bodyAngle = new List<float>();
         var feet = new Dictionary<string, int>();
@@ -40,14 +41,14 @@ static class ShotDiag
             var buf = new TickIntent[w.PlayerCount];
             int cap = (int)((tuning.Round.MaxSeconds + 10f) * tuning.TickRate);
             var p = w.Attacker;
-            Vector3 ballPrev = default, posPrev = default; float facePrev = 0f, speedPrev = 0f; Foot footPrev = Foot.Right;
+            Vector3 ballPrev = default, posPrev = default; float facePrev = 0f, speedPrev = 0f, fatiguePrev = 0f; Foot footPrev = Foot.Right;
             int touches = 0;
             bool shot = false;
             int pressTick = -1;
             for (int i = 0; i < cap; i++)
             {
                 if (p.ShotAction is { Made: false } sa) pressTick = sa.PlanTick;
-                ballPrev = w.Ball.Position; posPrev = p.Position; facePrev = p.Facing; speedPrev = p.Speed; footPrev = p.StrikeFoot;
+                ballPrev = w.Ball.Position; posPrev = p.Position; facePrev = p.Facing; speedPrev = p.Speed; footPrev = p.StrikeFoot; fatiguePrev = p.TurnFatigue;
                 buf[0] = script.Next(w);
                 w.Step(buf);
                 touches += w.Events.Count(e => e.Kind == EventKind.Touch && e.Team == 0);
@@ -68,7 +69,7 @@ static class ShotDiag
             dist.Add(s.Distance); speed.Add(speedPrev); charge.Add(s.Charge); chargeMiss.Add(s.ChargeMissDeg); sigmaH.Add(s.SigmaH);
             offFeet.Add(rel.Length()); ahead.Add(Vector2.Dot(rel, fwd));
             offFoot.Add(new Vector2(ballPrev.X - cp.X, ballPrev.Z - cp.Z).Length());
-            touchesBefore.Add(touches); timeToShot.Add(w.SimTime);
+            touchesBefore.Add(touches); timeToShot.Add(w.SimTime); fatigue.Add(fatiguePrev);
             foreach (var f in s.Factors) { if (!factors.TryGetValue(f.Name, out var l)) factors[f.Name] = l = new(); l.Add(f.Value); }
             foreach (var f in s.SpeedFactors) { if (!factors.TryGetValue("speed x " + f.Name, out var l)) factors["speed x " + f.Name] = l = new(); l.Add(f.Value); }
             launch.Add(s.Speed); bodyAngle.Add(s.BodyAngleDeg);
@@ -107,6 +108,7 @@ static class ShotDiag
         Console.WriteLine($"  charge: {F(charge)}   charge miss deg: {F(chargeMiss)}   sigma_h deg: {F(sigmaH)}");
         Console.WriteLine($"  ball from the feet m: {F(offFeet)}   ahead along the facing m: {F(ahead)}   from the striking foot's contact point m: {F(offFoot)}");
         Console.WriteLine($"  touches before the shot: {F(touchesBefore)}   seconds to the shot: {F(timeToShot)}");
+        Console.WriteLine($"  turn fatigue at the strike (0-100): {F(fatigue)}");
         foreach (var kv in factors.OrderBy(kv => kv.Key)) Console.WriteLine($"  factor {kv.Key}: {F(kv.Value)}");
         Console.WriteLine($"  wide {wide}: aimed outside the posts {wideAimOut}, aimed inside and sent wide {wideError}");
         return 0;

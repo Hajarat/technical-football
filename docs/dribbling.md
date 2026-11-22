@@ -50,6 +50,14 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   a skill gesture waiting, a shot's strike) shortens the cooldown to `early_execution` of the cadence (by the angle and
   close dribbling), never sooner than `early_min_interval` (0.22 s); the go-get-it legs then take over when they play the ball a few
   ticks sooner, and the stride may be quickened by up to a quarter to bring a step's window onto the ball.
+- Turn fatigue (0 to 100) tires rapid zig-zags: each touch the touch controller plays (a dribble touch, turn, cut, stop or
+  knock-on; not a trap, a first touch, a shot's soft touch, a skill move's own contacts or the strike) adds `fatigue_turn`
+  by the angle from his facing at the contact to the direction the ball is pushed (nothing up to 30 degrees, 10 at 60, 20
+  at 90, 40 at 180) times `fatigue_gain` (1.5 at close dribbling 1 to 0.5 at 99), and in possession it drains at
+  `fatigue_recovery` (10 a second at close dribbling 1 to 30 at 99). `fatigue_penalty` (none up to a fatigue of 20, whole
+  from 60) moves the early-execution fraction that share of the way back to 1, so the quick early touch after a turn fades
+  toward the normal cadence; the fraction is never above 1 and nothing else is slowed. It is zero whenever possession is
+  gained or lost, after a shot and at the start of a round.
 - Commit: its execution time before its contact (`execution_time`, by the ball's speed relative to the player: the `windup`,
   0.12 s, for a ball up to 4 m/s relative to him, down to 0.05 s at 8 m/s, so a fast ball coming at or across him is met by a
   touch thrown at it on an earlier swing instead of the legs going after it; a strike keeps the windup) the touch is committed, with its foot, kind (a dribble touch, a turn past

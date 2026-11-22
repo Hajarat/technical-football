@@ -54,7 +54,7 @@ static class ReplayTrace
         var drops = new List<string>();
         float vmin = float.MaxValue; int vminTick = -1;
         if (!quiet)
-            Console.WriteLine("tick  stick_deg mag spr | facing veldir  |v|   run  dRun/dt dSt/dt dV/dt | steer | ahead  lat   bv  | kind      phase     legs     eta  debt  post tau  | touch");
+            Console.WriteLine("tick  stick_deg mag spr | facing veldir  |v|   run  dRun/dt dSt/dt dV/dt | steer | ahead  lat   bv  | kind      phase     legs     eta  debt  post tau   fat  | touch");
         for (int i = 0; i < tickCount && w.State != RoundState.Report; i++)
         {
             Array.Clear(buf);
@@ -112,7 +112,7 @@ static class ReplayTrace
                     F(Vector2.Dot(rel, fwd)).PadLeft(5), F(TouchModel.Lateral(p.Position, p.Facing, w.Ball.Position)).PadLeft(5),
                     F(new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z).Length()).PadLeft(5), "|",
                     (p.SkillMove is { FeetTurn: true } ? "FeetTurn" : skill ? "SKILL:" + p.SkillMove?.Kind : kind).PadRight(9), phase.PadRight(9), legs.PadRight(8), F(p.NextTouchEta).PadLeft(5),
-                    F(debt).PadLeft(5), (post ? "P" : ".").PadLeft(3), F(tau).PadLeft(5), "|",
+                    F(debt).PadLeft(5), (post ? "P" : ".").PadLeft(3), F(tau).PadLeft(5), F(p.TurnFatigue, 1).PadLeft(5), "|",
                     dropped ? "UNPLAYED" : "", touched ? "TOUCH " + w.Events.First(e => e.Kind == EventKind.Touch).ToString() : "", isStep ? "<STEP" : "", !measured ? "(unmeasured)" : "",
                 }));
             }

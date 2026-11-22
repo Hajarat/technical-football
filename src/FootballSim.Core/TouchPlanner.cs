@@ -1088,10 +1088,41 @@ public static class TouchPlanner
 
     /// <summary>
     /// The early execution fraction for a turn of <paramref name="turnDeg"/> (the stick against the ball's travel): the share
-    /// of the normal cadence a turn may cut it to, early_execution at the angle times the close dribbling multiplier.
+    /// of the normal cadence a turn may cut it to, early_execution at the angle times the close dribbling multiplier, moved
+    /// back toward 1 (the normal cadence) by fatigue_penalty at his turn fatigue, and never above 1.
     /// </summary>
-    internal static float EarlyFraction(PlayerState p, float turnDeg, Tuning t) =>
-        t.Touch.EarlyExecution.Evaluate(turnDeg) * t.Touch.EarlyExecutionDribbling.ForRating(p.Sheet.CloseDribbling);
+    internal static float EarlyFraction(PlayerState p, float turnDeg, Tuning t)
+    {
+        var k = t.Touch;
+        float early = k.EarlyExecution.Evaluate(turnDeg) * k.EarlyExecutionDribbling.ForRating(p.Sheet.CloseDribbling);
+        float penalty = Math.Clamp(k.FatiguePenalty.Evaluate(p.TurnFatigue), 0f, 1f);
+        return MathF.Min(1f, early + (1f - early) * penalty);
+    }
+
+    /// <summary>
+    /// The turn fatigue one touch adds: fatigue_turn at the angle from <paramref name="facing"/> (radians) to the ground
+    /// direction of <paramref name="push"/> (the ball's velocity off the foot; no angle for a ball left still), times
+    /// fatigue_gain by close dribbling.
+    /// </summary>
+    internal static float TurnFatigueGain(PlayerSheet s, float facing, Vector3 push, Tuning t)
+    {
+        var flat = new Vector2(push.X, push.Z);
+        if (flat.LengthSquared() < 1e-6f) return 0f;
+        float deg = MathF.Abs(Movement.WrapAngle(MathF.Atan2(flat.Y, flat.X) - facing)) * 180f / MathF.PI;
+        return MathF.Max(0f, t.Touch.FatigueTurn.Evaluate(deg) * t.Touch.FatigueGain.ForRating(s.CloseDribbling));
+    }
+
+    /// <summary>
+    /// True for the touches that add turn fatigue: the touch controller's dribble touches, turns, cuts, stops and knock-ons.
+    /// A trap, a first touch, a shot's soft touch, a skill move's own contacts and the strike add none.
+    /// </summary>
+    internal static bool AddsTurnFatigue(ActionKind kind) =>
+        kind is ActionKind.Close or ActionKind.Jog or ActionKind.Sprint or ActionKind.Turn or ActionKind.Cut or ActionKind.Stop
+            or ActionKind.KnockOn or ActionKind.Heavy;
+
+    /// <summary>One tick in possession drains the turn fatigue: fatigue_recovery per second by close dribbling, never below zero.</summary>
+    static void RecoverTurnFatigue(PlayerState p, Tuning t) =>
+        p.TurnFatigue = Math.Clamp(p.TurnFatigue - MathF.Max(0f, t.Touch.FatigueRecovery.ForRating(p.Sheet.CloseDribbling)) * t.Dt, 0f, PlayerState.TurnFatigueMax);
 
     static void Install(PlayerState p, BallAction a, int tick, Tuning t)
     {
@@ -1142,6 +1173,7 @@ public static class TouchPlanner
         p.KnockOnRequested = false;
         p.StrikeContactTick = -1;
         p.ActionContactEta = float.NaN;
+        p.TurnFatigue = 0f;
         p.ClearForecast();
     }
 
@@ -1156,6 +1188,7 @@ public static class TouchPlanner
         int tick, float now, Tuning t, Pitch? pitch, SimRng rng)
     {
         if (p.StepBegun) p.StepsSinceTouch++;
+        if (inPossession) RecoverTurnFatigue(p, t);
         // A skill move under way plays the ball itself, whatever the shoot button does.
         if (inPossession && p.SkillAction != null) return SkillMoves.Step(p, Debounced(p, rawIntent, t), ball, tick, now, t, pitch);
         if (p.SkillBurstAtTick == tick)
@@ -1698,6 +1731,9 @@ public static class TouchPlanner
         }
 
         SkillMoves.ApplyExitBurst(p, now); // an exit touch of a kind without the touch boost still starts the burst
+        // Turn fatigue, once per contact made: by how far the ball leaves the foot away from where he faces.
+        if (AddsTurnFatigue(kind))
+            p.TurnFatigue = Math.Clamp(p.TurnFatigue + TurnFatigueGain(p.Sheet, p.Facing, v, t), 0f, PlayerState.TurnFatigueMax);
         p.LastTouchKind = kind;
         if (kind == ActionKind.KnockOn) p.KnockOnRequested = false;
         p.StepsSinceTouch = 0;

@@ -120,6 +120,16 @@
       "at99": 0.85
     },
     "early_min_interval": 0.22,
+    "fatigue_turn": [[0, 0], [30, 0], [60, 10], [90, 20], [135, 32], [180, 40]],
+    "fatigue_gain": {
+      "at1": 1.5,
+      "at99": 0.5
+    },
+    "fatigue_recovery": {
+      "at1": 10,
+      "at99": 30
+    },
+    "fatigue_penalty": [[0, 0], [20, 0], [60, 1]],
     "turning_stick_rate_deg": 20,
     "turning_max_steps": {
       "jog": 2,

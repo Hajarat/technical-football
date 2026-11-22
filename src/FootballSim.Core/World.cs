@@ -267,6 +267,7 @@ public sealed class World
         p.TurnRefHeading = p.Facing;
         p.TurnRefTime = 0f;
         p.InPossession = false;
+        p.TurnFatigue = 0f;
         p.NextTouchEta = float.NaN;
         p.NextTouchFoot = p.Sheet.PreferredFoot;
         p.NextTouchPoint = Vector3.Zero;
@@ -867,7 +868,7 @@ public sealed class World
             // A shot under way that loses the ball (the keeper took it, or it ran away) is dropped after the buffer.
             if (_controller == Attacker && _pending.Active) _pending.DeadlineTick = Math.Max(_pending.ContactTick, Tick) + Ticks(Tuning.Round.ShootBuffer);
             _controller.InPossession = false;
-            TouchPlanner.OnPossessionLost(_controller);
+            TouchPlanner.OnPossessionLost(_controller);   // (his turn fatigue goes with the ball)
             _events.Add(new SimEvent(EventKind.PossessionLost, Ball.Position, speed, Team: _controller.Team, PlayerIndex: _controller.Index));
         }
         _controller = p;
@@ -876,6 +877,7 @@ public sealed class World
         {
             _ballPlayed = true;
             p.InPossession = true;
+            p.TurnFatigue = 0f;
             _events.Add(new SimEvent(EventKind.PossessionGained, Ball.Position, speed, Team: p.Team, PlayerIndex: p.Index));
         }
     }
@@ -989,6 +991,7 @@ public sealed class World
         _softPending = false;
         _shotAtFoot = false;
         TouchPlanner.OnShotEnded(a);
+        a.TurnFatigue = 0f;
         Ball.Velocity = result.Launch;
         Ball.Spin = result.Spin;
         Attacker.LastTouchTime = SimTime;

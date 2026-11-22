@@ -469,6 +469,20 @@ public sealed class TouchTuning
     /// <summary>Touches are at least this far apart (from the previous touch), seconds.</summary>
     public float EarlyMinInterval { get; set; } = 0.22f;
     /// <summary>
+    /// Turn fatigue (0 to 100, see PlayerState.TurnFatigue) added by one touch of the touch controller, by the angle from his
+    /// facing at the contact to the direction the ball is pushed, degrees (0 to 180). Multiplied by <see cref="FatigueGain"/>.
+    /// </summary>
+    public Curve FatigueTurn { get; set; } = new((0f, 0f), (30f, 0f), (60f, 10f), (90f, 20f), (135f, 32f), (180f, 40f));
+    /// <summary>Multiplier on <see cref="FatigueTurn"/> by the close dribbling rating.</summary>
+    public RatingRange FatigueGain { get; set; } = new(1.5f, 0.5f);
+    /// <summary>Turn fatigue drained per second in possession, by the close dribbling rating.</summary>
+    public RatingRange FatigueRecovery { get; set; } = new(10f, 30f);
+    /// <summary>
+    /// How much of the early touch after a turn the turn fatigue takes away, 0 to 1 by the fatigue: the early-execution
+    /// fraction moves this share of the way back to 1, the normal cadence (see <see cref="EarlyExecution"/>).
+    /// </summary>
+    public Curve FatiguePenalty { get; set; } = new((0f, 0f), (20f, 0f), (60f, 1f));
+    /// <summary>
     /// The stick counts as moving (a turn is likely) when its smoothed turn rate is above this, degrees per second; then, as
     /// for a touch sent more than the execution angle off the ball's travel, the push goes to a meet at most
     /// <see cref="TurningMaxSteps"/> steps away.
