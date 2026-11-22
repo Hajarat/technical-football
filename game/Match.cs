@@ -11,6 +11,7 @@ public partial class Match : Node3D
 {
     public Pitch Pitch { get; private set; } = null!;
     public BallView Ball { get; private set; } = null!;
+    public BallTrail Trail { get; private set; } = null!;
     public PlayerView Attacker { get; private set; } = null!;
     public KeeperView Keeper { get; private set; } = null!;
     public CameraRig Camera { get; private set; } = null!;
@@ -24,6 +25,7 @@ public partial class Match : Node3D
     ShotTool? _shots;
     int _tick;
     double _frameSum, _frameWorst;
+    readonly List<double> _frameDeltas = new();
     int _frameCount;
     bool _paused;
     bool _quitting;
@@ -34,21 +36,14 @@ public partial class Match : Node3D
         if (_args.Background) MacBackground.Apply();
         else FitWindowToScreen();
 
-        var env = new Godot.Environment
-        {
-            BackgroundMode = Godot.Environment.BGMode.Color,
-            BackgroundColor = new Color(0.55f, 0.7f, 0.85f),
-            AmbientLightSource = Godot.Environment.AmbientSource.Color,
-            AmbientLightColor = new Color(0.8f, 0.85f, 0.9f),
-            AmbientLightEnergy = 0.6f,
-        };
-        AddChild(new WorldEnvironment { Environment = env });
+        AddChild(new WorldEnvironment { Environment = MakeEnvironment() });
         var sun = new DirectionalLight3D { ShadowEnabled = true, LightEnergy = 1.1f, DirectionalShadowMaxDistance = 160f };
         sun.Transform = new Transform3D(Basis.LookingAt(new Vector3(-0.3f, -1f, -0.35f).Normalized(), Vector3.Up), Vector3.Zero);
         AddChild(sun);
 
         Pitch = new Pitch { Name = "Pitch" }; AddChild(Pitch);
         Ball = new BallView { Name = "Ball" }; AddChild(Ball);
+        Trail = new BallTrail { Name = "Trail" }; AddChild(Trail); Trail.Follow(Ball);
         Attacker = new PlayerView { Name = "Attacker" }; AddChild(Attacker);
         Keeper = new KeeperView { Name = "Keeper" }; AddChild(Keeper);
         Overlay = new DebugOverlay { Name = "Overlay" }; AddChild(Overlay);
@@ -83,6 +78,20 @@ public partial class Match : Node3D
         if (!StartSession()) { _quitting = true; GetTree().Quit(1); }
         else if (_args.GalleryDir != null) StartGallery();
         else if (_args.ClipGalleryDir != null) StartClipGallery();
+    }
+
+    /// <summary>The overcast HDRI sky (background and ambient light), ACES tonemapping, subtle SSAO and a little glow.</summary>
+    static Godot.Environment MakeEnvironment()
+    {
+        var sky = new Sky { SkyMaterial = new PanoramaSkyMaterial { Panorama = GD.Load<Texture2D>("res://assets/hdri/sky_overcast_1k.exr") } };
+        return new Godot.Environment
+        {
+            BackgroundMode = Godot.Environment.BGMode.Sky, Sky = sky,
+            AmbientLightSource = Godot.Environment.AmbientSource.Sky, AmbientLightSkyContribution = 1f, AmbientLightEnergy = 0.9f,
+            TonemapMode = Godot.Environment.ToneMapper.Aces, TonemapExposure = 1f, TonemapWhite = 6f,
+            SsaoEnabled = true, SsaoRadius = 1.2f, SsaoIntensity = 1.5f, SsaoPower = 1.5f,
+            GlowEnabled = true, GlowIntensity = 0.25f, GlowStrength = 0.8f, GlowBloom = 0f, GlowHdrThreshold = 1.2f,
+        };
     }
 
     KeeperGallery? _gallery;
@@ -155,6 +164,7 @@ public partial class Match : Node3D
         if (_args.FrameTimes && ++_frameCount > 10) // skip warm-up frames
         {
             _frameSum += delta;
+            _frameDeltas.Add(delta);
             if (delta > _frameWorst) _frameWorst = delta;
         }
     }
@@ -260,11 +270,18 @@ public partial class Match : Node3D
         if (_args.FrameTimes)
         {
             int n = System.Math.Max(1, _frameCount - 10);
-            GD.Print($"FRAME_TIMES frames={n} avg_ms={_frameSum / n * 1000:F2} worst_ms={_frameWorst * 1000:F2}");
+            GD.Print($"FRAME_TIMES frames={n} avg_ms={_frameSum / n * 1000:F2} p99_ms={FrameP99() * 1000:F2} worst_ms={_frameWorst * 1000:F2}");
         }
         GD.Print($"DONE ticks={_tick}");
         LogQuit(_args.QuitAfterRound ? "quit-after-round" : "quit-after-ticks");
         GetTree().Quit(0);
+    }
+
+    double FrameP99()
+    {
+        if (_frameDeltas.Count == 0) return 0;
+        _frameDeltas.Sort();
+        return _frameDeltas[System.Math.Min(_frameDeltas.Count - 1, (int)(_frameDeltas.Count * 0.99))];
     }
 
     /// <summary>

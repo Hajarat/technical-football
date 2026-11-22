@@ -26,3 +26,16 @@ inside it once the ball is strikable or its next touch comes early enough in the
 11.3, halfway run 12.4, angled run 11.1 m, the distances the scoring bands were first measured at) it presses only once the
 ball, carried on at his speed to the contact, will be that close at the strike. Within 4 m of the keeper it stops sprinting
 and within 6 m takes close control.
+
+## How the arena is drawn
+
+All of it is view only: `game/Pitch.cs` draws the shapes the simulation's `Pitch` already has and changes none of them.
+
+- **Grass** (`game/grass.gdshader`): a CC0 colour / normal / roughness set tiled every 2 m in world space (a second sample at another scale and angle hides the repeat), with mowing stripes 5 m wide along X that alternate by 6% in brightness. The white markings are separate unshaded meshes just above it, so they stay crisp.
+- **Boards and surround**: CC0 concrete (surround) and painted-metal (boards: only its normal and roughness, under a flat muted dark blue-grey with a white cap on top) sets, projected in world metres. The board's inner face is still the simulation's wall.
+- **Cage** (`game/cage_net.gdshader`): on every wall from the board top (`arena.board_height`) up to `Pitch.Ceiling`, a diamond-mesh net with about 10 cm cells, a thin post every 4 m and a rail at ceiling height; over the goal mouth the net starts above the crossbar; there is no roof net. Strands are kept at least a pixel wide and melt into an even veil in the distance so they do not shimmer. Wherever a wall faces the camera (the near, +Z side) its net and posts fade to a few percent opacity so they never hide play. The goal net uses the same material.
+- **Sky and light** (`Match.MakeEnvironment`): a 1K CC0 overcast HDRI as the sky, background and ambient light, ACES tonemapping, subtle SSAO and a little glow, plus the sun and its shadows.
+- **Ball** (`game/ball_pattern.gdshader`, `BallView`): twelve dark pentagons on white, found by angle to the icosahedron's vertices; the mesh turns with `Ball.Spin`, integrated every rendered frame.
+- **Shot trail** (`game/BallTrail.cs`, `game/ball_trail.gdshader`): a strike starts a camera-facing smoke ribbon through the ball's recent positions when the ball leaves faster than 12 m/s; its width, length and opacity grow with speed up to 30 m/s. A save, frame hit, board hit, goal or bounce, a ball under 8 m/s, or 1 s after the strike stops it, and the rest fades over 0.3 s. Touches never start one. The constants are at the top of `BallTrail.cs`.
+
+Assets and their sources are listed in `game/assets/textures/SOURCES.md`.
