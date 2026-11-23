@@ -37,7 +37,7 @@ public static class ReportText
             var s = r.Shots[^1];
             lines.Add($"Aimed: {Spot(s.Aimed.X, s.Aimed.Y)}");
             lines.Add(float.IsNaN(s.Landed.X) ? "Went: never reached the goal line" : $"Went: {Spot(s.Landed.X, s.Landed.Y)}");
-            lines.Add($"Shot {F(s.Speed * 3.6f, 0)} km/h, {Spread(s)}");
+            lines.Add($"Shot {F(s.Speed * 3.6f, 0)} km/h{(s.Flick ? ", a flick" : s.FirstTime ? ", first time" : "")}, {Spread(s)}");
             var k = r.Keeper;
             lines.Add(float.IsNaN(k.ReactionS)
                 ? "Keeper: no dive needed"

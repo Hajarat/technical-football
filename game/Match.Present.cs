@@ -323,7 +323,7 @@ public partial class Match
         _hasStrike = false; _shotId = int.MinValue;
         Trail.Clear();
         _shotsSeen = 0;
-        Overlay.ClearWedge(); Overlay.ClearAimed(); Overlay.ClearLanded(); Overlay.ClearKeeperReach();
+        Overlay.ClearWedge(); Overlay.ClearAimed(); Overlay.ClearLanded(); Overlay.ClearKeeperReach(); Overlay.ClearLockOn();
         Hud.HideReport();
         Hud.SetPower(0); Hud.SetIdealMarker(0, false);
         _strikeTicks = 0; _touchCount = 0;
@@ -406,10 +406,30 @@ public partial class Match
         Hud.SetSpotLine($"Round {_round}  ·  {sc.Name}  ·  {World.Attacker.Sheet.Name} vs {World.Keeper.Sheet.Name}{defender}{hint}");
     }
 
+    readonly System.Collections.Generic.List<Vector3> _forecastPoints = new();
+
+    /// <summary>The lock-on on the overlay: the loose ball's forecast path from now on and each team's meeting ring.</summary>
+    void UpdateLockOnOverlay()
+    {
+        var w = World;
+        var f = w.Forecast;
+        if (!Overlay.Enabled || !f.Valid || w.State is not (RoundState.Live or RoundState.Strike)) { Overlay.ClearLockOn(); return; }
+        _forecastPoints.Clear();
+        int last = f.RestIndex >= 0 ? f.StartTick + f.RestIndex : f.LastTick;
+        for (int tick = Math.Max(w.Tick, f.StartTick); tick <= last; tick += 6) _forecastPoints.Add(G(f.PositionAt(tick)));
+        Overlay.SetForecastPath(_forecastPoints);
+        for (int team = 0; team < 2; team++)
+        {
+            var c = w.Claims[team];
+            if (c.Player != null) Overlay.SetMeeting(team, G(c.Point)); else Overlay.ClearMeeting(team);
+        }
+    }
+
     void UpdateOverlay()
     {
         var w = World;
         float gx = w.Pitch.GoalLineX;
+        UpdateLockOnOverlay();
         if (w.Shots.Count > 0 && _hasStrike)
         {
             var s = w.Shots[^1];

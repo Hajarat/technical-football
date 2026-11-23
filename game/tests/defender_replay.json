@@ -4,7 +4,7 @@
   "attacker_id": "striker_a",
   "keeper_id": "the_wall",
   "scenario_id": "defender_duel",
-  "tuning_hash": "bf3939a6d7f722e8",
+  "tuning_hash": "c383482ce78cbaf2",
   "defender_id": "centre_back",
   "defending_hash": "651451be4530be0e",
   "players_per_tick": 3,
@@ -5038,8 +5038,8 @@
       "knock": false
     },
     {
-      "mx": -0.54984254,
-      "mz": 0.8352683,
+      "mx": -0.5498425,
+      "mz": 0.83526826,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5068,8 +5068,8 @@
       "knock": false
     },
     {
-      "mx": -0.5516256,
-      "mz": 0.83409184,
+      "mx": -0.55162555,
+      "mz": 0.8340918,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5188,8 +5188,8 @@
       "knock": false
     },
     {
-      "mx": -0.5598699,
-      "mz": 0.82858056,
+      "mx": -0.5598698,
+      "mz": 0.8285805,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5338,8 +5338,8 @@
       "knock": false
     },
     {
-      "mx": -0.58628535,
-      "mz": 0.8101046,
+      "mx": -0.5862853,
+      "mz": 0.81010455,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5428,8 +5428,8 @@
       "knock": false
     },
     {
-      "mx": -0.6170358,
-      "mz": 0.78693503,
+      "mx": -0.61703575,
+      "mz": 0.786935,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5458,8 +5458,8 @@
       "knock": false
     },
     {
-      "mx": -0.6302197,
-      "mz": 0.7764169,
+      "mx": -0.63021964,
+      "mz": 0.7764168,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5668,8 +5668,8 @@
       "knock": false
     },
     {
-      "mx": -0.76724464,
-      "mz": 0.64135456,
+      "mx": -0.7672446,
+      "mz": 0.6413545,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5788,8 +5788,8 @@
       "knock": false
     },
     {
-      "mx": -0.8722917,
-      "mz": 0.4889859,
+      "mx": -0.8722916,
+      "mz": 0.48898587,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5908,8 +5908,8 @@
       "knock": false
     },
     {
-      "mx": -0.95240647,
-      "mz": 0.30483103,
+      "mx": -0.9519576,
+      "mz": 0.3062299,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5938,8 +5938,8 @@
       "knock": false
     },
     {
-      "mx": -0.9524784,
-      "mz": 0.30460602,
+      "mx": -0.9519655,
+      "mz": 0.3062052,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5968,8 +5968,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525491,
-      "mz": 0.30438507,
+      "mx": -0.9519719,
+      "mz": 0.3061854,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5978,8 +5978,8 @@
       "knock": false
     },
     {
-      "mx": 0.07187036,
-      "mz": 0.997414,
+      "mx": 0.07186376,
+      "mz": 0.99741447,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -5998,8 +5998,8 @@
       "knock": false
     },
     {
-      "mx": -0.95261014,
-      "mz": 0.3041938,
+      "mx": -0.9519684,
+      "mz": 0.3061965,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6008,8 +6008,8 @@
       "knock": false
     },
     {
-      "mx": 0.02445143,
-      "mz": 0.999701,
+      "mx": 0.02443356,
+      "mz": 0.99970144,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6028,8 +6028,8 @@
       "knock": false
     },
     {
-      "mx": -0.95265394,
-      "mz": 0.30405664,
+      "mx": -0.9519459,
+      "mz": 0.30626616,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6038,8 +6038,8 @@
       "knock": false
     },
     {
-      "mx": -0.022866473,
-      "mz": 0.9997385,
+      "mx": -0.02290163,
+      "mz": 0.99973774,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6058,8 +6058,8 @@
       "knock": false
     },
     {
-      "mx": -0.9526739,
-      "mz": 0.30399394,
+      "mx": -0.9518969,
+      "mz": 0.30641863,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6068,8 +6068,8 @@
       "knock": false
     },
     {
-      "mx": -0.069753036,
-      "mz": 0.99756426,
+      "mx": -0.06980881,
+      "mz": 0.9975604,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6088,8 +6088,8 @@
       "knock": false
     },
     {
-      "mx": -0.95266527,
-      "mz": 0.3040211,
+      "mx": -0.95181483,
+      "mz": 0.30667338,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6098,8 +6098,8 @@
       "knock": false
     },
     {
-      "mx": -0.115766995,
-      "mz": 0.9932764,
+      "mx": -0.115826555,
+      "mz": 0.9932695,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6118,8 +6118,8 @@
       "knock": false
     },
     {
-      "mx": -0.95262814,
-      "mz": 0.30413762,
+      "mx": -0.95169985,
+      "mz": 0.30703014,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6128,8 +6128,8 @@
       "knock": false
     },
     {
-      "mx": -0.15967909,
-      "mz": 0.98716897,
+      "mx": -0.15974171,
+      "mz": 0.98715883,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6148,8 +6148,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525989,
-      "mz": 0.30422902,
+      "mx": -0.9515917,
+      "mz": 0.30736506,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6158,8 +6158,8 @@
       "knock": false
     },
     {
-      "mx": -0.20139812,
-      "mz": 0.9795094,
+      "mx": -0.20146318,
+      "mz": 0.97949606,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6178,8 +6178,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525764,
-      "mz": 0.30429947,
+      "mx": -0.9515648,
+      "mz": 0.3074482,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6188,8 +6188,8 @@
       "knock": false
     },
     {
-      "mx": -0.24088027,
-      "mz": 0.9705549,
+      "mx": -0.24094708,
+      "mz": 0.97053826,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6208,8 +6208,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525595,
-      "mz": 0.30435252,
+      "mx": -0.9514693,
+      "mz": 0.30774364,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6218,8 +6218,8 @@
       "knock": false
     },
     {
-      "mx": -0.27812123,
-      "mz": 0.96054596,
+      "mx": -0.27818927,
+      "mz": 0.9605263,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6238,8 +6238,8 @@
       "knock": false
     },
     {
-      "mx": -0.95254713,
-      "mz": 0.3043911,
+      "mx": -0.9513771,
+      "mz": 0.30802882,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6248,8 +6248,8 @@
       "knock": false
     },
     {
-      "mx": -0.3131564,
-      "mz": 0.9497016,
+      "mx": -0.31322506,
+      "mz": 0.94967896,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6268,8 +6268,8 @@
       "knock": false
     },
     {
-      "mx": -0.95253867,
-      "mz": 0.30441773,
+      "mx": -0.95128703,
+      "mz": 0.3083066,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6278,8 +6278,8 @@
       "knock": false
     },
     {
-      "mx": -0.34604216,
-      "mz": 0.93821895,
+      "mx": -0.34611118,
+      "mz": 0.93819356,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6298,8 +6298,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525333,
-      "mz": 0.3044345,
+      "mx": -0.9511985,
+      "mz": 0.30857956,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6308,8 +6308,8 @@
       "knock": false
     },
     {
-      "mx": -0.37685814,
-      "mz": 0.926271,
+      "mx": -0.37692705,
+      "mz": 0.92624295,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6328,8 +6328,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525305,
-      "mz": 0.30444324,
+      "mx": -0.9511108,
+      "mz": 0.30885017,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6338,8 +6338,8 @@
       "knock": false
     },
     {
-      "mx": -0.40569583,
-      "mz": 0.9140081,
+      "mx": -0.4057643,
+      "mz": 0.91397774,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6358,8 +6358,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525298,
-      "mz": 0.3044455,
+      "mx": -0.951023,
+      "mz": 0.3091203,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6368,8 +6368,8 @@
       "knock": false
     },
     {
-      "mx": -0.4326569,
-      "mz": 0.90155864,
+      "mx": -0.4327247,
+      "mz": 0.90152615,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6388,8 +6388,8 @@
       "knock": false
     },
     {
-      "mx": -0.95253074,
-      "mz": 0.30444255,
+      "mx": -0.95093465,
+      "mz": 0.30939192,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6398,8 +6398,8 @@
       "knock": false
     },
     {
-      "mx": -0.4578494,
-      "mz": 0.8890297,
+      "mx": -0.45791638,
+      "mz": 0.8889953,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6418,8 +6418,8 @@
       "knock": false
     },
     {
-      "mx": -0.95253295,
-      "mz": 0.3044355,
+      "mx": -0.95084506,
+      "mz": 0.30966684,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6428,8 +6428,8 @@
       "knock": false
     },
     {
-      "mx": -0.481382,
-      "mz": 0.87651086,
+      "mx": -0.4814479,
+      "mz": 0.8764747,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6448,8 +6448,8 @@
       "knock": false
     },
     {
-      "mx": -0.95253617,
-      "mz": 0.3044254,
+      "mx": -0.9507539,
+      "mz": 0.3099468,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6458,8 +6458,8 @@
       "knock": false
     },
     {
-      "mx": -0.50336105,
-      "mz": 0.86407626,
+      "mx": -0.5034257,
+      "mz": 0.86403847,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6478,8 +6478,8 @@
       "knock": false
     },
     {
-      "mx": -0.95254016,
-      "mz": 0.3044128,
+      "mx": -0.95066047,
+      "mz": 0.31023332,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6488,8 +6488,8 @@
       "knock": false
     },
     {
-      "mx": -0.52389234,
-      "mz": 0.85178447,
+      "mx": -0.5239552,
+      "mz": 0.8517458,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6508,8 +6508,8 @@
       "knock": false
     },
     {
-      "mx": -0.95254475,
-      "mz": 0.30439863,
+      "mx": -0.95056427,
+      "mz": 0.3105281,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6518,8 +6518,8 @@
       "knock": false
     },
     {
-      "mx": -0.5431081,
-      "mz": 0.83966285,
+      "mx": -0.5431995,
+      "mz": 0.8396037,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6538,8 +6538,8 @@
       "knock": false
     },
     {
-      "mx": -0.95254964,
-      "mz": 0.30438337,
+      "mx": -0.95046467,
+      "mz": 0.31083262,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6548,8 +6548,8 @@
       "knock": false
     },
     {
-      "mx": -0.5610877,
-      "mz": 0.8277563,
+      "mx": -0.5612496,
+      "mz": 0.82764655,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6568,8 +6568,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525547,
-      "mz": 0.30436748,
+      "mx": -0.95036125,
+      "mz": 0.31114864,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6578,8 +6578,8 @@
       "knock": false
     },
     {
-      "mx": -0.5779058,
-      "mz": 0.8161036,
+      "mx": -0.5781918,
+      "mz": 0.8159008,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6598,8 +6598,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525598,
-      "mz": 0.30435148,
+      "mx": -0.9502534,
+      "mz": 0.31147775,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6608,8 +6608,8 @@
       "knock": false
     },
     {
-      "mx": -0.59363157,
-      "mz": 0.804737,
+      "mx": -0.5941066,
+      "mz": 0.8043864,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6628,8 +6628,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525649,
-      "mz": 0.30433565,
+      "mx": -0.94542104,
+      "mz": 0.31027284,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6638,8 +6638,8 @@
       "knock": false
     },
     {
-      "mx": -0.60832983,
-      "mz": 0.7936843,
+      "mx": -0.6090692,
+      "mz": 0.7931171,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6658,8 +6658,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525698,
-      "mz": 0.3043204,
+      "mx": -0.93854415,
+      "mz": 0.30841076,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6668,8 +6668,8 @@
       "knock": false
     },
     {
-      "mx": -0.6220596,
-      "mz": 0.7829699,
+      "mx": -0.6230768,
+      "mz": 0.78216064,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6688,8 +6688,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525744,
-      "mz": 0.3043058,
+      "mx": -0.9315234,
+      "mz": 0.30651602,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6698,8 +6698,8 @@
       "knock": false
     },
     {
-      "mx": -0.63487434,
-      "mz": 0.77261543,
+      "mx": -0.63618284,
+      "mz": 0.7715383,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6718,8 +6718,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525787,
-      "mz": 0.30429232,
+      "mx": -0.9243512,
+      "mz": 0.3045881,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6728,8 +6728,8 @@
       "knock": false
     },
     {
-      "mx": -0.6468267,
-      "mz": 0.7626371,
+      "mx": -0.6484366,
+      "mz": 0.7612687,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6748,8 +6748,8 @@
       "knock": false
     },
     {
-      "mx": -0.95258266,
-      "mz": 0.30428007,
+      "mx": -0.91701984,
+      "mz": 0.3026262,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6758,8 +6758,8 @@
       "knock": false
     },
     {
-      "mx": -0.65796125,
-      "mz": 0.7530518,
+      "mx": -0.6598824,
+      "mz": 0.7513688,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6778,8 +6778,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525861,
-      "mz": 0.30426916,
+      "mx": -0.90952045,
+      "mz": 0.30062944,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6788,8 +6788,8 @@
       "knock": false
     },
     {
-      "mx": -0.66832054,
-      "mz": 0.74387336,
+      "mx": -0.6705615,
+      "mz": 0.74185395,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6808,8 +6808,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525891,
-      "mz": 0.30425987,
+      "mx": -0.90184313,
+      "mz": 0.29859716,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6818,8 +6818,8 @@
       "knock": false
     },
     {
-      "mx": -0.67794275,
-      "mz": 0.7351147,
+      "mx": -0.6805108,
+      "mz": 0.73273796,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6838,8 +6838,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525915,
-      "mz": 0.3042523,
+      "mx": -0.89397687,
+      "mz": 0.29652825,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6848,8 +6848,8 @@
       "knock": false
     },
     {
-      "mx": -0.68686444,
-      "mz": 0.7267856,
+      "mx": -0.68976593,
+      "mz": 0.72403234,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6868,8 +6868,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525933,
-      "mz": 0.30424654,
+      "mx": -0.8859094,
+      "mz": 0.29442167,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6878,8 +6878,8 @@
       "knock": false
     },
     {
-      "mx": -0.69511807,
-      "mz": 0.7188956,
+      "mx": -0.69835883,
+      "mz": 0.7157479,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6898,8 +6898,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525946,
-      "mz": 0.30424282,
+      "mx": -0.87762684,
+      "mz": 0.29227656,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6908,8 +6908,8 @@
       "knock": false
     },
     {
-      "mx": -0.7027339,
-      "mz": 0.7114528,
+      "mx": -0.70631886,
+      "mz": 0.70789385,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6928,8 +6928,8 @@
       "knock": false
     },
     {
-      "mx": -0.95259506,
-      "mz": 0.30424106,
+      "mx": -0.86911345,
+      "mz": 0.29009184,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6938,8 +6938,8 @@
       "knock": false
     },
     {
-      "mx": -0.70974004,
-      "mz": 0.7044637,
+      "mx": -0.71367353,
+      "mz": 0.7004785,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6958,8 +6958,8 @@
       "knock": false
     },
     {
-      "mx": -0.95259494,
-      "mz": 0.30424166,
+      "mx": -0.8603513,
+      "mz": 0.2878663,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6968,8 +6968,8 @@
       "knock": false
     },
     {
-      "mx": -0.71618617,
-      "mz": 0.6979094,
+      "mx": -0.72044814,
+      "mz": 0.6935088,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6988,8 +6988,8 @@
       "knock": false
     },
     {
-      "mx": -0.952594,
-      "mz": 0.30424446,
+      "mx": -0.85131973,
+      "mz": 0.28559905,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -6998,8 +6998,8 @@
       "knock": false
     },
     {
-      "mx": -0.7221283,
-      "mz": 0.6917591,
+      "mx": -0.7266826,
+      "mz": 0.6869734,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7018,8 +7018,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525924,
-      "mz": 0.3042497,
+      "mx": -0.8419944,
+      "mz": 0.2832892,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7028,8 +7028,8 @@
       "knock": false
     },
     {
-      "mx": -0.72761655,
-      "mz": 0.68598413,
+      "mx": -0.7324334,
+      "mz": 0.6808387,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7048,8 +7048,8 @@
       "knock": false
     },
     {
-      "mx": -0.95258987,
-      "mz": 0.30425742,
+      "mx": -0.8323476,
+      "mz": 0.28093597,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7058,8 +7058,8 @@
       "knock": false
     },
     {
-      "mx": -0.73269475,
-      "mz": 0.6805574,
+      "mx": -0.73775005,
+      "mz": 0.6750739,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7078,8 +7078,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525866,
-      "mz": 0.30426776,
+      "mx": -0.8223458,
+      "mz": 0.27853903,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7088,8 +7088,8 @@
       "knock": false
     },
     {
-      "mx": -0.73740184,
-      "mz": 0.6754543,
+      "mx": -0.74267584,
+      "mz": 0.66965115,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7108,8 +7108,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525824,
-      "mz": 0.30428076,
+      "mx": -0.81194913,
+      "mz": 0.27609858,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7118,8 +7118,8 @@
       "knock": false
     },
     {
-      "mx": -0.74177206,
-      "mz": 0.6706521,
+      "mx": -0.74724954,
+      "mz": 0.66454357,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7138,8 +7138,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525773,
-      "mz": 0.3042966,
+      "mx": -0.8011094,
+      "mz": 0.27361566,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7148,8 +7148,8 @@
       "knock": false
     },
     {
-      "mx": -0.7458359,
-      "mz": 0.66612977,
+      "mx": -0.75150394,
+      "mz": 0.6597286,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7168,8 +7168,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525713,
-      "mz": 0.30431536,
+      "mx": -0.7897668,
+      "mz": 0.27109262,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7178,8 +7178,8 @@
       "knock": false
     },
     {
-      "mx": -0.7496199,
-      "mz": 0.66186863,
+      "mx": -0.75546896,
+      "mz": 0.6551844,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7198,8 +7198,8 @@
       "knock": false
     },
     {
-      "mx": -0.9525644,
-      "mz": 0.30433717,
+      "mx": -0.78254163,
+      "mz": 0.2685205,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7208,8 +7208,8 @@
       "knock": false
     },
     {
-      "mx": -0.75314784,
-      "mz": 0.6578513,
+      "mx": -0.75917083,
+      "mz": 0.6508915,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7228,8 +7228,8 @@
       "knock": false
     },
     {
-      "mx": -0.95255643,
-      "mz": 0.30436203,
+      "mx": -0.7752143,
+      "mz": 0.2659024,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7238,8 +7238,8 @@
       "knock": false
     },
     {
-      "mx": -0.756441,
-      "mz": 0.65406185,
+      "mx": -0.76263267,
+      "mz": 0.6468318,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7258,8 +7258,8 @@
       "knock": false
     },
     {
-      "mx": -0.9481349,
-      "mz": 0.3029802,
+      "mx": -0.76778,
+      "mz": 0.26324028,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7268,8 +7268,8 @@
       "knock": false
     },
     {
-      "mx": -0.759518,
-      "mz": 0.65048623,
+      "mx": -0.76587486,
+      "mz": 0.6429897,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7288,8 +7288,8 @@
       "knock": false
     },
     {
-      "mx": -0.9408761,
-      "mz": 0.30069503,
+      "mx": -0.76023394,
+      "mz": 0.26053557,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7298,8 +7298,8 @@
       "knock": false
     },
     {
-      "mx": -0.7623954,
-      "mz": 0.6471115,
+      "mx": -0.7689151,
+      "mz": 0.6393509,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7318,8 +7318,8 @@
       "knock": false
     },
     {
-      "mx": -0.93354034,
-      "mz": 0.2983885,
+      "mx": -0.75257087,
+      "mz": 0.2577894,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7328,8 +7328,8 @@
       "knock": false
     },
     {
-      "mx": -0.76508796,
-      "mz": 0.6439257,
+      "mx": -0.7717697,
+      "mz": 0.6359021,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7348,8 +7348,8 @@
       "knock": false
     },
     {
-      "mx": -0.92612684,
-      "mz": 0.2960604,
+      "mx": -0.7447853,
+      "mz": 0.25500238,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7358,8 +7358,8 @@
       "knock": false
     },
     {
-      "mx": -0.7676088,
-      "mz": 0.6409186,
+      "mx": -0.7744528,
+      "mz": 0.63263166,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7378,8 +7378,8 @@
       "knock": false
     },
     {
-      "mx": -0.9186341,
-      "mz": 0.29371035,
+      "mx": -0.736871,
+      "mz": 0.25217482,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7388,8 +7388,8 @@
       "knock": false
     },
     {
-      "mx": -0.7699698,
-      "mz": 0.6380803,
+      "mx": -0.7769771,
+      "mz": 0.6295288,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7408,8 +7408,8 @@
       "knock": false
     },
     {
-      "mx": -0.91106117,
-      "mz": 0.29133806,
+      "mx": -0.7288218,
+      "mz": 0.24930657,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7418,8 +7418,8 @@
       "knock": false
     },
     {
-      "mx": -0.77218145,
-      "mz": 0.6354021,
+      "mx": -0.77935386,
+      "mz": 0.62658405,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7438,8 +7438,8 @@
       "knock": false
     },
     {
-      "mx": -0.9034068,
-      "mz": 0.28894317,
+      "mx": -0.7206303,
+      "mz": 0.24639733,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7448,8 +7448,8 @@
       "knock": false
     },
     {
-      "mx": -0.7742546,
-      "mz": 0.6328742,
+      "mx": -0.7815941,
+      "mz": 0.62378734,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7468,8 +7468,8 @@
       "knock": false
     },
     {
-      "mx": -0.8958459,
-      "mz": 0.2865739,
+      "mx": -0.7124276,
+      "mz": 0.24348643,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7478,8 +7478,8 @@
       "knock": false
     },
     {
-      "mx": -0.77622014,
-      "mz": 0.63046205,
+      "mx": -0.783729,
+      "mz": 0.6211029,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7498,8 +7498,8 @@
       "knock": false
     },
     {
-      "mx": -0.8915764,
-      "mz": 0.28511265,
+      "mx": -0.7067295,
+      "mz": 0.24129923,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7508,8 +7508,8 @@
       "knock": false
     },
     {
-      "mx": -0.77808434,
-      "mz": 0.6281599,
+      "mx": -0.78576535,
+      "mz": 0.6185247,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7528,8 +7528,8 @@
       "knock": false
     },
     {
-      "mx": -0.88726157,
-      "mz": 0.28363702,
+      "mx": -0.7009158,
+      "mz": 0.23907568,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7538,8 +7538,8 @@
       "knock": false
     },
     {
-      "mx": -0.779853,
-      "mz": 0.62596273,
+      "mx": -0.78770936,
+      "mz": 0.616047,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7558,8 +7558,8 @@
       "knock": false
     },
     {
-      "mx": -0.8829009,
-      "mz": 0.28214696,
+      "mx": -0.69497824,
+      "mz": 0.23681517,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7568,8 +7568,8 @@
       "knock": false
     },
     {
-      "mx": -0.7815309,
-      "mz": 0.62386656,
+      "mx": -0.7895669,
+      "mz": 0.6136645,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7588,8 +7588,8 @@
       "knock": false
     },
     {
-      "mx": -0.8784937,
-      "mz": 0.28064257,
+      "mx": -0.68890786,
+      "mz": 0.23451683,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7598,8 +7598,8 @@
       "knock": false
     },
     {
-      "mx": -0.7788234,
-      "mz": 0.6272433,
+      "mx": -0.78722835,
+      "mz": 0.6166616,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7628,8 +7628,8 @@
       "knock": false
     },
     {
-      "mx": -0.78049016,
-      "mz": 0.6251681,
+      "mx": -0.7890757,
+      "mz": 0.614296,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7658,8 +7658,8 @@
       "knock": false
     },
     {
-      "mx": -0.78216445,
-      "mz": 0.6230721,
+      "mx": -0.7909237,
+      "mz": 0.61191475,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7688,8 +7688,8 @@
       "knock": false
     },
     {
-      "mx": -0.78384495,
-      "mz": 0.62095654,
+      "mx": -0.7927715,
+      "mz": 0.60951895,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7718,8 +7718,8 @@
       "knock": false
     },
     {
-      "mx": -0.7855303,
-      "mz": 0.6188232,
+      "mx": -0.7946174,
+      "mz": 0.6071105,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7748,8 +7748,8 @@
       "knock": false
     },
     {
-      "mx": -0.7872191,
-      "mz": 0.61667335,
+      "mx": -0.7964604,
+      "mz": 0.6046908,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7778,8 +7778,8 @@
       "knock": false
     },
     {
-      "mx": -0.78891,
-      "mz": 0.61450875,
+      "mx": -0.7982991,
+      "mz": 0.6022613,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7808,8 +7808,8 @@
       "knock": false
     },
     {
-      "mx": -0.79060185,
-      "mz": 0.6123307,
+      "mx": -0.8001325,
+      "mz": 0.5998233,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7838,8 +7838,8 @@
       "knock": false
     },
     {
-      "mx": -0.7922934,
-      "mz": 0.61014026,
+      "mx": -0.80195934,
+      "mz": 0.5973786,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7868,8 +7868,8 @@
       "knock": false
     },
     {
-      "mx": -0.7939836,
-      "mz": 0.60793924,
+      "mx": -0.80377877,
+      "mz": 0.5949284,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7898,8 +7898,8 @@
       "knock": false
     },
     {
-      "mx": -0.79567116,
-      "mz": 0.60572875,
+      "mx": -0.8055895,
+      "mz": 0.5924741,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7928,8 +7928,8 @@
       "knock": false
     },
     {
-      "mx": -0.79735523,
-      "mz": 0.60351026,
+      "mx": -0.8073908,
+      "mz": 0.5900171,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7958,8 +7958,8 @@
       "knock": false
     },
     {
-      "mx": -0.7990349,
-      "mz": 0.60128456,
+      "mx": -0.80918187,
+      "mz": 0.58755827,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -7988,8 +7988,8 @@
       "knock": false
     },
     {
-      "mx": -0.800709,
-      "mz": 0.59905344,
+      "mx": -0.81096154,
+      "mz": 0.58509946,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8018,8 +8018,8 @@
       "knock": false
     },
     {
-      "mx": -0.8023767,
-      "mz": 0.59681803,
+      "mx": -0.8127292,
+      "mz": 0.58264154,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8048,8 +8048,8 @@
       "knock": false
     },
     {
-      "mx": -0.80403703,
-      "mz": 0.5945792,
+      "mx": -0.81448424,
+      "mz": 0.58018583,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8078,8 +8078,8 @@
       "knock": false
     },
     {
-      "mx": -0.8056893,
-      "mz": 0.5923383,
+      "mx": -0.81622565,
+      "mz": 0.5777333,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8108,8 +8108,8 @@
       "knock": false
     },
     {
-      "mx": -0.8073327,
-      "mz": 0.5900964,
+      "mx": -0.81795305,
+      "mz": 0.575285,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8138,8 +8138,8 @@
       "knock": false
     },
     {
-      "mx": -0.8089668,
-      "mz": 0.5878544,
+      "mx": -0.81966585,
+      "mz": 0.57284194,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8168,8 +8168,8 @@
       "knock": false
     },
     {
-      "mx": -0.81059045,
-      "mz": 0.5856135,
+      "mx": -0.82136333,
+      "mz": 0.5704055,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8198,8 +8198,8 @@
       "knock": false
     },
     {
-      "mx": -0.81220317,
-      "mz": 0.5833746,
+      "mx": -0.82304496,
+      "mz": 0.5679763,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8228,8 +8228,8 @@
       "knock": false
     },
     {
-      "mx": -0.81380445,
-      "mz": 0.58113885,
+      "mx": -0.82471037,
+      "mz": 0.5655554,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8258,8 +8258,8 @@
       "knock": false
     },
     {
-      "mx": -0.81539357,
-      "mz": 0.57890683,
+      "mx": -0.82635915,
+      "mz": 0.5631436,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8288,8 +8288,8 @@
       "knock": false
     },
     {
-      "mx": -0.8169703,
-      "mz": 0.57667965,
+      "mx": -0.82799083,
+      "mz": 0.56074166,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8318,8 +8318,8 @@
       "knock": false
     },
     {
-      "mx": -0.818534,
-      "mz": 0.57445806,
+      "mx": -0.82960504,
+      "mz": 0.5583506,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8348,8 +8348,8 @@
       "knock": false
     },
     {
-      "mx": -0.82008415,
-      "mz": 0.5722429,
+      "mx": -0.83120155,
+      "mz": 0.5559712,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8378,8 +8378,8 @@
       "knock": false
     },
     {
-      "mx": -0.8216204,
-      "mz": 0.57003486,
+      "mx": -0.8327801,
+      "mz": 0.55360395,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8408,8 +8408,8 @@
       "knock": false
     },
     {
-      "mx": -0.82314247,
-      "mz": 0.56783485,
+      "mx": -0.83434033,
+      "mz": 0.5512497,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8438,8 +8438,8 @@
       "knock": false
     },
     {
-      "mx": -0.82464993,
-      "mz": 0.56564355,
+      "mx": -0.8358821,
+      "mz": 0.548909,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8468,8 +8468,8 @@
       "knock": false
     },
     {
-      "mx": -0.82614243,
-      "mz": 0.5634613,
+      "mx": -0.83740515,
+      "mz": 0.5465825,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8498,8 +8498,8 @@
       "knock": false
     },
     {
-      "mx": -0.8276198,
-      "mz": 0.56128925,
+      "mx": -0.8389095,
+      "mz": 0.54427093,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8528,8 +8528,8 @@
       "knock": false
     },
     {
-      "mx": -0.8290816,
-      "mz": 0.55912757,
+      "mx": -0.8403948,
+      "mz": 0.5419747,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8558,8 +8558,8 @@
       "knock": false
     },
     {
-      "mx": -0.83052784,
-      "mz": 0.55697715,
+      "mx": -0.841861,
+      "mz": 0.5396944,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8588,8 +8588,8 @@
       "knock": false
     },
     {
-      "mx": -0.8319582,
-      "mz": 0.5548384,
+      "mx": -0.8433081,
+      "mz": 0.5374306,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8618,8 +8618,8 @@
       "knock": false
     },
     {
-      "mx": -0.83337253,
-      "mz": 0.55271184,
+      "mx": -0.8447359,
+      "mz": 0.53518337,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8648,8 +8648,8 @@
       "knock": false
     },
     {
-      "mx": -0.8347707,
-      "mz": 0.55059785,
+      "mx": -0.8461446,
+      "mz": 0.53295344,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8678,8 +8678,8 @@
       "knock": false
     },
     {
-      "mx": -0.83615243,
-      "mz": 0.5484971,
+      "mx": -0.847534,
+      "mz": 0.5307411,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8708,8 +8708,8 @@
       "knock": false
     },
     {
-      "mx": -0.83751786,
-      "mz": 0.54640996,
+      "mx": -0.8489042,
+      "mz": 0.52854675,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8738,8 +8738,8 @@
       "knock": false
     },
     {
-      "mx": -0.8388668,
-      "mz": 0.54433674,
+      "mx": -0.85025525,
+      "mz": 0.52637064,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8768,8 +8768,8 @@
       "knock": false
     },
     {
-      "mx": -0.84019923,
-      "mz": 0.54227775,
+      "mx": -0.8515871,
+      "mz": 0.524213,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8798,8 +8798,8 @@
       "knock": false
     },
     {
-      "mx": -0.8415151,
-      "mz": 0.5402335,
+      "mx": -0.8528999,
+      "mz": 0.52207434,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8828,8 +8828,8 @@
       "knock": false
     },
     {
-      "mx": -0.8428144,
-      "mz": 0.5382043,
+      "mx": -0.85419375,
+      "mz": 0.51995486,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8858,8 +8858,8 @@
       "knock": false
     },
     {
-      "mx": -0.844097,
-      "mz": 0.53619045,
+      "mx": -0.8554686,
+      "mz": 0.51785475,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8888,8 +8888,8 @@
       "knock": false
     },
     {
-      "mx": -0.8453631,
-      "mz": 0.5341922,
+      "mx": -0.85672456,
+      "mz": 0.51577413,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8918,8 +8918,8 @@
       "knock": false
     },
     {
-      "mx": -0.8466126,
-      "mz": 0.53220963,
+      "mx": -0.857962,
+      "mz": 0.5137132,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8948,8 +8948,8 @@
       "knock": false
     },
     {
-      "mx": -0.8478455,
-      "mz": 0.5302432,
+      "mx": -0.85918087,
+      "mz": 0.511672,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -8978,8 +8978,8 @@
       "knock": false
     },
     {
-      "mx": -0.8490621,
-      "mz": 0.5282932,
+      "mx": -0.86038125,
+      "mz": 0.5096511,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9008,8 +9008,8 @@
       "knock": false
     },
     {
-      "mx": -0.85026217,
-      "mz": 0.5263595,
+      "mx": -0.8615634,
+      "mz": 0.5076501,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9038,8 +9038,8 @@
       "knock": false
     },
     {
-      "mx": -0.8514458,
-      "mz": 0.5244426,
+      "mx": -0.86272734,
+      "mz": 0.5056695,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9068,8 +9068,8 @@
       "knock": false
     },
     {
-      "mx": -0.8526133,
-      "mz": 0.5225425,
+      "mx": -0.86387336,
+      "mz": 0.50370896,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9098,8 +9098,8 @@
       "knock": false
     },
     {
-      "mx": -0.8537646,
-      "mz": 0.5206592,
+      "mx": -0.8650017,
+      "mz": 0.5017689,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9128,8 +9128,8 @@
       "knock": false
     },
     {
-      "mx": -0.85489976,
-      "mz": 0.51879317,
+      "mx": -0.8661124,
+      "mz": 0.49984923,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9158,8 +9158,8 @@
       "knock": false
     },
     {
-      "mx": -0.856019,
-      "mz": 0.5169442,
+      "mx": -0.86720574,
+      "mz": 0.49794993,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9188,8 +9188,8 @@
       "knock": false
     },
     {
-      "mx": -0.8571226,
-      "mz": 0.51511246,
+      "mx": -0.8682819,
+      "mz": 0.49607113,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9218,8 +9218,8 @@
       "knock": false
     },
     {
-      "mx": -0.8582104,
-      "mz": 0.51329815,
+      "mx": -0.8693411,
+      "mz": 0.49421275,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9248,8 +9248,8 @@
       "knock": false
     },
     {
-      "mx": -0.8592827,
-      "mz": 0.5115011,
+      "mx": -0.8703834,
+      "mz": 0.49237463,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9278,8 +9278,8 @@
       "knock": false
     },
     {
-      "mx": -0.86033946,
-      "mz": 0.5097216,
+      "mx": -0.8714091,
+      "mz": 0.49055696,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9308,8 +9308,8 @@
       "knock": false
     },
     {
-      "mx": -0.86138093,
-      "mz": 0.5079595,
+      "mx": -0.87241846,
+      "mz": 0.48875967,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9338,8 +9338,8 @@
       "knock": false
     },
     {
-      "mx": -0.8624074,
-      "mz": 0.5062149,
+      "mx": -0.8734117,
+      "mz": 0.48698264,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9368,8 +9368,8 @@
       "knock": false
     },
     {
-      "mx": -0.8634188,
-      "mz": 0.5044878,
+      "mx": -0.8743889,
+      "mz": 0.4852258,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9398,8 +9398,8 @@
       "knock": false
     },
     {
-      "mx": -0.8644154,
-      "mz": 0.5027782,
+      "mx": -0.87535036,
+      "mz": 0.48348907,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9428,8 +9428,8 @@
       "knock": false
     },
     {
-      "mx": -0.86539745,
-      "mz": 0.50108606,
+      "mx": -0.87629634,
+      "mz": 0.48177245,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9458,8 +9458,8 @@
       "knock": false
     },
     {
-      "mx": -0.86636496,
-      "mz": 0.49941146,
+      "mx": -0.877227,
+      "mz": 0.48007587,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9488,8 +9488,8 @@
       "knock": false
     },
     {
-      "mx": -0.8673181,
-      "mz": 0.4977542,
+      "mx": -0.87814254,
+      "mz": 0.47839904,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9518,8 +9518,8 @@
       "knock": false
     },
     {
-      "mx": -0.8682572,
-      "mz": 0.4961144,
+      "mx": -0.8790432,
+      "mz": 0.47674203,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9548,8 +9548,8 @@
       "knock": false
     },
     {
-      "mx": -0.8691823,
-      "mz": 0.49449188,
+      "mx": -0.8799293,
+      "mz": 0.47510457,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9578,8 +9578,8 @@
       "knock": false
     },
     {
-      "mx": -0.8700936,
-      "mz": 0.49288663,
+      "mx": -0.88080096,
+      "mz": 0.47348666,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9608,8 +9608,8 @@
       "knock": false
     },
     {
-      "mx": -0.8709913,
-      "mz": 0.49129853,
+      "mx": -0.88165843,
+      "mz": 0.47188812,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9638,8 +9638,8 @@
       "knock": false
     },
     {
-      "mx": -0.8718755,
-      "mz": 0.48972762,
+      "mx": -0.8825019,
+      "mz": 0.4703088,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9668,8 +9668,8 @@
       "knock": false
     },
     {
-      "mx": -0.87274647,
-      "mz": 0.48817375,
+      "mx": -0.88333154,
+      "mz": 0.46874866,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9698,8 +9698,8 @@
       "knock": false
     },
     {
-      "mx": -0.8736044,
-      "mz": 0.48663676,
+      "mx": -0.88414776,
+      "mz": 0.46720737,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9728,8 +9728,8 @@
       "knock": false
     },
     {
-      "mx": -0.87444943,
-      "mz": 0.48511672,
+      "mx": -0.8849507,
+      "mz": 0.4656849,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9758,8 +9758,8 @@
       "knock": false
     },
     {
-      "mx": -0.87528175,
-      "mz": 0.48361334,
+      "mx": -0.88574034,
+      "mz": 0.46418095,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9788,8 +9788,8 @@
       "knock": false
     },
     {
-      "mx": -0.87610143,
-      "mz": 0.4821267,
+      "mx": -0.8865172,
+      "mz": 0.4626956,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9818,8 +9818,8 @@
       "knock": false
     },
     {
-      "mx": -0.8769089,
-      "mz": 0.48065662,
+      "mx": -0.88728136,
+      "mz": 0.46122846,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9848,8 +9848,8 @@
       "knock": false
     },
     {
-      "mx": -0.87770414,
-      "mz": 0.47920293,
+      "mx": -0.8880331,
+      "mz": 0.45977953,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9878,8 +9878,8 @@
       "knock": false
     },
     {
-      "mx": -0.8784874,
-      "mz": 0.4777656,
+      "mx": -0.88877255,
+      "mz": 0.4583485,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9908,8 +9908,8 @@
       "knock": false
     },
     {
-      "mx": -0.87925875,
-      "mz": 0.4763445,
+      "mx": -0.88949996,
+      "mz": 0.45693532,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9938,8 +9938,8 @@
       "knock": false
     },
     {
-      "mx": -0.8800185,
-      "mz": 0.47493938,
+      "mx": -0.8902155,
+      "mz": 0.45553967,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9968,8 +9968,8 @@
       "knock": false
     },
     {
-      "mx": -0.88076675,
-      "mz": 0.47355035,
+      "mx": -0.8909193,
+      "mz": 0.45416147,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -9998,8 +9998,8 @@
       "knock": false
     },
     {
-      "mx": -0.88150376,
-      "mz": 0.47217706,
+      "mx": -0.8916118,
+      "mz": 0.45280054,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10028,8 +10028,8 @@
       "knock": false
     },
     {
-      "mx": -0.8822296,
-      "mz": 0.47081947,
+      "mx": -0.89229304,
+      "mz": 0.45145676,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10058,8 +10058,8 @@
       "knock": false
     },
     {
-      "mx": -0.88294446,
-      "mz": 0.46947742,
+      "mx": -0.8929631,
+      "mz": 0.45012978,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10088,8 +10088,8 @@
       "knock": false
     },
     {
-      "mx": -0.8836486,
-      "mz": 0.4681508,
+      "mx": -0.8936224,
+      "mz": 0.44881958,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10118,8 +10118,8 @@
       "knock": false
     },
     {
-      "mx": -0.88434213,
-      "mz": 0.4668394,
+      "mx": -0.894271,
+      "mz": 0.44752577,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10148,8 +10148,8 @@
       "knock": false
     },
     {
-      "mx": -0.88502514,
-      "mz": 0.46554315,
+      "mx": -0.8949092,
+      "mz": 0.44624838,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10178,8 +10178,8 @@
       "knock": false
     },
     {
-      "mx": -0.8856979,
-      "mz": 0.46426198,
+      "mx": -0.89553696,
+      "mz": 0.44498712,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10208,8 +10208,8 @@
       "knock": false
     },
     {
-      "mx": -0.8863605,
-      "mz": 0.46299562,
+      "mx": -0.89615464,
+      "mz": 0.44374183,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10238,8 +10238,8 @@
       "knock": false
     },
     {
-      "mx": -0.8870133,
-      "mz": 0.46174392,
+      "mx": -0.89676243,
+      "mz": 0.4425123,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10268,8 +10268,8 @@
       "knock": false
     },
     {
-      "mx": -0.88765615,
-      "mz": 0.4605068,
+      "mx": -0.8973604,
+      "mz": 0.44129843,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10298,8 +10298,8 @@
       "knock": false
     },
     {
-      "mx": -0.88828945,
-      "mz": 0.45928404,
+      "mx": -0.8979489,
+      "mz": 0.4400999,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10328,8 +10328,8 @@
       "knock": false
     },
     {
-      "mx": -0.8889133,
-      "mz": 0.45807555,
+      "mx": -0.89852786,
+      "mz": 0.43891653,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10358,8 +10358,8 @@
       "knock": false
     },
     {
-      "mx": -0.88952774,
-      "mz": 0.45688117,
+      "mx": -0.89909756,
+      "mz": 0.43774828,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10388,8 +10388,8 @@
       "knock": false
     },
     {
-      "mx": -0.8901331,
-      "mz": 0.45570078,
+      "mx": -0.8996582,
+      "mz": 0.43659487,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10418,8 +10418,8 @@
       "knock": false
     },
     {
-      "mx": -0.89072937,
-      "mz": 0.4545341,
+      "mx": -0.90021,
+      "mz": 0.43545604,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10448,8 +10448,8 @@
       "knock": false
     },
     {
-      "mx": -0.8913167,
-      "mz": 0.45338124,
+      "mx": -0.90075296,
+      "mz": 0.4343318,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10478,8 +10478,8 @@
       "knock": false
     },
     {
-      "mx": -0.8918954,
-      "mz": 0.45224175,
+      "mx": -0.9012874,
+      "mz": 0.43322173,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10508,8 +10508,8 @@
       "knock": false
     },
     {
-      "mx": -0.8924654,
-      "mz": 0.45111567,
+      "mx": -0.9018133,
+      "mz": 0.4321258,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10538,8 +10538,8 @@
       "knock": false
     },
     {
-      "mx": -0.8930271,
-      "mz": 0.45000276,
+      "mx": -0.902331,
+      "mz": 0.4310439,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10568,8 +10568,8 @@
       "knock": false
     },
     {
-      "mx": -0.8935805,
-      "mz": 0.4489029,
+      "mx": -0.9028405,
+      "mz": 0.42997554,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10598,8 +10598,8 @@
       "knock": false
     },
     {
-      "mx": -0.8941257,
-      "mz": 0.447816,
+      "mx": -0.90334207,
+      "mz": 0.42892095,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10628,8 +10628,8 @@
       "knock": false
     },
     {
-      "mx": -0.8946629,
-      "mz": 0.44674182,
+      "mx": -0.9038357,
+      "mz": 0.42787966,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10658,8 +10658,8 @@
       "knock": false
     },
     {
-      "mx": -0.8951922,
-      "mz": 0.44568023,
+      "mx": -0.9043217,
+      "mz": 0.42685163,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10688,8 +10688,8 @@
       "knock": false
     },
     {
-      "mx": -0.89571375,
-      "mz": 0.44463116,
+      "mx": -0.9048001,
+      "mz": 0.4258366,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10718,8 +10718,8 @@
       "knock": false
     },
     {
-      "mx": -0.8962277,
-      "mz": 0.4435944,
+      "mx": -0.9052711,
+      "mz": 0.4248344,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10748,8 +10748,8 @@
       "knock": false
     },
     {
-      "mx": -0.89673406,
-      "mz": 0.4425698,
+      "mx": -0.9057348,
+      "mz": 0.4238449,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10778,8 +10778,8 @@
       "knock": false
     },
     {
-      "mx": -0.89723307,
-      "mz": 0.44155717,
+      "mx": -0.9061913,
+      "mz": 0.42286795,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10808,8 +10808,8 @@
       "knock": false
     },
     {
-      "mx": -0.8977249,
-      "mz": 0.4405565,
+      "mx": -0.9066408,
+      "mz": 0.4219034,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10838,8 +10838,8 @@
       "knock": false
     },
     {
-      "mx": -0.8982095,
-      "mz": 0.4395675,
+      "mx": -0.90708333,
+      "mz": 0.42095104,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10868,8 +10868,8 @@
       "knock": false
     },
     {
-      "mx": -0.8986871,
-      "mz": 0.43859023,
+      "mx": -0.90751916,
+      "mz": 0.42001075,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10898,8 +10898,8 @@
       "knock": false
     },
     {
-      "mx": -0.8991579,
-      "mz": 0.43762434,
+      "mx": -0.9079483,
+      "mz": 0.41908228,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10928,8 +10928,8 @@
       "knock": false
     },
     {
-      "mx": -0.8996219,
-      "mz": 0.4366697,
+      "mx": -0.9083709,
+      "mz": 0.41816545,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10958,8 +10958,8 @@
       "knock": false
     },
     {
-      "mx": -0.90007925,
-      "mz": 0.43572628,
+      "mx": -0.90878713,
+      "mz": 0.4172602,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -10988,8 +10988,8 @@
       "knock": false
     },
     {
-      "mx": -0.90053,
-      "mz": 0.43479392,
+      "mx": -0.909197,
+      "mz": 0.4163663,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11018,8 +11018,8 @@
       "knock": false
     },
     {
-      "mx": -0.90097433,
-      "mz": 0.4338725,
+      "mx": -0.9096007,
+      "mz": 0.41548365,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11048,8 +11048,8 @@
       "knock": false
     },
     {
-      "mx": -0.9014123,
-      "mz": 0.43296173,
+      "mx": -0.9099983,
+      "mz": 0.41461205,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11078,8 +11078,8 @@
       "knock": false
     },
     {
-      "mx": -0.9018441,
-      "mz": 0.43206164,
+      "mx": -0.9103899,
+      "mz": 0.41375136,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11108,8 +11108,8 @@
       "knock": false
     },
     {
-      "mx": -0.9022697,
-      "mz": 0.43117207,
+      "mx": -0.9107757,
+      "mz": 0.41290146,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11138,8 +11138,8 @@
       "knock": false
     },
     {
-      "mx": -0.90268934,
-      "mz": 0.43029287,
+      "mx": -0.91115576,
+      "mz": 0.4120622,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11168,8 +11168,8 @@
       "knock": false
     },
     {
-      "mx": -0.90310305,
-      "mz": 0.42942393,
+      "mx": -0.9115301,
+      "mz": 0.41123345,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11198,8 +11198,8 @@
       "knock": false
     },
     {
-      "mx": -0.90351087,
-      "mz": 0.428565,
+      "mx": -0.9118989,
+      "mz": 0.41041487,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11228,8 +11228,8 @@
       "knock": false
     },
     {
-      "mx": -0.90391314,
-      "mz": 0.42771605,
+      "mx": -0.91226226,
+      "mz": 0.40960655,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11258,8 +11258,8 @@
       "knock": false
     },
     {
-      "mx": -0.90430975,
-      "mz": 0.42687705,
+      "mx": -0.9126203,
+      "mz": 0.4088083,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11288,8 +11288,8 @@
       "knock": false
     },
     {
-      "mx": -0.9047007,
-      "mz": 0.42604765,
+      "mx": -0.91297305,
+      "mz": 0.40801987,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11318,8 +11318,8 @@
       "knock": false
     },
     {
-      "mx": -0.9050863,
-      "mz": 0.4252279,
+      "mx": -0.9133206,
+      "mz": 0.40724126,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11348,8 +11348,8 @@
       "knock": false
     },
     {
-      "mx": -0.9054665,
-      "mz": 0.4244177,
+      "mx": -0.9136631,
+      "mz": 0.40647233,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11378,8 +11378,8 @@
       "knock": false
     },
     {
-      "mx": -0.90584147,
-      "mz": 0.42361683,
+      "mx": -0.91400063,
+      "mz": 0.4057128,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11408,8 +11408,8 @@
       "knock": false
     },
     {
-      "mx": -0.90621126,
-      "mz": 0.42282513,
+      "mx": -0.9143332,
+      "mz": 0.40496266,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11438,8 +11438,8 @@
       "knock": false
     },
     {
-      "mx": -0.9065761,
-      "mz": 0.42204258,
+      "mx": -0.91466105,
+      "mz": 0.4042217,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11468,8 +11468,8 @@
       "knock": false
     },
     {
-      "mx": -0.90693575,
-      "mz": 0.421269,
+      "mx": -0.9149841,
+      "mz": 0.40348986,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11498,8 +11498,8 @@
       "knock": false
     },
     {
-      "mx": -0.90729046,
-      "mz": 0.42050436,
+      "mx": -0.91530246,
+      "mz": 0.40276694,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11528,8 +11528,8 @@
       "knock": false
     },
     {
-      "mx": -0.9076405,
-      "mz": 0.41974849,
+      "mx": -0.91561645,
+      "mz": 0.40205294,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11558,8 +11558,8 @@
       "knock": false
     },
     {
-      "mx": -0.9079857,
-      "mz": 0.4190013,
+      "mx": -0.9159258,
+      "mz": 0.4013476,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11588,8 +11588,8 @@
       "knock": false
     },
     {
-      "mx": -0.9083262,
-      "mz": 0.41826257,
+      "mx": -0.91623086,
+      "mz": 0.40065092,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11618,8 +11618,8 @@
       "knock": false
     },
     {
-      "mx": -0.9086621,
-      "mz": 0.41753235,
+      "mx": -0.91653144,
+      "mz": 0.3999627,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11648,8 +11648,8 @@
       "knock": false
     },
     {
-      "mx": -0.9089934,
-      "mz": 0.41681042,
+      "mx": -0.9168279,
+      "mz": 0.3992828,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11678,8 +11678,8 @@
       "knock": false
     },
     {
-      "mx": -0.9093203,
-      "mz": 0.41609672,
+      "mx": -0.91712004,
+      "mz": 0.39861113,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11708,8 +11708,8 @@
       "knock": false
     },
     {
-      "mx": -0.9096429,
-      "mz": 0.41539118,
+      "mx": -0.91740817,
+      "mz": 0.39794764,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11738,8 +11738,8 @@
       "knock": false
     },
     {
-      "mx": -0.9099611,
-      "mz": 0.41469353,
+      "mx": -0.9176922,
+      "mz": 0.39729208,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11768,8 +11768,8 @@
       "knock": false
     },
     {
-      "mx": -0.9102751,
-      "mz": 0.41400394,
+      "mx": -0.9179723,
+      "mz": 0.39664453,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11798,8 +11798,8 @@
       "knock": false
     },
     {
-      "mx": -0.9105849,
-      "mz": 0.41332206,
+      "mx": -0.9182485,
+      "mz": 0.39600465,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11828,8 +11828,8 @@
       "knock": false
     },
     {
-      "mx": -0.9108906,
-      "mz": 0.41264793,
+      "mx": -0.91852087,
+      "mz": 0.39537257,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11858,8 +11858,8 @@
       "knock": false
     },
     {
-      "mx": -0.91119224,
-      "mz": 0.41198137,
+      "mx": -0.9187895,
+      "mz": 0.39474797,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11888,8 +11888,8 @@
       "knock": false
     },
     {
-      "mx": -0.91148996,
-      "mz": 0.41132233,
+      "mx": -0.9190543,
+      "mz": 0.3941308,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11918,8 +11918,8 @@
       "knock": false
     },
     {
-      "mx": -0.91178375,
-      "mz": 0.4106707,
+      "mx": -0.9193156,
+      "mz": 0.3935211,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11948,8 +11948,8 @@
       "knock": false
     },
     {
-      "mx": -0.9120737,
-      "mz": 0.41002628,
+      "mx": -0.9195733,
+      "mz": 0.3929186,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -11978,8 +11978,8 @@
       "knock": false
     },
     {
-      "mx": -0.91235983,
-      "mz": 0.4093892,
+      "mx": -0.91982746,
+      "mz": 0.39232326,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12008,8 +12008,8 @@
       "knock": false
     },
     {
-      "mx": -0.9126423,
-      "mz": 0.4087592,
+      "mx": -0.92007804,
+      "mz": 0.391735,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12038,8 +12038,8 @@
       "knock": false
     },
     {
-      "mx": -0.912921,
-      "mz": 0.4081362,
+      "mx": -0.9203254,
+      "mz": 0.39115363,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12068,8 +12068,8 @@
       "knock": false
     },
     {
-      "mx": -0.91319615,
-      "mz": 0.4075202,
+      "mx": -0.9205693,
+      "mz": 0.39057913,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12098,8 +12098,8 @@
       "knock": false
     },
     {
-      "mx": -0.91346776,
-      "mz": 0.40691105,
+      "mx": -0.92081,
+      "mz": 0.39001152,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12128,8 +12128,8 @@
       "knock": false
     },
     {
-      "mx": -0.91373587,
-      "mz": 0.40630868,
+      "mx": -0.9210474,
+      "mz": 0.38945052,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12158,8 +12158,8 @@
       "knock": false
     },
     {
-      "mx": -0.9140005,
-      "mz": 0.405713,
+      "mx": -0.9212816,
+      "mz": 0.3888961,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12188,8 +12188,8 @@
       "knock": false
     },
     {
-      "mx": -0.9142618,
-      "mz": 0.40512383,
+      "mx": -0.9215127,
+      "mz": 0.38834816,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12218,8 +12218,8 @@
       "knock": false
     },
     {
-      "mx": -0.9145197,
-      "mz": 0.40454125,
+      "mx": -0.9217408,
+      "mz": 0.38780662,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12248,8 +12248,8 @@
       "knock": false
     },
     {
-      "mx": -0.91477436,
-      "mz": 0.40396503,
+      "mx": -0.92196584,
+      "mz": 0.38727143,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12278,8 +12278,8 @@
       "knock": false
     },
     {
-      "mx": -0.91502583,
-      "mz": 0.40339524,
+      "mx": -0.9221878,
+      "mz": 0.3867424,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12308,8 +12308,8 @@
       "knock": false
     },
     {
-      "mx": -0.9152741,
-      "mz": 0.40283173,
+      "mx": -0.92240685,
+      "mz": 0.3862196,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12338,8 +12338,8 @@
       "knock": false
     },
     {
-      "mx": -0.9155191,
-      "mz": 0.4022743,
+      "mx": -0.92262304,
+      "mz": 0.38570288,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12368,8 +12368,8 @@
       "knock": false
     },
     {
-      "mx": -0.9157612,
-      "mz": 0.4017231,
+      "mx": -0.9228364,
+      "mz": 0.3851921,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12398,8 +12398,8 @@
       "knock": false
     },
     {
-      "mx": -0.9160002,
-      "mz": 0.40117776,
+      "mx": -0.92304707,
+      "mz": 0.3846872,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12428,8 +12428,8 @@
       "knock": false
     },
     {
-      "mx": -0.9162362,
-      "mz": 0.4006385,
+      "mx": -0.9232548,
+      "mz": 0.38418806,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12458,8 +12458,8 @@
       "knock": false
     },
     {
-      "mx": -0.9164693,
-      "mz": 0.4001051,
+      "mx": -0.92345995,
+      "mz": 0.38369477,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12488,8 +12488,8 @@
       "knock": false
     },
     {
-      "mx": -0.91669947,
-      "mz": 0.39957756,
+      "mx": -0.92366236,
+      "mz": 0.38320714,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12518,8 +12518,8 @@
       "knock": false
     },
     {
-      "mx": -0.91692674,
-      "mz": 0.39905557,
+      "mx": -0.92386234,
+      "mz": 0.38272503,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12548,8 +12548,8 @@
       "knock": false
     },
     {
-      "mx": -0.9171512,
-      "mz": 0.3985393,
+      "mx": -0.92405957,
+      "mz": 0.38224843,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12578,8 +12578,8 @@
       "knock": false
     },
     {
-      "mx": -0.91737294,
-      "mz": 0.39802873,
+      "mx": -0.9242543,
+      "mz": 0.3817773,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12608,8 +12608,8 @@
       "knock": false
     },
     {
-      "mx": -0.917592,
-      "mz": 0.39752355,
+      "mx": -0.92444664,
+      "mz": 0.38131148,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12638,8 +12638,8 @@
       "knock": false
     },
     {
-      "mx": -0.9178083,
-      "mz": 0.39702395,
+      "mx": -0.9246365,
+      "mz": 0.38085103,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12668,8 +12668,8 @@
       "knock": false
     },
     {
-      "mx": -0.9180219,
-      "mz": 0.39652964,
+      "mx": -0.9248238,
+      "mz": 0.3803957,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12698,8 +12698,8 @@
       "knock": false
     },
     {
-      "mx": -0.918233,
-      "mz": 0.39604062,
+      "mx": -0.92500883,
+      "mz": 0.37994555,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12728,8 +12728,8 @@
       "knock": false
     },
     {
-      "mx": -0.9184415,
-      "mz": 0.39555687,
+      "mx": -0.9251915,
+      "mz": 0.3795005,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12758,8 +12758,8 @@
       "knock": false
     },
     {
-      "mx": -0.9186474,
-      "mz": 0.39507836,
+      "mx": -0.9253719,
+      "mz": 0.37906048,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12788,8 +12788,8 @@
       "knock": false
     },
     {
-      "mx": -0.9188509,
-      "mz": 0.39460492,
+      "mx": -0.92555,
+      "mz": 0.3786254,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12818,8 +12818,8 @@
       "knock": false
     },
     {
-      "mx": -0.9190518,
-      "mz": 0.39413655,
+      "mx": -0.9257259,
+      "mz": 0.3781952,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12848,8 +12848,8 @@
       "knock": false
     },
     {
-      "mx": -0.9192505,
-      "mz": 0.3936731,
+      "mx": -0.9258995,
+      "mz": 0.3777698,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12878,8 +12878,8 @@
       "knock": false
     },
     {
-      "mx": -0.91944665,
-      "mz": 0.39321467,
+      "mx": -0.92607105,
+      "mz": 0.3773492,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12908,8 +12908,8 @@
       "knock": false
     },
     {
-      "mx": -0.9196406,
-      "mz": 0.39276108,
+      "mx": -0.92624044,
+      "mz": 0.37693325,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12938,8 +12938,8 @@
       "knock": false
     },
     {
-      "mx": -0.9198321,
-      "mz": 0.3923123,
+      "mx": -0.92640775,
+      "mz": 0.37652192,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12968,8 +12968,8 @@
       "knock": false
     },
     {
-      "mx": -0.92002136,
-      "mz": 0.39186823,
+      "mx": -0.9265729,
+      "mz": 0.37611517,
       "sprint": 1,
       "close": false,
       "shoot": false,
@@ -12998,8 +12998,8 @@
       "knock": false
     },
     {
-      "mx": -0.9202084,
-      "mz": 0.39142886,
+      "mx": -0.92673606,
+      "mz": 0.37571293,
       "sprint": 1,
       "close": false,
       "shoot": false,

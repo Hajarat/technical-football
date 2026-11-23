@@ -28,7 +28,9 @@ The table uses Xbox names.
 | Right stick: a side flicked from rest and released | Body feint to that side |
 | Right stick: a side held 0.1 s | Ball roll to that side |
 | Right stick: forward flick while sprinting | Knock-on: a heavy touch ahead to sprint onto |
-| Right bumper + left stick away from a loose ball | Let it run: no eager regain (see [dribbling.md](dribbling.md)) |
+| Left stick, without the ball | Lock-on: with a loose ball he can reach first he goes for it by himself. Stick at rest: the earliest point. Stick held toward a later point on the ball's path (within 40 degrees): he meets it there (see [dribbling.md](dribbling.md)) |
+| Right bumper + left stick away from a loose ball | Let it run: he does not go for it |
+| B, a skill gesture or a knock-on on the way to a loose ball | Played at his first contact: a first-time shot (a flick when there is no time for the wind-up), the move after his first touch, a knock-on as his first touch |
 | Left stick back with left and right bumpers held | Drag-back |
 | Right stick: back, then straight on to a side | Elastico toward that side |
 | Right stick: forward flick, rest, back | Heel-to-heel: the ball flicked on straight ahead |

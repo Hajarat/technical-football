@@ -110,16 +110,43 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   after it the controller eases it out (the drag-back's step itself rises and falls to rest).
 - The keeper and the view read the next expected contact (`NextTouchEta`, `NextTouchFoot`, `NextTouchPoint`): the committed
   touch's, else the one the controller steers for.
-- A lost ball (no one controls it, someone has controlled or struck it this round, play is live, no shot under way) in front of the player is gone for eagerly (`Regain`,
-  the `regain_*` keys in `possession`): within `regain_cone_deg` (75) either side of his facing and `regain_max_distance`
-  (10 m) of him, or anywhere within foot reach, the go-get-it legs run on to where it will be at the off-ball top speed,
-  whatever the stick and sprint button say, and the first touch takes it as soon as it is in reach, even with the stick
-  released. When the keeper contests it (within `regain_keeper_distance`, 3 m, of the ball, or reaching it no more than
-  `regain_keeper_margin`, 0.3 s, after the attacker, each timed as the gap beyond foot reach over his top speed: the keeper's
-  rush speed, the attacker's sprint speed) it is a race at normal foot reach; uncontested he also takes it from as far as
-  `regain_reach` (1.2 m) of his body, a toe-poke at 1.5 times the rated errors. Right bumper (the finesse modifier) held
-  with the left stick pushed more than 90 degrees away from the ball lets it run (see [controls.md](controls.md)). The trace's legs column
-  shows `Race` or `Regain`.
+- **Lock-on.** A loose ball (no one controls it, someone has controlled or struck it this round, play is Live or a shot is
+  waiting for its strike) is claimed: each team has at most one claim holder, and the holder goes for the ball by himself,
+  from any direction and distance, whatever the stick and sprint button say (`LockOn`, the `lock_on` block and the
+  `regain_*` keys in `possession`). A ball nobody has played yet (on the spot at the start of a round) is not claimed.
+  - *Forecast.* The ball's path is forecast once per ball path: a copy of the ball stepped `lock_on.horizon_seconds` (4 s)
+    ahead through the boards, the goal frame and the ceiling, with no players, one sample per tick (`BallForecast`). Any
+    kick, touch, save, deflection or tackle is a new path: the forecast is rebuilt (also whenever the real ball is more
+    than `rebuild_drift_m`, 0.05 m, off its sample) and both claims are taken afresh. A path that ends in the goal is not
+    claimed.
+  - *Solve.* For each candidate (an outfield player on his feet who is not stunned, stumbling or just tackled) the
+    solver finds the earliest sample, at a height a first touch plays, that he can bring within foot reach by its tick:
+    a distance gate first, then his own run stepped on a copy of his state. A ball at rest is reachable at any later
+    tick. The meeting is solved again every few ticks, and every tick once it is within a quarter of a second.
+  - *Holder.* With no holder the candidate with the earliest meeting takes the claim; a team-mate replaces him only by
+    arriving `takeover_margin_seconds` (0.1 s) earlier.
+  - *Legs.* The holder's legs run to the meeting point: flat out when the meeting is his earliest, otherwise at the pace
+    that arrives on the meeting tick, never slower than 0.8 m/s. Onto a ball that rolls away from him or lies still he
+    comes in no faster than the ball's own speed away plus the gap over his speed time constant, and close to the point
+    he stands and waits. A claim that ends gives the legs back to the stick on the same tick.
+  - *The stick still chooses.* With the stick at rest he takes the earliest sample. Held within `stick_slide_deg` (40)
+    of the bearing to a later sample he can reach, he meets the ball there instead (never later than the nearest
+    opponent's arrival), and his first touch waits for the ball to come to that point. Right bumper (the finesse
+    modifier) held with the left stick pushed more than 90 degrees away from the ball lets it run: no claim (see
+    [controls.md](controls.md)).
+  - *The race.* The holder's mode is `Free` when no opponent contests the ball and `Contested` otherwise: the keeper within
+    `regain_keeper_distance` (3 m) of the ball, or his rush (the gap beyond foot reach over his rush speed) reaching the
+    meeting no more than `regain_keeper_margin` (0.3 s) after the holder, or the other team's holder arriving within
+    that margin. Contested it is a race at normal foot reach; free he also takes a ball at his feet from as far as
+    `regain_reach` (1.2 m), a toe-poke at 1.5 times the rated errors, and his meeting is solved at that reach.
+  - *The first touch.* As soon as the ball is in reach: pushed toward the stick, or trapped with the stick at rest. A
+    knock-on asked for on the way (the button or the flick) is kept and played as the first touch. A skill gesture made
+    on the way is kept `skill.meet_wait_seconds` (1.5 s, instead of `buffer_seconds`) and the move starts once the first
+    touch has given him the ball. A shot pressed on the way is kept too (see [shooting.md](shooting.md)).
+  - The view and the keeper read the holder's meeting as his next touch (`NextTouchEta`, `NextTouchFoot`,
+    `NextTouchPoint`; `LockOnPoint` and `LockOnTick` on the player; `World.Claims` and `World.Forecast`). The trace's legs
+    column shows `Lock` (free) or `Race` (contested), and the debug overlay draws the forecast path and a ring at each
+    team's meeting. Lock-on draws no random numbers.
 
 ## Skill moves
 
