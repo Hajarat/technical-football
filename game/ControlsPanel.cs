@@ -11,7 +11,10 @@ public partial class ControlsPanel : PanelContainer
     const int FontSize = 15;
     static readonly Color Heading = new(1f, 0.85f, 0.3f), Dim = new(0.65f, 0.65f, 0.65f), Key = new(0.6f, 0.9f, 1f);
 
-    string _built = "";
+    bool _isBuilt, _bSwapped;
+    InputDevice _bDevice;
+    PadKind _bKind;
+    string _bPad = "";
     HBoxContainer _columns = null!;
     Label _title = null!, _foot = null!;
 
@@ -39,8 +42,12 @@ public partial class ControlsPanel : PanelContainer
     /// <summary>Shows the list for a device. <paramref name="padName"/> is the pad's name when known (it is shown in the title).</summary>
     public void Open(InputDevice device, PadKind kind, string padName, bool swapped)
     {
-        string key = $"{device}/{kind}/{padName}/{swapped}";
-        if (key != _built) { _built = key; Build(device, kind, padName, swapped); }
+        // (rebuilt only when what it shows changes; compared field by field so an open panel makes no garbage every tick)
+        if (!_isBuilt || device != _bDevice || kind != _bKind || padName != _bPad || swapped != _bSwapped)
+        {
+            _isBuilt = true; _bDevice = device; _bKind = kind; _bPad = padName; _bSwapped = swapped;
+            Build(device, kind, padName, swapped);
+        }
         Visible = true;
     }
 

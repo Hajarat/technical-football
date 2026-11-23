@@ -36,11 +36,13 @@ public sealed class KeyBind
 public sealed class PadBind
 {
     public readonly string Action;
+    /// <summary><see cref="Action"/> as a StringName, made once: polling with the string would build a new StringName on every call.</summary>
+    public readonly StringName ActionName;
     readonly JoyButton _button;
     readonly FaceSlot? _slot;
 
-    public PadBind(string action, JoyButton button) { Action = action; _button = button; }
-    public PadBind(string action, FaceSlot slot) { Action = action; _slot = slot; _button = JoyButton.Invalid; }
+    public PadBind(string action, JoyButton button) { Action = action; ActionName = action; _button = button; }
+    public PadBind(string action, FaceSlot slot) { Action = action; ActionName = action; _slot = slot; _button = JoyButton.Invalid; }
 
     /// <summary>The button index that triggers this action when the pad reports its face buttons crossed or not.</summary>
     public JoyButton Button(bool swapped) => _slot is not { } s ? _button : s switch
@@ -85,11 +87,13 @@ public sealed class PadBind
         _ => left ? "LT" : "RT",
     };
 
+    static readonly string[] PlayStationNames = { "PlayStation", "PS3", "PS4", "PS5", "DualShock", "DualSense", "Sony" };
+
     /// <summary>Kind from a joypad name as the OS reports it; an unknown or missing name gets Xbox naming.</summary>
     public static PadKind KindOf(string padName)
     {
         if (InputReader.DefaultSwap(padName)) return PadKind.Nintendo;
-        foreach (var s in new[] { "PlayStation", "PS3", "PS4", "PS5", "DualShock", "DualSense", "Sony" })
+        foreach (var s in PlayStationNames)
             if (padName.Contains(s, System.StringComparison.OrdinalIgnoreCase)) return PadKind.PlayStation;
         return PadKind.Xbox;
     }

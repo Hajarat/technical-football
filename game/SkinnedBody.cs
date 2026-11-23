@@ -133,7 +133,7 @@ public sealed partial class SkinnedBody : Node3D
         _trunk = new[] { _hips, _spine, _spine1, _spine2, _neck, _head };
         var driven = new List<int> { _hips, _spine, _spine1, _spine2, _neck, _head };
         for (int i = 0; i < 2; i++) driven.AddRange(new[] { _clav[i], _arm[i], _fore[i], _hand[i], _up[i], _leg[i], _foot[i], _toe[i] });
-        _driven = driven.ToArray();
+        _driven = driven.ToArray(); _drivenNames = null;
         _posPrev = new Vector3[_driven.Length]; _posCur = new Vector3[_driven.Length];
         _rotPrev = new Quaternion[_driven.Length]; _rotCur = new Quaternion[_driven.Length];
         _solvePos = new Vector3[_driven.Length]; _solveRot = new Quaternion[_driven.Length];
@@ -541,15 +541,18 @@ public sealed partial class SkinnedBody : Node3D
     public float ScaleFor(float height) => height / ModelHeight * _fit;
 
     /// <summary>Names of the driven bones in the order <see cref="PoseBones"/> takes their rotations (the .kclip bone order).</summary>
+    // (read from the skeleton once: the figure's statistics ask for a name on every tick that sets a new record)
     public IReadOnlyList<string> DrivenBoneNames
     {
         get
         {
+            if (_drivenNames != null) return _drivenNames;
             var names = new string[_driven.Length];
             for (int k = 0; k < _driven.Length; k++) names[k] = _sk.GetBoneName(_driven[k]);
-            return names;
+            return _drivenNames = names;
         }
     }
+    string[]? _drivenNames;
 
     /// <summary>
     /// Poses the skeleton from bone rotations, as a motion clip stores them: <paramref name="local"/> holds every driven bone's local

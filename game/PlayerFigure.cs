@@ -576,6 +576,30 @@ public partial class PlayerFigure : Node3D
 
     // ---------------------------------------------------------------------------------------------------------------
 
+    // ---- scratch arrays for one tick ----
+    // Update's two-element working arrays (ankles, knees, hands, poses) come from these pools rather than being made anew every
+    // tick; Update rewinds them at its start, and each array is cleared as it is handed out, as a new one would be. None outlives
+    // the tick: the keeper's rush snapshot copies into arrays of its own, and the two kept for the mocap layers alternate below.
+    readonly List<Vector3[]> _scratchV = new();
+    readonly List<float[]> _scratchF = new();
+    readonly List<bool[]> _scratchB = new();
+    readonly List<BootSurface[]> _scratchS = new();
+    int _scratchVN, _scratchFN, _scratchBN, _scratchSN;
+    readonly float[] _twA = new float[2], _twB = new float[2];
+    readonly bool[] _plantedA = new bool[2], _plantedB = new bool[2];
+
+    static T[] Scratch<T>(List<T[]> pool, ref int next)
+    {
+        if (next == pool.Count) pool.Add(new T[2]);
+        var a = pool[next++];
+        Array.Clear(a);
+        return a;
+    }
+    Vector3[] ScratchV() => Scratch(_scratchV, ref _scratchVN);
+    float[] ScratchF() => Scratch(_scratchF, ref _scratchFN);
+    bool[] ScratchB() => Scratch(_scratchB, ref _scratchBN);
+    BootSurface[] ScratchS() => Scratch(_scratchS, ref _scratchSN);
+
     /// <summary>Snap to a frame with no history (round reset): feet planted under the hips, no interpolation across the jump.</summary>
     public void Teleport(in FigureFrame f)
     {
@@ -683,6 +707,7 @@ public partial class PlayerFigure : Node3D
 
     public void Update(in FigureFrame f)
     {
+        _scratchVN = _scratchFN = _scratchBN = _scratchSN = 0;
         float dt = f.Dt > 0 ? f.Dt : 1f / 120f;
         if (!IsKeeper) _animFrame = f;   // (the keeper stores his in UpdateKeeper)
         SetDims(f.HeightM > 0.5f ? f.HeightM : 1.8f);
@@ -913,8 +938,10 @@ public partial class PlayerFigure : Node3D
 
         // ---- assembling the final ankles ----
 
-        var ank = new Vector3[2]; var dir = new Vector3[2]; var planted = new bool[2];
-        var tsurf = new BootSurface[2]; var tw = new float[2];
+        var ank = ScratchV(); var dir = ScratchV(); var tsurf = ScratchS();
+        // tw and planted are kept after the tick (_layTw, _layPlanted), so each takes the one of its two arrays they do not hold
+        var planted = ReferenceEquals(_layPlanted, _plantedA) ? _plantedB : _plantedA; Array.Clear(planted);
+        var tw = ReferenceEquals(_layTw, _twA) ? _twB : _twA; Array.Clear(tw);
         var fTouch = SoftTouchFrame(f, dt);   // (the touch the shot's soft touch takes out of the core's slots still follows through)
         for (int i = 0; i < 2; i++)
         {
@@ -1072,7 +1099,7 @@ public partial class PlayerFigure : Node3D
         }
 
         // ---- legs ----
-        var knee = new Vector3[2]; var ankEff = new Vector3[2];
+        var knee = ScratchV(); var ankEff = ScratchV();
         for (int i = 0; i < 2; i++)
         {
             Vector3 hip = body ? pel + P * new Vector3(0, 0, i == 0 ? -HipW : HipW) : pel + right * (i == 0 ? -HipW : HipW);
@@ -1084,7 +1111,7 @@ public partial class PlayerFigure : Node3D
 
         // ---- arms: each swings against the leg on its own side (forward when the opposite foot lands) ----
         Vector3 shoulderC = pel + B * new Vector3(0, 0.035f * H + TorsoLen - 0.03f * H, 0) + _skShoulderOff;
-        var handT = new Vector3[2]; var elbowPole = new Vector3[2];
+        var handT = ScratchV(); var elbowPole = ScratchV();
         float amp = 0.15f + 0.45f * sfs;
         // outfield arms: bent elbows (near a right angle at a run), swinging against the legs by speed, out from the body for balance in close
         // control and in a turn; built from shoulder and elbow angles in the chest frame, so the elbow lands where the angles put it

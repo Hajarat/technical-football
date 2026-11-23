@@ -211,8 +211,27 @@ public partial class Match
         _log?.Write("round_setup", ("round", _round), ("scenario", sc.Id), ("attacker", att.Id), ("keeper", kee.Id), ("defender", World.Defender?.Sheet.Id),
             ("seed", _seed.ToString()), ("retry_of", retryOf > 0 ? retryOf : null));
         ResetPresentation();
+        PrewarmRound();
         return true;
     }
+
+    /// <summary>
+    /// First-time work the round would otherwise do during play, done here while the round waits in Setup (a still frame, where a
+    /// dropped frame does not show):
+    /// - waits for the background compile of the game's code (<see cref="JitPrewarm"/>), so no method is compiled mid-play;
+    /// - the keeper's chip-safe depth table, which the core builds and caches per tuning, keeper and attacker on the keeper's first
+    ///   live decision (tens of milliseconds and most of a megabyte): the same call his brain makes, with the same sheets and
+    ///   tuning, so the core's cache makes it a lookup there;
+    /// - a full garbage collection, so the loading's garbage is gone and the collections play can still need are small ones.
+    /// </summary>
+    void PrewarmRound()
+    {
+        JitPrewarm.Wait();
+        if (_args.Perf && !_jitReported) { _jitReported = true; GD.Print($"PERF_JIT_PREWARM methods={JitPrewarm.Methods} ms={JitPrewarm.Milliseconds:F0}"); }
+        FootballSim.Core.Keeper.ChipSafeDepth(World.Keeper.Sheet, World.Attacker.Sheet, World.Tuning, World.Pitch, 10f);
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+    }
+    bool _jitReported;
 
     /// <summary>One physics tick of game logic: buttons, then at most one world step.</summary>
     void Tick(in PadSnapshot input)
@@ -306,7 +325,10 @@ public partial class Match
 
         if (World.IsSimulating)
         {
-            var intents = new TickIntent[World.PlayerCount];
+            // one buffer reused tick to tick (World.Step reads it as a span and keeps nothing), cleared as a new array would be
+            if (_intents.Length != World.PlayerCount) _intents = new TickIntent[World.PlayerCount];
+            else Array.Clear(_intents);
+            var intents = _intents;
             intents[0] = _replay != null ? _replay.IntentAt(World.Tick) : FromPad(pad);
             _closeControl = intents[0].CloseControl;
             _stick = intents[0].Move;
@@ -342,6 +364,11 @@ public partial class Match
         UpdateControls();
     }
 
+    TickIntent[] _intents = Array.Empty<TickIntent>();
+    string? _hintText;
+    InputDevice _hintDevice;
+    PadKind _hintKind;
+
     /// <summary>The corner hint, and the controls panel while paused or toggled (or forced by --controls-panel).</summary>
     void UpdateControls()
     {
@@ -349,7 +376,13 @@ public partial class Match
         bool swapped = Pad.SwapFaceButtons;
         bool forced = _args.ControlsPanel != null;
         if (forced) swapped = false;
-        Hud.SetControlsHint(device == InputDevice.Gamepad ? $"{Bindings.Pad.Pause.Label(kind)}: controls" : $"{Bindings.Controls.Label}: controls");
+        // (the hint's text is made again only when the device or the pad's kind changes, not every tick)
+        if (_hintText == null || device != _hintDevice || kind != _hintKind)
+        {
+            _hintDevice = device; _hintKind = kind;
+            _hintText = device == InputDevice.Gamepad ? $"{Bindings.Pad.Pause.Label(kind)}: controls" : $"{Bindings.Controls.Label}: controls";
+        }
+        Hud.SetControlsHint(_hintText);
         bool show = ((forced && !_args.ControlsHintOnly) || _paused || _controlsOn) && !_editor.IsOpen && !_capture.IsOpen;
         if (show) Hud.Controls.Open(device, kind, padName, swapped);
         else Hud.Controls.Close();

@@ -45,6 +45,9 @@ public partial class DebugOverlay : Node3D
     /// <summary>Translucent ground wedge from origin between two directions (only X and Z are used) out to length metres.</summary>
     public void SetWedge(Vector3 origin, Vector3 dirA, Vector3 dirB, float length)
     {
+        // (the same wedge as last time is left as it is rather than built again)
+        if (_wedgeSet && origin == _wOrigin && dirA == _wDirA && dirB == _wDirB && length == _wLength) return;
+        _wedgeSet = true; _wOrigin = origin; _wDirA = dirA; _wDirB = dirB; _wLength = length;
         _wedgeMesh.ClearSurfaces();
         float a0 = Mathf.Atan2(dirA.Z, dirA.X);
         float delta = Mathf.AngleDifference(a0, Mathf.Atan2(dirB.Z, dirB.X));
@@ -61,7 +64,15 @@ public partial class DebugOverlay : Node3D
         _wedgeMesh.SurfaceEnd();
     }
 
-    public void ClearWedge() => _wedgeMesh.ClearSurfaces();
+    public void ClearWedge()
+    {
+        if (!_wedgeSet && _wedgeCleared) return;
+        _wedgeSet = false; _wedgeCleared = true;
+        _wedgeMesh.ClearSurfaces();
+    }
+    bool _wedgeSet, _wedgeCleared;
+    Vector3 _wOrigin, _wDirA, _wDirB;
+    float _wLength;
 
     /// <summary>Marker for the aimed point (goal plane, world metres).</summary>
     public void SetAimed(Vector3 point) => Place(_aimed, point);
@@ -74,12 +85,18 @@ public partial class DebugOverlay : Node3D
     /// <summary>Flat circle on the ground around the keeper, radius in metres.</summary>
     public void SetKeeperReach(Vector3 centre, float radius)
     {
-        _reach.Mesh = MeshKit.Ring(Mathf.Max(0.01f, radius - 0.07f), radius + 0.07f, 64);
+        // the ring's mesh is built only when the radius changes, not every tick
+        if (_reach.Mesh == null || radius != _reachRadius)
+        {
+            _reach.Mesh = MeshKit.Ring(Mathf.Max(0.01f, radius - 0.07f), radius + 0.07f, 64);
+            _reachRadius = radius;
+        }
         _reach.Position = new Vector3(centre.X, 0.05f, centre.Z);
         _reach.Visible = true;
         _reach.ResetPhysicsInterpolation();
     }
     public void ClearKeeperReach() => _reach.Visible = false;
+    float _reachRadius;
 
     /// <summary>The loose ball's forecast path: a dotted line through the given ball centres (one per few ticks), on the ground or in the air.</summary>
     public void SetForecastPath(System.Collections.Generic.IReadOnlyList<Vector3> points)

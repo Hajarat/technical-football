@@ -35,11 +35,13 @@ public partial class Match : Node3D
     double _frameSum, _frameWorst;
     readonly List<double> _frameDeltas = new();
     int _frameCount;
+    PerfProbe? _perf;
     bool _paused;
     bool _quitting;
 
     public override void _Ready()
     {
+        JitPrewarm.Start();   // compiles the code in the background while the scene loads (see PrewarmRound)
         _args = ToolArgs.Parse();
         if (_args.Background) MacBackground.Apply();
         else FitWindowToScreen();
@@ -110,6 +112,7 @@ public partial class Match : Node3D
         // than real time instead of skipping ticks between frames), drawn without interpolation so each frame is exactly its tick.
         if (_shots != null && _args.BurstCount > 0) { Engine.MaxPhysicsStepsPerFrame = 1; GetTree().PhysicsInterpolation = false; }
 
+        if (_args.Perf) _perf = new PerfProbe(this, GetViewport(), _args);
         if (_args.FrameTimes)
             GD.Print($"DISPLAY refresh_hz={DisplayServer.ScreenGetRefreshRate()} vsync={DisplayServer.WindowGetVsyncMode()} max_fps={Engine.MaxFps} " +
                      $"screen={DisplayServer.WindowGetCurrentScreen()} screen_size={DisplayServer.ScreenGetSize()} scale={DisplayServer.ScreenGetScale()} screens={DisplayServer.GetScreenCount()}");
@@ -197,9 +200,16 @@ public partial class Match : Node3D
             if (_clipGallery.Step()) { _quitting = true; GD.Print("CLIP_GALLERY_DONE"); GetTree().Quit(0); }
             return;
         }
+        ulong pp = Time.GetTicksUsec(); long ap = System.GC.GetAllocatedBytesForCurrentThread();
         var pad = Pad.Poll();
+        ulong pt0 = Time.GetTicksUsec(); long a0 = System.GC.GetAllocatedBytesForCurrentThread();
         Tick(pad);
+        ulong pt1 = Time.GetTicksUsec(); long a1 = System.GC.GetAllocatedBytesForCurrentThread();
         Present();
+        ulong pt2 = Time.GetTicksUsec(); long a2 = System.GC.GetAllocatedBytesForCurrentThread();
+        _perf?.Section(PerfProbe.PadSlot, pt0 - pp, a0 - ap);
+        _perf?.Section(PerfProbe.TickSlot, pt1 - pt0, a1 - a0);
+        _perf?.Section(PerfProbe.PresentSlot, pt2 - pt1, a2 - a1);
         // The ball has been placed above; only now follow it.
         // (--side-cam: fixed side-on at the first skill move, 1 m along its run from where it starts)
         if (_args.SideCam && !Camera.Fixed && World.Attacker.SkillMove is { } sm)
@@ -212,11 +222,15 @@ public partial class Match : Node3D
         }
         Camera.Follow(_args.CloseKeeper ? new Vector3(World.Keeper.Position.X, 0, World.Keeper.Position.Z)
             : _args.CloseAttacker ? new Vector3(World.Attacker.Position.X + 0.6f, 0, World.Attacker.Position.Z) : Ball.Position, delta);
+        ulong pt3 = Time.GetTicksUsec(); long a3 = System.GC.GetAllocatedBytesForCurrentThread();
         HandleTools();
+        _perf?.Section(PerfProbe.CameraSlot, pt3 - pt2, a3 - a2);
+        _perf?.Section(PerfProbe.ToolsSlot, Time.GetTicksUsec() - pt3, System.GC.GetAllocatedBytesForCurrentThread() - a3);
     }
 
     public override void _Process(double delta)
     {
+        _perf?.Frame(delta, _tick, World?.State.ToString() ?? "-", World?.Shots.Count ?? 0, World?.Attacker.SkillMove != null);
         if (_args.FrameTimes && ++_frameCount > 10) // skip warm-up frames
         {
             _frameSum += delta;
@@ -337,6 +351,7 @@ public partial class Match : Node3D
             foreach (var line in FootStats.JumpLines()) GD.Print(line);
             GD.Print(ShotClipLayer.Summary());
         }
+        _perf?.Summary();
         if (_args.FrameTimes)
         {
             int n = System.Math.Max(1, _frameCount - 10);

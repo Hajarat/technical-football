@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using Godot;
 
@@ -149,7 +150,22 @@ public partial class Hud : CanvasLayer
     }
 
     /// <summary>Clock in seconds, shown as "11.4 s".</summary>
-    public void SetClock(float seconds) => _clock.Text = seconds.ToString("0.0", CultureInfo.InvariantCulture) + " s";
+    public void SetClock(float seconds)
+    {
+        // formatted on the stack and turned into a string only when the shown text changes (ten times a second, not every tick)
+        Span<char> buf = stackalloc char[32];
+        if (!seconds.TryFormat(buf, out int n, "0.0", CultureInfo.InvariantCulture) || n > buf.Length - 2)
+        {
+            _clock.Text = seconds.ToString("0.0", CultureInfo.InvariantCulture) + " s";
+            _clockText = null;
+            return;
+        }
+        buf[n++] = ' '; buf[n++] = 's';
+        if (_clockText != null && buf[..n].SequenceEqual(_clockText)) return;
+        _clockText = new string(buf[..n]);
+        _clock.Text = _clockText;
+    }
+    string? _clockText;
 
     /// <summary>Line naming the start spot and attacker.</summary>
     public void SetSpotLine(string text) => _spot.Text = text;
