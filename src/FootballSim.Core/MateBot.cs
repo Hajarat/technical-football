@@ -23,8 +23,8 @@ namespace FootballSim.Core;
 /// more than mate.rearm_onside_m onside he may arm again after mate.rearm_seconds. A pass under way while he is less than
 /// mate.pass_cancel_onside_m onside, the ball within mate.run_cancel_goal_m of the goal line, or his being the pass's receiver
 /// cancels the run. Away from the goal he moves at mate.backward_jog_share of the jog pace; toward it between the jog and his
-/// top speed by how far up the pitch the ball is. He does not move toward a board within 1.5 m of it, nor toward the goal line
-/// within 3 m of it; he curves round a body in his path. It draws no random numbers.
+/// top speed by how far up the pitch the ball is. He does not move toward a board within mate.board_margin_m of it, nor
+/// toward the goal line within mate.goal_line_margin_m of it; he curves round a body in his path. It draws no random numbers.
 /// </summary>
 public static class MateBot
 {
@@ -60,11 +60,6 @@ public static class MateBot
     const float LineVelSeconds = 0.15f;
     /// <summary>The gap's point lies this far beyond the line, metres.</summary>
     const float GapBeyondM = 2f;
-    const float BoardKeepM = 1.5f, GoalLineKeepM = 3f;
-    /// <summary>A body this near his path is in it; he curves until nobody is within <see cref="AvoidClearM"/>, metres.</summary>
-    const float AvoidPathM = 1f, AvoidClearM = 2f;
-    const float AvoidDeg = 60f;
-    const int BumpTicks = 10;
     /// <summary>The fields are sampled once in this many ticks.</summary>
     const int SlopeTicks = 3;
 
@@ -254,9 +249,9 @@ public static class MateBot
         // Edges: no movement toward a board near it, nor toward the goal line near it.
         if (pitch != null)
         {
-            if (dir.Y > 0f && pitch.HalfWidth - at.Y < BoardKeepM || dir.Y < 0f && at.Y + pitch.HalfWidth < BoardKeepM) dir.Y = 0f;
-            if (dir.X < 0f && at.X - pitch.MinX < BoardKeepM) dir.X = 0f;
-            if (dir.X > 0f && pitch.GoalLineX - at.X < GoalLineKeepM) dir.X = 0f;
+            if (dir.Y > 0f && pitch.HalfWidth - at.Y < k.BoardMarginM || dir.Y < 0f && at.Y + pitch.HalfWidth < k.BoardMarginM) dir.Y = 0f;
+            if (dir.X < 0f && at.X - pitch.MinX < k.BoardMarginM) dir.X = 0f;
+            if (dir.X > 0f && pitch.GoalLineX - at.X < k.GoalLineMarginM) dir.X = 0f;
             if (dir.LengthSquared() < 1e-4f) { p.MateHeading = default; return default; }
             dir = Vector2.Normalize(dir);
         }
@@ -287,11 +282,13 @@ public static class MateBot
     }
 
     /// <summary>
-    /// Bodies: with a player within 1 m of his path ahead he curves round on one side until nobody is within 2 m; for ten ticks
-    /// after a bump he steers at least 60 degrees off the body he bumped.
+    /// Bodies: with a player within mate.body_avoid_m of his path ahead he curves round on one side (mate.bump_steer_deg off
+    /// his way) until nobody is within mate.body_clear_m; for mate.bump_steer_ticks after a bump he steers at least that far
+    /// off the body he bumped.
     /// </summary>
     static Vector2 Avoid(PlayerState p, Vector2 dir, World w, Tuning t)
     {
+        var k = t.Mate;
         var at = Flat(p.Position);
         float touching = 2f * t.Defending.BodyRadiusM + 0.05f;
         PlayerState? inPath = null;
@@ -303,13 +300,13 @@ public static class MateBot
                 var to = Flat(o.Position) - at;
                 float dist = to.Length();
                 nearest = MathF.Min(nearest, dist);
-                if (dist <= touching) { p.MateBumpUntil = w.Tick + BumpTicks; p.MateBumpYaw = MathF.Atan2(to.Y, to.X); }
+                if (dist <= touching) { p.MateBumpUntil = w.Tick + k.BumpSteerTicks; p.MateBumpYaw = MathF.Atan2(to.Y, to.X); }
                 float along = Vector2.Dot(to, dir);
-                if (along <= 0f || along > AvoidClearM) continue;
+                if (along <= 0f || along > k.BodyClearM) continue;
                 float side = MathF.Abs(to.X * dir.Y - to.Y * dir.X);
-                if (side < AvoidPathM && along < inPathAlong) { inPath = o; inPathAlong = along; }
+                if (side < k.BodyAvoidM && along < inPathAlong) { inPath = o; inPathAlong = along; }
             }
-        if (nearest > AvoidClearM) p.MateAvoidSide = 0;
+        if (nearest > k.BodyClearM) p.MateAvoidSide = 0;
         if (inPath != null && p.MateAvoidSide == 0)
         {
             // Round the side he is already on (the body to the right of his way: he goes left).
@@ -317,11 +314,11 @@ public static class MateBot
             p.MateAvoidSide = dir.X * to.Y - dir.Y * to.X > 0f ? -1 : 1;
         }
         float yaw = MathF.Atan2(dir.Y, dir.X);
-        if (p.MateAvoidSide != 0 && inPath != null) yaw += p.MateAvoidSide * AvoidDeg * MathF.PI / 180f;
+        if (p.MateAvoidSide != 0 && inPath != null) yaw += p.MateAvoidSide * k.BumpSteerDeg * MathF.PI / 180f;
         if (w.Tick < p.MateBumpUntil)
         {
             float off = Movement.WrapAngle(yaw - p.MateBumpYaw);
-            float min = AvoidDeg * MathF.PI / 180f;
+            float min = k.BumpSteerDeg * MathF.PI / 180f;
             if (MathF.Abs(off) < min) yaw = p.MateBumpYaw + (off >= 0f ? min : -min);
         }
         return new Vector2(MathF.Cos(yaw), MathF.Sin(yaw));

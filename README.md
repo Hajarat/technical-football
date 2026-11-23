@@ -27,7 +27,7 @@ It is a personal project, built for the love of the game.
 
 ## Getting started
 
-Today the game is the 1v1 duel, one attacker against the keeper: a simulation core in C#, game data in JSON and a Godot 4.7 (.NET) shell. Run everything from the repo root.
+Today the game is the duel, one attacker against the keeper, with a defender and a first team scenario (two v one: a team-mate to pass to): a simulation core in C#, game data in JSON and a Godot 4.7 (.NET) shell. Run everything from the repo root.
 
 - **Play** (needs a gamepad): `./play.sh`. It builds the C# first, since `godot-mono --path game` alone runs the last compiled build, which a pull does not update. Game options go after `--`, e.g. `./play.sh --figure procedural`. The controls are in [docs/controls.md](docs/controls.md); the game also shows them on `H` or when paused.
 - **First checkout:** run `godot-mono --headless --path game --import` once.
@@ -49,6 +49,8 @@ Today the game is the 1v1 duel, one attacker against the keeper: a simulation co
 - [docs/arena.md](docs/arena.md): coordinates, the walled arena and penalty area, scenarios, loose-ball start spots, scripted rounds.
 - [docs/dribbling.md](docs/dribbling.md): speeds, turning, the touch controller, the boards, lock-on (going for a loose ball), and the skill moves with their timings.
 - [docs/shooting.md](docs/shooting.md): the five shot types, the striking foot, accuracy, aim, charge and the strike.
+- [docs/passing.md](docs/passing.md): the ground pass and the through ball, receiving, control that follows the ball, offside, and the pass probe.
+- [docs/teammate.md](docs/teammate.md): the team-mate's bot (fields and the run in behind), the defender and keeper against two, the scripted styles and their bands.
 - [docs/keeper.md](docs/keeper.md): how the keeper positions himself, closes down, saves and recovers, and the keeper probes.
 - [docs/defending.md](docs/defending.md): the defender: his bot, the auto tackle, lunge, slide, barge and block, how a round ends with him in it, and the defender probe.
 - [docs/controls.md](docs/controls.md): the controls panel, the gamepad and keyboard controls, skill-move gestures and the macOS controller note.

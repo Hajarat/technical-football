@@ -137,6 +137,13 @@ of the keeper's line to the ball, nearer to the ball than the keeper and not bea
 (the trace's race block reads `defender covers`). A ball within a dive of him is still his and his saves are unchanged. See
 [defending.md](defending.md#the-keeper-yields).
 
+## With a team-mate
+
+In a scenario with a second attacker the attacker the keeper reads is the controlled one, so from the strike of a pass it is
+the receiver. While the pass is on its way he sets himself (his arc, his depth) for where it will be met, the receiver's
+meeting point, instead of where the ball is; his rush and his saves still read the ball itself, and a pass winding up is not
+a shot, so he does not plant for it. See [passing.md](passing.md).
+
 ## Diagnostics
 
 The batch tool prints, under the scoring table, the keeper's distance off his line and the ball's distance from goal at the

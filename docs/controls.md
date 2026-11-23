@@ -37,7 +37,10 @@ The table uses Xbox names.
 | Right stick: forward flick, rest, a side | Spin (a roulette) toward that side |
 | Right stick: back flick, rest, a side | McGeady spin: the ball dragged behind, a turn away, out square to that side |
 | Right stick back alone | Nothing (the start of an elastico or a McGeady spin) |
-| A, X, Y, right bumper + A | Nothing during play: there are no passes |
+| A / Cross (tap or hold, with a team-mate) | Ground pass to his feet: the stick aims, and the hold (up to 0.4 s, then released for you) points further along the stick. Control moves to the receiver at the strike (see [passing.md](passing.md)) |
+| Y / Triangle (tap or hold, with a team-mate) | Through ball into the space he is running to; aimed the same way |
+| A, Y or B while a pass is on its way to you | A first-time pass or shot, struck when the ball arrives |
+| X, right bumper + A | Nothing during play |
 | A / Cross | Start the round; at the report, next round (new seed) |
 | Y / Triangle | At the report, retry with the same seed |
 | D-pad left / right | Previous / next start spot |
@@ -81,6 +84,7 @@ Works alongside a gamepad (the larger stick value wins) and when none is detecte
 | E | Curved (finesse) shot, held while shooting |
 | Left Shift | Chip, held while shooting |
 | Right mouse | Cancel: pressed after shoot and before the strike, a fake shot |
+| F / R | Ground pass / through ball, with a team-mate |
 | Back against the run + E + Left Shift | Drag-back, as the pad's left stick back with both bumpers |
 | Space, G | Shoot and cancel again, for keyboard-only play |
 | X | Knock-on |

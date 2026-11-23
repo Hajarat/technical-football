@@ -10,6 +10,9 @@ action, for any outfield player), `Contacts.cs` (bodies), `World.Defender.cs` (h
 `Movement.cs`. The bot's numbers are the `defender` section of `data/tuning/default.json`, the actions' the `defending`
 section. Values marked (ref) in `Data/Tuning.cs` were read from reference data; the others are ours.
 
+In a scenario with a team-mate (two v one) he also waits a reaction delay after a strike, anchors on where a pass will be met
+and cuts it out only when he is first: see [teammate.md](teammate.md#against-two-the-defender-and-the-keeper).
+
 ## The bot writes an intent
 
 The bot never moves the defender. Each tick it writes a `TickIntent` (stick, sprint, and the held buttons `Jockey`, `Tackle`,

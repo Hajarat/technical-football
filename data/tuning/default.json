@@ -336,7 +336,9 @@
     "horizon_seconds": 4,
     "rebuild_drift_m": 0.05,
     "takeover_margin_seconds": 0.1,
-    "stick_slide_deg": 40
+    "stick_slide_deg": 40,
+    "reaction_ratio": [[1, 0.35], [99, 0.05]],
+    "reaction_max_seconds": 0.5
   },
   "shot": {
     "first_time_error": [[0, 1], [10, 1.25], [20, 1.6]],
@@ -973,5 +975,64 @@
       "lift_deg": 40
     }
   },
-  "dt": 0.008333334
+  "dt": 0.008333334,
+  "pass": {
+    "charge_seconds": 0.4,
+    "min_distance": 1,
+    "max_distance": {"ground": 22, "through": 26},
+    "arrival_speed": {"ground": 5, "through": 6},
+    "speed_cap": {"min": 14, "max": 24},
+    "execution_seconds": [[0, 0.3], [1, 0.4]],
+    "angle_extra_seconds": [[0, 0], [45, 0], [90, 0.1], [135, 0.2], [180, 0.3]],
+    "through_ahead_seconds": [0.6, 1.4],
+    "stun_seconds": 0.15,
+    "flick_speed": 0.7,
+    "speed_step": 1
+  },
+  "control": {
+    "claim_jump_seconds": 0.1,
+    "stick_settle_seconds": 0.15
+  },
+  "mate": {
+    "sample_m": 2,
+    "spread_radius_m": 4,
+    "spread_weight": 1,
+    "opponent_radius_m": 2.5,
+    "opponent_weight": 0.1,
+    "space_weight": 1,
+    "lane_weight": 1,
+    "gap_weight_armed": 3,
+    "line_weight_armed": 5,
+    "line_weight_go": -3,
+    "goal_weight": 0.3,
+    "still_gradient": 0.05,
+    "backward_jog_share": 0.6,
+    "arm_ball_to_line_m": 10,
+    "arm_max_progress": 0.5,
+    "arm_carrier_to_defender_m": 12,
+    "attack_full_from_goal_m": 8,
+    "go_within_m": 0.5,
+    "armed_onside_m": 0.8,
+    "rearm_onside_m": 2,
+    "pass_cancel_onside_m": 3.5,
+    "run_cancel_goal_m": 8,
+    "space_cap_m": 4,
+    "full_gradient": 0.4,
+    "go_beyond_seconds": 0,
+    "rearm_seconds": 4,
+    "line_lead_seconds": 0.8,
+    "go_max_line_speed": 0.75,
+    "board_margin_m": 1.5,
+    "goal_line_margin_m": 3,
+    "body_avoid_m": 1,
+    "body_clear_m": 2,
+    "bump_steer_deg": 60,
+    "bump_steer_ticks": 10
+  },
+  "receive": {
+    "error": [[0, 1], [10, 1.3], [20, 1.8]],
+    "cooldown": [[0, 0.1], [10, 0.2], [20, 0.35]],
+    "rating": {"at1": 1.3, "at99": 0.7},
+    "queued_cooldown": 0.1
+  }
 }
