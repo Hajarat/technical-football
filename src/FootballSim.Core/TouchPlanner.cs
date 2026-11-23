@@ -128,9 +128,48 @@ public static class TouchPlanner
         float pace = stick < t.Movement.StickDeadZone ? 0f : stickCap * stick * Movement.ModeFraction(user, p.Sheet, t);
         if (dist < t.Touch.TurnReach.Rest + Pitch.PlayerRadius && bv.Length() < BoardStillBall && AtBoard(ball, t, pitch)) pace = 0f;
         float target = MathF.Max(pace, away + MathF.Max(0f, dist - 0.3f) / Movement.TimeConstant(p.Sheet, t));
+        target = MathF.Min(target, OrbitFreeSpeed(p, dir, dist, cap, t));
+        // A ball not coming at him is not run past: no faster than he can still brake from to its pace over the gap (not
+        // during a shot, which strikes it in stride).
+        if (p.ShotAction == null && Vector2.Dot(bv, rel / dist) > -ArriveIncoming)
+            target = MathF.Min(target, away + MathF.Sqrt(2f * ArriveDeceleration * MathF.Max(0f, dist - 0.3f)));
         float mag = Math.Clamp(target, 0.8f, cap) / MathF.Max(cap, 1e-3f);
         return new TickIntent { MoveX = dir.X * mag, MoveZ = dir.Y * mag, Sprint = 1f };
     }
+
+    /// <summary>
+    /// The fastest the go-get-it legs may run toward a ball <paramref name="dist"/> away along <paramref name="dir"/> without
+    /// it lying inside his turning circle (radius: speed over the turn rate at that speed), where he would run round it instead
+    /// of onto it: the ball off his facing by an angle is on the circle that leaves along the facing with radius
+    /// dist / (2 sin angle), kept <see cref="OrbitMargin"/> inside it. A ball ahead or behind sets no bound.
+    /// </summary>
+    static float OrbitFreeSpeed(PlayerState p, Vector2 dir, float dist, float cap, Tuning t)
+    {
+        float sin = MathF.Abs(Cross(FacingDir(p), dir));
+        if (sin < 1e-3f) return float.PositiveInfinity;
+        float r = OrbitMargin * dist / (2f * sin);
+        float w0 = Movement.TurnRateDeg(p.Sheet, t) * MathF.PI / 180f, k = t.Movement.TurnSpeedPenalty;
+        // v = r * w0 * (1 - k v / cap), solved for v.
+        return r * w0 / (1f + r * w0 * k / MathF.Max(cap, 1e-3f));
+    }
+
+    /// <summary>
+    /// How much sooner the go-get-it legs at any speed must play the ball than the held ones (within 15% of the pace) for the
+    /// controller to slow for it (see <see cref="LapSeconds"/>), ticks.
+    /// </summary>
+    static int LapTicks(Tuning t) => Ticks(LapSeconds, t);
+    /// <summary>... in seconds.</summary>
+    const float LapSeconds = 0.25f;
+
+    /// <summary>The braking the go-get-it legs' arrival speed allows for, m/s^2 (the speed law's own easing included).</summary>
+    const float ArriveDeceleration = 6f;
+    /// <summary>A ball coming at him faster than this, m/s, sets no arrival speed (he goes to meet it).</summary>
+    const float ArriveIncoming = 1f;
+
+    /// <summary>The turning circle the go-get-it legs allow is this share of the one that just reaches the ball.</summary>
+    const float OrbitMargin = 0.8f;
+
+    static float Cross(Vector2 a, Vector2 b) => a.X * b.Y - a.Y * b.X;
 
     /// <summary>
     /// The ground direction to run on to the ball: toward where it will be when the player, holding his speed, has closed the
@@ -635,6 +674,13 @@ public static class TouchPlanner
                 // The go-get-it legs within 15% of the pace, stretching for it, before they may run at any speed.
                 if (!tg.Found && stickActive) tg = Search(p, intent, ball, chase: true, 1, minJ, h, now, t, pitch, k.StretchReach, held: true, turnish: turnish, board: atBoard);
                 if (!tg.Found) tg = Search(p, intent, ball, chase: true, 1, minJ, h, now, t, pitch, turnish: turnish, board: atBoard);
+                // A ball the held legs reach only much later (a slow ball they would run past and come round to): go and get it
+                // at whatever speed plays it sooner, slowing for it rather than running a lap round it.
+                else if (tg.Chase && tg.Held && tg.J > minJ + LapTicks(t))
+                {
+                    var free = Search(p, intent, ball, chase: true, 1, minJ, tg.J - LapTicks(t), now, t, pitch, turnish: turnish, board: atBoard);
+                    if (free.Found) tg = free;
+                }
             }
         }
 
