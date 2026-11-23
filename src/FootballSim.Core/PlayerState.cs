@@ -144,8 +144,31 @@ public sealed class PlayerState
     /// within reach at an eligible swing), false while they follow the stick.
     /// </summary>
     public bool Chasing { get; internal set; }
-    /// <summary>How eagerly he goes for a loose ball this tick (see <see cref="Core.Regain"/>); None in possession.</summary>
+    /// <summary>
+    /// How he stands in the race for a loose ball this tick, derived from his team's claim (see <see cref="LockOn"/>): None
+    /// unless he holds it.
+    /// </summary>
     public RegainMode Regain { get; internal set; }
+    /// <summary>The claim holder's meeting: where the ball centre will be when he meets it. Meaningful while <see cref="LockOnTick"/> is not -1.</summary>
+    public Vector3 LockOnPoint { get; internal set; }
+    /// <summary>The claim holder's meeting: the world tick his touch is made on, or -1 when he holds no claim.</summary>
+    public int LockOnTick { get; internal set; } = -1;
+    /// <summary>
+    /// The earliest tick his meeting may fall on, written by an action queued without the ball (a shot's earliest strike tick);
+    /// 0 when none. Cleared when the action ends.
+    /// </summary>
+    public int MinArrivalTick { get; internal set; }
+    /// <summary>With <see cref="MinArrivalTick"/>: the highest ball centre the queued action plays, metres (NaN: any a first touch plays).</summary>
+    internal float MinArrivalHeight = float.NaN;
+    /// <summary>With <see cref="MinArrivalTick"/>: the queued action is a strike, met at the strike reach.</summary>
+    internal bool MinArrivalStrike;
+    /// <summary>The ball's velocity at the meeting, and whether it is at rest there (for the holder's legs).</summary>
+    internal Vector3 LockOnBallVelocity;
+    internal bool LockOnResting;
+    /// <summary>The ticks the meeting leaves him beyond his flat-out run (0: he must run flat out).</summary>
+    internal int LockOnSlack;
+    /// <summary>His last solves, kept between the ticks they are made afresh on.</summary>
+    internal LockOnSolveCache LockOnSolve;
 
     // ---- Defending. The view draws a defender, and an attacker's reactions, from these. ----
 
@@ -391,6 +414,8 @@ public sealed class PlayerState
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed; StepBegun = o.StepBegun;
         StumbleUntil = o.StumbleUntil; TackledLockUntil = o.TackledLockUntil;
+        LockOnPoint = o.LockOnPoint; LockOnTick = o.LockOnTick; MinArrivalTick = o.MinArrivalTick; MinArrivalHeight = o.MinArrivalHeight;
+        LockOnBallVelocity = o.LockOnBallVelocity; LockOnResting = o.LockOnResting; LockOnSlack = o.LockOnSlack;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction; TurnFatigue = o.TurnFatigue;
         GZone = o.GZone; GPrevZone = o.GPrevZone; GZoneStart = o.GZoneStart; GFwdLastTick = o.GFwdLastTick;
         GFwdStart = o.GFwdStart; GFwdFromNeutral = o.GFwdFromNeutral; GBackLastTick = o.GBackLastTick;

@@ -328,13 +328,21 @@
     "chase_speed_fraction": 0.97,
     "off_ball_turn_bonus": -0.2,
     "prediction_horizon": 1.5,
-    "regain_cone_deg": 75,
-    "regain_max_distance": 10,
     "regain_keeper_distance": 3,
     "regain_keeper_margin": 0.3,
     "regain_reach": 1.2
   },
+  "lock_on": {
+    "horizon_seconds": 4,
+    "rebuild_drift_m": 0.05,
+    "takeover_margin_seconds": 0.1,
+    "stick_slide_deg": 40
+  },
   "shot": {
+    "first_time_error": [[0, 1], [10, 1.25], [20, 1.6]],
+    "flick_max_distance_m": 10,
+    "flick_power": 0.6,
+    "flick_error": 1.5,
     "base_sigma_deg": 4.9,
     "sigma_skill_slope": 4.34,
     "vertical_ratio": 0.7,

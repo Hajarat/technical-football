@@ -41,6 +41,9 @@ using FootballSim.Core;
 //   ... --trace-defender <seed> [--style straight|cut|skill] [--every 12]
 //                                               prints the defender's state through one scripted round
 //   ... --write-defender-replays <dir>          searches scripted rounds for each defender action and writes one replay each
+//   ... --lock-probe [--seeds 1000] [--only behind,still_shot,first_time,flick,gesture,race,slide]
+//                                               scripted loose-ball rounds, one case per lock-on rule, with their targets
+//   ... --lock-probe --trace <case> [--seed 1]  prints one round of a case: the claim, the legs and the events
 //   ... --set defender.overshoot_m=0.6,...     overrides plain tuning numbers by their file names (experiments)
 //   ... --counters off                          the scripted attacker ignores the keeper (no shorter touches, rounding or chips)
 //   ... --close-down off                        the shallow keeper: he never closes down (close_down_range 0), so never charges
@@ -56,7 +59,7 @@ static class Cli
         {
             if (!args[i].StartsWith("--")) { Console.Error.WriteLine($"Unexpected argument '{args[i]}'"); return 2; }
             string key = args[i][2..];
-            if (key is "dump-tuning" or "skill-probe" or "keeper-probe") { opts[key] = "1"; continue; }
+            if (key is "dump-tuning" or "skill-probe" or "keeper-probe" or "lock-probe") { opts[key] = "1"; continue; }
             if (i + 1 >= args.Length) { Console.Error.WriteLine($"Missing value for --{key}"); return 2; }
             opts[key] = args[++i];
         }
@@ -94,6 +97,7 @@ static class Cli
             return ShotAuditCli.Run(auditPath, opts.TryGetValue("capture", out var capId) ? capId : null, dataDir, tuning);
         if (opts.ContainsKey("skill-probe")) return SkillProbe.Run(opts, dataDir, tuning);
         if (opts.ContainsKey("keeper-probe")) return KeeperProbe.Run(opts, dataDir, tuning);
+        if (opts.ContainsKey("lock-probe")) return LockProbe.Run(opts, dataDir, tuning);
         if (opts.TryGetValue("write-probe-replays", out var probeDir)) return KeeperProbe.WriteReplays(probeDir, dataDir, tuning);
         if (opts.TryGetValue("probe-replays", out var probeReplays)) return KeeperProbe.RunReplays(probeReplays, dataDir, tuning, opts);
         if (opts.TryGetValue("write-skill-replays", out var skillDir)) return SkillProbe.WriteReplays(skillDir, dataDir, tuning);

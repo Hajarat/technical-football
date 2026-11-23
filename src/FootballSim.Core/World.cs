@@ -51,6 +51,11 @@ public sealed partial class World
     bool _shotCancelled;       // the shot was turned into a fake: the rest of this press of shoot is ignored
     GestureRead _fake;         // a fake shot recognised: the shot winds up as a real one until the fake's contact ...
     int _fakeTick = -1;        // ... on this tick (the shot's planned strike, at least fake_contact_after_cancel after the cancel), or -1
+    bool _flightPress;         // shoot was pressed while a shot was in flight and is still held: it counts as pressed when play goes live
+
+    // Lock-on.
+    readonly LockOnClaim[] _claims = new LockOnClaim[2];
+    readonly List<LockOnCandidate>[] _candidates = { new(), new() };
 
     const ulong KeeperSeedSalt = 0x6B65657065723144UL;
 
@@ -153,8 +158,14 @@ public sealed partial class World
     public PlayerState Keeper => Teams[1][0];
     /// <summary>The player who controls the ball (dribbling it, or the keeper holding it), or null when the ball is loose.</summary>
     public PlayerState? BallController => _controller;
-    /// <summary>True once someone has controlled or struck the ball this round: a loose ball from then on was lost (see Regain).</summary>
+    /// <summary>True once someone has controlled or struck the ball this round: a loose ball from then on can be claimed (see LockOn).</summary>
     public bool BallPlayed { get => _ballPlayed; internal set => _ballPlayed = value; }
+    /// <summary>The loose ball's forecast path (see <see cref="BallForecast"/>): built for the current ball path, empty while nobody may claim the ball.</summary>
+    public BallForecast Forecast { get; } = new();
+    /// <summary>Each team's claim on the loose ball (see <see cref="LockOn"/>): index 0 the attackers', 1 the keeper's side. A null player is no claim.</summary>
+    public IReadOnlyList<LockOnClaim> Claims => _claims;
+    /// <summary>True when <paramref name="p"/> holds his team's claim on the loose ball this tick.</summary>
+    public bool HoldsClaim(PlayerState p) => _claims[p.Team].Player == p;
     /// <summary>The keeper's numbers for the latest shot.</summary>
     public KeeperReport KeeperReport => _brain.Report;
     /// <summary>Why the keeper did what he did on the latest tick (a diagnostic for probes; changes nothing).</summary>
@@ -207,6 +218,9 @@ public sealed partial class World
         _liveSeconds = 0f; _endTick = 0; _endClock = 0f; _lastShot = null;
         _controller = null; _awayFor = 0f; _softPending = false; _ballPlayed = Scenario.BallLoose; _shotAtFoot = false; _strikeFoot = Foot.Right; _strikeSurface = FootSurface.Laces; _strikeGeometry = new StrikeDecision(new StrikeChoice(Foot.Right, FootSurface.Laces), StrikeRule.Ahead); _aimYaw = 0f; _strikeUntimed = false;
         _shotStartTick = -1; _shotCancelled = false; _strikeEstMax = -1; _fakeTick = -1; _fake = default;
+        _flightPress = false;
+        _claims[0] = default; _claims[1] = default;
+        Forecast.Clear();
 
         float r = Tuning.Ball.Radius;
         Ball.Position = new Vector3(Scenario.Ball.X, r, Scenario.Ball.Z);
@@ -298,6 +312,15 @@ public sealed partial class World
         p.ActionContactEta = float.NaN;
         p.Chasing = false;
         p.Regain = RegainMode.None;
+        p.LockOnTick = -1;
+        p.LockOnPoint = Vector3.Zero;
+        p.LockOnBallVelocity = Vector3.Zero;
+        p.LockOnResting = false;
+        p.LockOnSlack = 0;
+        p.LockOnSolve = default;
+        p.MinArrivalTick = 0;
+        p.MinArrivalHeight = float.NaN;
+        p.MinArrivalStrike = false;
         p.LastTouchKind = ActionKind.First;
         p.KnockOnRequested = false;
         p.StepsSinceTouch = 0;
@@ -348,6 +371,9 @@ public sealed partial class World
         _events.Clear();
         if (State is RoundState.Setup or RoundState.Report) return;
 
+        // The claims on a loose ball, for the tick about to be stepped: before the defender's bot, which reads his.
+        UpdateLockOn(IntentFor(intents, 0, 0));
+
         // The defender's intent comes from his bot (or, with the bot off, from the caller); either way it is what is recorded.
         TickIntent def = default;
         if (Defender != null)
@@ -368,6 +394,22 @@ public sealed partial class World
         TickIntent atk = IntentFor(intents, 0, 0);
         StepSimulation(atk, def);
         PublishContract();
+    }
+
+    /// <summary>
+    /// Both teams' claims on the loose ball for the tick about to be stepped (see <see cref="LockOn.Update"/>): they stand only in
+    /// Live or Strike, once the ball has been played, while nobody controls it. The attacker and the defender are the candidates.
+    /// </summary>
+    void UpdateLockOn(in TickIntent atk)
+    {
+        bool live = State is RoundState.Live or RoundState.Strike && _ballPlayed && _controller == null;
+        _candidates[0].Clear(); _candidates[1].Clear();
+        if (live)
+        {
+            _candidates[0].Add(new LockOnCandidate(Attacker, atk, Stick: Attacker.ShotAction == null, LockOnRun.Attacker));
+            if (Defender != null) _candidates[1].Add(new LockOnCandidate(Defender, default, Stick: false, LockOnRun.Defender));
+        }
+        LockOn.Update(Forecast, _claims, _candidates, Teams, Keeper, Ball, Pitch, live, Tick + 1, SimTime + _dt, Tuning);
     }
 
     void StepSimulation(in TickIntent atk, in TickIntent def)
@@ -442,7 +484,9 @@ public sealed partial class World
         }
 
         // 5. Clock.
-        if (State == RoundState.Live) { Clock += _dt; }
+        // (A shot queued on the way to a loose ball does not stop the clock: it may wait seconds for its meeting.)
+        bool clockRuns = State == RoundState.Live || State == RoundState.Strike && _controller == null && _claims[0].Player == Attacker;
+        if (clockRuns) { Clock += _dt; }
         _liveSeconds += _dt;
 
         // 6. Referee.
@@ -461,7 +505,7 @@ public sealed partial class World
             EndRound(Outcome.Goal);
             return;
         }
-        if (State == RoundState.Live)
+        if (clockRuns)
         {
             float limit = Scenario.ClockLimit ?? float.MaxValue;
             if (Clock >= limit || _liveSeconds >= Tuning.Round.MaxSeconds) EndRound(Outcome.TimeUp);
@@ -497,6 +541,12 @@ public sealed partial class World
                 else if (s2.Contact2Tick > Tick) Take(s2.Contact2Tick);
             }
             if (a.ShotAction is { Made: false } sh) Take(sh.ContactTick);
+        }
+        // Without the ball but holding his team's claim on it: his meeting is his next touch (one misjudgement per claim).
+        if (float.IsPositiveInfinity(best) && _controller == null && _claims[0].Player == a && a.LockOnTick >= 0)
+        {
+            best = MathF.Max(0f, (a.LockOnTick - Tick) * _dt);
+            tick = -2 - _claims[0].SinceTick;
         }
         if (float.IsPositiveInfinity(best))
         {
@@ -567,18 +617,23 @@ public sealed partial class World
             _events.Add(started);
         // Shoot pressed: before the touch controller runs, so from the press tick on it plays no dribble touch it has not
         // already committed, and its next contact is the strike.
-        if (State == RoundState.Live && shootHeld && !_shootWasHeld) PressShoot(p, inPossession);
+        // A press made while the last shot was still in flight, and still held: it counts on the tick play is live again.
+        if (State == RoundState.Flight && shootHeld && !_shootWasHeld) _flightPress = true;
+        if (!shootHeld) _flightPress = false;
+        if (State == RoundState.Live && shootHeld && (!_shootWasHeld || _flightPress))
+        {
+            _flightPress = false;
+            PressShoot(p, inPossession);
+        }
         ChooseStrikeTimed(p);
         ShotForController(p);
 
         // From the press to the strike the controller's go-get-it legs run on to the ball (the left stick only aims).
         bool windup = State == RoundState.Live && shootHeld || State == RoundState.Strike && _pending.Active;
-        // A lost ball in front of him in live play, no shot under way: he goes for it (see Regain). A ball loose at the start
-        // of the round (on the spot) is not lost: he stands by it until he plays it.
-        p.Regain = State == RoundState.Live && _ballPlayed && !windup && !_shootWasHeld && !_pending.Active && p.ShotAction == null
-            && _controller == null && !TouchPlanner.Stunned(p, SimTime)
-            ? Regain.Assess(p, it, Ball, Keeper, tuning) : RegainMode.None;
-        if (Defender != null) p.Regain = RegainAgainstDefender(p, p.Regain);
+        // A loose ball he holds his team's claim on: his legs run to the meeting, through a shot's wind-up too (see LockOn).
+        // A ball loose at the start of the round (on the spot) is not claimed: he stands by it until he plays it.
+        bool holder = _claims[0].Player == p && p.LockOnTick >= 0;
+        if (!inPossession && !holder) p.KnockOnRequested = false;
         var assist = TouchPlanner.BeginTick(p, it, Ball, inPossession, State == RoundState.Live || windup, Tick, SimTime, tuning, Pitch, out var legs);
         // Stumbling (tackled or barged), his speed is capped.
         if (Defending.Stumbling(p, SimTime))
@@ -591,7 +646,8 @@ public sealed partial class World
         // Other players on both teams stand still (no behaviour yet).
         if (State == RoundState.Live)
         {
-            if ((it.KnockOn || knockGesture) && inPossession) TouchPlanner.RequestKnockOn(p);
+            // A knock-on asked for on the way to a ball he has the claim on is kept: his first touch is the knock-on.
+            if ((it.KnockOn || knockGesture) && (inPossession || holder)) TouchPlanner.RequestKnockOn(p);
 
             if (shootHeld)
             {
@@ -626,12 +682,58 @@ public sealed partial class World
             var mode = !windup ? TouchStepMode.Normal
                 : _controller != p ? TouchStepMode.None
                 : _softPending ? TouchStepMode.SoftOnly : TouchStepMode.CommittedOnly;
+            // A shot queued on the way to the ball whose only meeting comes before its wind-up is done: a flick close to the
+            // goal (see TryFlick); anywhere else a plain first touch, and the shot carries on as a shot in possession.
+            bool early = windup && holder && _claims[0].Early && _controller != p && p.ShotAction is { Made: false } && _fakeTick < 0;
+            bool flick = early && FlickInRange() && Ball.Position.Y < tuning.Shot.StrikeMaxHeight;
+            if (early && !flick) mode = TouchStepMode.Normal;
             if (TouchPlanner.Stunned(p, SimTime)) mode = TouchStepMode.None;
-            // Stumbling or just tackled he cannot play the ball; nor can he take a loose ball the defender is nearer to.
-            if (Defending.Stumbling(p, SimTime) || SimTime < p.TackledLockUntil || DefenderDeniesTouch(p)) mode = TouchStepMode.None;
-            TryTouch(p, it, mode);
+            // A meeting the stick slid to a later sample: he lets the ball come to it rather than take it the moment it is in
+            // reach (unless it is getting away from him).
+            if (holder && _claims[0].Slid && _controller == null && Tick < _claims[0].ArriveTick - SlideEarlyTicks
+                && Vector3.Dot(Ball.Velocity - p.Velocity, p.Position - Ball.Position) > 0f) mode = TouchStepMode.None;
+            // Stumbling or just tackled he cannot play the ball; nor a loose ball he and the defender are equally near, if the
+            // coin went the defender's way.
+            bool barred = Defending.Stumbling(p, SimTime) || SimTime < p.TackledLockUntil;
+            if (barred || DefenderDeniesTouch(p)) mode = TouchStepMode.None;
+            if (flick && !barred && !TouchPlanner.Stunned(p, SimTime) && ShotModel.CanStrike(p, Ball, tuning)) Flick(p, it);
+            else
+            {
+                bool had = _controller == p;
+                TryTouch(p, it, mode);
+                // The first touch of a shot queued without the ball: from here it is a shot in possession, its foot chosen
+                // again once the feet's contacts are known.
+                if (!had && _controller == p && p.ShotAction is { Made: false }) { _shotAtFoot = false; _softPending = false; _strikeUntimed = true; }
+            }
         }
         UpdateStrikeEstimate();
+        // The shot under way writes its earliest strike tick as the earliest meeting his claim may take (see LockOn).
+        bool queued = p.ShotAction is { Made: false } && _shotStartTick >= 0 && _fakeTick < 0 && _controller != p;
+        p.MinArrivalTick = queued ? EarliestStrikeTick(Tick + 1) : 0;
+        p.MinArrivalHeight = queued ? tuning.Shot.StrikeMaxHeight - 0.02f : float.NaN;
+        p.MinArrivalStrike = queued;
+    }
+
+    /// <summary>A first touch at a meeting the stick slid is made no more than this many ticks before the meeting.</summary>
+    const int SlideEarlyTicks = 2;
+
+    /// <summary>True when the ball is close enough to the goal centre for a flick (shot.flick_max_distance_m).</summary>
+    bool FlickInRange() => ShotModel.GoalDistance(Ball.Position, Pitch) <= Tuning.Shot.FlickMaxDistanceM;
+
+    /// <summary>
+    /// A flick: a shot queued on the way to the ball is struck at his first contact, before its wind-up is done, because no later
+    /// sample of the ball's path is his. Shoot counts as let go now, with the charge built so far; the ball leaves at
+    /// shot.flick_power of that charge's speed with the spreads times shot.flick_error.
+    /// </summary>
+    void Flick(PlayerState p, in TickIntent it)
+    {
+        if (!_pending.Active)
+        {
+            ReleaseShoot(p, it);
+            // (the rest of this press of shoot is spent: it neither charges again nor makes the flick a low shot)
+            _shotCancelled = it.ShootHeld;
+        }
+        ExecuteStrike(flick: true);
     }
 
     /// <summary>
@@ -736,6 +838,8 @@ public sealed partial class World
         if (a.ShotAction is not { Made: false } shot || _shotStartTick < 0) return;
         int est = EarliestStrikeTick(Tick + 1);
         Foot foot = _strikeFoot;
+        // Without the ball the strike falls at his meeting with it.
+        if (_controller != a && _claims[0].Player == a && a.LockOnTick >= 0) est = _claims[0].Early ? a.LockOnTick : Math.Max(est, a.LockOnTick);
         if (_controller == a && !_shotAtFoot)
         {
             if (a.StrikeContactTick >= 0) est = a.StrikeContactTick;
@@ -760,6 +864,13 @@ public sealed partial class World
     void TryStrike()
     {
         var a = Attacker;
+        // Without the ball the shot is kept for as long as he holds his team's claim on it; when the claim ends without him
+        // getting the ball, the buffer starts.
+        if (_controller != a)
+        {
+            if (_claims[0].Player == a) _pending.DeadlineTick = int.MaxValue;
+            else if (_pending.DeadlineTick == int.MaxValue) _pending.DeadlineTick = Math.Max(_pending.ContactTick, Tick) + Ticks(Tuning.Round.ShootBuffer);
+        }
         // Tackled or stumbling he cannot strike; the shot is dropped after the buffer like any that lost the ball.
         if (Defending.Stumbling(a, SimTime) || SimTime < a.TackledLockUntil)
         {
@@ -974,9 +1085,10 @@ public sealed partial class World
             : State == RoundState.Live && a.ShotAction == null ? SkillMoves.PendingHeld(a, Ball, Tick, SimTime, Tuning) : null;
         a.SkillExitTouch = State == RoundState.Live && _controller == a ? SkillMoves.ExitForecast(a, _lastIntent, Ball, Tick, Tuning) : null;
         IdealCharge = ShotModel.IdealCharge(ShotModel.GoalDistance(Ball.Position, Pitch), Tuning);
-        if (State == RoundState.Live && _controller == a)
+        bool claims = _controller == null && State is RoundState.Live or RoundState.Strike && _claims[0].Player == a;
+        if (State == RoundState.Live && _controller == a || claims)
         {
-            var f = Possession.PredictNextTouch(a, Tick, true, Tuning);
+            var f = Possession.PredictNextTouch(a, Tick, _controller == a, Tuning);
             a.NextTouchEta = f.Eta;
             if (!float.IsNaN(f.Eta)) { a.NextTouchFoot = f.Foot; a.NextTouchPoint = f.Point; }
         }
@@ -1016,10 +1128,20 @@ public sealed partial class World
         if (Attacker.ShotAction is { Made: false } s) { s.Phase = ActionPhase.Done; Attacker.ShotAction = null; }
     }
 
-    void ExecuteStrike()
+    /// <summary>
+    /// The strike. Struck without his controlling the ball first (a shot queued on the way to a loose ball) it is a first-time
+    /// strike: the spreads grow with the ball's ground speed against him (shot.first_time_error). <paramref name="flick"/>: struck
+    /// before its wind-up was done (see <see cref="Flick"/>).
+    /// </summary>
+    void ExecuteStrike(bool flick = false)
     {
+        bool firstTime = _controller != Attacker;
+        float against = TouchPlanner.RelativeBallSpeed(Attacker, Ball);
         var ctx = new ShotContext
         {
+            FirstTime = firstTime,
+            Flick = flick,
+            FirstTimeError = firstTime ? MathF.Max(0f, Tuning.Shot.FirstTimeError.Evaluate(against)) : 1f,
             Shooter = Attacker,
             Keeper = Keeper,
             BallPosition = Ball.Position,

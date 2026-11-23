@@ -656,21 +656,41 @@ public sealed class PossessionTuning
     public float OffBallTurnBonus { get; set; } = -0.2f;
     /// <summary>How far ahead the touch controller looks for a step that can play the ball, seconds.</summary>
     public float PredictionHorizon { get; set; } = 1.5f;
-    /// <summary>A loose ball within this angle either side of the facing counts as in front of the player (the eager regain), degrees.</summary>
-    public float RegainConeDeg { get; set; } = 75f;
-    /// <summary>A loose ball further than this is not gone for, metres.</summary>
-    public float RegainMaxDistance { get; set; } = 10f;
-    /// <summary>The keeper within this of the ball contests it, metres.</summary>
+    /// <summary>The keeper within this of the loose ball contests it, metres.</summary>
     public float RegainKeeperDistance { get; set; } = 3f;
-    /// <summary>The keeper contests the ball when he would reach it no more than this after the attacker, seconds.</summary>
+    /// <summary>The keeper, or the other team's claim holder, contests the ball when he would reach the meeting no more than this after the holder, seconds.</summary>
     public float RegainKeeperMargin { get; set; } = 0.3f;
     /// <summary>An uncontested regain takes the ball from this far from the body (beyond foot reach, at the stretched errors), metres.</summary>
     public float RegainReach { get; set; } = 1.2f;
 }
 
+/// <summary>Lock-on: the claim on a loose ball (see LockOn). Values marked (ref) are read from reference data.</summary>
+public sealed class LockOnTuning
+{
+    /// <summary>How far ahead the loose ball's path is forecast, seconds (the reference searches 10 s on a full pitch).</summary>
+    public float HorizonSeconds { get; set; } = 4f;
+    /// <summary>The real ball further than this from its forecast sample has left the path: the forecast is rebuilt, metres.</summary>
+    public float RebuildDriftM { get; set; } = 0.05f;
+    /// <summary>A team-mate takes the claim from the holder only by arriving this much earlier, seconds (ref).</summary>
+    public float TakeoverMarginSeconds { get; set; } = 0.1f;
+    /// <summary>The stick slides the meeting to a later sample whose bearing is within this of the stick, degrees (ref).</summary>
+    public float StickSlideDeg { get; set; } = 40f;
+}
+
 /// <summary>Shot model constants.</summary>
 public sealed class ShotTuning
 {
+    /// <summary>
+    /// A first-time strike (struck at the meeting, no trap): the direction and height spreads are multiplied by this, against the
+    /// ball's ground speed relative to the shooter, m/s.
+    /// </summary>
+    public Curve FirstTimeError { get; set; } = new((0f, 1f), (10f, 1.25f), (20f, 1.6f));
+    /// <summary>A flick (a queued shot struck at the first contact, before its wind-up is done) is made only this close to the goal centre, metres.</summary>
+    public float FlickMaxDistanceM { get; set; } = 10f;
+    /// <summary>A flick's ball speed is the same charge's times this.</summary>
+    public float FlickPower { get; set; } = 0.6f;
+    /// <summary>A flick's direction and height spreads are multiplied by this.</summary>
+    public float FlickError { get; set; } = 1.5f;
     public float BaseSigmaDeg { get; set; } = 4.9f;
     public float SigmaSkillSlope { get; set; } = 4.34f;
     public float VerticalRatio { get; set; } = 0.7f;
@@ -1776,6 +1796,7 @@ public sealed class Tuning
     public MovementTuning Movement { get; set; } = new();
     public TouchTuning Touch { get; set; } = new();
     public PossessionTuning Possession { get; set; } = new();
+    public LockOnTuning LockOn { get; set; } = new();
     public ShotTuning Shot { get; set; } = new();
     public KeeperTuning Keeper { get; set; } = new();
     public RoundTuning Round { get; set; } = new();

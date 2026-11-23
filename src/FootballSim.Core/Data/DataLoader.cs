@@ -284,6 +284,7 @@ public static class DataLoader
                 ("keeper.catch_range_standing_min", t.Keeper?.CatchRangeStandingMin), ("keeper.catch_range_standing_max", t.Keeper?.CatchRangeStandingMax),
                 ("keeper.catch_range_diving_min", t.Keeper?.CatchRangeDivingMin), ("keeper.catch_range_diving_max", t.Keeper?.CatchRangeDivingMax),
                 ("keeper.catch_range_time", t.Keeper?.CatchRangeTime),
+                ("shot.first_time_error", t.Shot?.FirstTimeError),
                 ("defender.hold_distance_m", t.Defender.HoldDistanceM), ("defender.hold_offset_min_m", t.Defender.HoldOffsetMinM), ("defender.hold_offset_max_m", t.Defender.HoldOffsetMaxM),
                 ("defender.to_active_after_s", t.Defender.ToActiveAfterS), ("defender.active_max_s", t.Defender.ActiveMaxS),
                 ("defending.auto.radius_walk_m", t.Defending.Auto.RadiusWalkM), ("defending.auto.radius_jockey_m", t.Defending.Auto.RadiusJockeyM), ("defending.auto.angle_deg", t.Defending.Auto.AngleDeg),
@@ -307,7 +308,18 @@ public static class DataLoader
             }
             if (!float.IsFinite(t.Touch.DangerRadius) || t.Touch.DangerRadius < 0f)
                 return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: touch.danger_radius: must be finite and not negative (default tuning in use)" };
+            if (t.LockOn == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: lock_on: must be an object (default tuning in use)" };
             var w = new List<LoadWarning>();
+            // Keys the lock-on replaced: a file that still has them loads, with a warning each.
+            try
+            {
+                using var doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+                if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("possession", out var poss) && poss.ValueKind == JsonValueKind.Object)
+                    foreach (var gone in new[] { "regain_cone_deg", "regain_max_distance" })
+                        if (poss.TryGetProperty(gone, out _))
+                            w.Add(new LoadWarning(fileLabel, "possession." + gone, "removed (lock-on goes for a loose ball from any direction and distance); ignored"));
+            }
+            catch (JsonException) { }
             if (t.TickRate < 1 || t.TickRate > 1000)
             {
                 w.Add(new LoadWarning(fileLabel, "tick_rate", $"{t.TickRate} is outside 1..1000; using 120"));

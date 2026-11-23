@@ -15,7 +15,7 @@ public enum DefenderMode { Hold, Press, Collect }
 /// behind him), bending in from the side close up and steering off after a bump. With the ball between them and the attacker
 /// within the tackle distance he presses the tackle button, a lunge or, by a roll made once per press, a slide; running
 /// alongside he may barge. After his active time, or once the attacker is past him, he drops back to hold. A loose ball he
-/// goes for.
+/// goes for, at his own meeting point with it.
 /// </para>
 /// The numbers are in tuning.defender. His draws come from his own generator, so nothing else's draws move.
 /// </summary>
@@ -249,27 +249,27 @@ public sealed class DefenderBot
         return new Vector2(MathF.Cos(yaw), MathF.Sin(yaw));
     }
 
-    /// <summary>A loose ball: he runs to where it will be shortly, at a velocity that closes on it and matches its own, so he arrives able to control it.</summary>
+    /// <summary>
+    /// A loose ball: he runs to his meeting with it (his team's claim, see <see cref="LockOn"/>; without one, to where the ball
+    /// will be shortly), at a velocity that closes on it and matches the ball's own there, so he arrives able to control it.
+    /// </summary>
     static TickIntent Collect(World w, PlayerState d, Vector2 dp, Vector2 bp)
     {
         var t = w.Tuning;
-        var bv = Flat(w.Ball.Velocity);
-        var aim = bp + bv * CollectLead;
-        var to = aim - dp;
-        float gap = to.Length();
-        float top = MathF.Max(0.1f, Movement.TopSpeed(d.Sheet, t));
-        // He closes on it no faster than he can brake from (so he arrives slow against the ball), on top of the ball's own velocity.
-        var want = bv + (gap > 1e-4f ? to / gap * MathF.Min(top, MathF.Sqrt(2f * CollectBrake * gap)) : Vector2.Zero);
-        float m = want.Length();
-        var it = new TickIntent { Sprint = 1f };
+        // His claim on the ball: his own meeting with it. Without one, where the ball will be shortly.
+        bool claim = w.HoldsClaim(d) && d.LockOnTick >= 0;
+        var bv = w.Ball.Velocity;
+        var aim = w.Ball.Position + bv * CollectLead;
+        var it = claim ? LockOn.CollectLegs(d, d.LockOnPoint, d.LockOnBallVelocity, t) : LockOn.CollectLegs(d, aim, bv, t);
+        float m = it.Move.Length();
         if (m > 1e-3f)
         {
-            var dir = SteerOffBump(w, d, want / m) * MathF.Min(1f, m / top);
+            var dir = SteerOffBump(w, d, it.Move / m) * m;
             it.MoveX = dir.X; it.MoveZ = dir.Y;
         }
         return it;
     }
 
-    /// <summary>He aims at where the ball will be this long on, seconds, and closes on it as if braking at collect_brake, m/s squared.</summary>
-    const float CollectLead = 0.25f, CollectBrake = 3.5f;
+    /// <summary>Without a claim he aims at where the ball will be this long on, seconds.</summary>
+    const float CollectLead = 0.25f;
 }

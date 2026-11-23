@@ -43,7 +43,7 @@ public sealed class Scenario
     public float BallHeadingDeg { get; set; }
     /// <summary>
     /// The ball starts as a lost ball (as after a heavy touch or a parry) instead of a ball on the spot: the attacker goes for it
-    /// eagerly from the first tick (see <see cref="Regain"/>).
+    /// by himself from the first tick (see <see cref="LockOn"/>).
     /// </summary>
     public bool BallLoose { get; set; }
     /// <summary>Where the attacker starts.</summary>

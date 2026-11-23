@@ -421,21 +421,9 @@ public sealed partial class World
     }
 
     /// <summary>
-    /// The attacker's regain of a loose ball with a defender about: none while he stumbles, and a race (normal foot reach)
-    /// rather than a free one when the defender is as close to the ball as a challenging keeper would be.
-    /// </summary>
-    RegainMode RegainAgainstDefender(PlayerState p, RegainMode mode)
-    {
-        if (mode == RegainMode.None || Defending.Stumbling(p, SimTime)) return RegainMode.None;
-        var d = Defender!;
-        if (mode == RegainMode.Free && !Defending.Down(d, SimTime) && Regain.ContestedBy(p, Ball, d, Movement.TopSpeed(d.Sheet, Tuning), Tuning))
-            return RegainMode.Contested;
-        return mode;
-    }
-
-    /// <summary>
-    /// True when the attacker may not take a loose ball this tick because the defender, on his feet with the ball within his
-    /// control distance, is nearer to it. Equally near, a coin from the defending stream decides, once per loose ball.
+    /// True when the attacker may not take a loose ball this tick: he and the defender (on his feet, the ball within his control
+    /// distance) are equally near it, and the coin from the defending stream, drawn once per loose ball, went the defender's way.
+    /// Otherwise whoever's foot arrives first plays it.
     /// </summary>
     bool DefenderDeniesTouch(PlayerState p)
     {
@@ -443,8 +431,7 @@ public sealed partial class World
         float dd = TouchModel.HorizontalDistance(d.Position, Ball.Position);
         if (dd > Tuning.Defender.ControlDistanceM) return false;
         float da = TouchModel.HorizontalDistance(p.Position, Ball.Position);
-        if (MathF.Abs(dd - da) <= LooseTieM) return _looseTie ??= _defRng.NextFloat() < 0.5f;
-        return dd < da;
+        return MathF.Abs(dd - da) <= LooseTieM && (_looseTie ??= _defRng.NextFloat() < 0.5f);
     }
 
     /// <summary>Two players whose distances to a loose ball differ by no more than this are equally near it, metres.</summary>
