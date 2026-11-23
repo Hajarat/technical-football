@@ -29,6 +29,7 @@ public partial class Match : Node3D
     double _frameSum, _frameWorst;
     readonly List<double> _frameDeltas = new();
     int _frameCount;
+    PerfProbe? _perf;
     bool _paused;
     bool _quitting;
 
@@ -80,6 +81,7 @@ public partial class Match : Node3D
         // than real time instead of skipping ticks between frames), drawn without interpolation so each frame is exactly its tick.
         if (_shots != null && _args.BurstCount > 0) { Engine.MaxPhysicsStepsPerFrame = 1; GetTree().PhysicsInterpolation = false; }
 
+        if (_args.Perf) _perf = new PerfProbe(this, GetViewport(), _args);
         if (_args.FrameTimes)
             GD.Print($"DISPLAY refresh_hz={DisplayServer.ScreenGetRefreshRate()} vsync={DisplayServer.WindowGetVsyncMode()} max_fps={Engine.MaxFps} " +
                      $"screen={DisplayServer.WindowGetCurrentScreen()} screen_size={DisplayServer.ScreenGetSize()} scale={DisplayServer.ScreenGetScale()} screens={DisplayServer.GetScreenCount()}");
@@ -152,8 +154,12 @@ public partial class Match : Node3D
             return;
         }
         var pad = Pad.Poll();
+        ulong pt0 = Time.GetTicksUsec();
         Tick(pad);
+        ulong pt1 = Time.GetTicksUsec();
         Present();
+        _perf?.Section(PerfProbe.TickSlot, pt1 - pt0);
+        _perf?.Section(PerfProbe.PresentSlot, Time.GetTicksUsec() - pt1);
         // The ball has been placed above; only now follow it.
         // (--side-cam: fixed side-on at the first skill move, 1 m along its run from where it starts)
         if (_args.SideCam && !Camera.Fixed && World.Attacker.SkillMove is { } sm)
@@ -171,6 +177,7 @@ public partial class Match : Node3D
 
     public override void _Process(double delta)
     {
+        _perf?.Frame(delta, _tick, World?.State.ToString() ?? "-", World?.Shots.Count ?? 0, World?.Attacker.SkillMove != null);
         if (_args.FrameTimes && ++_frameCount > 10) // skip warm-up frames
         {
             _frameSum += delta;
@@ -291,6 +298,7 @@ public partial class Match : Node3D
             foreach (var line in FootStats.JumpLines()) GD.Print(line);
             GD.Print(ShotClipLayer.Summary());
         }
+        _perf?.Summary();
         if (_args.FrameTimes)
         {
             int n = System.Math.Max(1, _frameCount - 10);

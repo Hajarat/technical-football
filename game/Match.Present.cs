@@ -338,9 +338,15 @@ public partial class Match
         Ball.SetPossession(w.Attacker.InPossession || w.Keeper.InPossession || w.Defender is { InPossession: true });
         var af = AttackerFrame(w.Attacker);
         FootStats.Tick = _tick;
+        ulong pt0 = Time.GetTicksUsec();
         Attacker.Apply(af, w.Attacker.InPossession);
+        ulong pt1 = Time.GetTicksUsec();
         Keeper.Apply(KeeperFrame(w.Keeper));
+        ulong pt2 = Time.GetTicksUsec();
         if (w.Defender is { } def) Defender.Apply(DefenderFrame(def), def.InPossession);
+        _perf?.Section(PerfProbe.AttackerSlot, pt1 - pt0);
+        _perf?.Section(PerfProbe.KeeperSlot, pt2 - pt1);
+        _perf?.Section(PerfProbe.DefenderSlot, Time.GetTicksUsec() - pt2);
         foreach (var e in w.Events)
         {
             if (e.Kind == EventKind.Tackle) _tackles++;

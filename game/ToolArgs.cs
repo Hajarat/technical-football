@@ -14,6 +14,14 @@ public sealed class ToolArgs
     public string? ShotDir;
     public readonly List<int> ShotTicks = new();
     public readonly List<string> ShotOn = new();
+    /// <summary>--perf: per-frame engine and render cost (see PerfProbe); --perf-vsync on|off (on = vsync, max_fps 60; off = uncapped), --perf-csv &lt;path&gt;, --perf-warmup &lt;frames&gt;.</summary>
+    public bool Perf;
+    public bool? PerfVsync;
+    public string? PerfCsv;
+    public int PerfWarmup = 60;
+    /// <summary>--perf-scale &lt;f&gt; (3D render scale) and --perf-msaa 0|2|4: diagnostics that change the GPU load to tell a GPU-bound or display-capped frame apart.</summary>
+    public float PerfScale = 1f;
+    public int PerfMsaa = -1;
     public bool FrameTimes, CloseCam, CloseKeeper, CloseAttacker, TopCam;
     /// <summary>--side-cam: the close camera on the attacker until his first skill move starts, then fixed side-on to his run there (CameraRig.FixSideOn).</summary>
     public bool SideCam;
@@ -84,6 +92,12 @@ public sealed class ToolArgs
                 case "--session-log": a.LogSession = true; break;
                 case "--background": a.Background = true; break;
                 case "--frame-times": a.FrameTimes = true; break;
+                case "--perf": a.Perf = true; break;
+                case "--perf-vsync": a.PerfVsync = Next() == "on"; break;
+                case "--perf-scale": float.TryParse(Next(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out a.PerfScale); break;
+                case "--perf-msaa": int.TryParse(Next(), out a.PerfMsaa); break;
+                case "--perf-csv": a.PerfCsv = Next(); break;
+                case "--perf-warmup": int.TryParse(Next(), out a.PerfWarmup); break;
                 case "--close-cam": a.CloseCam = true; break;
                 case "--top-cam": a.TopCam = true; break;
                 case "--close-attacker": a.CloseCam = true; a.CloseAttacker = true; break;
