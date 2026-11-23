@@ -180,8 +180,27 @@ public partial class Match
         _log?.Write("round_setup", ("round", _round), ("scenario", sc.Id), ("attacker", att.Id), ("keeper", kee.Id), ("defender", World.Defender?.Sheet.Id),
             ("seed", _seed.ToString()), ("retry_of", retryOf > 0 ? retryOf : null));
         ResetPresentation();
+        PrewarmRound();
         return true;
     }
+
+    /// <summary>
+    /// First-time work the round would otherwise do during play, done here while the round waits in Setup (a still frame, where a
+    /// dropped frame does not show):
+    /// - waits for the background compile of the game's code (<see cref="JitPrewarm"/>), so no method is compiled mid-play;
+    /// - the keeper's chip-safe depth table, which the core builds and caches per tuning, keeper and attacker on the keeper's first
+    ///   live decision (tens of milliseconds and most of a megabyte): the same call his brain makes, with the same sheets and
+    ///   tuning, so the core's cache makes it a lookup there;
+    /// - a full garbage collection, so the loading's garbage is gone and the collections play can still need are small ones.
+    /// </summary>
+    void PrewarmRound()
+    {
+        JitPrewarm.Wait();
+        if (_args.Perf && !_jitReported) { _jitReported = true; GD.Print($"PERF_JIT_PREWARM methods={JitPrewarm.Methods} ms={JitPrewarm.Milliseconds:F0}"); }
+        FootballSim.Core.Keeper.ChipSafeDepth(World.Keeper.Sheet, World.Attacker.Sheet, World.Tuning, World.Pitch, 10f);
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+    }
+    bool _jitReported;
 
     /// <summary>One physics tick of game logic: buttons, then at most one world step.</summary>
     void Tick(in PadSnapshot input)

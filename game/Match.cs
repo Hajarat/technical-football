@@ -35,6 +35,7 @@ public partial class Match : Node3D
 
     public override void _Ready()
     {
+        JitPrewarm.Start();   // compiles the code in the background while the scene loads (see PrewarmRound)
         _args = ToolArgs.Parse();
         if (_args.Background) MacBackground.Apply();
         else FitWindowToScreen();
