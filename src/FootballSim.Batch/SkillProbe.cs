@@ -21,13 +21,13 @@ static class SkillProbe
     /// One scripted move: what to expect, the trace from the gesture's first tick, and the exit direction (in the run's frame)
     /// taken when the move ends.
     /// </summary>
-    sealed record Move(string Name, Gesture Expect, int Side, string[] Entries, Func<int, int, Script> Trace, Vector2 Exit);
+    internal sealed record Move(string Name, Gesture Expect, int Side, string[] Entries, Func<int, int, Script> Trace, Vector2 Exit);
 
     /// <summary>
     /// One tick of a trace: the right stick, the left stick until the move ends (null: the entry run), shoot, cancel and both
     /// shoulder buttons (finesse and chip).
     /// </summary>
-    readonly record struct Script(Vector2 Right, Vector2? Left, bool Shoot, bool Cancel, bool Shoulders = false);
+    internal readonly record struct Script(Vector2 Right, Vector2? Left, bool Shoot, bool Cancel, bool Shoulders = false);
 
     static readonly string[] AllEntries = { "standing", "jog", "sprint" };
 
@@ -57,7 +57,7 @@ static class SkillProbe
 
     // Exits: away from the sold side at 45 degrees (step-over, feint, elastico: toward its side), a right turn after a drag-back,
     // the cut (fake cut), square to its side (McGeady spin), straight on otherwise.
-    static readonly Move[] Moves =
+    internal static readonly Move[] Moves =
     {
         new("step_over", Gesture.StepOver, 1, AllEntries, StepOver, Rot(Ahead, -45f)),
         new("step_over", Gesture.StepOver, -1, AllEntries, StepOver, Rot(Ahead, 45f)),
@@ -79,10 +79,10 @@ static class SkillProbe
         new("mcgeady", Gesture.McGeady, -1, AllEntries, McGeady, Rot(Ahead, -90f)),
     };
 
-    const int TraceTicks = 20;
+    internal const int TraceTicks = 20;
 
     /// <summary>The left stick before the gesture. Standing: a short jog to take the ball, then the stick released (a stop).</summary>
-    static TickIntent EntryIntent(string entry, int tick, int tickRate) => entry switch
+    internal static TickIntent EntryIntent(string entry, int tick, int tickRate) => entry switch
     {
         "standing" => tick < tickRate / 2 ? new TickIntent { MoveX = 1f } : default,
         "jog" => new TickIntent { MoveX = 1f },
@@ -90,7 +90,7 @@ static class SkillProbe
     };
 
     /// <summary>The gesture's tick for a seed: a random moment between 2.0 and 3.0 s (the same for the move and its baseline).</summary>
-    static int GestureTick(ulong seed, int tickRate) => 2 * tickRate + new Random((int)(seed * 7919UL % int.MaxValue)).Next(tickRate);
+    internal static int GestureTick(ulong seed, int tickRate) => 2 * tickRate + new Random((int)(seed * 7919UL % int.MaxValue)).Next(tickRate);
 
     sealed class Result
     {

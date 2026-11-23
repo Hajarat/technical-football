@@ -21,7 +21,10 @@ static class TestData
 
     public static PlayerSheet Player(string id) => Ok(DataLoader.LoadPlayer(Path.Combine(DataDir, "players", id + ".json")));
     public static Scenario Scenario(string id) => Ok(DataLoader.LoadScenario(Path.Combine(DataDir, "scenarios", id + ".json")));
-    public static Tuning Tuning() => new();
+    /// <summary>The built-in tuning with the shipped move sheets (data/moves/sheets.json, checked against the clip index).</summary>
+    public static Tuning Tuning() => new() { Sheets = Sheets };
+
+    public static readonly MoveSheets Sheets = Ok(DataLoader.LoadSheets(DataDir));
 
     static T Ok<T>(LoadResult<T> r) where T : class
     {

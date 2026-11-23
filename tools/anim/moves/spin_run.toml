@@ -56,6 +56,31 @@ on = [["contact", "lift", "right"], ["contact2", "release", "left"]]
 left = [[0.1856, 0.2464], [0.3056, 0.3564], [0.888, 0.947]]
 right = [[0.52942, 0.58347], [0.97133, 1.0]]
 
+# The move sheet (data/moves/sheets.json): the ball's legs, the exit rule and how far the left stick may turn its frame.
+[sheet]
+entry_speed = 4.02             # the pace the root comes in at, m/s
+steer_deg = 0
+
+[[sheet.leg]]
+from = "contact"
+to = "contact2"
+anchor = "pitch"
+foot = "right"
+surface = "sole"
+
+[[sheet.leg]]
+from = "contact2"
+to = "release"
+anchor = "facing"
+foot = "left"
+surface = "sole"
+
+[sheet.exit]
+kind = "touch"
+min_deg = -30
+max_deg = 30
+push = "jog"
+
 [[key]]
 t = 0.0
 ease = 0

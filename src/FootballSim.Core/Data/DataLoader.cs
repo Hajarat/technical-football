@@ -260,7 +260,46 @@ public static class DataLoader
     {
         var text = ReadFile(path, out var err);
         if (text == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = err + " (default tuning in use)" };
-        return ParseTuning(text, path);
+        var r = ParseTuning(text, path);
+        // The move sheets live beside the tuning folder (data/moves/sheets.json); without them every move is legacy.
+        string? dataDir = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath(path)));
+        if (r.Value != null && dataDir != null && File.Exists(SheetsPath(dataDir)))
+        {
+            var sheets = LoadSheets(dataDir);
+            r.Value.Sheets = sheets.Value;
+            var w = new List<LoadWarning>(r.Warnings);
+            if (sheets.Error != null) w.Add(new LoadWarning(SheetsPath(dataDir), "", sheets.Error + " (every move is played by its legacy formulas)"));
+            w.AddRange(sheets.Warnings);
+            return new LoadResult<Tuning> { Value = r.Value, Error = r.Error, Warnings = w };
+        }
+        return r;
+    }
+
+    /// <summary>The move sheets' file under a data folder.</summary>
+    public static string SheetsPath(string dataDir) => Path.Combine(dataDir, "moves", "sheets.json");
+
+    /// <summary>The skill clips' index the sheets' hashes are checked against (beside the data folder, in the game's assets).</summary>
+    public static string SheetClipIndexPath(string dataDir) =>
+        Path.GetFullPath(Path.Combine(dataDir, "..", "game", "assets", "anim", "attacker", "skills", "clips.json"));
+
+    /// <summary>
+    /// Loads the move sheets of a data folder and checks them against the skill clips' index: a sheet whose hash the index does not
+    /// carry is refused (the error names the file and the sheet). Without the index (a data folder away from the game's assets)
+    /// the sheets load with a warning.
+    /// </summary>
+    public static LoadResult<MoveSheets> LoadSheets(string dataDir)
+    {
+        string path = SheetsPath(dataDir), index = SheetClipIndexPath(dataDir);
+        var text = ReadFile(path, out var err);
+        if (text == null) return new LoadResult<MoveSheets> { Error = err };
+        var w = new List<LoadWarning>();
+        string? indexText = File.Exists(index) ? ReadFile(index, out _) : null;
+        if (indexText == null) w.Add(new LoadWarning(path, "", $"the clip index {index} was not found; the sheets' hashes are not checked"));
+        try { return new LoadResult<MoveSheets> { Value = MoveSheets.Parse(text, path, indexText, index), Warnings = w }; }
+        catch (Exception e) when (e is FormatException or JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            return new LoadResult<MoveSheets> { Error = e is FormatException ? e.Message : $"{path}: {e.Message}" };
+        }
     }
 
     /// <summary>Parses tuning JSON. Values the file omits keep their built-in defaults.</summary>
@@ -285,6 +324,7 @@ public static class DataLoader
                 ("skill.ball_roll_run_blend", t.Skill.BallRollRunBlend), ("skill.ball_roll_keep", t.Skill.BallRollKeep),
                 ("skill.step_over_run_blend", t.Skill.StepOverRunBlend), ("skill.step_over_run_keep", t.Skill.StepOverRunKeep),
                 ("skill.heel_to_heel_run_blend", t.Skill.HeelToHeelRunBlend), ("skill.elastico_run_blend", t.Skill.ElasticoRunBlend), ("skill.spin_run_blend", t.Skill.SpinRunBlend), ("skill.mcgeady_run_blend", t.Skill.McGeadyRunBlend),
+                ("skill.sprint_blend", t.Skill.SprintBlend), ("skill.drag_back_run_blend", t.Skill.DragBackRunBlend),
                 ("skill.sided_exit_burst", t.Skill.SidedExitBurst), ("skill.straight_exit_burst", t.Skill.StraightExitBurst),
                 ("shot.ideal_charge", t.Shot.IdealCharge), ("shot.angle_accuracy", t.Shot.AngleAccuracy), ("shot.angle_power", t.Shot.AnglePower),
                 ("shot.angle_extra_windup_s", t.Shot.AngleExtraWindupS), ("shot.goal_mouth_accuracy", t.Shot.GoalMouthAccuracy),

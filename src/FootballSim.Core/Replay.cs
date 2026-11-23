@@ -93,6 +93,12 @@ public sealed class Replay
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefendingHash { get; set; }
     /// <summary>
+    /// The hash of the move sheets the round was played with (<see cref="MoveSheets.Sha"/>); absent for a round played without
+    /// sheets and for one recorded before they existed (they are not part of <see cref="TuningHash"/>).
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SheetsHash { get; set; }
+    /// <summary>
     /// The attacker's full sheet in the data/players format, written only when the attacker was the player editor's Custom player
     /// (who has no file). When present it is used instead of looking up <see cref="AttackerId"/>; older replays have none.
     /// </summary>
@@ -117,7 +123,7 @@ public sealed class Replay
 
     /// <summary>True if the replay was recorded under the same tuning.</summary>
     public bool MatchesTuning(Tuning t) => TuningHash == DataLoader.TuningHash(t) && (DefendingHash == null || DefendingHash == DataLoader.DefendingHash(t))
-        && (TeamHash == null || TeamHash == DataLoader.TeamHash(t));
+        && (TeamHash == null || TeamHash == DataLoader.TeamHash(t)) && (SheetsHash == null || SheetsHash == t.Sheets?.Sha);
 
     /// <summary>Embeds the attacker's sheet (see <see cref="AttackerSheet"/>).</summary>
     public void SetAttackerSheet(PlayerSheet sheet)
@@ -228,7 +234,7 @@ public sealed class Replay
     {
         Version = Version, Seed = Seed, AttackerId = AttackerId, KeeperId = KeeperId, ScenarioId = ScenarioId, TuningHash = TuningHash,
         AttackerSheet = AttackerSheet, Partial = Partial, Capture = Capture?.Copy(), PlayersPerTick = PlayersPerTick,
-        DefenderId = DefenderId, DefendingHash = DefendingHash, MateId = MateId, TeamHash = TeamHash,
+        DefenderId = DefenderId, DefendingHash = DefendingHash, MateId = MateId, TeamHash = TeamHash, SheetsHash = SheetsHash,
         Intents = new List<IntentRecord>(Intents),
     };
 }
@@ -272,6 +278,7 @@ public sealed class ReplayRecorder
             MateId = world.HasMates ? mateId ?? world.Teams[0][1].Sheet.Id : null,
             TeamHash = world.HasMates ? DataLoader.TeamHash(world.Tuning) : null,
             DefendingHash = world.Defender != null ? DataLoader.DefendingHash(world.Tuning) : null,
+            SheetsHash = world.Tuning.Sheets?.Sha,
         };
     }
 

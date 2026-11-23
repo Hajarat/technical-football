@@ -42,6 +42,21 @@ radius = 0.11
 touch = { contact = "right", release = "right" }
 
 # Travel: 3 m/s into the wind-up (pelvis z 0.36 at t 0.2, 0.65 at the plant, 0.85 at the contact), half of it kept by the end.
+# The move sheet (data/moves/sheets.json): the ball's legs, the exit rule and how far the left stick may turn its frame.
+[sheet]
+entry_speed = 3.00             # the pace the root comes in at, m/s
+steer_deg = 0
+
+[[sheet.leg]]
+from = "contact"
+to = "release"
+anchor = "launch"
+foot = "right"
+surface = "outside"
+
+[sheet.exit]
+kind = "launch"
+
 [[key]]
 t = 0.0
 ease = 0.0

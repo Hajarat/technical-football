@@ -124,8 +124,37 @@ the move began (the exit touch) takes its leg by the touch's weight, so its boot
 the foot that made a touch of the move's own (a fake cut's exit touch, 0.1 s after the hook), its leg moves at most 0.06 m a tick against the
 hips while it winds up and reaches at most 0.96 of its length, its foot turns toward the touch's at most 0.24 rad a tick, and the hips come
 toward the figure's foot when it is out of reach. A fake cut
-whose hook is the outside of the foot (the cut toward the shooting foot's side) has no clip and is drawn procedurally, as everything is with
+whose hook is the outside of the foot (the cut toward the shooting foot's side) has its own clips (`fake_cut_out_*`, picked by the cut's
+side against the playing foot). Everything is drawn procedurally with
 `--skill-anim procedural` or `--attacker-anim procedural`. Build steps, asset list and licences: `game/assets/characters/SOURCES.md`.
+
+### Move sheets and the clip standard
+
+`tools/anim/author.py` writes a move sheet for every move file with a `[sheet]` table, into `data/moves/sheets.json`, in the same
+run as the clips (what a sheet holds and how the simulation loads it: [dribbling.md](dribbling.md#move-sheets)).
+
+- The sheet comes from the file's authored side, its own ending and its first `[[variant]]`. Its `root` is the pelvis' ground
+  point low-passed (a Gaussian of 0.05 s, the motion continued at its own pace before the first frame and after the last), from
+  under the hips at the first frame, so stride sway stays in the clip and out of the simulation; its yaw is the `root = { yaw }`
+  channel of the keys (0 where a file keys none). The ball keys become the leg tracks, each in its leg's anchor frame.
+- `[sheet]` gives `steer_deg`, `entry_speed` (a run file: the pace its root comes in at), `plant` (spans of normalised time in
+  which the root may brake harder), one `[[sheet.leg]]` per ball leg (`from`, `to`, `anchor`, `foot`, `surface`) and
+  `[sheet.exit]` (`kind`, `min_deg`, `max_deg`, `rest_deg`, `push`, `foot`, `surface`).
+- Every clip of the file gets `sheet` (the sheet's `name`, `entry` and `sha`) and `root` (that clip's own root, one row per frame)
+  in `clips.json`.
+- Checked for every sheet: the ball jumps no more than 2 cm from one driven leg to the next.
+- A file with a `[card]` table is held to the clip standard as well, and is refused when it misses any of it: the root starts on
+  the run's line at the entry speed; up to the release it accelerates no harder than 12 m/s^2 (20 inside `plant` spans, or the file's own `plant_accel` there); on a
+  driven leg the playing leg is within 0.96 of its length; there is a key at least every 0.05 s between the first and the last
+  contact (the release for a move with one contact); and every band `name = [min, max]` of `[card]` holds, measured on the solved
+  frames by `clip_measures.card_measures` (`out_m`, `out_s`, `contact2_s`, `pull_m`, `end_behind_m`, `end_side_m`, `hips_m`,
+  `exit_speed`, `hop_m`, `stop_share`, `keep`, `open_deg`, `lift_m`, and the three beats: `drop_m`, the pelvis' height range, which a
+  card must give; `snap_deg`, the shoulder line against the hip line, 20 degrees or more unless the card says otherwise; `drive_m`,
+  the travel of the hand on the non-playing side relative to the chest, 0.25 m or more unless the card says otherwise). No file
+  has a card yet.
+- The run files written before the sheets are drawn on the simulation's path less the clip's straight root (`drag_back_run.toml`
+  in his own frame, its root standing still), so their sheets' roots are not his real travel; a file is rewritten in the ground
+  frame when its move is converted.
 
 ## The defender
 

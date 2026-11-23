@@ -74,6 +74,65 @@ def measure(path: Path, foot: str, t: rt.Target) -> dict[str, float]:
             "foot_h": float(pf[:, 1].max() - t.rest_glob_t[k("LeftFoot"), 1] + t.sole_y), "drop": float(pel[:, 1].max() - pel[:, 1].min()), "deg_s": deg_s}
 
 
+def card_measures(events: dict[str, int], ball: np.ndarray, root: np.ndarray, pel: np.ndarray, gr: np.ndarray, gt: np.ndarray,
+                  t: rt.Target, side: str, foot: str, radius: float, entry_speed: float, fps: int) -> dict[str, float]:
+    """What a move file's [card] bands are checked against (author.py), measured on the solved frames. "His frame" is the root with
+    its axes along and across the run at the start (it does not turn with his facing); "toward the side" is toward the move's
+    side, or the playing foot's side for a move without one.
+
+    * out_m: how far the ball goes away from the side from where it was against him at the contact (his frame), up to the last
+      contact; out_s: the seconds from the contact until it is within 2 cm of that.
+    * contact2_s: the second contact's time after the first.
+    * pull_m: how far the ball is pulled back along the run on the pitch from the contact to the release.
+    * end_behind_m, end_side_m: at the release, the ball behind his hip line and toward the side of him (his frame).
+    * hips_m: the root's largest shift away from the side between the contact and the last contact.
+    * exit_speed: the root's speed toward the side at the release (m/s).
+    * hop_m: how far back the root comes from its furthest point along the run by the release.
+    * stop_share: the share of the move (start to release) by which his pace along the run has first come to nothing.
+    * keep: his lowest pace from the start to the release as a share of the entry speed.
+    * open_deg: the root's yaw at the release, toward the side.
+    * lift_m: the ball's highest lift above rest.
+    * drop_m: the pelvis' height range (the sell beat); snap_deg: the shoulder line's peak turn against the hip line (the snap
+      beat); drive_m: the path extent of the hand on the non-playing side relative to the chest, in the chest's axes (the drive beat).
+    """
+    k = rt.BONES.index
+    sgn = 1.0 if (side == "left" or (side == "none" and foot == "left")) else -1.0
+    c1, rel = events["contact"], events["release"]
+    last = events.get("contact2", rel)
+    bx = ball[:, 0] - root[:, 0]; bz = ball[:, 2] - root[:, 1]
+    out = -sgn * (bx[c1:last + 1] - bx[c1])
+    reached = np.nonzero(out >= out.max() - 0.02)[0]
+    vel = np.diff(root[:, :2], axis=0) * fps
+    pace = np.linalg.norm(vel[: max(rel, 1)], axis=1)
+    fwd = vel[: max(rel, 1), 1]
+    stopped = np.nonzero(fwd <= 0.05)[0]
+    sh = gt[:, k("LeftArm")] - gt[:, k("RightArm")]; hp = gt[:, k("LeftUpLeg")] - gt[:, k("RightUpLeg")]
+    turn = np.degrees(np.arctan2(sh[:, 2], sh[:, 0]) - np.arctan2(hp[:, 2], hp[:, 0]))
+    turn = (turn + 180) % 360 - 180
+    s2 = k("Spine2")
+    hand = k("LeftHand" if foot == "right" else "RightHand")
+    chest = gr[:, s2] @ t.rest_glob_r[s2].T
+    hrel = np.einsum("nji,nj->ni", chest, gt[:, hand] - gt[:, s2])
+    return {
+        "out_m": float(out.max()),
+        "out_s": float(reached[0] / fps) if len(reached) else 0.0,
+        "contact2_s": float((events["contact2"] - c1) / fps) if "contact2" in events else 0.0,
+        "pull_m": float((ball[c1, 2] - ball[c1:rel + 1, 2]).max()),
+        "end_behind_m": float(-bz[rel]),
+        "end_side_m": float(sgn * bx[rel]),
+        "hips_m": float((-sgn * (root[c1:last + 1, 0] - root[0, 0])).max()),
+        "exit_speed": float(sgn * vel[min(rel, len(vel)) - 1, 0]),
+        "hop_m": float(root[: rel + 1, 1].max() - root[rel, 1]),
+        "stop_share": float(stopped[0] / max(rel, 1)) if len(stopped) else 1.0,
+        "keep": float(pace.min() / entry_speed) if entry_speed > 1e-6 else 1.0,
+        "open_deg": float(sgn * root[rel, 2]),
+        "lift_m": float(ball[:, 1].max() - radius),
+        "drop_m": float(pel[:, 1].max() - pel[:, 1].min()),
+        "snap_deg": float(np.abs(turn).max()),
+        "drive_m": float(np.linalg.norm(hrel.max(axis=0) - hrel.min(axis=0))),
+    }
+
+
 def fmt(k: str, v: float) -> str:
     return f"{v:.0f}" if k in ("lean", "back", "bend", "sh_turn", "deg_s") else f"{v:.3f}"
 

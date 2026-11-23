@@ -295,6 +295,8 @@ ending (`[[ending]]`, its own clip named with the ending's suffix and `ending` i
 default): it reads `entry_speed` to blend each move's standing and running clips, the events to time the clip onto the core's ticks, `ball.on`
 and `ball.touch` for where the playing foot is pinned to the live ball, `ball.track` for the contact direction on the ball, `contacts` for the
 planted feet, and takes the clip's root (`SkillClip.Root`) as the line under its hips from the first frame to the last.
+A move file's `[sheet]` table makes its move sheet (`data/moves/sheets.json`, see `docs/animation.md`); each of its clips carries the
+sheet's name, entry and hash (`sheet`) and its own low-passed root (`root`) in clips.json.
 
 | Move file | Clips | What it shows |
 | --- | --- | --- |
