@@ -226,7 +226,7 @@ public sealed partial class World
         var rel = Flat(Ball.Position) - Flat(p.Position);
         float dist = rel.Length();
         // (a shot winding up counts only while the attacker can still strike the ball: it is his, or at his feet)
-        bool windup = Attacker.ShotAction is { Made: false }
+        bool windup = ShotWindup
             && (_controller == Attacker || TouchModel.HorizontalDistance(Attacker.Position, Ball.Position) <= Tuning.Defender.TackleMaxDistanceM);
         bool coming = State == RoundState.Flight && Vector2.Dot(Flat(Ball.Velocity), -rel) > 0f;
         bool front = dist < 1e-3f || MathF.Abs(Movement.WrapAngle(MathF.Atan2(rel.Y, rel.X) - p.Facing)) < MathF.PI / 2f;

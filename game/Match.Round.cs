@@ -209,8 +209,8 @@ public partial class Match
         if (_holdAfterCapture)
         {
             // the button that saved (B is also shoot, A also cancel) does nothing in play until it is let go
-            if (!pad.ShootHeld && !pad.Cancel) _holdAfterCapture = false;
-            else { pad.ShootHeld = false; pad.Cancel = false; }
+            if (!pad.ShootHeld && !pad.Cancel && !pad.PassHeld && !pad.ThroughHeld) _holdAfterCapture = false;
+            else { pad.ShootHeld = false; pad.Cancel = false; pad.PassHeld = false; pad.ThroughHeld = false; }
         }
         if (_editor.IsOpen)
         {
@@ -352,7 +352,7 @@ public partial class Match
     {
         MoveX = p.MoveX, MoveZ = p.MoveZ, Sprint = p.Sprint, CloseControl = p.CloseControl,
         ShootHeld = p.ShootHeld, Finesse = p.Finesse, Chip = p.Chip, Driven = p.Driven, KnockOn = p.KnockOn,
-        RightX = p.RightX, RightZ = p.RightZ, Cancel = p.Cancel, SkillKey = p.SkillKey,
+        RightX = p.RightX, RightZ = p.RightZ, Cancel = p.Cancel, PassHeld = p.PassHeld, ThroughHeld = p.ThroughHeld, SkillKey = p.SkillKey,
     };
 
     /// <summary>The round reached Report: save its replay into the session folder, log it, print one console line.</summary>

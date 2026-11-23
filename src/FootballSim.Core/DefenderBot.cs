@@ -130,7 +130,7 @@ public sealed class DefenderBot
         }
         var spot = HoldSpotFor(bp, _offset, w.Pitch, t);
         // A shot winding up: he steps onto the ball's line to the goal centre, at the depth he is at, to get in its way.
-        if (w.Attacker.ShotAction is { Made: false } && w.BallController == w.Attacker)
+        if (w.ShotWindup && w.BallController == w.Attacker)
         {
             var goal = new Vector2(w.Pitch.GoalLineX, 0f);
             var line = goal - bp;

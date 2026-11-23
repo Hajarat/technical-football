@@ -489,18 +489,21 @@ public static class LockOn
             bool early = false;
             float maxHeight = float.IsNaN(p.MinArrivalHeight) ? PlayableHeight(t) : p.MinArrivalHeight;
             ref var cache = ref p.LockOnSolve;
-            bool again = cache.Fresh || claim.SinceTick == now || Math.Abs(p.MinArrivalTick - cache.LaterMin) > ResolveTicks
-                || (p.MinArrivalTick > 0) != (cache.LaterMin > 0) || cache.Final.Found && cache.Final.ArriveTick < now;
+            // (a pass on its way to him is met where it was played to, no sooner: the same rule as a queued action's tick)
+            int notBefore = Math.Max(p.MinArrivalTick, p.MeetNotBefore);
+            bool strikeReach = p.MinArrivalTick > 0 && p.MinArrivalStrike;
+            bool again = cache.Fresh || claim.SinceTick == now || Math.Abs(notBefore - cache.LaterMin) > ResolveTicks
+                || (notBefore > 0) != (cache.LaterMin > 0) || cache.Final.Found && cache.Final.ArriveTick < now;
             if (again)
             {
-                if (p.MinArrivalTick > 0)
+                if (notBefore > 0)
                 {
                     // The action's own meeting: the first sample from its tick on, at the reach and height it plays.
-                    var later = Solve(p, f, now, Math.Max(now, p.MinArrivalTick), toTick, nowSeconds, t, pitch, c.Run, maxHeight,
-                        cache.Later.Found ? cache.Later.ArriveTick : -1, strike: p.MinArrivalStrike);
+                    var later = Solve(p, f, now, Math.Max(now, notBefore), toTick, nowSeconds, t, pitch, c.Run, maxHeight,
+                        cache.Later.Found ? cache.Later.ArriveTick : -1, strike: strikeReach);
                     cache.Later = later;
-                    cache.LaterMin = p.MinArrivalTick;
-                    if (m.ArriveTick >= p.MinArrivalTick)
+                    cache.LaterMin = notBefore;
+                    if (m.ArriveTick >= notBefore)
                     {
                         // His earliest meeting already leaves the action its time.
                         if (later.Found) m = later;
@@ -534,7 +537,7 @@ public static class LockOn
                     // The stick slides the meeting along the path, never later than the nearest opponent's arrival.
                     if (c.Stick) m = Slide(p, f, m, c.Intent.Move, now, Math.Min(toTick, nearest), nowSeconds, t, pitch, c.Run, maxHeight);
                 }
-                cache.Slid = !early && m.ArriveTick > first[team].ArriveTick && p.MinArrivalTick <= 0;
+                cache.Slid = !early && m.ArriveTick > first[team].ArriveTick && notBefore <= 0;
                 cache.Contested = contested;
                 cache.Final = m;
                 cache.Early = early;
@@ -550,7 +553,7 @@ public static class LockOn
             claim.RunTicks = m.RunTicks;
             claim.Early = early;
             claim.Slid = cache.Slid;
-            claim.StrikeReach = !early && p.MinArrivalTick > 0 && p.MinArrivalStrike;
+            claim.StrikeReach = !early && strikeReach;
             claim.OpponentTick = nearest;
             p.Regain = contested ? RegainMode.Contested : RegainMode.Free;
             p.LockOnTick = m.ArriveTick;

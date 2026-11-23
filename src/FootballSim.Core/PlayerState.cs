@@ -160,6 +160,11 @@ public sealed class PlayerState
     public int MinArrivalTick { get; internal set; }
     /// <summary>With <see cref="MinArrivalTick"/>: the highest ball centre the queued action plays, metres (NaN: any a first touch plays).</summary>
     internal float MinArrivalHeight = float.NaN;
+    /// <summary>
+    /// The earliest tick his meeting may fall on because a pass was played to him for then (its expected arrival); 0 when none.
+    /// As with a queued action, he waits for that sample only while the ball is coming to him and no opponent is there first.
+    /// </summary>
+    public int MeetNotBefore { get; internal set; }
     /// <summary>With <see cref="MinArrivalTick"/>: the queued action is a strike, met at the strike reach.</summary>
     internal bool MinArrivalStrike;
     /// <summary>The ball's velocity at the meeting, and whether it is at rest there (for the holder's legs).</summary>
@@ -167,6 +172,10 @@ public sealed class PlayerState
     internal bool LockOnResting;
     /// <summary>The ticks the meeting leaves him beyond his flat-out run (0: he must run flat out).</summary>
     internal int LockOnSlack;
+    /// <summary>His next first touch is of a team-mate's pass: it pays for the ball's speed (see the receive tuning).</summary>
+    internal bool ReceivingPass;
+    /// <summary>Simulation seconds until which he plays no touch after receiving a pass.</summary>
+    internal float ReceiveCooldownUntil = -100f;
     /// <summary>His last solves, kept between the ticks they are made afresh on.</summary>
     internal LockOnSolveCache LockOnSolve;
 

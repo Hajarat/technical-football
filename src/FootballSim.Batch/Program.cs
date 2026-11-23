@@ -59,7 +59,7 @@ static class Cli
         {
             if (!args[i].StartsWith("--")) { Console.Error.WriteLine($"Unexpected argument '{args[i]}'"); return 2; }
             string key = args[i][2..];
-            if (key is "dump-tuning" or "skill-probe" or "keeper-probe" or "lock-probe") { opts[key] = "1"; continue; }
+            if (key is "dump-tuning" or "skill-probe" or "keeper-probe" or "lock-probe" or "pass-probe" or "mate-probe") { opts[key] = "1"; continue; }
             if (i + 1 >= args.Length) { Console.Error.WriteLine($"Missing value for --{key}"); return 2; }
             opts[key] = args[++i];
         }
@@ -98,6 +98,7 @@ static class Cli
         if (opts.ContainsKey("skill-probe")) return SkillProbe.Run(opts, dataDir, tuning);
         if (opts.ContainsKey("keeper-probe")) return KeeperProbe.Run(opts, dataDir, tuning);
         if (opts.ContainsKey("lock-probe")) return LockProbe.Run(opts, dataDir, tuning);
+        if (opts.ContainsKey("pass-probe")) return PassProbe.Run(opts, dataDir, tuning);
         if (opts.TryGetValue("write-probe-replays", out var probeDir)) return KeeperProbe.WriteReplays(probeDir, dataDir, tuning);
         if (opts.TryGetValue("probe-replays", out var probeReplays)) return KeeperProbe.RunReplays(probeReplays, dataDir, tuning, opts);
         if (opts.TryGetValue("write-skill-replays", out var skillDir)) return SkillProbe.WriteReplays(skillDir, dataDir, tuning);

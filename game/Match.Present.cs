@@ -426,7 +426,7 @@ public partial class Match
                 GD.Print($"FOOT_EVENT tick={_tick} kind={(af.StrikeEvent ? "strike" : "touch")} foot={(af.EventRight ? "R" : "L")} err_m={Attacker.Figure.LastContactError:F3}");
         }
 
-        Hud.SetPower(w.ShotCharge);
+        Hud.SetPower(MathF.Max(w.ShotCharge, w.PassCharge)); // (a pass's hold fills the same bar: how far along the stick it points)
         Hud.SetIdealMarker(w.IdealCharge, w.ShotCharge > 0.001f);
         if (w.Attacker.Action is { IsShot: true } shot && shot.PlanTick != _shotId)
         {

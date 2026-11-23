@@ -1619,6 +1619,12 @@ public static class TouchPlanner
         Foot foot = a.Foot;
         var (sigmaS, sigmaD) = Sigmas(p, foot, kind, mode, t);
         if (far) { sigmaS *= FarStretchErrorScale; sigmaD *= FarStretchErrorScale; }
+        // The first touch of a team-mate's pass: wider with the ball's speed against him, eased by first_touch.
+        if (p.ReceivingPass && kind is ActionKind.First or ActionKind.TrapLow or ActionKind.TrapMid or ActionKind.TrapHigh or ActionKind.KnockOn && p.ReceivingPass)
+        {
+            float m = MathF.Max(0f, t.Receive.Error.Evaluate(RelativeBallSpeed(p, ball))) * t.Receive.Rating.ForRating(p.Sheet.FirstTouch);
+            sigmaS *= m; sigmaD *= m;
+        }
         Vector3 v, spin = Vector3.Zero;
         float errDeg = 0f, turnSign = 0f;
         Meet meet = default;
