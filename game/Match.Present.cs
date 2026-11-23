@@ -473,16 +473,19 @@ public partial class Match
     // what the spot line was last made from: it is made again only when one of them changes, not every tick
     int _spotRound = -1;
     bool _spotSetup;
-    string? _spotScenario, _spotAttacker, _spotKeeper, _spotDefender;
+    string? _spotScenario, _spotAttacker, _spotMate, _spotKeeper, _spotDefender;
 
     void UpdateHudText()
     {
         var sc = World.Scenario;
         bool setup = World.State == RoundState.Setup;
         string? def = World.Defender?.Sheet.Name;
-        if (_round == _spotRound && setup == _spotSetup && sc.Name == _spotScenario && World.Attacker.Sheet.Name == _spotAttacker
+        // (the line names player 0 and the team-mate, whoever the pad drives)
+        string first = World.Teams[0][0].Sheet.Name;
+        string? mateName = World.HasMates ? World.Teams[0][1].Sheet.Name : null;
+        if (_round == _spotRound && setup == _spotSetup && sc.Name == _spotScenario && first == _spotAttacker && mateName == _spotMate
             && World.Keeper.Sheet.Name == _spotKeeper && def == _spotDefender) return;
-        _spotRound = _round; _spotSetup = setup; _spotScenario = sc.Name; _spotAttacker = World.Attacker.Sheet.Name;
+        _spotRound = _round; _spotSetup = setup; _spotScenario = sc.Name; _spotAttacker = first; _spotMate = mateName;
         _spotKeeper = World.Keeper.Sheet.Name; _spotDefender = def;
         string hint = setup ? "  ·  A/Enter to start" : "";
         string defender = World.Defender != null ? $" and {World.Defender.Sheet.Name}" : "";

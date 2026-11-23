@@ -228,7 +228,7 @@ public partial class Match
     {
         JitPrewarm.Wait();
         if (_args.Perf && !_jitReported) { _jitReported = true; GD.Print($"PERF_JIT_PREWARM methods={JitPrewarm.Methods} ms={JitPrewarm.Milliseconds:F0}"); }
-        FootballSim.Core.Keeper.ChipSafeDepth(World.Keeper.Sheet, World.Attacker.Sheet, World.Tuning, World.Pitch, 10f);
+        FootballSim.Core.Keeper.ChipSafeDepth(World.Keeper.Sheet, World.Teams[0][0].Sheet, World.Tuning, World.Pitch, 10f);
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
     }
     bool _jitReported;
