@@ -49,19 +49,21 @@ public static class PoseLayers
     public static void TwistTrunk(Skeleton sk, Span<Quaternion> local, ReadOnlySpan<Quaternion> globalRot, float angle)
     {
         if (MathF.Abs(angle) < 1e-6f) return;
-        int[] trunk = { sk.Hips, sk.Find("Spine"), sk.Find("Spine1"), sk.Find("Spine2") };
+        Span<int> trunk = stackalloc int[] { sk.Hips, sk.Find("Spine"), sk.Find("Spine1"), sk.Find("Spine2") };   // (on the stack: this runs every tick)
         for (int t = 0; t < trunk.Length; t++)
             RotateLocal(sk, local, globalRot, trunk[t], Vector3.UnitY, angle * TwistShare[t]);
         for (int i = 0; i < 2; i++)
             RotateLocal(sk, local, globalRot, sk.UpLeg[i], Vector3.UnitY, -angle * TwistShare[0]);
     }
 
+    static readonly string[] SpineNames = { "Spine", "Spine1", "Spine2" };
+
     /// <summary>Pitches the trunk forward by <paramref name="angle"/> about the body's sideways axis (model +X turned by <paramref name="yaw"/>), over the three spine bones.</summary>
     public static void LeanTrunk(Skeleton sk, Span<Quaternion> local, ReadOnlySpan<Quaternion> globalRot, float yaw, float angle)
     {
         if (MathF.Abs(angle) < 1e-6f) return;
         var axis = Vector3.Transform(Vector3.UnitX, Spring.Yaw(yaw));   // the body's left: a turn about it tips the chest forward
-        foreach (var name in new[] { "Spine", "Spine1", "Spine2" })
+        foreach (var name in SpineNames)
             RotateLocal(sk, local, globalRot, sk.Find(name), axis, angle / 3f);
     }
 

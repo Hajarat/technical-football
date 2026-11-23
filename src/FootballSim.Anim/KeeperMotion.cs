@@ -428,8 +428,13 @@ public sealed class KeeperMotion
             ps = _db.Set(input.Set);
             return input.Set;
         }
-        var takeoff = _db.Exact(KeeperChooser.Takeoff(input.Set));
-        var flight = _db.Exact(KeeperChooser.Flight(input.Set));
+        if (input.Set != _chainNamesOf)
+        {
+            // (the halves' names are made once per hybrid set, not on every tick of the save)
+            _chainNamesOf = input.Set; _takeoffName = KeeperChooser.Takeoff(input.Set); _flightName = KeeperChooser.Flight(input.Set);
+        }
+        var takeoff = _db.Exact(_takeoffName);
+        var flight = _db.Exact(_flightName);
         if (flight == null) { _chainBase = null; ps = _db.Set(input.Set); return input.Set; }
         if (_chainBase != input.Set)
         {
@@ -444,8 +449,12 @@ public sealed class KeeperMotion
         }
         if (_chainStage == 0 && takeoff == null) _chainStage = 1;
         ps = _chainStage == 0 ? takeoff : flight;
-        return _chainStage == 0 ? KeeperChooser.Takeoff(input.Set) : KeeperChooser.Flight(input.Set);
+        return _chainStage == 0 ? _takeoffName : _flightName;
     }
+    string? _chainNamesOf, _takeoffName, _flightName;
+
+    /// <summary><see cref="KeeperChooser.Flight"/> of a hybrid set, from the names <see cref="ResolveSet"/> made for it when it is that set.</summary>
+    string FlightOf(string chainBase) => chainBase == _chainNamesOf ? _flightName! : KeeperChooser.Flight(chainBase);
 
     bool _wasGround;
 
@@ -579,7 +588,7 @@ public sealed class KeeperMotion
         {
             // a take-off likewise: where its time to its take-off event is what is left before the flight's lead
             int ev = pc.Event("takeoff");
-            var fl = _chainBase != null ? _db.Exact(KeeperChooser.Flight(_chainBase)) : null;
+            var fl = _chainBase != null ? _db.Exact(FlightOf(_chainBase)) : null;
             if (ev < 0 || fl == null) return f;
             float left = Math.Max(0f, input.TargetTime - FlightLead(fl, input.Side));
             return Math.Clamp(ev - (int)MathF.Round(left * pc.Clip.Fps), 0, Math.Max(0, ev - 1));
@@ -646,7 +655,7 @@ public sealed class KeeperMotion
         if (_chainStage == 0 && _chainBase != null)
         {
             int ev = pc.Event("takeoff");
-            var flight = _db.Exact(KeeperChooser.Flight(_chainBase));
+            var flight = _db.Exact(FlightOf(_chainBase));
             clipTo = ((ev >= 0 ? ev : pc.Clip.FrameCount - 1) - f) / (float)pc.Clip.Fps + (flight != null ? FlightLead(flight, input.Side) : 0f);
         }
         else clipTo = pc.TargetFrame >= 0 ? (pc.TargetFrame - f) / (float)pc.Clip.Fps : 0f;
@@ -967,7 +976,7 @@ public sealed class KeeperMotion
         Vector3 save = input.HasSavePoint ? Features.ToCharacter(input.SavePoint - new Vector3(_root.X, 0, _root.Y), _yaw) - hipsNow : Vector3.Zero;
         float time = input.HasTarget ? input.TargetTime : 0f;
         // a take-off counts down to its take-off event: the time left before the flight's own lead to the contact
-        if (input.HasTarget && ps.Name.EndsWith(":" + KeeperChooser.TakeoffTag) && _chainBase != null && _db.Exact(KeeperChooser.Flight(_chainBase)) is PoseSet fl)
+        if (input.HasTarget && ps.Name.EndsWith(":" + KeeperChooser.TakeoffTag) && _chainBase != null && _db.Exact(FlightOf(_chainBase)) is PoseSet fl)
             time -= FlightLead(fl, input.Side);
         Features.WriteSave(_query, save, time);
         Span<Vector2> tp = stackalloc Vector2[3];

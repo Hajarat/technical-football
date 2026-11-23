@@ -60,9 +60,13 @@ public sealed class Skeleton
     /// <summary>Index of the bone whose short name is <paramref name="shortName"/>, or -1.</summary>
     public int Find(string shortName)
     {
-        for (int k = 0; k < Names.Count; k++) if (Short(Names[k]) == shortName) return k;
+        // (compared in place: the motion layers look bones up by name every tick, and a substring per bone tried was garbage)
+        for (int k = 0; k < Names.Count; k++) if (ShortSpan(Names[k]).SequenceEqual(shortName)) return k;
         return -1;
     }
+
+    /// <summary><see cref="Short"/> as a span over the name, without making a string.</summary>
+    static ReadOnlySpan<char> ShortSpan(string bone) => bone.AsSpan(Math.Max(bone.LastIndexOf('_'), bone.LastIndexOf(':')) + 1);
 
     /// <summary>
     /// Forward kinematics: global rotations and joint positions (model space) of every bone from local rotations and the hips position.

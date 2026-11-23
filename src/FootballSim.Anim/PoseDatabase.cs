@@ -547,9 +547,12 @@ public sealed class PoseSet
     /// <summary>The clip holding set frame <paramref name="frame"/> and the frame within it.</summary>
     public PoseClip Locate(int frame, out int clipFrame)
     {
-        // clips are few; a linear walk is plenty
-        foreach (var pc in Clips)
+        // clips are few; a linear walk is plenty (indexed: a foreach over the interface would box its enumerator on every search)
+        for (int i = 0; i < Clips.Count; i++)
+        {
+            var pc = Clips[i];
             if (frame < pc.End) { clipFrame = frame - pc.Start; return pc; }
+        }
         throw new ArgumentOutOfRangeException(nameof(frame));
     }
 
