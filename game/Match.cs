@@ -153,13 +153,16 @@ public partial class Match : Node3D
             if (_clipGallery.Step()) { _quitting = true; GD.Print("CLIP_GALLERY_DONE"); GetTree().Quit(0); }
             return;
         }
+        ulong pp = Time.GetTicksUsec(); long ap = System.GC.GetAllocatedBytesForCurrentThread();
         var pad = Pad.Poll();
-        ulong pt0 = Time.GetTicksUsec();
+        ulong pt0 = Time.GetTicksUsec(); long a0 = System.GC.GetAllocatedBytesForCurrentThread();
         Tick(pad);
-        ulong pt1 = Time.GetTicksUsec();
+        ulong pt1 = Time.GetTicksUsec(); long a1 = System.GC.GetAllocatedBytesForCurrentThread();
         Present();
-        _perf?.Section(PerfProbe.TickSlot, pt1 - pt0);
-        _perf?.Section(PerfProbe.PresentSlot, Time.GetTicksUsec() - pt1);
+        ulong pt2 = Time.GetTicksUsec(); long a2 = System.GC.GetAllocatedBytesForCurrentThread();
+        _perf?.Section(PerfProbe.PadSlot, pt0 - pp, a0 - ap);
+        _perf?.Section(PerfProbe.TickSlot, pt1 - pt0, a1 - a0);
+        _perf?.Section(PerfProbe.PresentSlot, pt2 - pt1, a2 - a1);
         // The ball has been placed above; only now follow it.
         // (--side-cam: fixed side-on at the first skill move, 1 m along its run from where it starts)
         if (_args.SideCam && !Camera.Fixed && World.Attacker.SkillMove is { } sm)
@@ -172,7 +175,10 @@ public partial class Match : Node3D
         }
         Camera.Follow(_args.CloseKeeper ? new Vector3(World.Keeper.Position.X, 0, World.Keeper.Position.Z)
             : _args.CloseAttacker ? new Vector3(World.Attacker.Position.X + 0.6f, 0, World.Attacker.Position.Z) : Ball.Position, delta);
+        ulong pt3 = Time.GetTicksUsec(); long a3 = System.GC.GetAllocatedBytesForCurrentThread();
         HandleTools();
+        _perf?.Section(PerfProbe.CameraSlot, pt3 - pt2, a3 - a2);
+        _perf?.Section(PerfProbe.ToolsSlot, Time.GetTicksUsec() - pt3, System.GC.GetAllocatedBytesForCurrentThread() - a3);
     }
 
     public override void _Process(double delta)

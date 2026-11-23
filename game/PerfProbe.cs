@@ -36,11 +36,16 @@ public sealed partial class PerfProbe
         public override void _PhysicsProcess(double delta) { if (_end) _probe.PhysicsEnd(); else _probe.PhysicsStart(); }
     }
 
-    public const int TickSlot = 0, PresentSlot = 1, AttackerSlot = 2, KeeperSlot = 3, DefenderSlot = 4;
-    static readonly string[] SlotNames = { "tick_ms", "present_ms", "attacker_apply_ms", "keeper_apply_ms", "defender_apply_ms" };
-    readonly ulong[] _slotUs = new ulong[5];
-    /// <summary>Adds microseconds to a named section of the physics tick (summed over the ticks of one frame).</summary>
-    public void Section(int slot, ulong us) => _slotUs[slot] += us;
+    public const int TickSlot = 0, PresentSlot = 1, AttackerSlot = 2, KeeperSlot = 3, DefenderSlot = 4, PadSlot = 5, CameraSlot = 6, ToolsSlot = 7;
+    const int Slots = 8;
+    static readonly string[] SlotNames = { "tick", "present", "attacker_apply", "keeper_apply", "defender_apply", "pad", "camera", "tools" };
+    readonly ulong[] _slotUs = new ulong[Slots];
+    readonly long[] _slotBytes = new long[Slots];
+    /// <summary>
+    /// Adds microseconds and managed bytes allocated (on this thread) to a named section of the physics tick, summed over the ticks of
+    /// one frame. <paramref name="bytes"/> is the difference of two GC.GetAllocatedBytesForCurrentThread readings around the section.
+    /// </summary>
+    public void Section(int slot, ulong us, long bytes = 0) { _slotUs[slot] += us; _slotBytes[slot] += bytes; }
 
     ulong _procStart, _procMs_us, _physStart, _physSum, _physTicks;
     void ProcessStart() => _procStart = Time.GetTicksUsec();
@@ -51,13 +56,18 @@ public sealed partial class PerfProbe
     struct Row
     {
         public int Frame, Tick, PhysTicks, Gen0, Gen1, Gen2;
-        public double S0, S1, S2, S3, S4;
+
         public double DeltaMs, ProcessMs, PhysicsMs, CpuMs, GpuMs, Draws, Objects, Prims;
         public long AllocBytes;
         public string State, Note;
     }
 
-    readonly List<Row> _rows = new();
+    // Sized up front so the probe itself allocates nothing per frame (a list that grows would show in the frame's allocation).
+    const int Capacity = 16384;
+    readonly List<Row> _rows = new(Capacity);
+    readonly List<double> _slotMs = new(Capacity * Slots);   // per row, Slots values
+    readonly List<long> _slotAlloc = new(Capacity * Slots);
+    double Ms(Row r, int slot) => _slotMs[r.Frame * Slots + slot];
     readonly Rid _viewport;
     readonly string? _csv;
     readonly int _warmup;
@@ -115,11 +125,11 @@ public sealed partial class PerfProbe
             Draws = RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame),
             Objects = RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalObjectsInFrame),
             Prims = RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalPrimitivesInFrame),
-            S0 = _slotUs[0] / 1000.0, S1 = _slotUs[1] / 1000.0, S2 = _slotUs[2] / 1000.0, S3 = _slotUs[3] / 1000.0, S4 = _slotUs[4] / 1000.0,
             AllocBytes = alloc - _alloc, Gen0 = g0 - _g0, Gen1 = g1 - _g1, Gen2 = g2 - _g2,
             State = state, Note = _pendingNote,
         });
-        Array.Clear(_slotUs);
+        for (int i = 0; i < Slots; i++) { _slotMs.Add(_slotUs[i] / 1000.0); _slotAlloc.Add(_slotBytes[i]); }
+        Array.Clear(_slotUs); Array.Clear(_slotBytes);
         _g0 = g0; _g1 = g1; _g2 = g2; _alloc = alloc; _pendingNote = "";
     }
 
@@ -145,11 +155,14 @@ public sealed partial class PerfProbe
             GD.Print(Stats("frame", set.Select(r => r.DeltaMs)));
             GD.Print(Stats("process", set.Select(r => r.ProcessMs)));
             GD.Print(Stats("physics", set.Select(r => r.PhysicsMs)));
-            GD.Print(Stats("tick", set.Select(r => r.S0)));
-            GD.Print(Stats("present", set.Select(r => r.S1)));
-            GD.Print(Stats("att_apply", set.Select(r => r.S2)));
-            GD.Print(Stats("kee_apply", set.Select(r => r.S3)));
-            GD.Print(Stats("def_apply", set.Select(r => r.S4)));
+            GD.Print(Stats("tick", set.Select(r => Ms(r, TickSlot))));
+            GD.Print(Stats("present", set.Select(r => Ms(r, PresentSlot))));
+            GD.Print(Stats("att_apply", set.Select(r => Ms(r, AttackerSlot))));
+            GD.Print(Stats("kee_apply", set.Select(r => Ms(r, KeeperSlot))));
+            GD.Print(Stats("def_apply", set.Select(r => Ms(r, DefenderSlot))));
+            GD.Print(Stats("pad", set.Select(r => Ms(r, PadSlot))));
+            GD.Print(Stats("camera", set.Select(r => Ms(r, CameraSlot))));
+            GD.Print(Stats("tools", set.Select(r => Ms(r, ToolsSlot))));
             GD.Print(Stats("phys_ticks", set.Select(r => (double)r.PhysTicks), "ticks/frame"));
             GD.Print(Stats("other", set.Select(r => r.DeltaMs - r.ProcessMs - r.PhysicsMs)));
             GD.Print(Stats("cpu_render", set.Select(r => r.CpuMs)));
@@ -164,10 +177,15 @@ public sealed partial class PerfProbe
                 $"PERF_SPIKE frame={r.Frame} tick={r.Tick} delta={r.DeltaMs:F2} proc={r.ProcessMs:F2} phys={r.PhysicsMs:F2} cpu={r.CpuMs:F2} gpu={r.GpuMs:F2} alloc={r.AllocBytes} gen0={r.Gen0} state={r.State} note={r.Note}"));
         if (_csv != null)
         {
-            var sb = new StringBuilder("frame,tick,delta_ms,process_ms,physics_ms,cpu_render_ms,gpu_render_ms,draws,objects,prims,phys_ticks,tick_ms,present_ms,attacker_apply_ms,keeper_apply_ms,defender_apply_ms,alloc_bytes,gen0,gen1,gen2,state,note\n");
+            // a section's time is <name>_ms and its allocation <name>_bytes; the present section includes the three figures' apply
+            var sb = new StringBuilder("frame,tick,delta_ms,process_ms,physics_ms,cpu_render_ms,gpu_render_ms,draws,objects,prims,phys_ticks,"
+                + string.Join(",", SlotNames.Select(n => n + "_ms")) + ",alloc_bytes," + string.Join(",", SlotNames.Select(n => n + "_bytes")) + ",gen0,gen1,gen2,state,note\n");
             foreach (var r in _rows)
                 sb.AppendLine(string.Create(CultureInfo.InvariantCulture,
-                    $"{r.Frame},{r.Tick},{r.DeltaMs:F3},{r.ProcessMs:F3},{r.PhysicsMs:F3},{r.CpuMs:F3},{r.GpuMs:F3},{r.Draws},{r.Objects},{r.Prims},{r.PhysTicks},{r.S0:F3},{r.S1:F3},{r.S2:F3},{r.S3:F3},{r.S4:F3},{r.AllocBytes},{r.Gen0},{r.Gen1},{r.Gen2},{r.State},{r.Note}"));
+                    $"{r.Frame},{r.Tick},{r.DeltaMs:F3},{r.ProcessMs:F3},{r.PhysicsMs:F3},{r.CpuMs:F3},{r.GpuMs:F3},{r.Draws},{r.Objects},{r.Prims},{r.PhysTicks},") +
+                    string.Join(",", Enumerable.Range(0, Slots).Select(i => Ms(r, i).ToString("F3", CultureInfo.InvariantCulture))) + "," + r.AllocBytes + "," +
+                    string.Join(",", Enumerable.Range(0, Slots).Select(i => _slotAlloc[r.Frame * Slots + i])) +
+                    string.Create(CultureInfo.InvariantCulture, $",{r.Gen0},{r.Gen1},{r.Gen2},{r.State},{r.Note}"));
             File.WriteAllText(_csv, sb.ToString());
             GD.Print("PERF_CSV " + _csv);
         }

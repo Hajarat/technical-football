@@ -338,15 +338,15 @@ public partial class Match
         Ball.SetPossession(w.Attacker.InPossession || w.Keeper.InPossession || w.Defender is { InPossession: true });
         var af = AttackerFrame(w.Attacker);
         FootStats.Tick = _tick;
-        ulong pt0 = Time.GetTicksUsec();
+        ulong pt0 = Time.GetTicksUsec(); long a0 = GC.GetAllocatedBytesForCurrentThread();
         Attacker.Apply(af, w.Attacker.InPossession);
-        ulong pt1 = Time.GetTicksUsec();
+        ulong pt1 = Time.GetTicksUsec(); long a1 = GC.GetAllocatedBytesForCurrentThread();
         Keeper.Apply(KeeperFrame(w.Keeper));
-        ulong pt2 = Time.GetTicksUsec();
+        ulong pt2 = Time.GetTicksUsec(); long a2 = GC.GetAllocatedBytesForCurrentThread();
         if (w.Defender is { } def) Defender.Apply(DefenderFrame(def), def.InPossession);
-        _perf?.Section(PerfProbe.AttackerSlot, pt1 - pt0);
-        _perf?.Section(PerfProbe.KeeperSlot, pt2 - pt1);
-        _perf?.Section(PerfProbe.DefenderSlot, Time.GetTicksUsec() - pt2);
+        _perf?.Section(PerfProbe.AttackerSlot, pt1 - pt0, a1 - a0);
+        _perf?.Section(PerfProbe.KeeperSlot, pt2 - pt1, a2 - a1);
+        _perf?.Section(PerfProbe.DefenderSlot, Time.GetTicksUsec() - pt2, GC.GetAllocatedBytesForCurrentThread() - a2);
         foreach (var e in w.Events)
         {
             if (e.Kind == EventKind.Tackle) _tackles++;
