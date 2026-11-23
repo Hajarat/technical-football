@@ -237,7 +237,7 @@ public sealed partial class World
         _shotStartTick = -1; _shotCancelled = false; _strikeEstMax = -1; _fakeTick = -1; _fake = default;
         _flightPress = false;
         _controlled = 0; _jumpTick = int.MinValue / 2; _jumpStick = default;
-        ResetPass(); _passes = 0; _received = 0; _offsides = 0;
+        ResetPass(); _passes = 0; _received = 0; _offsides = 0; _controlChanges = 0;
         _claims[0] = default; _claims[1] = default;
         Forecast.Clear();
 
@@ -346,7 +346,7 @@ public sealed partial class World
         p.MeetNotBefore = 0;
         p.ReceivingPass = false;
         p.ReceiveCooldownUntil = -100f;
-        p.OffsideFlag = false; p.MateRun = MateRun.Support; p.MateBeyondTick = -1; p.MateRunEndTick = int.MinValue / 2; p.MateRuns = 0; p.MateLineX = float.NaN; p.MateLineVel = 0f; p.MateAvoidSide = 0; p.MateBumpUntil = 0; p.MateHeading = default;
+        p.OffsideFlag = false; p.MateRun = MateRun.Support; p.MateBeyondTick = -1; p.MateRunEndTick = int.MinValue / 2; p.MateRuns = 0; p.MateSlopeTick = int.MinValue / 2; p.MateLineX = float.NaN; p.MateLineVel = 0f; p.MateAvoidSide = 0; p.MateBumpUntil = 0; p.MateHeading = default;
         p.LastTouchKind = ActionKind.First;
         p.KnockOnRequested = false;
         p.StepsSinceTouch = 0;
@@ -442,7 +442,8 @@ public sealed partial class World
             if (HasMates)
                 foreach (var m in Teams[0])
                     if (m != Attacker && !m.OffsideFlag && (only == null || only == m)) _candidates[0].Add(new LockOnCandidate(m, default, Stick: false, LockOnRun.Attacker));
-            if (Defender != null) _candidates[1].Add(new LockOnCandidate(Defender, default, Stick: false, LockOnRun.Defender));
+            // (against a team he first has to see the strike: no claim run until his reaction delay is over)
+            if (Defender != null && !DefenderReacting) _candidates[1].Add(new LockOnCandidate(Defender, default, Stick: false, LockOnRun.Defender));
         }
         // (the named receiver meets the pass where it was played to, at its expected arrival)
         foreach (var m in Teams[0]) m.MeetNotBefore = only == m ? _pass!.ExpectedArrivalTick : 0;
@@ -521,6 +522,7 @@ public sealed partial class World
         // (the run cycle starts afresh for both: the new player is the pad's, the old one the bot's)
         old.MateRun = MateRun.Support; old.MateBeyondTick = -1; Attacker.MateRun = MateRun.Support; Attacker.MateBeyondTick = -1;
         _jumpStick = _lastIntent.Move;
+        _controlChanges++;
         _events.Add(new SimEvent(EventKind.ControlChanged, now.Position, now.Speed, Team: 0, PlayerIndex: index, Other: from, Reason: reason));
     }
 
@@ -736,6 +738,7 @@ public sealed partial class World
             AttackerPosition = a.Position,
             AttackerVelocity = a.Velocity,
             DefenderCovers = Defender != null && DefenderCovers(),
+            Coming = PassMeeting,
         };
     }
 
@@ -1413,6 +1416,7 @@ public sealed partial class World
         Attacker.LastTouchFoot = result.Foot;
         Attacker.StrikeFoot = result.Foot;
         _shots.Add(result);
+        StartReaction();
         { bool none = false; OffsideAtStrike(Attacker, null, ref none); } // (a shot's rebound cannot be tapped in by a player who was beyond the line)
         _lastShot = result;
         _pending = default;
@@ -1499,6 +1503,7 @@ public sealed partial class World
             Shots = _shots.ToArray(),
             Keeper = _brain.Report,
             Defender = FinishDefenderReport(),
+            Team = HasMates ? new TeamReport { Passes = _passes, Received = _received, Offside = Outcome == Outcome.Offside, ControlChanges = _controlChanges } : null,
         };
         State = RoundState.Report;
     }

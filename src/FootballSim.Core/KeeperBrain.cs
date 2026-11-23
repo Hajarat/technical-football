@@ -31,6 +31,12 @@ internal readonly struct KeeperSituation
     /// </summary>
     public bool DefenderCovers { get; init; }
 
+    /// <summary>
+    /// While a pass is on its way: where it will be met (the receiver's meeting point). The keeper sets himself for a ball there
+    /// instead of where the ball is now; his rush and saves still read the ball itself. Null with no pass.
+    /// </summary>
+    public Vector3? Coming { get; init; }
+
     /// <summary>No attacker information: the keeper holds his arc and reacts to strikes only.</summary>
     public static KeeperSituation None => new() { AttackerNextTouch = float.PositiveInfinity, AttackerTouchTick = -1, StrikeIn = float.PositiveInfinity };
 }

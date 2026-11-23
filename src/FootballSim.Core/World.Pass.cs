@@ -30,7 +30,7 @@ public sealed partial class World
         _passKind = PassKind.None; _passWasHeld = false; _passCharge = 0f; _passStick = default;
         // (a pass button already down when the round starts, as the button that started it, is not a press)
         _passCancelled = true;
-        _pass = null; PassCharge = 0f; PassReceiver = null;
+        _pass = null; PassCharge = 0f; PassReceiver = null; _reactTick = -1;
     }
 
     partial void ResetPassInput(PlayerState old)
@@ -211,6 +211,7 @@ public sealed partial class World
             Passer = a, Kind = kind, Receiver = plan.Receiver, Target = plan.Target, StrikeTick = Tick,
             ExpectedArrivalTick = Tick + (float.IsFinite(arrive) ? (int)MathF.Ceiling(arrive * Tuning.TickRate) : Ticks(Tuning.LockOn.HorizonSeconds)),
         };
+        StartReaction();
         // Offside is judged on the positions at the strike: a named receiver beyond the line ends the round here.
         bool offence = false;
         OffsideAtStrike(a, plan.Receiver, ref offence);
@@ -218,20 +219,72 @@ public sealed partial class World
         if (plan.Receiver != null) JumpTo(plan.Receiver.Index, ControlReason.Pass);
     }
 
-    int _passes, _received;
+    int _passes, _received, _controlChanges;
     /// <summary>Passes struck this round.</summary>
     public int Passes => _passes;
     /// <summary>Passes a team-mate's first touch received this round.</summary>
     public int PassesReceived => _received;
 
-    /// <summary>The reaction delay the opponents' computer-controlled outfield players have to a strike now, seconds (see <see cref="ReactionDelay"/>); 0 without one.</summary>
+    /// <summary>
+    /// The reaction delay the pass planner allows the defender for a pass struck now, seconds: his reaction distance (see
+    /// <see cref="StartReaction"/>) at an assumed ball speed, no more than lock_on.reaction_max_seconds; 0 without a team-mate.
+    /// </summary>
     float OpponentReactionSeconds()
     {
-        float s = 0f;
-        ReactionEstimate(ref s);
-        return s;
+        if (!HasMates || Defender is not { } d) return 0f;
+        float need = TouchModel.HorizontalDistance(d.Position, Ball.Position) * MathF.Max(0f, Tuning.LockOn.ReactionRatio.Evaluate(d.Sheet.Awareness));
+        return MathF.Min(Tuning.LockOn.ReactionMaxSeconds, need / ReactionSpeedGuess);
     }
-    partial void ReactionEstimate(ref float seconds);
+
+    /// <summary>The ball speed the pass planner assumes when it turns the defender's reaction distance into a time, m/s.</summary>
+    const float ReactionSpeedGuess = 10f;
+
+    int _reactTick = -1;        // the tick of the attackers' last strike the defender is still reacting to, or -1
+    Vector3 _reactBall;         // the ball at that strike
+    float _reactDistance;       // the ball must travel this far before he reacts, metres
+
+    /// <summary>
+    /// A strike by the attackers in a scenario with a team-mate: the computer-controlled defender reacts to it only once the
+    /// ball has travelled his distance to it at the strike times lock_on.reaction_ratio (by his awareness), or
+    /// lock_on.reaction_max_seconds have passed. Until then he makes no claim run and holds to where the ball was struck.
+    /// </summary>
+    void StartReaction()
+    {
+        if (!HasMates || Defender is not { } d) return;
+        _reactTick = Tick;
+        _reactBall = Ball.Position;
+        _reactDistance = TouchModel.HorizontalDistance(d.Position, Ball.Position) * MathF.Max(0f, Tuning.LockOn.ReactionRatio.Evaluate(d.Sheet.Awareness));
+    }
+
+    /// <summary>True while the defender has not yet reacted to the attackers' last strike (see <see cref="StartReaction"/>).</summary>
+    public bool DefenderReacting => _reactTick >= 0 && _controller == null
+        && (Tick - _reactTick) * _dt < Tuning.LockOn.ReactionMaxSeconds
+        && TouchModel.HorizontalDistance(Ball.Position, _reactBall) < _reactDistance;
+
+    /// <summary>While a pass is on its way: where it will be met (its receiver's meeting point, or its target until he has one). Null with no pass.</summary>
+    public Vector3? PassMeeting => _pass == null ? null : _claims[0].Player != null ? _claims[0].Point : _pass.Target;
+
+    /// <summary>
+    /// What the defender's bot anchors on with the ball loose in a scenario with a team-mate: where the ball was struck while he
+    /// has not reacted, then the attackers' meeting point with it (their claim), or the ball when they have none.
+    /// </summary>
+    public Vector3 DefenderAnchor => DefenderReacting ? _reactBall : _claims[0].Player != null ? _claims[0].Point : Ball.Position;
+
+    /// <summary>
+    /// True when the defender goes for the loose ball himself: always in a scenario without a team-mate; with one, only when he
+    /// has reacted and his own meeting with the ball is no later than the attackers' (he cuts it out), or they have none.
+    /// </summary>
+    public bool DefenderGoesForBall
+    {
+        get
+        {
+            if (!HasMates) return true;
+            if (DefenderReacting) return false;
+            var mine = _claims[1]; var theirs = _claims[0];
+            if (theirs.Player == null) return true;
+            return mine.Player != null && mine.ArriveTick <= theirs.ArriveTick;
+        }
+    }
 
     /// <summary>
     /// The pass record's life, once a tick before the claims are taken: it ends when the ball has left the path the pass was

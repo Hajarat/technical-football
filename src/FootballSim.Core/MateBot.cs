@@ -65,6 +65,8 @@ public static class MateBot
     const float AvoidPathM = 1f, AvoidClearM = 2f;
     const float AvoidDeg = 60f;
     const int BumpTicks = 10;
+    /// <summary>The fields are sampled once in this many ticks.</summary>
+    const int SlopeTicks = 3;
 
     static float SegmentDistance(Vector2 p, Vector2 a, Vector2 b)
     {
@@ -239,8 +241,13 @@ public static class MateBot
         if (p.MateRun == MateRun.Back)
             return Intent(p, new Vector2(-1f, 0f), top, top, jog, w, t);
 
-        var scene = SceneOf(w, p);
-        var g = Gradient(at, scene, t);
+        // The fields are read every few ticks (they move slowly); between readings he keeps the slope he last saw.
+        if (w.Tick - p.MateSlopeTick >= SlopeTicks || w.Tick < p.MateSlopeTick || before != p.MateRun)
+        {
+            p.MateSlope = Gradient(at, SceneOf(w, p), t);
+            p.MateSlopeTick = w.Tick;
+        }
+        var g = p.MateSlope;
         float slope = g.Length();
         if (slope < k.StillGradient) { p.MateHeading = default; return default; }
         var dir = g / slope;

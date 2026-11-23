@@ -33,6 +33,24 @@ public partial class Match
     bool ReportReached => World.State == RoundState.Report;
 
     /// <summary>A skill move as the attacker's figure starts drawing it: which clips (and their blend) or the procedural drawing.</summary>
+    /// <summary>Passes, control changes and offside calls go to the session log as they happen (a live round only, not a replay).</summary>
+    void LogTeamEvent(SimEvent e)
+    {
+        if (_replay != null) return;
+        switch (e.Kind)
+        {
+            case EventKind.Pass:
+                _log?.Write("pass", ("round", _round), ("tick", World.Tick), ("from", e.PlayerIndex), ("to", e.Other), ("speed", Math.Round(e.Speed, 2)));
+                break;
+            case EventKind.ControlChanged:
+                _log?.Write("control", ("round", _round), ("tick", World.Tick), ("team", e.Team), ("from", e.Other), ("to", e.PlayerIndex), ("reason", e.Reason.ToString().ToLowerInvariant()));
+                break;
+            case EventKind.Offside:
+                _log?.Write("offside", ("round", _round), ("tick", World.Tick), ("player", e.PlayerIndex));
+                break;
+        }
+    }
+
     void LogSkill(SkillStart m) => _log?.Write("skill", ("round", _round), ("tick", World.Tick), ("move", m.Move), ("foot", m.Right ? "R" : "L"),
         ("side", m.Side < 0 ? "left" : m.Side > 0 ? "right" : "none"), ("stand_clip", m.StandClip), ("run_clip", m.RunClip),
         ("w_run", Math.Round(m.WRun, 2)), ("entry_speed", Math.Round(m.EntrySpeed, 2)), ("drawing", m.Clips ? "clips" : "procedural"));

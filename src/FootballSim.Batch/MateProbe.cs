@@ -161,4 +161,124 @@ static class MateProbe
         Console.WriteLine($"outcome {w.Outcome} at tick {w.Tick}, runs {mate.MateRuns}");
         return 0;
     }
+
+    /// <summary>
+    /// --trace-team seed [--style solo|square|through] [--every 12]: one scripted round of a scenario with a team-mate, a line
+    /// every few ticks and on every pass, control change, touch, tackle, strike and offside.
+    /// </summary>
+    public static int TraceTeam(Tuning tuning, Scenario sc, PlayerSheet a, PlayerSheet k, PlayerSheet? d, PlayerSheet? m, ScriptedAttacker script, ulong seed, int every)
+    {
+        var w = new World(tuning, sc, a, k, seed, d, m);
+        w.Begin();
+        var buf = new TickIntent[w.PlayerCount];
+        Console.WriteLine($"trace team: scenario={sc.Id} seed={seed} style={script.Team}");
+        Console.WriteLine("  tick state   ctl  p0(x,z)        p1(x,z)       run      ball(x,z)      bv   line  defender(x,z)        events");
+        for (int i = 0; i < 40 * tuning.TickRate && w.State != RoundState.Report; i++)
+        {
+            buf[0] = script.Next(w);
+            w.Step(buf);
+            var ev = w.Events.Where(e => e.Kind is EventKind.Pass or EventKind.ControlChanged or EventKind.Offside or EventKind.Strike or EventKind.Tackle
+                or EventKind.Block or EventKind.Save or EventKind.Goal or EventKind.PossessionGained or EventKind.PossessionLost)
+                .Select(e => e.Kind == EventKind.ControlChanged ? $"ControlChanged[{e.Other}>{e.PlayerIndex} {e.Reason}]" : $"{e.Kind}[{e.Team}.{e.PlayerIndex}]").ToList();
+            if (w.Tick % every != 0 && ev.Count == 0) continue;
+            var p0 = w.Teams[0][0].Position; var b = w.Ball;
+            string p1 = w.HasMates ? $"{F(w.Teams[0][1].Position.X).PadLeft(6)},{F(w.Teams[0][1].Position.Z).PadLeft(6)} {w.Teams[0][1].MateRun,-7}" : "".PadLeft(21);
+            string def = w.Defender is { } df ? $"{F(df.Position.X).PadLeft(6)},{F(df.Position.Z).PadLeft(6)} {df.DefenderAction,-7}" : "";
+            Console.WriteLine($"{w.Tick,6} {w.State,-7} {w.ControlledIndex,3}  {F(p0.X).PadLeft(6)},{F(p0.Z).PadLeft(6)}  {p1}  {F(b.Position.X).PadLeft(6)},{F(b.Position.Z).PadLeft(6)} {F(b.Velocity.Length()).PadLeft(5)} {(w.OffsideOn ? F(w.OffsideLine) : "-").PadLeft(6)}  {def}  {string.Join(" ", ev)}");
+        }
+        Console.WriteLine($"outcome {w.Outcome} at tick {w.Tick}; passes {w.Passes} (received {w.PassesReceived}), offside {w.Offsides}, shots {w.Shots.Count}");
+        return 0;
+    }
+
+    /// <summary>
+    /// The bands of the team probe: rounds that end in a goal, percent, per scripted style (set from the measured rates), and
+    /// how far the square pass has to beat playing alone, points.
+    /// </summary>
+    public static readonly Dictionary<string, (float Lo, float Hi)> GoalBands = new()
+    {
+        ["solo"] = (3f, 10f), ["square"] = (13f, 24f), ["through"] = (15f, 28f),
+    };
+    public const float SquareOverSolo = 10f;
+    /// <summary>
+    /// two_v_one may take no more than this many times as long as defender_duel: 10,000 rounds played alone (the same script,
+    /// so the rounds are alike), and a second of play in every style (the passing styles' rounds last about twice as long).
+    /// </summary>
+    public const float SpeedRatioMax = 2f;
+
+    /// <summary>
+    /// --probe team [--n 2000] [--seed 1] [--styles solo,square,through] [--speed 1]: scripted rounds of two_v_one per style with
+    /// how each ended and what the pair did, against the bands; with --speed, the time 10,000 rounds take beside defender_duel's.
+    /// </summary>
+    public static int RunTeam(Dictionary<string, string> opts, string dataDir, Tuning tuning)
+    {
+        int n = opts.TryGetValue("n", out var ns) ? int.Parse(ns, Ic) : 2000;
+        ulong seed = opts.TryGetValue("seed", out var sd) ? ulong.Parse(sd, Ic) : 1UL;
+        var styles = (opts.TryGetValue("styles", out var st) ? st : "solo,square,through").Split(',', StringSplitOptions.RemoveEmptyEntries);
+        var scr = DataLoader.LoadScenario(Path.Combine(dataDir, "scenarios", "two_v_one.json"));
+        if (!scr.Ok) { Console.Error.WriteLine("error: " + scr.Error); return 1; }
+        var sc = scr.Value!;
+        PlayerSheet? P(string key, string def)
+        {
+            var r = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", (opts.TryGetValue(key, out var v) ? v : def) + ".json"));
+            if (!r.Ok) Console.Error.WriteLine("error: " + r.Error);
+            return r.Value;
+        }
+        var a = P("attacker", sc.DefaultAttacker); var k = P("keeper", sc.DefaultKeeper); var d = P("defender", sc.DefaultDefender); var m = P("mate", sc.DefaultMate);
+        if (a == null || k == null || d == null || m == null) return 1;
+        Console.WriteLine($"team probe: {n} rounds of two_v_one per style, attacker {a.Id}, team-mate {m.Id}, defender {d.Id}, keeper {k.Id}");
+        Console.WriteLine("  style     goal%  held%  dispossessed%  offside%  time_up%  other%   passes/round  received%  shots/round  seconds/round");
+        bool ok = true;
+        var goal = new Dictionary<string, double>();
+        foreach (string style in styles)
+        {
+            if (!Enum.TryParse<ScriptedAttacker.TeamStyle>(style, true, out var team)) { Console.Error.WriteLine($"unknown style '{style}'"); return 2; }
+            var outcomes = new int[Enum.GetValues<Outcome>().Length];
+            long passes = 0, received = 0, shots = 0;
+            double clock = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var r = RoundRunner.RunToReport(tuning, sc, a, k, seed + (ulong)i, out _, new ScriptedAttacker { Team = team }, defender: d, mate: m);
+                outcomes[(int)r.Outcome]++;
+                passes += r.Team?.Passes ?? 0; received += r.Team?.Received ?? 0; shots += r.Shots.Count; clock += r.Clock;
+            }
+            double Pct(Outcome o) => 100.0 * outcomes[(int)o] / n;
+            double other = 100.0 - Pct(Outcome.Goal) - Pct(Outcome.Held) - Pct(Outcome.Dispossessed) - Pct(Outcome.Offside) - Pct(Outcome.TimeUp);
+            goal[style] = Pct(Outcome.Goal);
+            Console.WriteLine($"  {style,-8} {F(Pct(Outcome.Goal), 1),6} {F(Pct(Outcome.Held), 1),6} {F(Pct(Outcome.Dispossessed), 1),14} {F(Pct(Outcome.Offside), 1),9} {F(Pct(Outcome.TimeUp), 1),9} {F(other, 1),7} {F((double)passes / n, 2),14} {F(100.0 * received / Math.Max(1, passes), 1),10} {F((double)shots / n, 2),12} {F(clock / n, 1),14}");
+        }
+        foreach (string style in styles)
+            if (GoalBands.TryGetValue(style, out var band)) ok &= Line($"{style}: rounds that end in a goal", goal[style], band.Lo, band.Hi);
+        if (goal.ContainsKey("solo") && goal.ContainsKey("square"))
+            ok &= Line("square over solo, points", goal["square"] - goal["solo"], SquareOverSolo, 100, "");
+        if (opts.ContainsKey("speed"))
+        {
+            // The same script in both (it plays alone), so the rounds are alike and the time compares the simulation; then
+            // the passing styles, whose rounds last longer and have more shots, by the time a simulated second takes.
+            var duel = DataLoader.LoadScenario(Path.Combine(dataDir, "scenarios", "defender_duel.json")).Value!;
+            (double Seconds, long Ticks) Time(Scenario s, PlayerSheet? mate, ScriptedAttacker.TeamStyle team)
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                long ticks = 0;
+                for (int i = 0; i < 10000; i++)
+                {
+                    RoundRunner.RunToReport(tuning, s, a, k, seed + (ulong)i, out var replay, new ScriptedAttacker { Team = team }, defender: d, mate: mate);
+                    ticks += replay.TickCount;
+                }
+                return (sw.Elapsed.TotalSeconds, ticks);
+            }
+            var tDuel = Time(duel, null, ScriptedAttacker.TeamStyle.Solo);
+            Console.WriteLine($"  10,000 rounds: defender_duel {F(tDuel.Seconds, 1)} s ({F(tDuel.Ticks / 120.0 / 10000, 1)} s of play a round)");
+            foreach (var team in new[] { ScriptedAttacker.TeamStyle.Solo, ScriptedAttacker.TeamStyle.Square, ScriptedAttacker.TeamStyle.Through })
+            {
+                var tt = Time(sc, m, team);
+                double total = tt.Seconds / Math.Max(1e-9, tDuel.Seconds);
+                double perTick = tt.Seconds / Math.Max(1, tt.Ticks) / (tDuel.Seconds / Math.Max(1, tDuel.Ticks));
+                Console.WriteLine($"  10,000 rounds: two_v_one {team.ToString().ToLowerInvariant()} {F(tt.Seconds, 1)} s ({F(tt.Ticks / 120.0 / 10000, 1)} s of play a round): {F(total)} times defender_duel, {F(perTick)} times per second of play");
+                ok &= Line($"two_v_one {team.ToString().ToLowerInvariant()} over defender_duel, per second of play", perTick, 0, SpeedRatioMax, "");
+                if (team == ScriptedAttacker.TeamStyle.Solo) ok &= Line("two_v_one solo over defender_duel, 10,000 rounds", total, 0, SpeedRatioMax, "");
+            }
+        }
+        Console.WriteLine(ok ? "team probe: every band met" : "team probe: BANDS MISSED");
+        return ok ? 0 : 3;
+    }
 }

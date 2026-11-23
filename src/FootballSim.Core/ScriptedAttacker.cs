@@ -51,6 +51,33 @@ public sealed class ScriptedAttacker
     /// <summary>Going round the defender, close control is held (short touches) while he is within this of the ball, metres (0: never).</summary>
     public float StyleCloseRange { get; set; }
 
+    /// <summary>What the scripted attacker does with a team-mate: nothing, or one pass and then play on as the receiver.</summary>
+    public enum TeamStyle { Solo, Square, Through }
+
+    /// <summary>
+    /// The style with a team-mate (a scenario that has one). Solo never passes. Square plays one ground pass to him once the
+    /// defender is in front within <see cref="PassDistance"/> of the ball (or the ball is within two metres of the shooting
+    /// distance). Through holds the ball up short of the defender and plays one through ball as the team-mate's run reaches
+    /// the offside line (or when the defender gets too close to wait). After the pass the script plays on as the
+    /// receiver, as it plays alone.
+    /// </summary>
+    public TeamStyle Team { get; set; }
+    /// <summary>Square: the pass is played with the defender in front within this of the ball, metres.</summary>
+    public float PassDistance { get; set; } = 8f;
+    /// <summary>Through: the pass is pressed with the team-mate's armed run within this of the line, metres.</summary>
+    public float ThroughWithin { get; set; } = 2f;
+    /// <summary>Through: waiting for the run he stops with the defender in front within this of the ball, and passes anyway once he is within <see cref="ReleaseDistance"/>, metres.</summary>
+    public float HoldUpDistance { get; set; } = 8f;
+    public float ReleaseDistance { get; set; } = 6f;
+    /// <summary>Through: he passes only with the team-mate at least this far onside, metres.</summary>
+    public float OnsideRoom { get; set; } = 1f;
+    /// <summary>The pass button is held this many ticks (a tap: the pass points just beyond the nearest man on the stick).</summary>
+    public int PassHoldTicks { get; set; } = 6;
+
+    bool _passed;                    // the style's one pass has been struck (or given up)
+    int _passHeld;                   // ticks the pass button has been held, 0 before the press
+    int _controlled = -1;            // the player the script drove last tick
+
     int _styleSide;                  // going round the defender: +1 to +Z, -1 to -Z, 0 not
     bool _skillPlayed;               // the skill move of the current approach has been asked for
     bool _skillNow;                  // ... on this tick
@@ -261,11 +288,62 @@ public sealed class ScriptedAttacker
         else if (_styleSide != 0 && (!inFront || dist > trigger + 3f)) { _styleSide = 0; _skillPlayed = false; }
     }
 
+    /// <summary>The team style's pass: true while the script is pressing, holding or waiting on it (<paramref name="it"/> is then the intent).</summary>
+    bool PassNow(World w, out TickIntent it)
+    {
+        it = default;
+        var a = w.Attacker;
+        PlayerState? mate = null;
+        foreach (var m in w.Teams[0]) if (m != a && m.Role == PlayerRole.Outfield) { mate = m; break; }
+        if (mate == null || w.State != RoundState.Live) return false;
+        if (w.Passes > 0) { _passed = true; return false; }
+        var ball = new Vector2(w.Ball.Position.X, w.Ball.Position.Z);
+        var mp = new Vector2(mate.Position.X, mate.Position.Z);
+        bool through = Team == TeamStyle.Through;
+        // The stick: at him for a ground pass; for a through ball up the pitch from him, into his run.
+        var aim = mp + (through ? new Vector2(4f, 0f) : Vector2.Zero) - ball;
+        aim = aim.LengthSquared() > 1e-6f ? Vector2.Normalize(aim) : new Vector2(1f, 0f);
+        if (_passHeld == 0)
+        {
+            if (w.BallController != a) return false;
+            float toGoal = Vector2.Distance(ball, new Vector2(w.Pitch.GoalLineX, 0f));
+            float toDefender = w.Defender is { } d && d.Position.X > ball.X ? Vector2.Distance(new Vector2(d.Position.X, d.Position.Z), ball) : float.PositiveInfinity;
+            bool now;
+            if (through)
+            {
+                // (onside with room to spare: the line may come back at him while the pass winds up)
+                bool onside = !w.OffsideOn || w.OffsideLine - mate.Position.X >= OnsideRoom;
+                bool run = mate.MateRun == MateRun.Go || mate.MateRun == MateRun.Armed && w.OffsideLine - mate.Position.X <= ThroughWithin + OnsideRoom;
+                // (with the defender on top of him he cannot wait for the run any longer)
+                now = onside && (run || toDefender <= ReleaseDistance);
+                // Waiting for the run with the defender ahead, he holds the ball up instead of running on into him.
+                if (!now && toDefender <= HoldUpDistance) return true;
+            }
+            else now = toDefender <= PassDistance || w.Scenario.ShootDistance > 0f && toGoal <= w.Scenario.ShootDistance + 2f;
+            if (!now) return false;
+        }
+        // Pressed: held for the tap, then the stick stays on him until the strike (the receiver is chosen again every tick).
+        _passHeld++;
+        bool held = _passHeld <= PassHoldTicks;
+        it = new TickIntent { MoveX = aim.X, MoveZ = aim.Y, PassHeld = held && !through, ThroughHeld = held && through };
+        // (given up if nothing was struck in a second and a half: the ball was lost on the way)
+        if (_passHeld > 180) { _passed = true; return false; }
+        return true;
+    }
+
     SimRng Tactic(World w) => _tacticRng ??= new SimRng(w.Seed ^ 0x3A91C7E25B0D4F68UL);
 
     /// <summary>The intent for the attacker this tick.</summary>
     public TickIntent Next(World w)
     {
+        // Control has moved to another player (a pass, a loose ball): the attempt starts afresh for him.
+        if (_controlled >= 0 && w.ControlledIndex != _controlled)
+        {
+            _released = false; _heldFor = 0f; _pressCharge = float.NaN; _styleSide = 0; _roundSide = 0; _skillPlayed = false; _shootThrough = false;
+            _chipRolled = false;
+        }
+        _controlled = w.ControlledIndex;
+        if (Team != TeamStyle.Solo && w.HasMates && !_passed && !_released && _heldFor == 0f && PassNow(w, out var pass)) return pass;
         if (!_released && _heldFor == 0f) ReadDefender(w);
         bool chipNow = !_released && _heldFor == 0f && Counters && ReadKeeper(w);
         if (_heldFor == 0f && !_released) _chipThis = chipNow;

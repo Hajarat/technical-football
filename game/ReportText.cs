@@ -16,6 +16,7 @@ public static class ReportText
         Outcome.Held => "SAVED (held)",
         Outcome.Dispossessed => "DISPOSSESSED",
         Outcome.Foul => "FOUL",
+        Outcome.Offside => "OFFSIDE",
         _ when r.Keeper.Action == KeeperResult.Parried => "SAVED (parried, ball was live)",
         Outcome.Wide => "WIDE",
         Outcome.Over => "OVER",
@@ -43,9 +44,18 @@ public static class ReportText
                 ? "Keeper: no dive needed"
                 : $"Keeper: reacted in {F(k.ReactionS, 2)} s, needed {F(k.NeededM, 1)} m, reach {F(k.ReachM, 1)} m, margin {F(k.MarginM, 1)} m");
         }
+        if (r.Team is { } team) lines.Add(TeamLine(team));
         if (r.Defender is { } d) lines.Add(DefenderLine(r, d));
         lines.Add(Footer);
         return lines.ToArray();
+    }
+
+    /// <summary>What the pair did, in a round with a team-mate.</summary>
+    static string TeamLine(TeamReport t)
+    {
+        string passes = t.Passes == 0 ? "no pass" : t.Passes == 1 ? "1 pass" : $"{t.Passes} passes";
+        if (t.Passes > 0) passes += t.Received == t.Passes ? " (received)" : $" ({t.Received} received)";
+        return "Team: " + passes + (t.Offside ? ", offside" : "");
     }
 
     /// <summary>What the defender did, in a round with one.</summary>

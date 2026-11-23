@@ -794,7 +794,7 @@ public sealed class MateTuning
     /// <summary>After a run he waits this long before he arms again, seconds.</summary>
     public float RearmSeconds { get; set; } = 4f;
     /// <summary>He holds to where the line will be this long from now while it comes back up the pitch at him, seconds.</summary>
-    public float LineLeadSeconds { get; set; } = 0.4f;
+    public float LineLeadSeconds { get; set; } = 0.8f;
     /// <summary>He does not go while the line comes back up the pitch faster than this, m/s.</summary>
     public float GoMaxLineSpeed { get; set; } = 0.75f;
     /// <summary>He does not move toward a board nearer than this, metres, nor toward the goal line nearer than goal_line_margin_m.</summary>

@@ -81,11 +81,17 @@ public sealed class DefenderBot
         bool loose = w.State is RoundState.Live or RoundState.Strike && w.BallController == null && w.BallPlayed;
         int awareness = d.Sheet.Awareness;
 
-        if (loose)
+        if (loose && w.DefenderGoesForBall)
         {
             Mode = DefenderMode.Collect;
             _buttonLeft = 0f;
             return Collect(w, d, dp, bp);
+        }
+        // Against a team, a loose ball he is not first to (a pass on its way): he holds, anchored on where it will be met.
+        if (loose)
+        {
+            var anchor = w.DefenderAnchor;
+            bp = new Vector2(anchor.X, anchor.Z);
         }
         if (Mode == DefenderMode.Collect) EnterHold();
 

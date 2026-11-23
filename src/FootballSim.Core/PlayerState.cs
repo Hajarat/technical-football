@@ -192,6 +192,9 @@ public sealed class PlayerState
     public int MateRuns { get; internal set; }
     /// <summary>The side he curves round a body in his path on (+1 left of his way, -1 right), or 0 with nobody in it.</summary>
     internal int MateAvoidSide;
+    /// <summary>The slope of the fields as he last read it, and the tick he read it on.</summary>
+    internal System.Numerics.Vector2 MateSlope;
+    internal int MateSlopeTick = int.MinValue / 2;
     /// <summary>The offside line's x as he last saw it (NaN before), and its smoothed speed, m/s (negative: coming back up the pitch).</summary>
     internal float MateLineX = float.NaN, MateLineVel;
     /// <summary>Until this world tick he steers off the body he bumped, which lay along this yaw from him.</summary>

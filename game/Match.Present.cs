@@ -455,6 +455,7 @@ public partial class Match
         {
             if (e.Kind == EventKind.Strike) { _strikeOrigin = e.Position; _hasStrike = true; }
             Rumble(e);
+            LogTeamEvent(e);
         }
         UpdateOverlay();
     }

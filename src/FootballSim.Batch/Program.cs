@@ -112,6 +112,7 @@ static class Cli
             if (probe == "shots") return ShotDiag.Run(opts, dataDir, tuning);
             if (probe == "shot") return ShotProbe.Run(opts, dataDir, tuning);
             if (probe == "defender") return DefenderProbe.Run(opts, dataDir, tuning);
+            if (probe == "team") return MateProbe.RunTeam(opts, dataDir, tuning);
             if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, sessions, shots, shot, defender)"); return 2; }
             return DribbleProbe.Run(opts, dataDir, tuning);
         }
@@ -147,6 +148,10 @@ static class Cli
             return KeeperReplays.Trace(tuning, sc, attacker, keeper, ulong.Parse(traceSeed, CultureInfo.InvariantCulture),
                 opts.TryGetValue("trace-from", out var tf) ? int.Parse(tf, CultureInfo.InvariantCulture) : -1,
                 opts.TryGetValue("trace-to", out var tt) ? int.Parse(tt, CultureInfo.InvariantCulture) : -1);
+
+        if (opts.TryGetValue("trace-team", out var teamSeed))
+            return MateProbe.TraceTeam(tuning, sc, attacker, keeper, defender, mateSheet, MateScript(opts) ?? new ScriptedAttacker(),
+                ulong.Parse(teamSeed, CultureInfo.InvariantCulture), opts.TryGetValue("every", out var te) ? int.Parse(te, CultureInfo.InvariantCulture) : 12);
 
         if (opts.TryGetValue("save-replay", out var savePath))
         {
@@ -284,7 +289,17 @@ static class Cli
     }
 
     /// <summary>The scripted attacker for --style solo|square|through (a scenario with a team-mate); null without the option.</summary>
-    static ScriptedAttacker? MateScript(Dictionary<string, string> opts) => null;
+    static ScriptedAttacker? MateScript(Dictionary<string, string> opts)
+    {
+        if (!opts.TryGetValue("style", out var style)) return null;
+        return style switch
+        {
+            "solo" => new ScriptedAttacker { Team = ScriptedAttacker.TeamStyle.Solo },
+            "square" => new ScriptedAttacker { Team = ScriptedAttacker.TeamStyle.Square },
+            "through" => new ScriptedAttacker { Team = ScriptedAttacker.TeamStyle.Through },
+            _ => null,
+        };
+    }
 
     static T? Load<T>(LoadResult<T> r) where T : class
     {
