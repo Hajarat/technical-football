@@ -154,7 +154,7 @@ public partial class PlayerFigure
         if (run is KPose r)
         {
             var rel = new Vector3(-pos.X, 0, -pos.Z);
-            _rushSnap = Shift(r, rel);
+            ShiftInto(ref _rushSnap, r, rel);   // (kept across ticks: its own arrays, never the scratch ones)
             C = _wR >= 1f ? r : Blend(C, r, Smooth(_wR));
         }
         else if (_wR > 0f)
@@ -171,7 +171,7 @@ public partial class PlayerFigure
                 ft.Planted = false; ft.Timed = false; ft.InStance = false; ft.Released = false; ft.Blend = 0f;
                 ft.BlendFrom = C.Ank[i]; ft.Ankle = C.Ank[i]; ft.Plant = new Vector3(C.Ank[i].X, AnkleH, C.Ank[i].Z);
             }
-            TrackSlide(new[] { false, false }, C.Ank);
+            TrackSlide(ScratchB(), C.Ank);
             _lastPos = pos;
         }
     }
@@ -239,7 +239,7 @@ public partial class PlayerFigure
         // the foot on the side he is going and the feet stay on their own sides, so they never cross
         Vector3 lead = hv * 0.10f;
         if (lead.Length() > 0.35f) lead = lead.Normalized() * 0.35f;
-        var tgt = new Vector3[2]; var err = new float[2];
+        var tgt = ScratchV(); var err = ScratchF();
         for (int i = 0; i < 2; i++)
         {
             float side = i == 0 ? -1f : 1f;
@@ -269,7 +269,7 @@ public partial class PlayerFigure
                 ft.Stepping = true; ft.T = 0; ft.Dur = stepDur; ft.From = ft.Plant;
             }
         }
-        var ank = new Vector3[2]; var dir = new Vector3[2];
+        var ank = ScratchV(); var dir = ScratchV();
         for (int i = 0; i < 2; i++) { ank[i] = _kf[i].Ankle; dir[i] = fwd; }
         // never let the feet cross: the right foot stays at least a hip width to the right of the left
         float gap = (ank[1] - ank[0]).Dot(right);
@@ -282,7 +282,7 @@ public partial class PlayerFigure
 
         Basis B = new Basis(right, -_kLean) * new Basis(fwd, Vector3.Up, right);
         Vector3 shoulderC = pel + B * new Vector3(0, 0.035f * H + TorsoLen - 0.03f * H, 0);
-        var knee = new Vector3[2]; var hand = new Vector3[2]; var pole = new Vector3[2];
+        var knee = ScratchV(); var hand = ScratchV(); var pole = ScratchV();
         for (int i = 0; i < 2; i++)
         {
             float side = i == 0 ? -1f : 1f;
@@ -432,7 +432,7 @@ public partial class PlayerFigure
         Vector3 pel = new(pos.X + _dDir.X * _dOff, pelY, pos.Z + _dDir.Z * _dOff);
         Vector3 bodyUp = B.Y, bodyRight = B.Z;
 
-        var knee = new Vector3[2]; var ank = new Vector3[2]; var dir = new Vector3[2]; var handW = new Vector3[2]; var pole = new Vector3[2];
+        var knee = ScratchV(); var ank = ScratchV(); var dir = ScratchV(); var handW = ScratchV(); var pole = ScratchV();
         float aH = 1f - Mathf.Exp(-dt / (diving || holdBall ? 0.04f : getting ? 0.08f : 0.12f));
         float aA = 1f - Mathf.Exp(-dt / 0.05f);
         float kneeFwd = Smooth((g - 0.05f) / 0.40f);
@@ -565,7 +565,7 @@ public partial class PlayerFigure
         Vector3 pel = new(pos.X, _dPelY, pos.Z);
         float shoulderUp = 0.035f * H + TorsoLen - 0.03f * H;
 
-        var knee = new Vector3[2]; var ank = new Vector3[2]; var dir = new Vector3[2]; var hand = new Vector3[2]; var pole = new Vector3[2];
+        var knee = ScratchV(); var ank = ScratchV(); var dir = ScratchV(); var hand = ScratchV(); var pole = ScratchV();
         for (int i = 0; i < 2; i++)
         {
             float side = i == 0 ? -1f : 1f;
@@ -591,12 +591,12 @@ public partial class PlayerFigure
 
     // ---------------------------------------------------------------------------------------------------------------
 
-    static KPose Blend(in KPose a, in KPose b, float w)
+    KPose Blend(in KPose a, in KPose b, float w)
     {
         var r = new KPose
         {
             Pel = a.Pel.Lerp(b.Pel, w), Q = a.Q.Slerp(b.Q, w),
-            Knee = new Vector3[2], Ank = new Vector3[2], Dir = new Vector3[2], Hand = new Vector3[2], Pole = new Vector3[2],
+            Knee = ScratchV(), Ank = ScratchV(), Dir = ScratchV(), Hand = ScratchV(), Pole = ScratchV(),
         };
         for (int i = 0; i < 2; i++)
         {
@@ -611,15 +611,23 @@ public partial class PlayerFigure
         return r;
     }
 
-    /// <summary>The pose moved by <paramref name="by"/> (positions only).</summary>
-    static KPose Shift(in KPose p, Vector3 by)
+    /// <summary>The pose moved by <paramref name="by"/> (positions only), in this tick's scratch arrays.</summary>
+    KPose Shift(in KPose p, Vector3 by)
     {
-        var r = new KPose
-        {
-            Pel = p.Pel + by, Q = p.Q, Dir = (Vector3[])p.Dir.Clone(), Pole = (Vector3[])p.Pole.Clone(),
-            Knee = new Vector3[2], Ank = new Vector3[2], Hand = new Vector3[2],
-        };
-        for (int i = 0; i < 2; i++) { r.Knee[i] = p.Knee[i] + by; r.Ank[i] = p.Ank[i] + by; r.Hand[i] = p.Hand[i] + by; }
+        var r = new KPose { Pel = p.Pel, Q = p.Q, Dir = ScratchV(), Pole = ScratchV(), Knee = ScratchV(), Ank = ScratchV(), Hand = ScratchV() };
+        ShiftInto(ref r, p, by);
         return r;
+    }
+
+    /// <summary>Writes <paramref name="p"/> moved by <paramref name="by"/> into <paramref name="into"/>'s own arrays (made once if it has none).</summary>
+    static void ShiftInto(ref KPose into, in KPose p, Vector3 by)
+    {
+        into.Knee ??= new Vector3[2]; into.Ank ??= new Vector3[2]; into.Dir ??= new Vector3[2]; into.Hand ??= new Vector3[2]; into.Pole ??= new Vector3[2];
+        into.Pel = p.Pel + by; into.Q = p.Q;
+        for (int i = 0; i < 2; i++)
+        {
+            into.Dir[i] = p.Dir[i]; into.Pole[i] = p.Pole[i];
+            into.Knee[i] = p.Knee[i] + by; into.Ank[i] = p.Ank[i] + by; into.Hand[i] = p.Hand[i] + by;
+        }
     }
 }
