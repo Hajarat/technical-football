@@ -45,6 +45,7 @@ The table uses Xbox names.
 | Menu / Options / Start | Pause |
 | Y / Triangle while paused | Open the player editor (see [Player editor](#player-editor)) |
 | Keyboard `B` | Swap face buttons (A with B, X with Y) for the active pad. On by default for Nintendo / Switch / Pro Controller pads; the choice is saved per pad name |
+| Keyboard `V` | Controller vibration on or off (a toast says which). On by default; the choice is saved for every pad in `user://controls.cfg` |
 
 Skill-move directions are taken against the running direction (the facing when standing), and every side move works to
 either side (the attacker draws them from authored clips, see [animation.md](animation.md)). The right stick counts from half deflection; the timings are in the `skill` section of
@@ -91,6 +92,7 @@ Works alongside a gamepad (the larger stick value wins) and when none is detecte
 | M | Capture the round (see [Round capture](#round-capture)) |
 | P or Esc | Pause |
 | B | Swap the pad's face buttons (see above) |
+| V | Controller vibration on or off (see above) |
 | H | Show or hide the controls panel |
 | T | Open the player editor while play is stopped: paused, in Setup or at the report |
 

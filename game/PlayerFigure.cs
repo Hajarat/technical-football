@@ -709,6 +709,7 @@ public partial class PlayerFigure : Node3D
     {
         _scratchVN = _scratchFN = _scratchBN = _scratchSN = 0;
         float dt = f.Dt > 0 ? f.Dt : 1f / 120f;
+        if (!IsKeeper) _animFrame = f;   // (the keeper stores his in UpdateKeeper)
         SetDims(f.HeightM > 0.5f ? f.HeightM : 1.8f);
         float k = H / 1.8f;
         Vector3 pos = f.Position;
@@ -1185,6 +1186,8 @@ public partial class PlayerFigure : Node3D
             if (_atkAnim?.Shots is { Playing: true } sl2) for (int i = 0; i < 2; i++) planted[i] = sl2.Planted(i);
             else if (_atkAnim?.Shots is { Active: true } hb2) for (int i = 0; i < 2; i++) planted[i] &= !hb2.HandBackStepping(i);
             if (_atkAnim?.Shots is { StrikeDrawn: true } sd2) dir[sd2.Foot] = sd2.StrikeDir;
+            // and a defending clip (--defender-anim mocap): the feet its foot lock holds
+            if (_defAnim is { Showing: true } da) for (int i = 0; i < 2; i++) planted[i] = da.FootPlanted(i);
             int layNow = _atkAnim?.Skills is { } sk2 ? (sk2.Playing ? 2 : sk2.Active ? 1 : 0) : 0;
             if (MocapLogOn && Stats != null && (layNow != _layWas || f.Skill.Valid != _laySkillWas))
                 GD.Print($"SKILL_LAYER tick={Stats.Tick} state={(layNow == 2 ? "clip" : layNow == 1 ? "hand-back" : "off")} skill={(f.Skill.Valid ? f.Skill.Kind.ToString() : "-")} {_atkAnim?.Skills?.Describe()}");
@@ -2298,6 +2301,7 @@ public partial class PlayerFigure : Node3D
         _joints.SplitTrunk = _split; _joints.PelvisBasis = Pb; _joints.HeadBasis = Hb;
         if (_keeperAnim != null) _keeperAnim.Present(_joints, _animFrame);   // --keeper-anim mocap (PlayerFigure.Keeper.cs)
         else if (!MocapPresent()) _body?.Pose(_joints);
+        DefenderPresent();   // --defender-anim mocap: the defending clips over the pose just shown (DefenderAnimator.cs)
     }
 
     /// <summary>Stretches a limb mesh (centred on its midpoint, +Y distal, built for <paramref name="refLen"/> metres plus end caps) between two joints.</summary>

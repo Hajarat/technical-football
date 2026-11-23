@@ -42,7 +42,7 @@ public partial class Match
         string game = ProjectSettings.GlobalizePath("res://");
         _data = new GameData(Path.GetFullPath(_args.DataDir ?? Path.Combine(game, "..", "data")));
         _data.Reload();
-        if (_args.LogSession || _args.ReplayPath == null && _args.GalleryDir == null && _args.ClipGalleryDir == null) _log = SessionLog.Create(Path.GetFullPath(Path.Combine(game, "..")));
+        if (_args.LogSession || _args.ReplayPath == null && _args.GalleryDir == null && _args.DefenderGalleryDir == null && _args.ClipGalleryDir == null) _log = SessionLog.Create(Path.GetFullPath(Path.Combine(game, "..")));
         _buildCommit = BuildInfo.Commit;
         _headCommit = BuildInfo.ReadHead(game);
         bool stale = BuildInfo.IsStale(_buildCommit, _headCommit);
@@ -63,6 +63,11 @@ public partial class Match
         {
             _log?.Write("controls", ("pad", name), ("swap_face_buttons", swapped), ("reason", reason));
             if (reason == "toggle") Hud.Toast(swapped ? "Face buttons: swapped" : "Face buttons: standard");
+        };
+        Pad.VibrationChanged += on =>
+        {
+            _log?.Write("controls", ("vibration", on), ("reason", "toggle"));
+            Hud.Toast(on ? "Vibration: on" : "Vibration: off");
         };
         Input.JoyConnectionChanged += (device, connected) => { LogPads(); GD.Print($"PADS device {device} {(connected ? "connected" : "disconnected")}"); };
 
@@ -111,7 +116,7 @@ public partial class Match
         {
             ["id"] = (int)id, ["name"] = Input.GetJoyName((int)id), ["guid"] = Input.GetJoyGuid((int)id),
         }).ToList();
-        _log?.Write("pads", ("count", pads.Count), ("pads", pads));
+        _log?.Write("pads", ("count", pads.Count), ("pads", pads), ("vibration", Pad.Vibration));
     }
 
     void LogWarnings()
@@ -174,7 +179,7 @@ public partial class Match
         // edge stops at the near boards.
         Camera.SetLimits(World.Pitch.MinX, World.Pitch.GoalLineX + World.Pitch.NetDepth + 0.5f, World.Pitch.HalfWidth);
         World.Recorder = new ReplayRecorder(World, att.Id, kee.Id, sc.Id, def?.Id);
-        Defender.Visible = World.Defender != null && _gallery == null && _clipGallery == null;
+        Defender.Visible = World.Defender != null && _gallery == null && _clipGallery == null && _defenderGallery == null;
         if (att.Id == PlayerPresets.CustomId && att == _data.Custom) World.Recorder.Replay.SetAttackerSheet(att);
         _flightTicks = 0; _liveTicks = 0; _beganReplay = false;
         _log?.Write("round_setup", ("round", _round), ("scenario", sc.Id), ("attacker", att.Id), ("keeper", kee.Id), ("defender", World.Defender?.Sheet.Id),

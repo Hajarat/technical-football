@@ -31,7 +31,8 @@ static class ReplayTrace
         var replay = Replay.Load(file, out var err);
         if (replay == null) { Console.Error.WriteLine(err); return 1; }
         var sc = DataLoader.LoadScenario(Path.Combine(dataDir, "scenarios", replay.ScenarioId + ".json")).Value!;
-        var att = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", replay.AttackerId + ".json")).Value!;
+        // A round played with the editor's Custom player carries its sheet; any other names a file in data/players.
+        var att = (replay.ParseAttackerSheet() ?? DataLoader.LoadPlayer(Path.Combine(dataDir, "players", replay.AttackerId + ".json"))).Value!;
         var kee = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", replay.KeeperId + ".json")).Value!;
         var w = new World(tuning, sc, att, kee, replay.Seed);
         w.Begin();

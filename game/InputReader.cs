@@ -170,6 +170,7 @@ public partial class InputReader : Node
         Axis(RUp, JoyAxis.RightY, -1); Axis(RDown, JoyAxis.RightY, 1);
         BindFaceButtons();
         BindFixedButtons();
+        LoadVibration();
     }
 
     // ---- face-button swap (A<->B, X<->Y) for pads that report them crossed, e.g. Switch-mode Xbox-layout pads ----
@@ -237,12 +238,39 @@ public partial class InputReader : Node
         SwapChanged?.Invoke(name, SwapFaceButtons, "toggle");
     }
 
+    // ---- controller vibration (on by default, saved for every pad) ----
+
+    /// <summary>True when events may vibrate the pad.</summary>
+    public bool Vibration { get; private set; } = true;
+    /// <summary>Raised when the person toggles vibration: (on).</summary>
+    public event System.Action<bool>? VibrationChanged;
+
+    void LoadVibration()
+    {
+        var cfg = new ConfigFile();
+        if (cfg.Load(ConfigPath) == Error.Ok && cfg.HasSectionKey("feedback", "vibration"))
+            Vibration = (bool)cfg.GetValue("feedback", "vibration");
+    }
+
+    /// <summary>Turns vibration on or off and remembers it; turning it off stops any vibration under way.</summary>
+    public void ToggleVibration()
+    {
+        Vibration = !Vibration;
+        if (!Vibration) foreach (int id in Input.GetConnectedJoypads()) Input.StopJoyVibration(id);
+        var cfg = new ConfigFile();
+        cfg.Load(ConfigPath);
+        cfg.SetValue("feedback", "vibration", Vibration);
+        cfg.Save(ConfigPath);
+        VibrationChanged?.Invoke(Vibration);
+    }
+
     /// <summary>Call exactly once per _PhysicsProcess.</summary>
     public PadSnapshot Poll()
     {
         TrackPad();
         // (the key's edge is read every poll, so a B typed into a note does not toggle the swap when the panel closes)
         if (KeyboardEnabled && Pressed(Bindings.SwapFace) && !TextEntry) ToggleSwap();
+        if (KeyboardEnabled && Pressed(Bindings.Vibration) && !TextEntry) ToggleVibration();
         var pad = PollPad();
         if (!KeyboardEnabled) return HoldKnockOn(pad);
         return HoldKnockOn(Merge(pad, PollKeyboard()));

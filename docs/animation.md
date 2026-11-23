@@ -130,14 +130,44 @@ whose hook is the outside of the foot (the cut toward the shooting foot's side) 
 ## The defender
 
 In a round with a defender the game draws him with the outfield figure in blue (`Match.Defender`, a `PlayerView`): his
-running, jockeying steps and standing come from the same stride clock and run cycles as the attacker's body without the
-ball. His defending actions are poses laid over that body by `game/PlayerFigure.Defender.cs`, from what the core publishes
-(`FigureFrame.Defender`: the action, its seconds, its side, the leading foot of a lunge or slide, the leg reach while set): a
-crouch for the jockey, the leading foot put out to the core's foot for the lunge, feet first along the ground for the
-slide, lying and getting up after it, a leg out for the block, a lean for the barge and a pitched, wobbling trunk for the
-stumble. Each eases in and out by its own weight, and while one shows the motion-captured trunk and arms give way to it by
-that weight. The attacker's figure takes the stumble pose while the core says he stumbles. These poses are procedural:
-there are no motion-captured defending clips yet.
+running comes from the same stride clock and run cycles as the attacker's body without the ball, and
+`game/PlayerFigure.Defender.cs` lays procedural poses over that body from what the core publishes (`FigureFrame.Defender`:
+the action, its seconds, its side, the leading foot of a lunge or slide, the leg reach while set): a crouch for the jockey,
+the leading foot put out to the core's foot for the lunge, feet first along the ground for the slide, lying and getting up
+after it, a leg out for the block, a lean for the barge and a pitched, wobbling trunk for the stumble.
+
+By default (`--defender-anim mocap`; `procedural` keeps those poses alone) the defending itself is drawn from motion clips
+in `game/assets/anim/defender` (`game/DefenderAnimator.cs`), after the figure has posed the body, so the pose above is both
+the fallback and what every clip is blended from and back to. The chooser (`src/FootballSim.Anim/DefenderChooser.cs`)
+turns the action into a clip set:
+
+| Action | Set | How it is played |
+| --- | --- | --- |
+| Hold, Jockey or Press, standing (under 0.35 m/s; stepping from 0.6) | `set:idle` | the stance clips, searched every 12 ticks |
+| Jockey, and Hold or Press while he holds jockey, stepping | `jockey` | the side shuffles, the dropping off and the closing down in one set: the matcher picks by his velocity against his facing, and the clip's rate follows his speed |
+| Lunge | `lunge` | the clip whose leading foot is on the lunge's side (`ActionSide`; the other side is the mirror), entered where its own time to `contact` is the core's time to the contact and played 0.6 to 2.2 times as fast so the two land together; the root is free while he is planted (the clip steps in and back) and returns after it |
+| Block | `block` | the clip with the leg of the ball's side out, its `contact` (the widest frame) landing when the core's leg reach has grown |
+| Slide, then Grounded | `slide` | the baked slide with the leg of the slide's side leading, played through the lying that follows |
+| GettingUp | `getup` | entered as early as its `up` can still land 0.8 of the way through the core's get-up at up to 2.6 times its speed |
+| Stumble | `stumble` | played through once from the frame nearest his pose |
+| Barge | `barge` | no kept clip: the figure's lean |
+| Hold or Press running, Recover, Collect | none | the figure's run cycles |
+
+`KeeperMotion`, the keeper's engine, plays the sets (the search, the blend at every switch, the planted feet held where they
+landed, the chest kept square to his facing in the stance sets). The tackling foot is brought onto the core's foot point
+(`TackleFoot`) by leg IK, its weight rising over the last 0.2 s before the contact, held while the foot is live and let go
+over 0.2 s; the blocking foot goes out to the side by the core's leg reach the same way. The attacker's figure has the same
+layer for his reactions (`FigureDefender.Reaction`): `stumble` while the core says he stumbles, `barged` when a barge's
+push carries him (the audition kept no clip of that, so he plays the stumble clips while the push carries him), `fall` when the
+round ended in a foul. A set with no kept clip
+keeps the procedural pose. `--defender-anim-log` prints a `DEFENDER_MM` line at every switch (who, action, set, clip, frame,
+rate); `--defender-anim-drop-set a,b` leaves sets empty to check the fallback. The clips, their sources and the audition's
+verdicts are in `game/assets/anim/SOURCES.md`.
+
+`--defender-gallery <dir>` (`game/DefenderGallery.cs`) plays every action and reaction from a script, without the
+simulation, and writes a contact sheet per script (side view over front view, each tile labelled with the action and the
+clip drawn) and a `DEFENDER_GALLERY` line: the clips that played, the fastest bone turn (`POP` above 1,500 deg/s), the
+lowest joint and, for a lunge, the tackling ankle's distance from the core's foot point on the contact tick.
 
 ## Players
 

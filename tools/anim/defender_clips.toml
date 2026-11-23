@@ -1,0 +1,345 @@
+# Defender clip list (and the attacker's reactions to him), for the audition: the one file edited to add, trim or drop a clip.
+# Same keys as clips.toml (the keeper's); retargeted onto game/assets/characters/player.glb into game/assets/anim/defender/:
+#
+#   python3 tools/anim/cmu.py --config tools/anim/defender_clips.toml
+#   uv run --with numpy python3 tools/anim/retarget.py --config tools/anim/defender_clips.toml \
+#       --model game/assets/characters/player.glb --out game/assets/anim/defender
+#
+# Sets (the chooser's, src/FootballSim.Anim/DefenderChooser.cs):
+#   jockey   moving in his stance, facing held: tags "side" (shuffles), "back" (dropping off), "close" (closing down to a stop)
+#   set      standing in his stance ("idle": the clip for standing still)
+#   lunge    the standing tackle: a step in and a foot out; "contact" is the frame the leading foot is furthest out; side = that foot
+#   block    a leg out to the side for a shot; "contact" is its widest frame; side = that leg
+#   barge    a shoulder into a runner alongside
+#   slide    the slide tackle: no CMU trial has one, so it is the keeper's baked slide (file_from)
+#   getup    from the ground after a slide; "up" as in clips.toml
+#   stumble, barged, fall   the attacker's: losing his balance, pushed sideways, brought down ("landing" as in clips.toml);
+#            a stumble's and a barged clip's "recover" is where he starts to catch himself: the clip is entered before it
+#
+# Keys beyond clips.toml's:
+#   fps        the trial's own frame rate when it is not 120 (subject 77 was recorded at 60)
+#   file_from  for source = "baked": the .kclip is copied from this path (relative to game/assets/anim) instead of being baked here
+#
+# Frame ranges and events were read off each trial's motion (pelvis height and path against its facing, foot reach from the pelvis),
+# as for the keeper's list. The verdicts are the audition's of 2026-11-22 (the user sent the recommended picks unchanged).
+
+# ---- jockey: basketball defensive slides (subject 78), backpedals -------------------------------------------------------------
+
+[[clip]]
+name = "jockey_side_shuffle_78_29"
+trial = "78_29"
+frames = [1, 171]
+set = "jockey"
+side = "right"
+tags = ["side"]
+contact_speed = 1.2
+verdict = "keep"
+loop = false
+notes = "low side shuffle to his right, arms out, facing held (about 2.5 m/s)"
+
+[[clip]]
+name = "jockey_side_toside_78_30"
+trial = "78_30"
+frames = [1, 703]
+set = "jockey"
+side = "none"
+tags = ["side"]
+contact_speed = 0.6
+contact_tolerance_cm = 4
+verdict = "keep"
+loop = false
+notes = "side shuffles right, left, right with the turns between them, facing held"
+
+[[clip]]
+name = "jockey_back_zigzag_78_28"
+trial = "78_28"
+frames = [1, 448]
+set = "jockey"
+side = "none"
+tags = ["back"]
+contact_speed = 1.2
+verdict = "keep"
+loop = false
+notes = "dropping off on the diagonal, hips opening one way then the other"
+
+[[clip]]
+name = "jockey_back_quick_76_11"
+trial = "76_11"
+frames = [40, 360]
+set = "jockey"
+side = "none"
+tags = ["back"]
+verdict = "keep"
+loop = false
+notes = "quick large steps straight backwards, upright"
+
+[[clip]]
+name = "jockey_back_crouch_136_12"
+trial = "136_12"
+frames = [121, 600]
+set = "jockey"
+side = "none"
+tags = ["back"]
+contact_tolerance_cm = 4
+verdict = "reject"
+loop = false
+notes = "walking backwards crouched (slow)"
+
+[[clip]]
+name = "jockey_close_left_78_25"
+trial = "78_25"
+frames = [60, 300]
+set = "jockey"
+side = "left"
+tags = ["close"]
+contact_speed = 1.2
+contact_tolerance_cm = 4
+verdict = "trim"
+loop = false
+notes = "closing down forward and to his left, then stopping low"
+
+[[clip]]
+name = "jockey_close_right_78_27"
+trial = "78_27"
+frames = [50, 250]
+set = "jockey"
+side = "right"
+tags = ["close"]
+contact_speed = 1.2
+verdict = "trim"
+loop = false
+notes = "closing down forward and to his right, then stopping low"
+
+# ---- set: standing in his stance ----------------------------------------------------------------------------------------------
+
+[[clip]]
+name = "set_low_78_26"
+trial = "78_26"
+frames = [200, 300]
+set = "set"
+side = "none"
+tags = ["idle"]
+verdict = "trim"
+loop = false
+notes = "low defensive stance after closing down: knees bent, arms out, small weight shifts"
+
+[[clip]]
+name = "set_ready_77_03"
+trial = "77_03"
+fps = 60
+frames = [241, 480]
+set = "set"
+side = "none"
+tags = ["idle"]
+verdict = "keep"
+loop = false
+notes = "crouched ready stance with small weight shifts (the keeper's ready stance trial)"
+
+# ---- lunge: the standing tackle -----------------------------------------------------------------------------------------------
+
+[[clip]]
+name = "lunge_deep_144_17"
+trial = "144_17"
+frames = [760, 960]
+set = "lunge"
+side = "right"
+events = { contact = 847 }
+verdict = "keep"
+loop = false
+notes = "deep lunge straight forward onto the right foot, then back up"
+
+[[clip]]
+name = "lunge_deep_144_11"
+trial = "144_11"
+frames = [1050, 1250]
+set = "lunge"
+side = "left"
+events = { contact = 1110 }
+verdict = "keep"
+loop = false
+notes = "deep lunge forward onto the left foot, left arm up"
+
+[[clip]]
+name = "lunge_kick_144_05"
+trial = "144_05"
+frames = [320, 440]
+set = "lunge"
+side = "right"
+events = { contact = 366 }
+verdict = "reject"
+loop = false
+notes = "front kick with the right foot from a guard stance (hands up), foot at waist height"
+
+[[clip]]
+name = "lunge_stepkick_135_04"
+trial = "135_04"
+frames = [289, 480]
+set = "lunge"
+side = "right"
+events = { contact = 371 }
+verdict = "reject"
+loop = false
+notes = "step forward and front kick with the right foot, landing in a long stance"
+
+# ---- block: a leg out for a shot ----------------------------------------------------------------------------------------------
+
+[[clip]]
+name = "block_sidestep_83_05"
+trial = "83_05"
+frames = [100, 300]
+set = "block"
+side = "right"
+events = { contact = 170 }
+verdict = "keep"
+loop = false
+notes = "very large step to his right, the right leg stretched out wide"
+
+[[clip]]
+name = "block_sidestep_83_13"
+trial = "83_13"
+frames = [121, 420]
+set = "block"
+side = "right"
+events = { contact = 182 }
+verdict = "keep"
+loop = false
+notes = "wide step to his right into a low stance"
+
+# ---- barge --------------------------------------------------------------------------------------------------------------------
+
+[[clip]]
+name = "barge_sidestep_127_14"
+trial = "127_14"
+frames = [1, 151]
+set = "barge"
+side = "right"
+contact_speed = 1.5
+verdict = "reject"
+loop = false
+notes = "running, a hard step to his right (the nearest CMU has to a shoulder into a runner alongside)"
+
+# ---- slide: the keeper's baked slide tackle (CMU has none) -------------------------------------------------------------------
+
+[[clip]]
+name = "slide_baked"
+source = "baked"
+file_from = "keeper/slide_baked.kclip"
+script = "slide"
+set = "slide"
+side = "right"
+verdict = "keep"
+loop = false
+notes = "the procedural slide tackle baked for the keeper: down on his side, the right leg out along the ground at the ball (side: the leading leg)"
+
+# ---- getup: the keeper's get-up trials ----------------------------------------------------------------------------------------
+
+[[clip]]
+name = "getup_side_140_03"
+trial = "140_03"
+frames = [231, 760]
+cut = [[601, 645]]
+set = "getup"
+side = "none"
+events = { up = 695 }
+contact_tolerance_cm = 4
+verdict = "keep"
+loop = false
+notes = "get up from lying on his side"
+
+[[clip]]
+name = "getup_back_140_08"
+trial = "140_08"
+frames = [161, 660]
+cut = [[495, 545]]
+set = "getup"
+side = "none"
+events = { up = 603 }
+contact_tolerance_cm = 4
+verdict = "keep"
+loop = false
+notes = "get up from lying on his back"
+
+[[clip]]
+name = "getup_back_139_18"
+trial = "139_18"
+frames = [141, 600]
+cut = [[371, 471]]
+set = "getup"
+side = "none"
+events = { up = 501 }
+verdict = "keep"
+loop = false
+notes = "get up from his back, rolling over"
+
+# ---- the attacker's reactions -------------------------------------------------------------------------------------------------
+
+[[clip]]
+name = "stumble_trip_104_13"
+trial = "104_13"
+frames = [60, 230]
+set = "stumble"
+side = "none"
+contact_speed = 0.6
+contact_tolerance_cm = 4
+events = { recover = 120 }
+verdict = "keep"
+loop = false
+notes = "trips forward, arms flung out, catches himself and goes on"
+
+[[clip]]
+name = "stumble_catch_22_12"
+trial = "22_12"
+frames = [1, 150]
+set = "stumble"
+side = "none"
+contact_tolerance_cm = 4
+events = { recover = 40 }
+verdict = "keep"
+loop = false
+notes = "pitched forward low, catches himself over three steps"
+
+[[clip]]
+name = "barged_lurch_104_13"
+trial = "104_13"
+frames = [230, 420]
+set = "barged"
+side = "left"
+contact_speed = 0.6
+contact_tolerance_cm = 4
+events = { recover = 290 }
+verdict = "reject"
+loop = false
+notes = "staggers sideways with an arm thrown up, then recovers"
+
+[[clip]]
+name = "fall_face_90_16"
+trial = "90_16"
+frames = [400, 620]
+set = "fall"
+side = "none"
+events = { landing = 453 }
+verdict = "keep"
+loop = false
+notes = "falls forward onto his front (onto a mat) and lies"
+
+[[clip]]
+name = "fall_slip_90_17"
+trial = "90_17"
+frames = [300, 520]
+set = "fall"
+side = "none"
+events = { landing = 440 }
+verdict = "reject"
+loop = false
+notes = "feet slip out from under him, lands on his back"
+
+[[clip]]
+name = "fall_rug_90_18"
+trial = "90_18"
+frames = [61, 300]
+set = "fall"
+side = "none"
+events = { landing = 127 }
+verdict = "keep"
+loop = false
+notes = "legs pulled from under him, lands on his back and lies"

@@ -48,7 +48,12 @@ Every number is in the `movement` and `touch` sections of `data/tuning/default.j
   change of the target speed held to the contact, which reaches the running speed through the speed law and keeps it within
   15% of the pace (as much either way near the off-ball top speed). When the stick's legs cannot reach the ball, the
   go-get-it legs run to where it will be, at the stick's pace or faster up to the off-ball top speed (first within 15% of the
-  pace, the leg stretching if need be, and only then at any speed). The steering stops
+  pace, the leg stretching if need be, and only then at any speed; but when the legs held to the pace reach the ball only
+  more than 0.25 s later than legs at any speed would, as with a soft touch he would run past and come round to, he slows
+  for it instead). The go-get-it legs never run faster than leaves the ball outside his turning circle (the speed over the
+  turn rate at that speed, kept to 0.8 of the circle that just reaches the ball), so he does not run round a ball off to his
+  side; and, except during a shot, never faster at a ball that is not coming at him (faster than 1 m/s) than he could brake
+  from to its pace at 6 m/s^2 over the gap less 0.3 m, so he does not run past a slow ball whatever the stick's pace. The steering stops
   correcting within `reach_tolerance` (0.08 m) of the contact point; the foot reaches the rest.
 - A demand (the stick turned past the execution angle off the ball's travel and off the run, the stick released for a stop,
   a skill gesture waiting, a shot's strike) shortens the cooldown to `early_execution` of the cadence (by the angle and

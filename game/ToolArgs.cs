@@ -63,6 +63,14 @@ public sealed class ToolArgs
     public bool KeeperAnimLog;
     /// <summary>--keeper-anim-drop-set a,b: the pose database leaves these clip sets empty (the procedural fallback's check).</summary>
     public readonly List<string> KeeperAnimDropSets = new();
+    /// <summary>--defender-anim mocap|procedural: the defender's stance, tackles, block, slide and get-up, and the attacker's stumble and fall, from the motion clips in assets/anim/defender (the default; needs the skinned figure; see DefenderAnimator) or from the procedural poses alone.</summary>
+    public string DefenderAnim = "mocap";
+    /// <summary>--defender-anim-log: print a DEFENDER_MM line at every switch of the defending clips (who, action, set, clip, frame, rate).</summary>
+    public bool DefenderAnimLog;
+    /// <summary>--defender-anim-drop-set a,b: the defender's pose database leaves these clip sets empty (the procedural fallback's check).</summary>
+    public readonly List<string> DefenderAnimDropSets = new();
+    /// <summary>--defender-gallery &lt;dir&gt;: play every defending action and reaction from a script (no simulation) and write screenshots there.</summary>
+    public string? DefenderGalleryDir;
     /// <summary>--bake-keeper-pose &lt;dir&gt;: play the keeper gallery's dive, smother and slide scripts procedurally and write their bone rotations there (tools/anim/bake_procedural.py).</summary>
     public string? BakeDir;
     /// <summary>--player-editor: start with the player editor open (for screenshots).</summary>
@@ -72,7 +80,7 @@ public sealed class ToolArgs
 
     /// <summary>A person playing: a window, and no replay, screenshot, gallery, bake or quit option.</summary>
     public bool Interactive => DisplayServer.GetName() != "headless" && ReplayPath == null && ShotDir == null && ShotTicks.Count == 0 && ShotOn.Count == 0
-        && BurstCount == 0 && GalleryDir == null && ClipGalleryDir == null && BakeDir == null && QuitAfterTicks == 0 && !QuitAfterRound
+        && BurstCount == 0 && GalleryDir == null && DefenderGalleryDir == null && ClipGalleryDir == null && BakeDir == null && QuitAfterTicks == 0 && !QuitAfterRound
         && ControlsPanel == null && !Background;
 
     /// <summary>The options of this run (the latest <see cref="Parse"/>), for views created after it.</summary>
@@ -131,6 +139,15 @@ public sealed class ToolArgs
                     if (a.KeeperAnim != "procedural" && a.KeeperAnim != "mocap") { GD.PushWarning($"--keeper-anim expects mocap or procedural, got '{a.KeeperAnim}'; using mocap"); a.KeeperAnim = "mocap"; }
                     break;
                 case "--keeper-anim-log": a.KeeperAnimLog = true; break;
+                case "--defender-anim":
+                    a.DefenderAnim = (Next() ?? "").ToLowerInvariant();
+                    if (a.DefenderAnim != "procedural" && a.DefenderAnim != "mocap") { GD.PushWarning($"--defender-anim expects mocap or procedural, got '{a.DefenderAnim}'; using mocap"); a.DefenderAnim = "mocap"; }
+                    break;
+                case "--defender-anim-log": a.DefenderAnimLog = true; break;
+                case "--defender-anim-drop-set":
+                    a.DefenderAnimDropSets.AddRange((Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                    break;
+                case "--defender-gallery": a.DefenderGalleryDir = Next(); break;
                 case "--attacker-anim":
                     a.AttackerAnim = (Next() ?? "").ToLowerInvariant();
                     if (a.AttackerAnim != "procedural" && a.AttackerAnim != "mocap") { GD.PushWarning($"--attacker-anim expects mocap or procedural, got '{a.AttackerAnim}'; using procedural"); a.AttackerAnim = "procedural"; }
@@ -173,6 +190,11 @@ public sealed class ToolArgs
         {
             if (!System.IO.Path.IsPathRooted(a.GalleryDir)) a.GalleryDir = System.IO.Path.Combine(ProjectSettings.GlobalizePath("res://"), a.GalleryDir);
             DirAccess.MakeDirRecursiveAbsolute(a.GalleryDir);
+        }
+        if (a.DefenderGalleryDir != null)
+        {
+            if (!System.IO.Path.IsPathRooted(a.DefenderGalleryDir)) a.DefenderGalleryDir = System.IO.Path.Combine(ProjectSettings.GlobalizePath("res://"), a.DefenderGalleryDir);
+            DirAccess.MakeDirRecursiveAbsolute(a.DefenderGalleryDir);
         }
         if (a.BakeDir != null)
         {
