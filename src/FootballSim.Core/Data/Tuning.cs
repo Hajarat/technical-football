@@ -748,7 +748,7 @@ public sealed class MateTuning
     public float SampleM { get; set; } = 2f;
     /// <summary>Spread: he keeps this far off the carrier (and where the carrier will be in 0.2 s), metres; the layer is clamped at 3 m either way.</summary>
     public float SpreadRadiusM { get; set; } = 4f;
-    public float SpreadWeight { get; set; } = 0.2f;
+    public float SpreadWeight { get; set; } = 1f;
     /// <summary>Opponents: he keeps this far off each outfield opponent, metres.</summary>
     public float OpponentRadiusM { get; set; } = 2.5f;
     public float OpponentWeight { get; set; } = 0.1f;
@@ -777,12 +777,26 @@ public sealed class MateTuning
     public float AttackFullFromGoalM { get; set; } = 8f;
     /// <summary>He goes once within this of the line, metres.</summary>
     public float GoWithinM { get; set; } = 0.5f;
+    /// <summary>Armed, he waits this far onside of the line, so a step up by the defender does not catch him, metres.</summary>
+    public float ArmedOnsideM { get; set; } = 0.8f;
     /// <summary>Back onside by more than this he arms again, metres.</summary>
     public float RearmOnsideM { get; set; } = 2f;
     /// <summary>A pass under way cancels his run while he is less than this onside, metres.</summary>
     public float PassCancelOnsideM { get; set; } = 3.5f;
     /// <summary>So does the ball within this of the goal line, metres.</summary>
     public float RunCancelGoalM { get; set; } = 8f;
+    /// <summary>The free-space field counts no more than this distance to the nearest opponent or board, metres: further out he is free enough.</summary>
+    public float SpaceCapM { get; set; } = 4f;
+    /// <summary>He moves at his full asked speed on a slope this steep or steeper, eased in below it, per metre.</summary>
+    public float FullGradient { get; set; } = 0.4f;
+    /// <summary>A run that has been past the line this long with no pass is given up, seconds.</summary>
+    public float GoBeyondSeconds { get; set; } = 0f;
+    /// <summary>After a run he waits this long before he arms again, seconds.</summary>
+    public float RearmSeconds { get; set; } = 4f;
+    /// <summary>He holds to where the line will be this long from now while it comes back up the pitch at him, seconds.</summary>
+    public float LineLeadSeconds { get; set; } = 0.4f;
+    /// <summary>He does not go while the line comes back up the pitch faster than this, m/s.</summary>
+    public float GoMaxLineSpeed { get; set; } = 0.75f;
     /// <summary>He does not move toward a board nearer than this, metres, nor toward the goal line nearer than goal_line_margin_m.</summary>
     public float BoardMarginM { get; set; } = 1.5f;
     public float GoalLineMarginM { get; set; } = 3f;

@@ -237,7 +237,7 @@ public sealed partial class World
         _shotStartTick = -1; _shotCancelled = false; _strikeEstMax = -1; _fakeTick = -1; _fake = default;
         _flightPress = false;
         _controlled = 0; _jumpTick = int.MinValue / 2; _jumpStick = default;
-        ResetPass(); _passes = 0; _received = 0;
+        ResetPass(); _passes = 0; _received = 0; _offsides = 0;
         _claims[0] = default; _claims[1] = default;
         Forecast.Clear();
 
@@ -346,6 +346,7 @@ public sealed partial class World
         p.MeetNotBefore = 0;
         p.ReceivingPass = false;
         p.ReceiveCooldownUntil = -100f;
+        p.OffsideFlag = false; p.MateRun = MateRun.Support; p.MateBeyondTick = -1; p.MateRunEndTick = int.MinValue / 2; p.MateRuns = 0; p.MateLineX = float.NaN; p.MateLineVel = 0f; p.MateAvoidSide = 0; p.MateBumpUntil = 0; p.MateHeading = default;
         p.LastTouchKind = ActionKind.First;
         p.KnockOnRequested = false;
         p.StepsSinceTouch = 0;
@@ -435,12 +436,12 @@ public sealed partial class World
         _candidates[0].Clear(); _candidates[1].Clear();
         if (live)
         {
-            if (only == null || only == Attacker)
+            if ((only == null || only == Attacker) && !Attacker.OffsideFlag)
                 _candidates[0].Add(new LockOnCandidate(Attacker, atk, Stick: Attacker.ShotAction == null, LockOnRun.Attacker));
             // (a team-mate may hold the claim too: control then jumps to him)
             if (HasMates)
                 foreach (var m in Teams[0])
-                    if (m != Attacker && (only == null || only == m)) _candidates[0].Add(new LockOnCandidate(m, default, Stick: false, LockOnRun.Attacker));
+                    if (m != Attacker && !m.OffsideFlag && (only == null || only == m)) _candidates[0].Add(new LockOnCandidate(m, default, Stick: false, LockOnRun.Attacker));
             if (Defender != null) _candidates[1].Add(new LockOnCandidate(Defender, default, Stick: false, LockOnRun.Defender));
         }
         // (the named receiver meets the pass where it was played to, at its expected arrival)
@@ -517,6 +518,8 @@ public sealed partial class World
         now.StickChangeTick = -100000; now.StickReleasedTicks = 0; now.LastStickMove = Vector2.Zero;
         now.StepsSinceTouch = 0; now.PushSteps = 1; now.Chasing = false; now.ClearForecast();
         _jumpTick = Tick;
+        // (the run cycle starts afresh for both: the new player is the pad's, the old one the bot's)
+        old.MateRun = MateRun.Support; old.MateBeyondTick = -1; Attacker.MateRun = MateRun.Support; Attacker.MateBeyondTick = -1;
         _jumpStick = _lastIntent.Move;
         _events.Add(new SimEvent(EventKind.ControlChanged, now.Position, now.Speed, Team: 0, PlayerIndex: index, Other: from, Reason: reason));
     }
@@ -542,6 +545,13 @@ public sealed partial class World
         var assist = stunned
             ? new MoveAssist(top * Tuning.Shot.StunSpeedFraction, 1f + Tuning.Possession.OffBallTurnBonus, Vector2.Zero, HardCap: top * Tuning.Shot.StunSpeedFraction, TurnAbout: true)
             : new MoveAssist(top, 1f + Tuning.Possession.OffBallTurnBonus, Vector2.Zero, TurnAbout: true);
+        // (standing, he turns to face the ball)
+        if (it.Move.LengthSquared() < 1e-6f && p.Speed < 0.5f && !stunned)
+        {
+            float want = MathF.Atan2(Ball.Position.Z - p.Position.Z, Ball.Position.X - p.Position.X);
+            float step = Movement.TurnRateDeg(p.Sheet, Tuning) * MathF.PI / 180f * _dt;
+            assist = assist with { Facing = p.Facing + Math.Clamp(Movement.WrapAngle(want - p.Facing), -step, step) };
+        }
         Movement.Step(p, it, _dt, SimTime, assist, Tuning, Pitch);
         ApplyPush(p);
     }
@@ -1231,6 +1241,7 @@ public sealed partial class World
         }
         p.ReceivingPass = false;
         _pass = null;
+        if (OffsideTouch(p)) return;
         if (touch.Kind == ActionKind.Soft) _softPending = false;
         _events.Add(new SimEvent(EventKind.Touch, touch.ContactPoint, touch.BallVelocity.Length(), Foot: touch.Foot, Team: p.Team, PlayerIndex: p.Index));
         if (!inPossession) SetController(p);
@@ -1355,6 +1366,8 @@ public sealed partial class World
     /// </summary>
     void ExecuteStrike(bool flick = false)
     {
+        // (a player who was beyond the line at the last strike may not play the ball: his first-time strike is the offence)
+        if (OffsideTouch(Attacker)) return;
         if (_pending.Pass != PassKind.None) { ExecutePass(flick); return; }
         bool firstTime = _controller != Attacker;
         float against = TouchPlanner.RelativeBallSpeed(Attacker, Ball);
@@ -1400,6 +1413,7 @@ public sealed partial class World
         Attacker.LastTouchFoot = result.Foot;
         Attacker.StrikeFoot = result.Foot;
         _shots.Add(result);
+        { bool none = false; OffsideAtStrike(Attacker, null, ref none); } // (a shot's rebound cannot be tapped in by a player who was beyond the line)
         _lastShot = result;
         _pending = default;
         _ballPlayed = true;

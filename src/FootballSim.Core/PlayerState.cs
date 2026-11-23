@@ -179,6 +179,27 @@ public sealed class PlayerState
     /// <summary>His last solves, kept between the ticks they are made afresh on.</summary>
     internal LockOnSolveCache LockOnSolve;
 
+    // ---- offside and the team-mate bot's memory ----
+    /// <summary>He was beyond the offside line at his team's last strike: he may not play the ball until a team-mate who was not has (see Offside).</summary>
+    public bool OffsideFlag { get; internal set; }
+    /// <summary>Where the team-mate bot is in its run cycle (see MateBot).</summary>
+    public MateRun MateRun { get; internal set; }
+    /// <summary>The world tick his run in behind went past the line, or -1.</summary>
+    internal int MateBeyondTick = -1;
+    /// <summary>The world tick his last run ended (he was back onside), for the wait before the next.</summary>
+    internal int MateRunEndTick = int.MinValue / 2;
+    /// <summary>Runs in behind he has started this round.</summary>
+    public int MateRuns { get; internal set; }
+    /// <summary>The side he curves round a body in his path on (+1 left of his way, -1 right), or 0 with nobody in it.</summary>
+    internal int MateAvoidSide;
+    /// <summary>The offside line's x as he last saw it (NaN before), and its smoothed speed, m/s (negative: coming back up the pitch).</summary>
+    internal float MateLineX = float.NaN, MateLineVel;
+    /// <summary>Until this world tick he steers off the body he bumped, which lay along this yaw from him.</summary>
+    internal int MateBumpUntil;
+    internal float MateBumpYaw;
+    /// <summary>The direction he moved along last tick (unit, zero while he stood); read by the probe to count reversals.</summary>
+    public System.Numerics.Vector2 MateHeading { get; internal set; }
+
     // ---- Defending. The view draws a defender, and an attacker's reactions, from these. ----
 
     /// <summary>For an outfield player without the ball: what he is doing (see <see cref="Core.DefenderAction"/>).</summary>

@@ -43,6 +43,7 @@ static class PassProbe
     static World Make(Setup s, Scenario sc, ulong seed)
     {
         var w = new World(s.Tuning, sc, s.Attacker, s.Keeper, seed, sc.Defenders > 0 ? s.Defender : null, s.Mate);
+        w.MateBotEnabled = false;
         w.Begin();
         return w;
     }

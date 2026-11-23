@@ -71,6 +71,9 @@ public enum TackleKind { None, Auto, Lunge, Slide }
 /// </remarks>
 public enum EventKind { Touch, Strike, Bounce, FrameHit, Save, Goal, OutOfPlay, PossessionGained, PossessionLost, BoardHit, SkillMove, Tackle, TackleStart, Block, Barge, Foul, Pass, ControlChanged, Offside }
 
+/// <summary>The team-mate bot's run cycle: holding space, pulled onto the offside line, running in behind, coming back onside.</summary>
+public enum MateRun { Support, Armed, Go, Back }
+
 /// <summary>Why the player a team's intent drives changed (see <see cref="EventKind.ControlChanged"/>).</summary>
 public enum ControlReason { None, Pass, Claim }
 

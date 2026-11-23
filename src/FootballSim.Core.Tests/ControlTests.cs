@@ -26,6 +26,7 @@ public class ControlTests
             Offside = offside, ClockLimit = 20f,
         };
         var w = new World(tuning ?? new Tuning(), sc, Player("striker_a"), Player("the_wall"), seed, defender != null ? Player("centre_back") : null, Player("team_mate"));
+        w.MateBotEnabled = false; // (he stands where he is put)
         w.Begin();
         return w;
     }
@@ -49,6 +50,7 @@ public class ControlTests
             Offside = offside, ClockLimit = 20f,
         };
         var w = new World(tuning ?? new Tuning(), sc, Player("striker_a"), Player("the_wall"), seed, defender != null ? Player("centre_back") : null, Player(mate));
+        w.MateBotEnabled = false; // (he stands where he is put)
         w.Begin();
         return w;
     }

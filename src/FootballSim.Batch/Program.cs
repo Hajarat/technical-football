@@ -99,6 +99,7 @@ static class Cli
         if (opts.ContainsKey("keeper-probe")) return KeeperProbe.Run(opts, dataDir, tuning);
         if (opts.ContainsKey("lock-probe")) return LockProbe.Run(opts, dataDir, tuning);
         if (opts.ContainsKey("pass-probe")) return PassProbe.Run(opts, dataDir, tuning);
+        if (opts.ContainsKey("mate-probe")) return MateProbe.Run(opts, dataDir, tuning);
         if (opts.TryGetValue("write-probe-replays", out var probeDir)) return KeeperProbe.WriteReplays(probeDir, dataDir, tuning);
         if (opts.TryGetValue("probe-replays", out var probeReplays)) return KeeperProbe.RunReplays(probeReplays, dataDir, tuning, opts);
         if (opts.TryGetValue("write-skill-replays", out var skillDir)) return SkillProbe.WriteReplays(skillDir, dataDir, tuning);
