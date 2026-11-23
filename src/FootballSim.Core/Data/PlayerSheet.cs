@@ -35,6 +35,12 @@ public sealed class PlayerSheet
     public static readonly IReadOnlyList<string> DefendingRatingNames = new[]
         { "stand_tackle", "slide_tackle", "jockeying", "blocking", "awareness", "strength" };
 
+    /// <summary>
+    /// The passing ratings, in file order. A file without one reads 50 (no warning), and a sheet whose passing ratings are all 50
+    /// is written without them, so sheets from before they existed load and save exactly as they did.
+    /// </summary>
+    public static readonly IReadOnlyList<string> PassingRatingNames = new[] { "ground_pass", "through_pass" };
+
     public const float HeightMin = 1.60f, HeightMax = 2.05f, WeightMin = 55f, WeightMax = 100f;
     public const int RatingDefault = 50;
 
@@ -81,6 +87,10 @@ public sealed class PlayerSheet
     public int Awareness { get; set; } = RatingDefault;
     /// <summary>Shoulder barges, with weight.</summary>
     public int Strength { get; set; } = RatingDefault;
+    /// <summary>Ground passes: the speed a pass to feet can reach, and how soon it is played.</summary>
+    public int GroundPass { get; set; } = RatingDefault;
+    /// <summary>Through balls: the speed a pass into space can reach, and how soon it is played.</summary>
+    public int ThroughPass { get; set; } = RatingDefault;
     public float HeightM { get; set; } = 1.80f;
     public float WeightKg { get; set; } = 75f;
     public Foot PreferredFoot { get; set; } = Foot.Right;
@@ -103,6 +113,7 @@ public sealed class PlayerSheet
         "handling" => Handling, "rushing_out" => RushingOut,
         "stand_tackle" => StandTackle, "slide_tackle" => SlideTackle, "jockeying" => Jockeying,
         "blocking" => Blocking, "awareness" => Awareness, "strength" => Strength,
+        "ground_pass" => GroundPass, "through_pass" => ThroughPass,
         _ => throw new ArgumentException($"Unknown rating '{name}'", nameof(name)),
     };
 
@@ -139,6 +150,8 @@ public sealed class PlayerSheet
             case "blocking": Blocking = v; break;
             case "awareness": Awareness = v; break;
             case "strength": Strength = v; break;
+            case "ground_pass": GroundPass = v; break;
+            case "through_pass": ThroughPass = v; break;
             default: throw new ArgumentException($"Unknown rating '{name}'", nameof(name));
         }
     }
@@ -158,6 +171,8 @@ public sealed class PlayerSheet
             foreach (var n in RatingNames) w.WriteNumber(n, GetRating(n));
             if (DefendingRatingNames.Any(n => GetRating(n) != RatingDefault))
                 foreach (var n in DefendingRatingNames) w.WriteNumber(n, GetRating(n));
+            if (PassingRatingNames.Any(n => GetRating(n) != RatingDefault))
+                foreach (var n in PassingRatingNames) w.WriteNumber(n, GetRating(n));
             w.WriteNumber("height_m", HeightM);
             w.WriteNumber("weight_kg", WeightKg);
             w.WriteString("preferred_foot", PreferredFoot == Foot.Left ? "left" : "right");

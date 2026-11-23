@@ -24,9 +24,9 @@ public static class RoundRunner
     /// on toward the goal (a fingertip) is followed until the ball goes in (Scored) or stops heading on goal (Parried).
     /// </summary>
     public static Result RunFirstShot(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, ulong seed,
-        ScriptedAttacker? script = null, bool followUp = false, PlayerSheet? defender = null)
+        ScriptedAttacker? script = null, bool followUp = false, PlayerSheet? defender = null, PlayerSheet? mate = null)
     {
-        var world = new World(tuning, scenario, attacker, keeper, seed, defender);
+        var world = new World(tuning, scenario, attacker, keeper, seed, defender, mate);
         script ??= new ScriptedAttacker();
         world.Begin();
         var buf = new TickIntent[world.PlayerCount];
@@ -104,10 +104,10 @@ public static class RoundRunner
     /// optionally recording a replay.
     /// </summary>
     public static RoundReport RunToReport(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, ulong seed,
-        out Replay replay, ScriptedAttacker? script = null, PlayerSheet? defender = null)
+        out Replay replay, ScriptedAttacker? script = null, PlayerSheet? defender = null, PlayerSheet? mate = null)
     {
-        var world = new World(tuning, scenario, attacker, keeper, seed, defender);
-        var rec = new ReplayRecorder(world, attacker.Id, keeper.Id, scenario.Id, defender?.Id);
+        var world = new World(tuning, scenario, attacker, keeper, seed, defender, mate);
+        var rec = new ReplayRecorder(world, attacker.Id, keeper.Id, scenario.Id, defender?.Id, mate?.Id);
         world.Recorder = rec;
         script ??= new ScriptedAttacker();
         world.Begin();

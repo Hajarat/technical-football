@@ -168,13 +168,21 @@ public partial class Match
             def = _data.Attackers.Find(p => p.Id == _defenderId) ?? _data.Attackers.Find(p => p.Id == sc.DefaultDefender);
             if (def == null) _data.Warnings.Add($"{sc.Id}: defender '{_defenderId}' not found in players; a plain sheet is used");
         }
-        World = new World(_data.Tuning, sc, att, kee, _seed, def);
+        // A scenario with a team-mate: his sheet is the scenario's (any outfield player file), else the attacker's own.
+        PlayerSheet? mate = null;
+        if (sc.Mate != null)
+        {
+            mate = _data.Attackers.Find(p => p.Id == sc.DefaultMate);
+            if (mate == null) _data.Warnings.Add($"{sc.Id}: team-mate '{sc.DefaultMate}' not found in players; the attacker's sheet is used");
+        }
+        World = new World(_data.Tuning, sc, att, kee, _seed, def, mate);
         Pitch.Build(World.Pitch);
         // Left edge at the back wall; right edge may reach 0.5 m past the back of the net so the whole goal shows; the bottom
         // edge stops at the near boards.
         Camera.SetLimits(World.Pitch.MinX, World.Pitch.GoalLineX + World.Pitch.NetDepth + 0.5f, World.Pitch.HalfWidth);
-        World.Recorder = new ReplayRecorder(World, att.Id, kee.Id, sc.Id, def?.Id);
+        World.Recorder = new ReplayRecorder(World, att.Id, kee.Id, sc.Id, def?.Id, mate?.Id);
         Defender.Visible = World.Defender != null && _gallery == null && _clipGallery == null && _defenderGallery == null;
+        Mate.Visible = World.HasMates && _gallery == null && _clipGallery == null && _defenderGallery == null;
         if (att.Id == PlayerPresets.CustomId && att == _data.Custom) World.Recorder.Replay.SetAttackerSheet(att);
         _flightTicks = 0; _liveTicks = 0; _beganReplay = false;
         _log?.Write("round_setup", ("round", _round), ("scenario", sc.Id), ("attacker", att.Id), ("keeper", kee.Id), ("defender", World.Defender?.Sheet.Id),

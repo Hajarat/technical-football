@@ -16,6 +16,10 @@ public partial class Match : Node3D
     public KeeperView Keeper { get; private set; } = null!;
     /// <summary>The defender's figure; hidden in a round without a defender.</summary>
     public PlayerView Defender { get; private set; } = null!;
+    /// <summary>The team-mate's figure (team 0, player 1); hidden in a round without one. <see cref="Attacker"/> is always player 0's.</summary>
+    public PlayerView Mate { get; private set; } = null!;
+    /// <summary>The ring under the player the pad drives, in a round with a team-mate.</summary>
+    MeshInstance3D _controlRing = null!;
     public CameraRig Camera { get; private set; } = null!;
     public Hud Hud { get; private set; } = null!;
     public DebugOverlay Overlay { get; private set; } = null!;
@@ -49,6 +53,13 @@ public partial class Match : Node3D
         Attacker = new PlayerView { Name = "Attacker" }; AddChild(Attacker);
         Keeper = new KeeperView { Name = "Keeper" }; AddChild(Keeper);
         Defender = new PlayerView { Name = "Defender" }; AddChild(Defender);
+        Mate = new PlayerView { Name = "Mate" }; AddChild(Mate);
+        _controlRing = new MeshInstance3D
+        {
+            Name = "ControlRing", Visible = false, Mesh = MeshKit.Ring(0.62f, 0.72f, 48),
+            MaterialOverride = MeshKit.Unshaded(new Color(1f, 1f, 1f, 0.9f)), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(_controlRing);
         Overlay = new DebugOverlay { Name = "Overlay" }; AddChild(Overlay);
         Camera = new CameraRig { Name = "Camera" }; AddChild(Camera);
         Hud = new Hud { Name = "Hud" }; AddChild(Hud);
@@ -74,6 +85,15 @@ public partial class Match : Node3D
         Defender.Figure.AttackerLocoMode = _args.AttackerLoco;
         Defender.Figure.DefenderAnimMode = _args.DefenderAnim;
         Defender.Visible = false;
+        // The team-mate: the attacker's figure and colours, with measurements of his own (they are not printed).
+        Mate.SetTeamColor(new Color(0.85f, 0.1f, 0.1f));
+        Mate.Figure.Stats = new FigureStats(); Mate.Figure.StatsName = "mate";
+        Mate.Figure.AttackerAnimMode = _args.AttackerAnim;
+        Mate.Figure.AttackerLocoMode = _args.AttackerLoco;
+        Mate.Figure.SkillAnimMode = _args.SkillAnim;
+        Mate.Figure.ShotAnimMode = _args.ShotAnim;
+        Mate.Figure.DefenderAnimMode = _args.DefenderAnim;
+        Mate.Visible = false;
         Overlay.Enabled = true; // default on for now
         if (_args.TopCam) Camera.UseTopDown();
         else if (_args.CloseCam) Camera.UseCloseUp();
@@ -113,7 +133,7 @@ public partial class Match : Node3D
     /// <summary>--defender-gallery: the defender (and the attacker, for his reactions) is driven from a script instead of the simulation; the keeper, ball, overlay and HUD stay out of the shots.</summary>
     void StartDefenderGallery()
     {
-        Keeper.Visible = false; Ball.Visible = false; Hud.Visible = false;
+        Keeper.Visible = false; Ball.Visible = false; Hud.Visible = false; Mate.Visible = false;
         Overlay.Enabled = false;
         _defenderGallery = new DefenderGallery(this, _args.DefenderGalleryDir!, World.Pitch.GoalLineX);
     }
@@ -121,7 +141,7 @@ public partial class Match : Node3D
     /// <summary>--clip-gallery: motion clips (the keeper's unless --clip-folder / --clip-model say otherwise) play on a body of their own; the match figures, ball, overlay and HUD stay out of the shots.</summary>
     void StartClipGallery()
     {
-        Attacker.Visible = false; Keeper.Visible = false; Defender.Visible = false; Ball.Visible = false; Hud.Visible = false;
+        Attacker.Visible = false; Keeper.Visible = false; Defender.Visible = false; Mate.Visible = false; Ball.Visible = false; Hud.Visible = false;
         Overlay.Enabled = false;
         _clipGallery = new ClipGallery(this, _args.ClipGalleryDir!, _args.Video, _args.ClipOnly, World.Pitch.GoalLineX, _args.ClipFolder, _args.ClipModel);
     }
@@ -129,7 +149,7 @@ public partial class Match : Node3D
     /// <summary>--keeper-gallery: the keeper is driven from a script instead of the simulation; the attacker, overlay and ball ring stay out of the shots.</summary>
     void StartGallery()
     {
-        Attacker.Visible = false;
+        Attacker.Visible = false; Mate.Visible = false;
         Overlay.Enabled = false;
         _gallery = new KeeperGallery(this, _args.GalleryDir!, World.Pitch.GoalLineX);
     }
@@ -144,6 +164,7 @@ public partial class Match : Node3D
         if (!Keeper.Figure.TryUseSkinned("res://assets/characters/keeper.glb", out string e2)
             && !Keeper.Figure.TryUseSkinned("res://assets/characters/player.glb", out _)) problems.Add(e2);
         if (!Defender.Figure.TryUseSkinned("res://assets/characters/player.glb", out string e3)) problems.Add(e3);
+        if (!Mate.Figure.TryUseSkinned("res://assets/characters/player.glb", out string e4)) problems.Add(e4);
         if (problems.Count == 0) return;
         _figureWarning = "Skinned figures unavailable, using procedural: " + string.Join("; ", problems);
         GD.PushWarning(_figureWarning);

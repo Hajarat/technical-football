@@ -86,6 +86,12 @@ public sealed partial class World
         ApplyPush(p);
         ApplyPush(a);
         Contacts.Separate(a, p, Tick, SimTime, Tuning, Pitch);
+        if (HasMates)
+        {
+            foreach (var m in Teams[0])
+                if (m != a) Contacts.Separate(m, p, Tick, SimTime, Tuning, Pitch);
+            SeparateMates();
+        }
         p.TackleFoot = FootOf(p);
 
         if (State is RoundState.Live or RoundState.Strike)
@@ -126,6 +132,9 @@ public sealed partial class World
         ApplyPush(p);
         ApplyPush(Attacker);
         Contacts.Separate(Attacker, p, Tick, SimTime, Tuning, Pitch);
+        if (HasMates)
+            foreach (var m in Teams[0])
+                if (m != Attacker) Contacts.Separate(m, p, Tick, SimTime, Tuning, Pitch);
         p.TackleFoot = FootOf(p);
         PublishDefender(default);
     }

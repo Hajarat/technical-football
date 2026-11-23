@@ -133,6 +133,14 @@ static class Cli
             if (defender == null) return 1;
         }
 
+        // A scenario with a team-mate: his sheet (--mate, else the scenario's).
+        PlayerSheet? mateSheet = null;
+        if (sc.Mate != null)
+        {
+            mateSheet = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", (opts.TryGetValue("mate", out var mt) ? mt : sc.DefaultMate) + ".json")));
+            if (mateSheet == null) return 1;
+        }
+
         if (opts.TryGetValue("trace-keeper", out var traceSeed))
             return KeeperReplays.Trace(tuning, sc, attacker, keeper, ulong.Parse(traceSeed, CultureInfo.InvariantCulture),
                 opts.TryGetValue("trace-from", out var tf) ? int.Parse(tf, CultureInfo.InvariantCulture) : -1,
@@ -141,7 +149,7 @@ static class Cli
         if (opts.TryGetValue("save-replay", out var savePath))
         {
             ulong rs = opts.TryGetValue("seed", out var rss) ? ulong.Parse(rss, CultureInfo.InvariantCulture) : 1UL;
-            var report = RoundRunner.RunToReport(tuning, sc, attacker, keeper, rs, out var replay, defender: defender);
+            var report = RoundRunner.RunToReport(tuning, sc, attacker, keeper, rs, out var replay, MateScript(opts), defender: defender, mate: mateSheet);
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(savePath))!);
             replay.Save(savePath);
             Console.WriteLine($"saved {savePath} ({replay.TickCount} ticks), outcome {report.Outcome.Label()}");
@@ -192,7 +200,9 @@ static class Cli
             var sw = Stopwatch.StartNew();
             for (int i = 0; i < n; i++)
             {
-                var r = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i, new ScriptedAttacker { Counters = counters }, followUp: true, defender: defender);
+                var script = MateScript(opts) ?? new ScriptedAttacker();
+                script.Counters = counters;
+                var r = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i, script, followUp: true, defender: defender, mate: mateSheet);
                 counts[(int)r.End]++;
                 stats.Add(r);
             }
@@ -241,12 +251,18 @@ static class Cli
             def = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", (replay.DefenderId ?? sc.DefaultDefender) + ".json")));
             if (def == null) return 1;
         }
+        PlayerSheet? mate = null;
+        if (sc.Mate != null)
+        {
+            mate = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", (replay.MateId ?? sc.DefaultMate) + ".json")));
+            if (mate == null) return 1;
+        }
         if (!replay.MatchesTuning(tuning))
             Console.WriteLine("Tuning has changed since this replay, so the result may differ.");
         if (replay.Partial)
         {
             // a capture or an unfinished round: the recorded ticks, then the shots so far (there is no report)
-            var world = replay.Play(tuning, sc, att, kee, defender: def);
+            var world = replay.Play(tuning, sc, att, kee, defender: def, mate: mate);
             Console.WriteLine($"replay {path}: scenario={replay.ScenarioId} attacker={replay.AttackerId} keeper={replay.KeeperId} seed={replay.Seed} ticks={replay.TickCount}");
             if (replay.Capture is { } c) Console.WriteLine($"capture {c.Id}: {c.Tag}{(c.Note.Length > 0 ? " · " + c.Note : "")}");
             Console.WriteLine($"partial: {replay.TickCount} ticks, no report");
@@ -259,11 +275,14 @@ static class Cli
             if (world.Shots.Count == 0) Console.WriteLine("no shots");
             return 0;
         }
-        var report = replay.Run(tuning, sc, att, kee, def);
+        var report = replay.Run(tuning, sc, att, kee, def, mate);
         Console.WriteLine($"replay {path}: scenario={replay.ScenarioId} attacker={replay.AttackerId} keeper={replay.KeeperId} seed={replay.Seed} ticks={replay.TickCount}");
         Console.WriteLine(report.ToJson());
         return 0;
     }
+
+    /// <summary>The scripted attacker for --style solo|square|through (a scenario with a team-mate); null without the option.</summary>
+    static ScriptedAttacker? MateScript(Dictionary<string, string> opts) => null;
 
     static T? Load<T>(LoadResult<T> r) where T : class
     {

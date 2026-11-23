@@ -1,0 +1,39 @@
+{
+  "id": "two_v_one",
+  "name": "Two v one",
+  "default_attacker": "striker_a",
+  "default_keeper": "the_wall",
+  "default_defender": "centre_back",
+  "default_mate": "team_mate",
+  "team_size": 2,
+  "defenders": 1,
+  "offside": true,
+  "ball": {
+    "x": 4.5,
+    "z": -3.0
+  },
+  "attacker": {
+    "x": 4.0,
+    "z": -3.0,
+    "facing_deg": 0
+  },
+  "mate": {
+    "x": 5.0,
+    "z": 5.0
+  },
+  "defender": {
+    "x": 16.0,
+    "z": 0
+  },
+  "keeper_on_line": false,
+  "clock_limit": 20,
+  "shoot_distance": 14,
+  "pitch": {
+    "length": 30.0,
+    "width": 20.0,
+    "goal_width": 7.32,
+    "goal_height": 2.44,
+    "penalty_area_depth": 16.5,
+    "penalty_area_width": 40.32
+  }
+}
