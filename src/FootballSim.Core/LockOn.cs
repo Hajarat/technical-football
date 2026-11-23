@@ -91,12 +91,16 @@ public static class LockOn
     const int FlatOutSlack = 4;
     /// <summary>The search for the first reachable sample never jumps further than this, ticks.</summary>
     const int MaxStride = 12;
+    /// <summary>A run is stepped this far past the tick it is tried for, ticks: a sample missed by less says by how much, and the search jumps there.</summary>
+    const int MissTicks = 60;
     /// <summary>The stick slide looks at one sample in this many, ticks.</summary>
     const int SlideStride = 6;
     /// <summary>The ball is coming to him when its travel at his earliest meeting is within this cosine of the direction to him.</summary>
     const float ComingCos = 0.2f;
     /// <summary>A candidate's meeting is solved afresh every this many ticks (and at once on a new ball path).</summary>
-    const int ResolveTicks = 4;
+    const int ResolveTicks = 6;
+    /// <summary>... and every this many once the meeting is within <see cref="FineTicks"/>.</summary>
+    const int NearResolveTicks = 2;
 
     static Vector2 Flat(Vector3 v) => new(v.X, v.Z);
 
@@ -220,7 +224,7 @@ public static class LockOn
         c.Jockeying = false;
         c.Def.Carry = Vector2.Zero;
         // (a short run is stepped finely, so a meeting close at hand is placed to the tick)
-        int stride = maxTicks <= FineTicks ? 1 : maxTicks <= 2 * FineTicks ? 2 : RunStride;
+        int stride = maxTicks <= FineTicks ? 1 : maxTicks <= 2 * FineTicks ? 2 : maxTicks <= 4 * FineTicks ? RunStride : 2 * RunStride;
         float dt = t.Dt * stride;
         for (int k = 0; k < maxTicks; k += stride)
         {
@@ -288,7 +292,8 @@ public static class LockOn
                 return false;
             }
             bool resting = f.RestingAt(a - 1);
-            need = RunTicks(p, point, f.VelocityAt(a - 1), resting, reach, n, run, nowSeconds, t, pitch);
+            // (the run is stepped a little past the tick, so a sample he just misses says by how much)
+            need = RunTicks(p, point, f.VelocityAt(a - 1), resting, reach, n + MissTicks, run, nowSeconds, t, pitch);
             return need <= n;
         }
 
@@ -298,8 +303,8 @@ public static class LockOn
         {
             if (Try(at, out int need)) { good = at; goodNeed = need; break; }
             bad = at;
-            int short_ = need == int.MaxValue ? MaxStride : (need - (at - now + 1) + 1) / 2;
-            int next = at + Math.Clamp(short_, 1, MaxStride);
+            int short_ = need == int.MaxValue ? MaxStride : need - (at - now + 1);
+            int next = at + Math.Clamp(short_, 1, need == int.MaxValue ? MaxStride : MissTicks);
             // The last sample is always tried before giving up.
             at = at < hi && next > hi ? hi : next;
         }
@@ -307,7 +312,9 @@ public static class LockOn
         // The hint was his: is an earlier one too? One tick back first (the usual case: the meeting stands), then by halves.
         if (good == at && at == hint && bad == lo - 1 && good > lo)
         {
-            if (Try(good - 1, out int n1)) { good--; goodNeed = n1; }
+            // (a run that needs every tick it has cannot make a sample a tick sooner)
+            if (goodNeed >= good - now) bad = good - 1;
+            else if (Try(good - 1, out int n1)) { good--; goodNeed = n1; }
             else bad = good - 1;
         }
         while (good - bad > 1)
@@ -434,9 +441,9 @@ public static class LockOn
                 // His earliest meeting is solved afresh every few ticks (and at once on a new ball path); in between, the run
                 // goes as the last solve stepped it, so its meeting stands.
                 ref var cache = ref p.LockOnSolve;
-                bool fresh = !cache.Solved || cache.PathTick != f.StartTick || now - cache.Tick >= ResolveTicks
-                    || cache.First.Found && cache.First.ArriveTick - now <= FineTicks
-                    || cache.Final.Found && cache.Final.ArriveTick - now <= FineTicks;
+                bool near = cache.First.Found && cache.First.ArriveTick - now <= FineTicks || cache.Final.Found && cache.Final.ArriveTick - now <= FineTicks;
+                bool fresh = !cache.Solved || cache.PathTick != f.StartTick || now - cache.Tick >= (near ? NearResolveTicks : ResolveTicks)
+                    || cache.First.Found && cache.First.ArriveTick < now || cache.Final.Found && cache.Final.ArriveTick < now;
                 if (fresh)
                 {
                     var solved = Solve(p, f, now, now, toTick, nowSeconds, t, pitch, c.Run, hint: cache.First.Found ? cache.First.ArriveTick : -1);
