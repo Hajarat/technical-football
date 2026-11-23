@@ -453,7 +453,7 @@ public partial class Match
             EventKind.Foul => (0.8f, 0.7f, 0.3f),
             _ => (0f, 0f, 0f),
         };
-        if (secs <= 0f) return;
+        if (secs <= 0f || !Pad.Vibration) return;
         foreach (int id in Input.GetConnectedJoypads()) Input.StartJoyVibration(id, weak, strong, secs);
     }
 

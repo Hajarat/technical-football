@@ -64,6 +64,11 @@ public partial class Match
             _log?.Write("controls", ("pad", name), ("swap_face_buttons", swapped), ("reason", reason));
             if (reason == "toggle") Hud.Toast(swapped ? "Face buttons: swapped" : "Face buttons: standard");
         };
+        Pad.VibrationChanged += on =>
+        {
+            _log?.Write("controls", ("vibration", on), ("reason", "toggle"));
+            Hud.Toast(on ? "Vibration: on" : "Vibration: off");
+        };
         Input.JoyConnectionChanged += (device, connected) => { LogPads(); GD.Print($"PADS device {device} {(connected ? "connected" : "disconnected")}"); };
 
         if (_data.Scenarios.Count == 0 || _data.Attackers.Count == 0 || _data.Keepers.Count == 0)
@@ -111,7 +116,7 @@ public partial class Match
         {
             ["id"] = (int)id, ["name"] = Input.GetJoyName((int)id), ["guid"] = Input.GetJoyGuid((int)id),
         }).ToList();
-        _log?.Write("pads", ("count", pads.Count), ("pads", pads));
+        _log?.Write("pads", ("count", pads.Count), ("pads", pads), ("vibration", Pad.Vibration));
     }
 
     void LogWarnings()

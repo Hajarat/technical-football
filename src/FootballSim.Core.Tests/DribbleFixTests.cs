@@ -249,4 +249,46 @@ public class DribbleFixTests
             Assert.Equal(0, lost);
         }
     }
+    /// <summary>
+    /// Captures C1 and C2 (2026-11-23 play-test, "running around self while in possession"): a soft first touch from the
+    /// kick-off with the stick barely pushed, then the stick pushed fully on at a jog (C1) or a sprint (C2). The go-get-it legs
+    /// ran at least at the stick's pace, so they could reach the slow ball only by running past it and coming round: he ran a
+    /// full circle round it for over a second. He now slows for it: the next touch comes within 0.7 s of the first and he
+    /// never turns more than a quarter circle before it.
+    /// </summary>
+    [Theory]
+    [InlineData("capture-C1-breakaway-touch-dribble.json")]
+    [InlineData("capture-C2-breakaway-wrong-foot.json")]
+    public void ASoftFirstTouchIsPlayedOnRatherThanRunRound(string capture)
+    {
+        string f = Path.Combine(TestData.DataDir, "..", "src", "FootballSim.Core.Tests", "TestData", "playtest", capture);
+        if (!File.Exists(f)) { _out.WriteLine($"no capture at {f}; skipped"); return; }
+        var rp = Replay.Load(f, out var err);
+        Assert.True(rp != null, err);
+        var sheet = rp!.ParseAttackerSheet();
+        Assert.True(sheet?.Value != null);
+        var w = new World(new Tuning(), TestData.Scenario(rp.ScenarioId), sheet!.Value!, TestData.Player(rp.KeeperId), rp.Seed);
+        w.Begin();
+        var buf = new TickIntent[w.PlayerCount];
+        int per = Math.Max(1, rp.PlayersPerTick);
+        int first = -1, second = -1;
+        float turned = 0f, prev = float.NaN;
+        for (int tick = 0; tick < rp.TickCount && second < 0; tick++)
+        {
+            Array.Clear(buf);
+            for (int i = 0; i < w.PlayerCount && i < per; i++) buf[i] = rp.Intents[tick * per + i].ToIntent();
+            w.Step(buf);
+            if (first >= 0 && !float.IsNaN(prev)) turned += MathF.Abs(Movement.WrapAngle(w.Attacker.Facing - prev));
+            prev = w.Attacker.Facing;
+            if (w.Events.Any(e => e.Kind == EventKind.Touch && e.Team == 0))
+            {
+                if (first < 0) first = w.Tick; else second = w.Tick;
+            }
+        }
+        float gap = (second - first) / (float)w.Tuning.TickRate, deg = turned * 180f / MathF.PI;
+        _out.WriteLine($"first touch {first}, next {second} ({gap:F2} s), facing turned {deg:F0} deg between them");
+        Assert.True(first >= 0 && second > first, $"touches {first}, {second}");
+        Assert.True(gap <= 0.7f, $"next touch {gap:F2} s after the first");
+        Assert.True(deg <= 90f, $"facing turned {deg:F0} deg before the next touch");
+    }
 }

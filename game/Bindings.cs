@@ -121,6 +121,8 @@ public static class Bindings
     public static readonly KeyBind CaptureOpen = new("M", Key.M);
     public static readonly KeyBind Pause = new("P / Esc", Key.P, Key.Escape);
     public static readonly KeyBind SwapFace = new("B", Key.B);
+    /// <summary>Turns controller vibration on or off (saved).</summary>
+    public static readonly KeyBind Vibration = new("V", Key.V);
     public static readonly KeyBind Controls = new("H", Key.H);
     /// <summary>Opens the player editor while play is stopped (paused, in Setup or at the report).</summary>
     public static readonly KeyBind EditorOpen = new("T", Key.T);
@@ -223,6 +225,7 @@ public static class Bindings
                 new("Capture this round (tag and note)", CaptureOpen.Label, B(Pad.Capture)),
                 new("Debug overlay", Overlay.Label, B(Pad.Overlay)),
                 new("Swap face buttons", SwapFace.Label, $"keyboard {SwapFace.Label}"),
+                new("Controller vibration on / off", Vibration.Label, $"keyboard {Vibration.Label}"),
                 new("This panel", Controls.Label, $"{B(Pad.Pause)} (shown while paused)"),
             }),
             new("Player editor", new()
