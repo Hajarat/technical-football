@@ -13,7 +13,9 @@ public readonly record struct BallSpan(string From, string To, int Foot);
 /// The root is the clip's own travel with the sway taken out: a straight line on the ground from under the hips at the first
 /// frame to under them at the last, at an even pace; its heading is the hips' heading at the first frame and stays fixed, so a turn
 /// the clip makes (a fake cut, a spin) is kept relative to it. The pose relative to the root is what is put on the simulation's
-/// position and facing.
+/// position and facing. A move the simulation plays from its move sheet is drawn on the sheet's root instead
+/// (<see cref="SheetRoot"/>, <see cref="SheetYaw"/>: the clip's own low-passed pelvis track and keyed facing, clips.json <c>root</c>),
+/// which is the path the simulation follows, so the body goes where the clip does.
 /// </summary>
 public sealed class SkillClip
 {
@@ -34,11 +36,16 @@ public sealed class SkillClip
     /// <summary>The root's fixed heading (model yaw, radians: 0 faces +Z).</summary>
     public float RootYaw { get; }
 
+    /// <summary>The sheet root per frame (model x, z in metres from under the hips at the first frame, yaw in radians toward his left), or null for a clip without one.</summary>
+    readonly Vector3[]? _sheetRoot;
+    public bool HasSheetRoot => _sheetRoot != null;
+
     public SkillClip(Clip clip, Skeleton sk, string move, string side, int foot, string entry, float entrySpeed, float ballRadius,
-        IReadOnlyList<BallSpan> on, IReadOnlyList<BallSpan> touches, Vector3[]? ball)
+        IReadOnlyList<BallSpan> on, IReadOnlyList<BallSpan> touches, Vector3[]? ball, Vector3[]? sheetRoot = null)
     {
         Clip = clip; Move = move; Side = side; Foot = foot; Entry = entry; EntrySpeed = entrySpeed; BallRadius = ballRadius;
         On = on; Touches = touches;
+        _sheetRoot = sheetRoot != null && sheetRoot.Length == clip.FrameCount ? sheetRoot : null;
         _ball = ball != null && ball.Length == clip.FrameCount ? ball : new Vector3[clip.FrameCount];
         var h0 = clip.Hips(0); var h1 = clip.Hips(clip.FrameCount - 1);
         _root0 = new Vector2(h0.X, h0.Z); _root1 = new Vector2(h1.X, h1.Z);
@@ -75,6 +82,23 @@ public sealed class SkillClip
 
     /// <summary>The root on the ground at <paramref name="seconds"/> (model x, z).</summary>
     public Vector2 Root(float seconds) => Vector2.Lerp(_root0, _root1, Math.Clamp(seconds / Math.Max(LastSeconds, 1e-4f), 0f, 1f));
+
+    Vector3 SheetRow(float seconds)
+    {
+        float f = Math.Clamp(seconds * Clip.Fps, 0f, Clip.FrameCount - 1);
+        int a = (int)MathF.Floor(f), b = Math.Min(a + 1, Clip.FrameCount - 1);
+        return Vector3.Lerp(_sheetRoot![a], _sheetRoot[b], f - a);
+    }
+
+    /// <summary>The sheet root on the ground at <paramref name="seconds"/> (model x, z, where the hips' first frame stands), for a clip that has one.</summary>
+    public Vector2 SheetRoot(float seconds)
+    {
+        var r = SheetRow(seconds);
+        return new Vector2(_root0.X + r.X, _root0.Y + r.Y);
+    }
+
+    /// <summary>The sheet root's yaw at <paramref name="seconds"/> (model yaw, radians, toward his left), for a clip that has one.</summary>
+    public float SheetYaw(float seconds) => SheetRow(seconds).Z;
 
     /// <summary>The authored ball centre at <paramref name="seconds"/> (clip model space).</summary>
     public Vector3 Ball(float seconds)
@@ -126,7 +150,9 @@ public sealed class SkillClipLibrary
                 if (ball.TryGetProperty("track", out var tr))
                     track = tr.EnumerateArray().Select(v => new Vector3(v[0].GetSingle(), v[1].GetSingle(), v[2].GetSingle())).ToArray();
             }
-            list.Add(new SkillClip(e.Clip, lib.Skeleton, move, e.Side, foot, entry, speed, radius, on, touches, track));
+            Vector3[]? root = c.TryGetProperty("root", out var rt)
+                ? rt.EnumerateArray().Select(v => new Vector3(v[0].GetSingle(), v[1].GetSingle(), v[2].GetSingle() * MathF.PI / 180f)).ToArray() : null;
+            list.Add(new SkillClip(e.Clip, lib.Skeleton, move, e.Side, foot, entry, speed, radius, on, touches, track, root));
         }
         return new SkillClipLibrary(lib.Skeleton, list);
     }
@@ -144,10 +170,24 @@ public sealed class SkillClipLibrary
         {
             if (c.Move != move || c.Foot != foot) continue;
             if (side != 0 && c.Side != "none" && c.Side != (side < 0 ? "left" : "right")) continue;
+            // (a sprint entry is picked by name, see ForEntry: only a sheet-driven move has one)
+            if (c.Entry == "sprint" || c.Clip.Name.EndsWith("_swap")) continue;
             if (c.Entry == "run") run ??= c; else stand ??= c;
         }
         if (stand == null && run == null) return null;
         return (stand ?? run!, run ?? stand!);
+    }
+
+    /// <summary>The clip of <paramref name="move"/> for <paramref name="foot"/> and <paramref name="side"/> from the entry <paramref name="entry"/> ("stand", "run" or "sprint"), or null.</summary>
+    public SkillClip? ForEntry(string move, int foot, int side, string entry)
+    {
+        foreach (var c in Clips)
+        {
+            if (c.Move != move || c.Foot != foot || c.Entry != entry || c.Clip.Name.EndsWith("_swap")) continue;
+            if (side != 0 && c.Side != "none" && c.Side != (side < 0 ? "left" : "right")) continue;
+            return c;
+        }
+        return null;
     }
 }
 

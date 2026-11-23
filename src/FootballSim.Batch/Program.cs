@@ -26,7 +26,7 @@ using FootballSim.Core;
 //                                               speed surges, acceleration, speed steps, touch cadence and heading response of dribbling
 //   ... --probe feel --rtrace <replay> [--from T --to T] [--steps-only 1]
 //                                               traces one recorded round tick by tick and attributes its speed steps (diagnostic)
-//   ... --probe move-identity [--seeds 8] [--only elastico,...]
+//   ... --probe move-identity [--seeds 8] [--only elastico,...] [--cards 1] [--runs 1]
 //                                               every skill move from standing, a jog and a sprint: the ball's and the body's
 //                                               measures, each move's card, and the pairs of moves that look alike
 //   ... --skill-probe [--seeds 50] [--ratings 1,50,99] [--only step_over,...] [--list-failed 1]

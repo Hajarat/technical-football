@@ -96,7 +96,7 @@ contact (`max_snap_frames`, and how many were over 2 clip frames).
 
 Skill moves (`--skill-anim clips`, the default) are drawn from hand-authored full-body clips (`game/SkillClipLayer.cs`,
 `src/FootballSim.Anim/SkillClips.cs`, the clips in `game/assets/anim/attacker/skills/`, see `game/assets/anim/SOURCES.md`) for all nine moves
-the simulation makes, each foot (and side), from standing and from a run; the quick turn at the feet (a drag-back kind with its own short
+the simulation makes, each foot (and side), from standing and from a run (the drag-back from a sprint too); the quick turn at the feet (a drag-back kind with its own short
 timing, told apart by its sole span under 0.3 s) stays procedural. When a move starts, its standing and running clips are blended by the
 speed he came in at (0 at the standing clip's entry speed, 1 at the running clip's, smoothstep between; fixed for the move). The clip's time
 follows the core's ticks: its `start`→`contact` span plays over the move's start→contact tick (a step-over's or feint's contact is its middle
@@ -150,11 +150,22 @@ run as the clips (what a sheet holds and how the simulation loads it: [dribbling
   frames by `clip_measures.card_measures` (`out_m`, `out_s`, `contact2_s`, `pull_m`, `end_behind_m`, `end_side_m`, `hips_m`,
   `exit_speed`, `hop_m`, `stop_share`, `keep`, `open_deg`, `lift_m`, and the three beats: `drop_m`, the pelvis' height range, which a
   card must give; `snap_deg`, the shoulder line against the hip line, 20 degrees or more unless the card says otherwise; `drive_m`,
-  the travel of the hand on the non-playing side relative to the chest, 0.25 m or more unless the card says otherwise). No file
-  has a card yet.
-- The run files written before the sheets are drawn on the simulation's path less the clip's straight root (`drag_back_run.toml`
-  in his own frame, its root standing still), so their sheets' roots are not his real travel; a file is rewritten in the ground
-  frame when its move is converted.
+  the travel of the hand on the non-playing side relative to the chest, 0.25 m or more unless the card says otherwise). The
+  elastico's two files and the drag-back's three have cards.
+- `plant_accel` is used by `elastico*.toml` (23: the plant for the snap, which the card's 2 m/s toward the exit by the release
+  needs; its root reaches 22), `drag_back_run.toml` (32; 31) and `drag_back_sprint.toml` (47; 45): the card's stop by 0.45 of the move, and the ball ending
+  0.20 to 0.30 m behind his hip line after a pull of 0.90 or 1.10 m, need a harder stop than a plant's 20 m/s^2 (the legacy
+  drag-back stopped him at 29 to 47 m/s^2).
+- A move the simulation plays from its sheet (`BallAction.Sheet`, see [dribbling.md](dribbling.md#the-follower)) is drawn on the
+  sheet's root: the clips of the two entries the simulation blends (`stand`, `run`, `sprint`) at the simulation's own share, not
+  the chooser's (`SKILL_SHEET` in the log), each clip's pose taken relative to its own `root` in clips.json (position and yaw)
+  and put on the simulation's position and facing, so the body goes where the clip does and a planted foot stays on its spot.
+  The ball pin on such a move ramps in over at most the last 0.1 s before a contact (`SheetPinLead`) and holds over the on-ball
+  spans; the rest of the layer (time map, planted feet, hand-over and hand-back) is as for any clip.
+- The elastico's and drag-back's files are written in the ground frame: every position is where he and the ball are on the pitch
+  from under his hips at the start, with pelvis keys every 1/30 s as his path. The other moves' run files, written before the
+  sheets, are drawn on the simulation's path less the clip's straight root, so their sheets' roots are not his real travel; a
+  file is rewritten in the ground frame when its move is converted.
 
 ## The defender
 

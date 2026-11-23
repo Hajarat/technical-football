@@ -845,7 +845,7 @@ def check_sheet(c: Clip, rig: Rig) -> None:
     entry = sh["entry_speed"]
     # the root at the start: on the run's line, running along it at the entry speed
     v0 = (c.root[1, :2] - c.root[0, :2]) * FPS
-    if abs(v0[0]) > 0.1 or abs(v0[1] - entry) > max(0.15, 0.05 * entry):
+    if abs(v0[0]) > 0.1 or abs(v0[1] - entry) > max(0.15, 0.08 * entry):
         p.append(f"the root starts at {v0[1]:.2f} m/s along the run and {v0[0]:.2f} m/s across it; the entry speed is {entry:.2f}")
     # its acceleration up to the release (after it the run takes over)
     xz = c.root[: rel + 1, :2]

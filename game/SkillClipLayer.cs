@@ -60,6 +60,8 @@ public sealed class SkillClipLayer
 
     // the move being played
     bool _playing, _handBack, _transition, _pending;
+    /// <summary>The move is played from its move sheet: its clips are drawn on the sheet's root (see <see cref="SkillClip.SheetRoot"/>).</summary>
+    bool _sheet;
     int _moveId = int.MinValue, _foot;
     SkillClip? _stand, _run, _runAlt;
     /// <summary>The second ending's weight against the running clip's own (0..1, eased), and its linear progress.</summary>
@@ -326,8 +328,17 @@ public sealed class SkillClipLayer
         // move's dribble set for the pose shown, his speed, the ball and the stick; by the speed alone when the set is missing.
         float bySpeed = SkillEntryBlend.RunWeight(speed, _stand.EntrySpeed, _run.EntrySpeed);
         _wRun = bySpeed; _entrySpeed = speed;
+        // A move the simulation plays from its sheet: the two entries it blends and its share of the second, so the body drawn
+        // goes where the simulation takes him (no chooser, and no second ending).
+        _sheet = false;
+        if (s.Sheet && _lib.ForEntry(_move, foot, Math.Sign((int)s.Side), s.SheetEntryA) is { HasSheetRoot: true } sa
+            && _lib.ForEntry(_move, foot, Math.Sign((int)s.Side), s.SheetEntryB) is { HasSheetRoot: true } sb)
+        {
+            _stand = sa; _run = sb; _wRun = sa == sb ? 0f : s.SheetShare; _runAlt = null; _sheet = true;
+            GD.Print($"SKILL_SHEET move={_move} foot={(foot == 1 ? "R" : "L")} speed={speed:F2} a={sa.Clip.Name} b={sb.Clip.Name} share={_wRun:F2}");
+        }
         _sets ??= AttackerChooser.BuildSkills(_lib);
-        if (_run != _stand && _sets.TryGetValue(AttackerChooser.SetFor(AttackerState.Skill, _move), out var set))
+        if (!_sheet && _run != _stand && _sets.TryGetValue(AttackerChooser.SetFor(AttackerState.Skill, _move), out var set))
         {
             Span<float> query = stackalloc float[Features.Count];
             EntryQuery(f, sc, speed, 0f, query);
@@ -414,7 +425,11 @@ public sealed class SkillClipLayer
     }
 
     /// <summary>The running clip's root at <paramref name="ct"/>, its second ending crossed in.</summary>
-    System.Numerics.Vector2 RunRoot(float ct) => _runAlt == null || _wAlt <= 0f ? _run!.Root(ct) : System.Numerics.Vector2.Lerp(_run!.Root(ct), _runAlt.Root(ct), _wAlt);
+    System.Numerics.Vector2 RunRoot(float ct) => _sheet ? _run!.SheetRoot(ct)
+        : _runAlt == null || _wAlt <= 0f ? _run!.Root(ct) : System.Numerics.Vector2.Lerp(_run!.Root(ct), _runAlt.Root(ct), _wAlt);
+
+    /// <summary>The standing clip's root at <paramref name="ct"/>: its straight line, or the sheet's root for a sheet-driven move.</summary>
+    System.Numerics.Vector2 StandRoot(float ct) => _sheet ? _stand!.SheetRoot(ct) : _stand!.Root(ct);
 
     /// <summary>The blended clip pose at simulation time <paramref name="t"/>, placed on the simulation's position and facing (each clip at its own time).</summary>
     void ClipPose(in FigureFrame f, float sc, float t, NQuat[] outRot, out NVec3 hips)
@@ -425,7 +440,7 @@ public sealed class SkillClipLayer
         var hb = RunSample(cr);
         for (int k = 0; k < _n; k++) outRot[k] = _wRun <= 0f ? _a[k] : _wRun >= 1f ? _b[k] : NQuat.Slerp(_a[k], _b[k], _wRun);
         var h = NVec3.Lerp(ha, hb, _wRun);
-        var root = System.Numerics.Vector2.Lerp(_stand.Root(ct), RunRoot(cr), _wRun);
+        var root = System.Numerics.Vector2.Lerp(StandRoot(ct), RunRoot(cr), _wRun);
         var q = Placement(f);
         var rm = M(f.Position, sc); rm.Y = 0f;
         hips = rm + NVec3.Transform(new NVec3(h.X - root.X, h.Y, h.Z - root.Y), q);
@@ -438,7 +453,10 @@ public sealed class SkillClipLayer
     /// </summary>
     NQuat Placement(in FigureFrame f)
     {
-        float own = _move == "spin" ? _stand!.Heading(_ct) * (1f - _wRun) + _run!.Heading(_ctRun) * _wRun : _stand!.RootYaw * (1f - _wRun) + _run!.RootYaw * _wRun;
+        // (a sheet-driven move: the sheet's own yaw, which the simulation's facing follows, so a turn the root makes is the
+        // simulation's and what the clip turns against its root is kept)
+        float own = _sheet ? _stand!.SheetYaw(_ct) * (1f - _wRun) + _run!.SheetYaw(_ctRun) * _wRun
+            : _move == "spin" ? _stand!.Heading(_ct) * (1f - _wRun) + _run!.Heading(_ctRun) * _wRun : _stand!.RootYaw * (1f - _wRun) + _run!.RootYaw * _wRun;
         return Spring.Yaw(ModelSpace.YawFromFacing(f.Facing) - own);
     }
 
@@ -447,7 +465,7 @@ public sealed class SkillClipLayer
     {
         var rb = _runAlt == null || _wAlt <= 0f ? _run!.Ball(_ctRun) : NVec3.Lerp(_run!.Ball(_ctRun), _runAlt.Ball(_ctRun), _wAlt);
         var b = NVec3.Lerp(_stand!.Ball(_ct), rb, _wRun);
-        var root = System.Numerics.Vector2.Lerp(_stand.Root(_ct), RunRoot(_ctRun), _wRun);
+        var root = System.Numerics.Vector2.Lerp(StandRoot(_ct), RunRoot(_ctRun), _wRun);
         var rm = M(f.Position, sc); rm.Y = 0f;
         return rm + NVec3.Transform(new NVec3(b.X - root.X, b.Y, b.Z - root.Y), Placement(f));
     }
@@ -504,6 +522,9 @@ public sealed class SkillClipLayer
             var q = _pins[i];
             // the first ramps in from where the clip starts, a later one over at most 0.12 s after the one before it ends
             q.RampFrom = i == 0 ? Math.Min(_pinRamp0, q.From) : Math.Min(q.From, Math.Max(prevTo, q.From - 0.12f));
+            // (a sheet-driven move's body already goes where its clip does: the pin takes the foot only over the last
+            // SheetPinLead before a contact, and holds it over the on-ball spans)
+            if (_sheet) q.RampFrom = Math.Max(q.RampFrom, q.From - SheetPinLead);
             prevTo = Math.Max(prevTo, q.To);
             _pins[i] = q;
         }
@@ -563,6 +584,8 @@ public sealed class SkillClipLayer
         return 0.5f * v * a + v * (u - a);
     }
     const float RampEase = 0.3f;
+    /// <summary>For a sheet-driven move the ball pin ramps in over at most this long before a contact, clip seconds.</summary>
+    public const float SheetPinLead = 0.1f;
 
     /// <summary>The playing foot onto the live ball, the planted feet held, an exit touch's leg taken by its weight, the boots out of the ground.</summary>
     void Constrain(in FigureFrame f, float sc, ReadOnlySpan<float> tw, float dt)

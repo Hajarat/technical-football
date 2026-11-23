@@ -730,7 +730,7 @@
     "meet_wait_seconds": 1.5,
     "meet_correction_max": 0.35,
     "driver": {
-      "step_over": "legacy", "body_feint": "legacy", "ball_roll": "legacy", "drag_back": "legacy", "elastico": "legacy",
+      "step_over": "legacy", "body_feint": "legacy", "ball_roll": "legacy", "drag_back": "sheet", "elastico": "sheet",
       "heel_to_heel": "legacy", "spin": "legacy", "mcgeady": "legacy", "fake_stop": "legacy", "fake_cut": "legacy"
     },
     "sprint_blend": [[5.5, 0], [7, 1]],

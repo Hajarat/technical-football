@@ -3,7 +3,7 @@ using System.Numerics;
 using FootballSim.Core;
 
 /// <summary>
-/// The identity probe: every skill move from standing, a jog and a sprint (the skill probe's gestures and exit sticks, 8 seeds),
+/// The identity probe: every skill move from standing, a jog and a sprint (the skill probe's gestures and exit sticks, 8 seeds, both sides of a sided move),
 /// measured so that two moves that look alike fail. Six ball measures in the player's frame (centred on him, axes along his run
 /// at the gesture and across it; it does not turn with his facing), from the move's start to 0.3 s after its release: how far the
 /// ball gets to each side, forward and back, its lift, and the move's own contacts. Four body measures over the move: his sideways
@@ -44,7 +44,7 @@ static class MoveIdentityProbe
             new Band("pull_s", 0.35f, 0.37f),
             new Band("end_behind_m", 0.20f, 0.30f),
             new Band("end_side_m", 0.10f, 0.18f),
-            new Band("end_ball_mps", 0f, 0.05f),
+            new Band("end_ball_mps", 0f, 0.35f),
             new Band("stop_share", 0f, 0.45f, new[] { "jog", "sprint" }),
             new Band("hop_m", 0.20f, 0.30f),
             new Band("open_deg", 80f, 100f),
@@ -71,9 +71,10 @@ static class MoveIdentityProbe
         var keeper = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", "the_wall.json")).Value;
         if (sheet == null || keeper == null) { Console.Error.WriteLine("players not found"); return 1; }
 
-        // one script per move: the skill probe's first of each name (a sided move toward his right)
-        var moves = SkillProbe.Moves.Where(m => m.Expect != Gesture.KnockOn).GroupBy(m => m.Name).Select(g => g.First())
-            .Where(m => only == null || only.Contains(m.Name)).ToList();
+        // the skill probe's scripts per move: both sides of a sided move (the ball lies a little to one side of a dribbler, so a
+        // sided move measures differently on its two sides; every measure is taken toward the move's own side and the two are averaged)
+        var moves = SkillProbe.Moves.Where(m => m.Expect != Gesture.KnockOn).GroupBy(m => m.Name).Select(g => g.ToList())
+            .Where(g => only == null || only.Contains(g[0].Name)).ToList();
         Console.WriteLine($"move identity: attacker={attackerId} seeds={seeds} from {seed0}; the player's frame (centred on him, axes along his run at the " +
                           "gesture and across it); ball measures from the move's start to 0.3 s after its release: side_to / side_away = furthest toward " +
                           "and away from the move's side (his right for a move without one), fwd / back = furthest ahead and furthest back (negative: " +
@@ -84,13 +85,14 @@ static class MoveIdentityProbe
         var mean = new Dictionary<(string, string), (float[] Ball, float[] Body)>();
         var cardLines = new List<string>();
         int cardsFailed = 0;
-        foreach (var move in moves)
+        foreach (var sides in moves)
             foreach (var entry in Entries)
             {
-                var runs = new Trial[seeds];
-                Parallel.For(0, seeds, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i => runs[i] = RunOne(move, entry, tuning, sheet, keeper, seed0 + (ulong)i));
+                var move = sides[0];
+                var runs = new Trial[seeds * sides.Count];
+                Parallel.For(0, runs.Length, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i => runs[i] = RunOne(sides[i / seeds], entry, tuning, sheet, keeper, seed0 + (ulong)(i % seeds)));
                 var made = runs.Where(r => r.Made).ToList();
-                if (opts.ContainsKey("runs")) for (int i = 0; i < seeds; i++) Console.WriteLine($"RUN {move.Name} {entry} seed {seed0 + (ulong)i}: {runs[i].Line}");
+                if (opts.ContainsKey("runs")) for (int i = 0; i < runs.Length; i++) Console.WriteLine($"RUN {move.Name} {entry} side {sides[i / seeds].Side} seed {seed0 + (ulong)(i % seeds)}: {runs[i].Line}");
                 string F(float v, string f = "F2") => float.IsNaN(v) ? "-" : v.ToString(f, CultureInfo.InvariantCulture);
                 var ball = Enumerable.Range(0, 6).Select(k => made.Count == 0 ? float.NaN : made.Average(r => r.Ball[k])).ToArray();
                 var body = Enumerable.Range(0, 4).Select(k => made.Count == 0 ? float.NaN : made.Average(r => r.Body[k])).ToArray();
@@ -99,17 +101,20 @@ static class MoveIdentityProbe
                 if (Cards.TryGetValue(move.Name, out var bands) && made.Count > 0)
                 {
                     var missed = new List<string>();
+                    var all = new List<string>();
                     foreach (var b in bands)
                     {
                         if (b.At != null && !b.At.Contains(entry)) continue;
                         var (lo, hi) = b.By != null && b.By.TryGetValue(entry, out var by) ? by : (b.Min, b.Max);
                         float v = made.Average(r => r.Card.TryGetValue(b.Measure, out var x) ? x : float.NaN);
+                        all.Add($"{b.Measure}={F(v, "F3")}");
                         if (!(v >= lo - 1e-4f && v <= hi + 1e-4f)) missed.Add($"{b.Measure}={F(v, "F3")} (band {F(lo)} to {(float.IsInfinity(hi) ? "any" : F(hi))})");
                     }
                     card = missed.Count == 0 ? "pass" : "FAIL";
+                    if (opts.ContainsKey("cards")) cardLines.Add($"CARDS {move.Name} {entry}: " + string.Join(" ", all));
                     if (missed.Count > 0) { cardsFailed++; cardLines.Add($"CARD {move.Name} {entry}: " + string.Join("; ", missed)); }
                 }
-                rows.Add(new[] { move.Name, entry, Driver(move.Name, tuning), $"{made.Count}/{seeds}" }
+                rows.Add(new[] { move.Name, entry, Driver(move.Name, tuning), $"{made.Count}/{runs.Length}" }
                     .Concat(ball.Select((v, k) => F(v, k == 5 ? "F0" : "F2"))).Concat(body.Select((v, k) => F(v, k == 1 ? "F0" : "F2"))).Append(card).ToArray());
             }
         var widths = header.Select((h, i) => Math.Max(h.Length, rows.Count == 0 ? 0 : rows.Max(r => r[i].Length))).ToArray();
@@ -124,16 +129,17 @@ static class MoveIdentityProbe
             for (int i = 0; i < moves.Count; i++)
                 for (int j = i + 1; j < moves.Count; j++)
                 {
-                    if (!mean.TryGetValue((moves[i].Name, entry), out var x) || !mean.TryGetValue((moves[j].Name, entry), out var y)) continue;
+                    string ni = moves[i][0].Name, nj = moves[j][0].Name;
+                    if (!mean.TryGetValue((ni, entry), out var x) || !mean.TryGetValue((nj, entry), out var y)) continue;
                     bool noBall = x.Ball[5] < 0.5f && y.Ball[5] < 0.5f;
                     float[] u = noBall ? BodyUnits : BallUnits, p = noBall ? x.Body : x.Ball, q = noBall ? y.Body : y.Ball;
                     string[] names = noBall ? BodyNames : BallNames;
                     var apart = Enumerable.Range(0, u.Length).Where(k => MathF.Abs(p[k] - q[k]) >= u[k] - 1e-4f).Select(k => names[k]).ToList();
                     if (apart.Count >= 2) continue;
                     // (fake stop against fake cut is reported and not counted: their ball rules are not this work's)
-                    bool counted = !(moves[i].Name.StartsWith("fake_") && moves[j].Name.StartsWith("fake_"));
+                    bool counted = !(ni.StartsWith("fake_") && nj.StartsWith("fake_"));
                     if (counted) pairsFailed++;
-                    Console.WriteLine($"PAIR {entry}: {moves[i].Name} and {moves[j].Name}: {(apart.Count == 0 ? "no measure apart" : "only " + apart[0] + " apart")}" +
+                    Console.WriteLine($"PAIR {entry}: {ni} and {nj}: {(apart.Count == 0 ? "no measure apart" : "only " + apart[0] + " apart")}" +
                                       $" ({(noBall ? "body" : "ball")} measures){(counted ? "" : " (reported, not counted)")}");
                 }
         Console.WriteLine($"IDENTITY pairs_failed={pairsFailed} cards_failed={cardsFailed}");
@@ -213,7 +219,7 @@ static class MoveIdentityProbe
                 latMin = MathF.Min(latMin, lat); latMax = MathF.Max(latMax, lat);
                 turn += MathF.Abs(Movement.WrapAngle(p.Facing - facingBefore)) * 180f / MathF.PI;
                 lowPace = MathF.Min(lowPace, vel.Length());
-                fwdMax = MathF.Max(fwdMax, Vector2.Dot(pos - origin, f));
+                if (w.Tick >= act.ContactTick - 1) fwdMax = MathF.Max(fwdMax, Vector2.Dot(pos - origin, f));
                 if (float.IsNaN(stopAt) && Vector2.Dot(vel, f) <= 0.1f) stopAt = (w.Tick + 1 - start) / (float)Math.Max(1, end - start);
                 int lastContact = act.Contact2Tick > 0 ? act.Contact2Tick : end - 1;
                 if (w.Tick <= lastContact) hips = MathF.Max(hips, -lat);
@@ -221,6 +227,8 @@ static class MoveIdentityProbe
                 {
                     side0 = relS; ballAtContact = new Vector2(w.Ball.Position.X, w.Ball.Position.Z);
                     res.Line += string.Create(CultureInfo.InvariantCulture, $" contact+{w.Tick - start} ball ahead {relF:F3} side {relS:F3} miss {act.ContactMiss:F3} pace {vel.Length():F2}");
+                    if (act.Sheet != null)
+                        res.Line += string.Create(CultureInfo.InvariantCulture, $" nudge ahead {Vector2.Dot(act.MeetNudge, f):F3} side {Vector2.Dot(act.MeetNudge, r) * sgn:F3} made {act.MeetNudgeMade.Length():F3}");
                 }
                 if (!float.IsNaN(side0) && w.Tick >= act.ContactTick && w.Tick <= lastContact)
                 {

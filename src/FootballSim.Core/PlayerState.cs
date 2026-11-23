@@ -412,6 +412,9 @@ public sealed class PlayerState
     internal int SkillBufFakeFrom = -1;
     /// <summary>World tick a move ended on, when the touch planner may make the exit touch at once; -1 otherwise.</summary>
     internal int SkillExitTick = -1;
+    /// <summary>For a sheet-driven move's exit touch on <see cref="SkillExitTick"/>: the sheet's exit rule and the run and side its band is measured from; null otherwise.</summary>
+    internal SheetExit? SkillExitRule;
+    internal Vector2 SkillExitFwd, SkillExitSide;
     /// <summary>World tick a heel-to-heel or elastico ended on, when its exit burst starts (its second contact was the exit touch); -1 otherwise.</summary>
     internal int SkillBurstAtTick = -1;
     /// <summary>Simulation seconds before which no move starts (the drag-back's cooldown).</summary>
@@ -457,7 +460,7 @@ public sealed class PlayerState
         GSideConsumed = o.GSideConsumed; GKnockUsed = o.GKnockUsed; GKnockWaitTick = o.GKnockWaitTick; GPrevCancel = o.GPrevCancel;
         LastGesture = o.LastGesture; LastGestureTick = o.LastGestureTick; SkillEffective = o.SkillEffective; SkillChainCount = o.SkillChainCount;
         SkillAction = o.SkillAction; SkillBufKind = o.SkillBufKind; SkillBufSide = o.SkillBufSide; SkillBufCut = o.SkillBufCut;
-        SkillBufTick = o.SkillBufTick; SkillBufFakeFrom = o.SkillBufFakeFrom; SkillExitTick = o.SkillExitTick; SkillBurstAtTick = o.SkillBurstAtTick; SkillCooldownUntil = o.SkillCooldownUntil; SkillChainUntil = o.SkillChainUntil;
+        SkillBufTick = o.SkillBufTick; SkillBufFakeFrom = o.SkillBufFakeFrom; SkillExitTick = o.SkillExitTick; SkillExitRule = o.SkillExitRule; SkillExitFwd = o.SkillExitFwd; SkillExitSide = o.SkillExitSide; SkillBurstAtTick = o.SkillBurstAtTick; SkillCooldownUntil = o.SkillCooldownUntil; SkillChainUntil = o.SkillChainUntil;
         SkillBoostUntil = o.SkillBoostUntil; SkillBoostFactor = o.SkillBoostFactor; SkillBoostDuration = o.SkillBoostDuration;
         SkillBoostCap = o.SkillBoostCap; SkillBurstUntil = o.SkillBurstUntil; SkillBurstFactor = o.SkillBurstFactor; SkillBurstCap = o.SkillBurstCap;
         return this;

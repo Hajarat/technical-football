@@ -340,6 +340,8 @@ public partial class Match
         Contact2Elapsed = sk.Contact2Tick >= 0 ? (p.CurrentTick - sk.Contact2Tick) * dt : float.NaN,
         LiftElapsed = sk.LiftTick >= 0 ? (p.CurrentTick - sk.LiftTick) * dt : float.NaN,
         Right2 = sk.Foot2 == Foot.Right, Surface2 = (BootSurface)(int)sk.Surface2, FeetTurn = sk.FeetTurn,
+        // (a move the simulation plays from its sheet: its clips are drawn on the sheet's root, with the simulation's blend)
+        Sheet = sk.Sheet != null, SheetEntryA = sk.Sheet?.A.Entry ?? "", SheetEntryB = sk.Sheet?.B.Entry ?? "", SheetShare = sk.Sheet?.W ?? 0f,
     };
 
     static FigureAction ActionFrame(BallAction? a, PlayerState p, float dt)
