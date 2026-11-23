@@ -10,8 +10,8 @@
 # hides itself (--background). Godot's stdout/stderr are captured to a log and printed afterwards, so REPORT / SHOT /
 # FOOT_* lines are visible to the caller. Exit status: `open -W` does not return the app's exit code, so this script
 # exits 0 when the run finished, 2 for a launch failure, and 1 if the log contains an "ERROR:" or "SCRIPT ERROR:" line.
-# Godot grabs the front for a moment while it starts, before any game code can run, so a small watcher hands the
-# front back to the app that had it, only while Godot itself is frontmost and only until the run ends.
+# Godot may grab the front for a moment while it starts, before any game code can run. Nothing hands the front back:
+# a watcher that did could not tell this run's window from a game being played, and pushed the played one behind.
 #
 # On Linux (the headless devbox) there is no window to keep in the background: the game renders into a virtual X
 # display (xvfb-run, software Vulkan via Mesa llvmpipe) with the dummy audio driver, from the game folder, and the same
@@ -32,22 +32,8 @@ if [[ $(uname) != Darwin ]]; then
   rm -f $log
   exit $bad
 fi
-prev=$(lsappinfo front)
-previd=$(lsappinfo info -only bundleid $prev 2>/dev/null | sed -n 's/.*="\(.*\)"/\1/p' | head -1)
-(
-  while true; do
-    cur=$(lsappinfo front)
-    if [[ $cur != $prev ]]; then
-      name=$(lsappinfo info -only name $cur 2>/dev/null | head -1)
-      [[ $name == *'"Godot"'* ]] && [[ -n $previd ]] && open -b $previd
-    fi
-    sleep 0.03
-  done
-) &
-watcher=$!
 open -g -n -W -a $app --stdout $log --stderr $log --args --path $game -- --background "$@"
 rc=$?
-kill $watcher 2>/dev/null
 cat $log
 if (( rc != 0 )); then echo "run-bg: open failed ($rc)" >&2; rm -f $log; exit 2; fi
 bad=0
