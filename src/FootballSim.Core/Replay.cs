@@ -41,19 +41,24 @@ public sealed class IntentRecord
     public bool Slide { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Barge { get; set; }
+    // The pass buttons. Absent in older replays and left out of the file while released.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Pass { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Through { get; set; }
 
     public static IntentRecord From(in TickIntent i) => new()
     {
         Mx = i.MoveX, Mz = i.MoveZ, Sprint = i.Sprint, Close = i.CloseControl, Shoot = i.ShootHeld, Finesse = i.Finesse, Chip = i.Chip, Knock = i.KnockOn,
         Rx = i.RightX, Rz = i.RightZ, Cancel = i.Cancel, Skill = i.SkillKey, Driven = i.Driven,
-        Jockey = i.Jockey, Tackle = i.Tackle, Slide = i.Slide, Barge = i.Barge,
+        Jockey = i.Jockey, Tackle = i.Tackle, Slide = i.Slide, Barge = i.Barge, Pass = i.PassHeld, Through = i.ThroughHeld,
     };
 
     public TickIntent ToIntent() => new()
     {
         MoveX = Mx, MoveZ = Mz, Sprint = Sprint, CloseControl = Close, ShootHeld = Shoot, Finesse = Finesse, Chip = Chip, KnockOn = Knock,
         RightX = Rx, RightZ = Rz, Cancel = Cancel, SkillKey = Skill, Driven = Driven,
-        Jockey = Jockey, Tackle = Tackle, Slide = Slide, Barge = Barge,
+        Jockey = Jockey, Tackle = Tackle, Slide = Slide, Barge = Barge, PassHeld = Pass, ThroughHeld = Through,
     };
 }
 
@@ -72,6 +77,15 @@ public sealed class Replay
     /// <summary>The defender's sheet id, in a round with a defender; absent otherwise.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefenderId { get; set; }
+    /// <summary>The team-mate's sheet id, in a round with one; absent otherwise.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MateId { get; set; }
+    /// <summary>
+    /// A hash of the team tuning (passes, the team-mate, control, receiving), in a round with a team-mate; absent otherwise (those
+    /// values are not part of <see cref="TuningHash"/>, so a round without one is recorded exactly as before they existed).
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TeamHash { get; set; }
     /// <summary>
     /// A hash of the defender and defending tuning, in a round with a defender; absent otherwise (those blocks are not part of
     /// <see cref="TuningHash"/>, so a round without a defender is recorded exactly as before they existed).
@@ -102,7 +116,8 @@ public sealed class Replay
     public int TickCount => PlayersPerTick > 0 ? Intents.Count / PlayersPerTick : 0;
 
     /// <summary>True if the replay was recorded under the same tuning.</summary>
-    public bool MatchesTuning(Tuning t) => TuningHash == DataLoader.TuningHash(t) && (DefendingHash == null || DefendingHash == DataLoader.DefendingHash(t));
+    public bool MatchesTuning(Tuning t) => TuningHash == DataLoader.TuningHash(t) && (DefendingHash == null || DefendingHash == DataLoader.DefendingHash(t))
+        && (TeamHash == null || TeamHash == DataLoader.TeamHash(t));
 
     /// <summary>Embeds the attacker's sheet (see <see cref="AttackerSheet"/>).</summary>
     public void SetAttackerSheet(PlayerSheet sheet)
@@ -172,10 +187,11 @@ public sealed class Replay
     /// the attacker's intent of that tick. The sheets and scenario must be the ones named in the replay.
     /// </summary>
     /// <param name="defender">The defender's sheet, in a scenario with one (a default sheet when null).</param>
+    /// <param name="mate">The team-mate's sheet, in a scenario with one (the attacker's when null).</param>
     public World Play(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, Action<World, TickIntent>? afterStep = null,
-        PlayerSheet? defender = null)
+        PlayerSheet? defender = null, PlayerSheet? mate = null)
     {
-        var world = new World(tuning, scenario, attacker, keeper, Seed, defender);
+        var world = new World(tuning, scenario, attacker, keeper, Seed, defender, mate);
         world.Begin();
         int n = world.PlayerCount;
         var buf = new TickIntent[n];
@@ -198,9 +214,9 @@ public sealed class Replay
     /// (capped). The sheets and scenario must be the ones named in the replay.
     /// </summary>
     /// <param name="defender">The defender's sheet, in a scenario with one (a default sheet when null).</param>
-    public RoundReport Run(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, PlayerSheet? defender = null)
+    public RoundReport Run(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, PlayerSheet? defender = null, PlayerSheet? mate = null)
     {
-        var world = Play(tuning, scenario, attacker, keeper, defender: defender);
+        var world = Play(tuning, scenario, attacker, keeper, defender: defender, mate: mate);
         var buf = new TickIntent[world.PlayerCount];
         int cap = TailCap(tuning);
         for (int i = 0; i < cap && world.State != RoundState.Report; i++) world.Step(buf);
@@ -212,7 +228,7 @@ public sealed class Replay
     {
         Version = Version, Seed = Seed, AttackerId = AttackerId, KeeperId = KeeperId, ScenarioId = ScenarioId, TuningHash = TuningHash,
         AttackerSheet = AttackerSheet, Partial = Partial, Capture = Capture?.Copy(), PlayersPerTick = PlayersPerTick,
-        DefenderId = DefenderId, DefendingHash = DefendingHash,
+        DefenderId = DefenderId, DefendingHash = DefendingHash, MateId = MateId, TeamHash = TeamHash,
         Intents = new List<IntentRecord>(Intents),
     };
 }
@@ -241,7 +257,7 @@ public sealed class ReplayRecorder
     readonly int _players;
 
     /// <summary>Starts a recording for a world.</summary>
-    public ReplayRecorder(World world, string attackerId, string keeperId, string scenarioId, string? defenderId = null)
+    public ReplayRecorder(World world, string attackerId, string keeperId, string scenarioId, string? defenderId = null, string? mateId = null)
     {
         _players = world.PlayerCount;
         _replay = new Replay
@@ -253,6 +269,8 @@ public sealed class ReplayRecorder
             TuningHash = DataLoader.TuningHash(world.Tuning),
             PlayersPerTick = _players,
             DefenderId = world.Defender != null ? defenderId ?? world.Defender.Sheet.Id : null,
+            MateId = world.HasMates ? mateId ?? world.Teams[0][1].Sheet.Id : null,
+            TeamHash = world.HasMates ? DataLoader.TeamHash(world.Tuning) : null,
             DefendingHash = world.Defender != null ? DataLoader.DefendingHash(world.Tuning) : null,
         };
     }

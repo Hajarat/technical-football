@@ -70,12 +70,18 @@ public static class Possession
 
     /// <summary>
     /// The next touch of a player in possession: the committed touch (seconds to its contact tick, its foot and its contact
-    /// point), else the swing the touch controller steers for (its forecast, updated every tick). <see cref="TouchForecast.None"/>
-    /// when none is expected.
+    /// point), else the swing the touch controller steers for (its forecast, updated every tick). Without the ball, the meeting
+    /// of a player who holds his team's claim on it: the seconds to it, the foot <see cref="TouchModel.ChooseFoot"/> gives at the
+    /// point, and the point. <see cref="TouchForecast.None"/> when none is expected.
     /// </summary>
     public static TouchForecast PredictNextTouch(PlayerState p, int tick, bool inPossession, Tuning t)
     {
-        if (!inPossession) return TouchForecast.None;
+        if (!inPossession)
+        {
+            // The claim holder's meeting with a loose ball (see LockOn).
+            if (p.LockOnTick < tick) return TouchForecast.None;
+            return new TouchForecast((p.LockOnTick - tick) * t.Dt, TouchModel.ChooseFoot(p.Sheet, p.Position, p.Facing, p.LockOnPoint, t), p.LockOnPoint);
+        }
         if (p.TouchAction is { Pending: true } a) return new TouchForecast(a.ContactEta(tick, t.Dt), a.Foot, a.ContactPoint);
         if (p.ForecastTick < tick) return TouchForecast.None;
         return new TouchForecast((p.ForecastTick - tick) * t.Dt, p.ForecastFoot, p.ForecastPoint);

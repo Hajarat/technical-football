@@ -108,6 +108,18 @@ public sealed class DefenderReport
 }
 
 /// <summary>The record of one round, available when the state reaches Report.</summary>
+/// <summary>What the attacking pair did in a round with a team-mate.</summary>
+public sealed class TeamReport
+{
+    /// <summary>Passes struck, and how many of them a team-mate's first touch received (a first-time shot or pass back is not a touch).</summary>
+    public int Passes { get; init; }
+    public int Received { get; init; }
+    /// <summary>The round ended on an offside call.</summary>
+    public bool Offside { get; init; }
+    /// <summary>Times control moved to another player (on a pass, or to the team's claim holder on a loose ball).</summary>
+    public int ControlChanges { get; init; }
+}
+
 public sealed class RoundReport
 {
     public Outcome Outcome { get; init; }
@@ -121,6 +133,10 @@ public sealed class RoundReport
     /// <summary>The defender's numbers; absent (and left out of the JSON) in a scenario without one.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public DefenderReport? Defender { get; init; }
+
+    /// <summary>The team's numbers; absent (and left out of the JSON) in a scenario without a team-mate.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public TeamReport? Team { get; init; }
 
     /// <summary>The report as JSON, used to compare two runs exactly.</summary>
     public string ToJson() => JsonSerializer.Serialize(this, DataLoader.Options);

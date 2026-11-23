@@ -144,8 +144,64 @@ public sealed class PlayerState
     /// within reach at an eligible swing), false while they follow the stick.
     /// </summary>
     public bool Chasing { get; internal set; }
-    /// <summary>How eagerly he goes for a loose ball this tick (see <see cref="Core.Regain"/>); None in possession.</summary>
+    /// <summary>
+    /// How he stands in the race for a loose ball this tick, derived from his team's claim (see <see cref="LockOn"/>): None
+    /// unless he holds it.
+    /// </summary>
     public RegainMode Regain { get; internal set; }
+    /// <summary>The claim holder's meeting: where the ball centre will be when he meets it. Meaningful while <see cref="LockOnTick"/> is not -1.</summary>
+    public Vector3 LockOnPoint { get; internal set; }
+    /// <summary>The claim holder's meeting: the world tick his touch is made on, or -1 when he holds no claim.</summary>
+    public int LockOnTick { get; internal set; } = -1;
+    /// <summary>
+    /// The earliest tick his meeting may fall on, written by an action queued without the ball (a shot's earliest strike tick);
+    /// 0 when none. Cleared when the action ends.
+    /// </summary>
+    public int MinArrivalTick { get; internal set; }
+    /// <summary>With <see cref="MinArrivalTick"/>: the highest ball centre the queued action plays, metres (NaN: any a first touch plays).</summary>
+    internal float MinArrivalHeight = float.NaN;
+    /// <summary>
+    /// The earliest tick his meeting may fall on because a pass was played to him for then (its expected arrival); 0 when none.
+    /// As with a queued action, he waits for that sample only while the ball is coming to him and no opponent is there first.
+    /// </summary>
+    public int MeetNotBefore { get; internal set; }
+    /// <summary>With <see cref="MinArrivalTick"/>: the queued action is a strike, met at the strike reach.</summary>
+    internal bool MinArrivalStrike;
+    /// <summary>The ball's velocity at the meeting, and whether it is at rest there (for the holder's legs).</summary>
+    internal Vector3 LockOnBallVelocity;
+    internal bool LockOnResting;
+    /// <summary>The ticks the meeting leaves him beyond his flat-out run (0: he must run flat out).</summary>
+    internal int LockOnSlack;
+    /// <summary>His next first touch is of a team-mate's pass: it pays for the ball's speed (see the receive tuning).</summary>
+    internal bool ReceivingPass;
+    /// <summary>Simulation seconds until which he plays no touch after receiving a pass.</summary>
+    internal float ReceiveCooldownUntil = -100f;
+    /// <summary>His last solves, kept between the ticks they are made afresh on.</summary>
+    internal LockOnSolveCache LockOnSolve;
+
+    // ---- offside and the team-mate bot's memory ----
+    /// <summary>He was beyond the offside line at his team's last strike: he may not play the ball until a team-mate who was not has (see Offside).</summary>
+    public bool OffsideFlag { get; internal set; }
+    /// <summary>Where the team-mate bot is in its run cycle (see MateBot).</summary>
+    public MateRun MateRun { get; internal set; }
+    /// <summary>The world tick his run in behind went past the line, or -1.</summary>
+    internal int MateBeyondTick = -1;
+    /// <summary>The world tick his last run ended (he was back onside), for the wait before the next.</summary>
+    internal int MateRunEndTick = int.MinValue / 2;
+    /// <summary>Runs in behind he has started this round.</summary>
+    public int MateRuns { get; internal set; }
+    /// <summary>The side he curves round a body in his path on (+1 left of his way, -1 right), or 0 with nobody in it.</summary>
+    internal int MateAvoidSide;
+    /// <summary>The slope of the fields as he last read it, and the tick he read it on.</summary>
+    internal System.Numerics.Vector2 MateSlope;
+    internal int MateSlopeTick = int.MinValue / 2;
+    /// <summary>The offside line's x as he last saw it (NaN before), and its smoothed speed, m/s (negative: coming back up the pitch).</summary>
+    internal float MateLineX = float.NaN, MateLineVel;
+    /// <summary>Until this world tick he steers off the body he bumped, which lay along this yaw from him.</summary>
+    internal int MateBumpUntil;
+    internal float MateBumpYaw;
+    /// <summary>The direction he moved along last tick (unit, zero while he stood); read by the probe to count reversals.</summary>
+    public System.Numerics.Vector2 MateHeading { get; internal set; }
 
     // ---- Defending. The view draws a defender, and an attacker's reactions, from these. ----
 
@@ -391,6 +447,8 @@ public sealed class PlayerState
         GaitPhase = o.GaitPhase; StepFrequency = o.StepFrequency; GaitLockTicks = o.GaitLockTicks; GaitLockTarget = o.GaitLockTarget;
         SteerVelocity = o.SteerVelocity; RunSpeed = o.RunSpeed; CurrentTick = o.CurrentTick; SwingMiddleCrossed = o.SwingMiddleCrossed; StepBegun = o.StepBegun;
         StumbleUntil = o.StumbleUntil; TackledLockUntil = o.TackledLockUntil;
+        LockOnPoint = o.LockOnPoint; LockOnTick = o.LockOnTick; MinArrivalTick = o.MinArrivalTick; MinArrivalHeight = o.MinArrivalHeight;
+        LockOnBallVelocity = o.LockOnBallVelocity; LockOnResting = o.LockOnResting; LockOnSlack = o.LockOnSlack;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction; TurnFatigue = o.TurnFatigue;
         GZone = o.GZone; GPrevZone = o.GPrevZone; GZoneStart = o.GZoneStart; GFwdLastTick = o.GFwdLastTick;
         GFwdStart = o.GFwdStart; GFwdFromNeutral = o.GFwdFromNeutral; GBackLastTick = o.GBackLastTick;

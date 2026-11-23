@@ -38,9 +38,10 @@ public enum RoundState { Setup, Live, Strike, Flight, Outcome, Report }
 /// How a round ended. <see cref="None"/> while it is still running. In the arena a round ends only as Goal, Held or TimeUp;
 /// Wide and Over are kept for scripted shot results and older reports, Out only marks a round stopped because a value became
 /// not-a-number. Claimed is reserved and not produced yet. With a defender a round also ends as Dispossessed (he controls the
-/// ball he won) or Foul (his lunge or slide met the attacker's body before the ball).
+/// ball he won) or Foul (his lunge or slide met the attacker's body before the ball). With offside on, a round also ends as
+/// Offside (a pass named a team-mate beyond the line, or a flagged team-mate touched the ball).
 /// </summary>
-public enum Outcome { None, Goal, Held, Wide, Over, Claimed, Out, TimeUp, Dispossessed, Foul }
+public enum Outcome { None, Goal, Held, Wide, Over, Claimed, Out, TimeUp, Dispossessed, Foul, Offside }
 
 /// <summary>
 /// What an outfield player without the ball is doing (the game draws a defender from it, with
@@ -63,8 +64,21 @@ public enum TackleKind { None, Auto, Lunge, Slide }
 /// Tackle is a ball won from a dribble (position = ball centre, speed = the ball's speed after it, the player = the tackler);
 /// TackleStart a lunge or slide beginning; Block a ball deflected by an outfield player's body, leg or foot; Barge a shoulder
 /// barge that landed; Foul a lunge or slide that met the opponent's body before the ball.
+/// Pass is a pass struck (position = ball centre, speed = its launch speed, the player = the passer; <see cref="SimEvent.Other"/>
+/// = the named receiver's index, or -1 for a pass into space). ControlChanged is the team's intent moving to another player
+/// (the player = the new one, <see cref="SimEvent.Other"/> = the one before, <see cref="SimEvent.Reason"/> why). Offside is the
+/// offence (the player = the one flagged).
 /// </remarks>
-public enum EventKind { Touch, Strike, Bounce, FrameHit, Save, Goal, OutOfPlay, PossessionGained, PossessionLost, BoardHit, SkillMove, Tackle, TackleStart, Block, Barge, Foul }
+public enum EventKind { Touch, Strike, Bounce, FrameHit, Save, Goal, OutOfPlay, PossessionGained, PossessionLost, BoardHit, SkillMove, Tackle, TackleStart, Block, Barge, Foul, Pass, ControlChanged, Offside }
+
+/// <summary>The team-mate bot's run cycle: holding space, pulled onto the offside line, running in behind, coming back onside.</summary>
+public enum MateRun { Support, Armed, Go, Back }
+
+/// <summary>Why the player a team's intent drives changed (see <see cref="EventKind.ControlChanged"/>).</summary>
+public enum ControlReason { None, Pass, Claim }
+
+/// <summary>The kind of pass.</summary>
+public enum PassKind { None, Ground, Through }
 
 /// <summary>
 /// Shot flavour chosen by the modifiers held while shooting: chip wins; driven with finesse is a low finesse; then driven,
@@ -84,8 +98,10 @@ public enum Foot { Left, Right }
 /// <param name="Team">For player events (Touch, Strike, PossessionGained, PossessionLost): the player's team, else -1.</param>
 /// <param name="PlayerIndex">For player events: the player's index in the team, else -1.</param>
 /// <param name="Skill">For <see cref="EventKind.SkillMove"/>: the move that started; null otherwise.</param>
+/// <param name="Other">For Pass: the named receiver's index in the team (-1 none). For ControlChanged: the index control came from.</param>
+/// <param name="Reason">For ControlChanged: why.</param>
 public readonly record struct SimEvent(EventKind Kind, Vector3 Position, float Speed, bool Held = false, Foot Foot = Foot.Right, int Team = -1,
-    int PlayerIndex = -1, ActionKind? Skill = null);
+    int PlayerIndex = -1, ActionKind? Skill = null, int Other = -1, ControlReason Reason = ControlReason.None);
 
 /// <summary>Helpers for <see cref="Outcome"/>.</summary>
 public static class OutcomeExtensions

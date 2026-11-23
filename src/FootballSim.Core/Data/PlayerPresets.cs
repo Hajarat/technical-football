@@ -225,7 +225,8 @@ public enum PlayerEditKind { Rating, Foot, Trait, Height, Weight }
 public sealed record PlayerEditRow(PlayerEditKind Kind, string Name, PlayerTrait Trait = PlayerTrait.None)
 {
     /// <summary>
-    /// The rows in order: the outfield ratings (<paramref name="ratingNames"/> minus <paramref name="keeperNames"/>, in file order),
+    /// The rows in order: the outfield ratings (<paramref name="ratingNames"/> minus <paramref name="keeperNames"/>, in file order, the
+    /// passing ratings after skill_moves),
     /// preferred_foot, one row per trait, height_m and weight_kg. Defaults to the sheet's own lists, so a rating added there gets a row.
     /// </summary>
     public static IReadOnlyList<PlayerEditRow> All(IReadOnlyList<string>? ratingNames = null, IReadOnlyList<string>? keeperNames = null)
@@ -233,7 +234,13 @@ public sealed record PlayerEditRow(PlayerEditKind Kind, string Name, PlayerTrait
         ratingNames ??= PlayerSheet.RatingNames;
         keeperNames ??= PlayerSheet.KeeperRatingNames;
         var rows = new List<PlayerEditRow>();
-        foreach (var n in ratingNames) if (!keeperNames.Contains(n)) rows.Add(new PlayerEditRow(PlayerEditKind.Rating, n));
+        foreach (var n in ratingNames)
+        {
+            if (keeperNames.Contains(n)) continue;
+            rows.Add(new PlayerEditRow(PlayerEditKind.Rating, n));
+            // (the passing ratings, kept in a list of their own, follow the other ratings on the ball)
+            if (n == "skill_moves") foreach (var pass in PlayerSheet.PassingRatingNames) rows.Add(new PlayerEditRow(PlayerEditKind.Rating, pass));
+        }
         rows.Add(new PlayerEditRow(PlayerEditKind.Foot, "preferred_foot"));
         foreach (var t in Enum.GetValues<PlayerTrait>())
         {

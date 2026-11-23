@@ -10,6 +10,9 @@ action, for any outfield player), `Contacts.cs` (bodies), `World.Defender.cs` (h
 `Movement.cs`. The bot's numbers are the `defender` section of `data/tuning/default.json`, the actions' the `defending`
 section. Values marked (ref) in `Data/Tuning.cs` were read from reference data; the others are ours.
 
+In a scenario with a team-mate (two v one) he also waits a reaction delay after a strike, anchors on where a pass will be met
+and cuts it out only when he is first: see [teammate.md](teammate.md#against-two-the-defender-and-the-keeper).
+
 ## The bot writes an intent
 
 The bot never moves the defender. Each tick it writes a `TickIntent` (stick, sprint, and the held buttons `Jockey`, `Tackle`,
@@ -95,9 +98,14 @@ The game draws these from motion clips where it has them and with poses over the
 
 ## How a round ends
 
-A tackle never ends the round. The ball runs loose and both may go for it: the attacker's regain is the usual one (a race,
-at normal foot reach, when the defender is close), and he cannot take a ball the defender is nearer to while it is within
-the defender's `control_distance_m` (equally near, a coin from the defending generator decides, once per loose ball). The
+A tackle never ends the round. The ball runs loose and both go for it: each holds his team's claim on the forecast ball
+(lock-on, see [dribbling.md](dribbling.md)) and runs to his own meeting point with it, the defender at a velocity that
+closes on the ball no faster than he can brake from, so he arrives able to control it. Whoever's foot arrives first plays
+it: nobody is barred from the ball. The attacker's claim is a race (normal foot reach) when the defender's arrival is within
+`regain_keeper_margin` of his own, and when the defender is the earlier he still runs and plays the ball if the defender
+misses it. Only an exact tie keeps the coin: with both equally near (within 0.05 m) a ball inside the defender's
+`control_distance_m`, a coin from the defending generator, drawn once per loose ball, says whether the attacker may touch it.
+The defender needs the ball at his feet for `control_s`, so the attacker can nick it in that window. The
 round ends as **DISPOSSESSED** once a loose ball has been within `control_distance_m` of the defender's feet, on the ground
 and no faster than `control_speed` against his own velocity, for `control_s`. It ends as **FOUL** on a foul. `Outcome` has
 both, after the existing values. The round's report carries a `defender` block (auto tackles won, lunges and slides tried

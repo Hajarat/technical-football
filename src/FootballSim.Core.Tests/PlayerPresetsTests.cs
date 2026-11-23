@@ -175,11 +175,12 @@ public class PlayerPresetsTests
     {
         var rows = PlayerEditRow.All();
         var expected = PlayerSheet.RatingNames.Where(n => !PlayerSheet.KeeperRatingNames.Contains(n))
+            .SelectMany(n => n == "skill_moves" ? new[] { n }.Concat(PlayerSheet.PassingRatingNames) : new[] { n })
             .Concat(new[] { "preferred_foot" })
             .Concat(PlayerSheet.TraitNames.Select(t => t.Name))
             .Concat(new[] { "height_m", "weight_kg" });
         Assert.Equal(expected, rows.Select(r => r.Name));
-        Assert.Equal(15, rows.Count(r => r.Kind == PlayerEditKind.Rating));
+        Assert.Equal(17, rows.Count(r => r.Kind == PlayerEditKind.Rating));
         Assert.Equal(Enum.GetValues<PlayerTrait>().Length - 1, rows.Count(r => r.Kind == PlayerEditKind.Trait));
     }
 

@@ -309,8 +309,8 @@ public static class TouchPlanner
             p.PlannerSteer = Toward(Rotate(p.PlannerSteer, Movement.WrapAngle(p.Facing - p.SteerFacing)), Vector2.Zero, SteerStep(t));
             p.SteerFacing = p.Facing;
             p.SteerCarry = Toward(p.SteerCarry, Vector2.Zero, SteerStep(t));
-            // A loose ball he goes for (see Regain): the go-get-it legs, off the ball.
-            legs = p.Regain != RegainMode.None ? ChaseIntent(p, ball, intent, t, offBall: true) : intent;
+            // A loose ball he holds his team's claim on (see LockOn): his legs run to the meeting, whatever the stick says.
+            legs = p.LockOnTick >= 0 ? LockOn.Legs(p, tick, t) : intent;
             float top = Movement.TopSpeed(p.Sheet, t);
             return Stunned(p, now)
                 ? new MoveAssist(top * t.Shot.StunSpeedFraction, 1f + t.Possession.OffBallTurnBonus, p.PlannerSteer, HardCap: top * t.Shot.StunSpeedFraction, TurnAbout: true, Carry: p.SteerCarry)
@@ -1665,6 +1665,12 @@ public static class TouchPlanner
         Foot foot = a.Foot;
         var (sigmaS, sigmaD) = Sigmas(p, foot, kind, mode, t);
         if (far) { sigmaS *= FarStretchErrorScale; sigmaD *= FarStretchErrorScale; }
+        // The first touch of a team-mate's pass: wider with the ball's speed against him, eased by first_touch.
+        if (p.ReceivingPass && kind is ActionKind.First or ActionKind.TrapLow or ActionKind.TrapMid or ActionKind.TrapHigh or ActionKind.KnockOn && p.ReceivingPass)
+        {
+            float m = MathF.Max(0f, t.Receive.Error.Evaluate(RelativeBallSpeed(p, ball))) * t.Receive.Rating.ForRating(p.Sheet.FirstTouch);
+            sigmaS *= m; sigmaD *= m;
+        }
         Vector3 v, spin = Vector3.Zero;
         float errDeg = 0f, turnSign = 0f;
         Meet meet = default;
@@ -1898,7 +1904,7 @@ public static class TouchPlanner
     /// First contact with a loose ball: as soon as it is in reach of the trap for its height band (and the last touch is at least
     /// turn_min_interval ago), with the first_touch errors. A ball at the feet with the stick pushed is pushed to the next meet
     /// like a dribble touch; otherwise (the stick released, or a ball above the feet) it is trapped by its band (see
-    /// <see cref="TouchModel.TrapKindFor"/>).
+    /// <see cref="TouchModel.TrapKindFor"/>). A knock-on asked for on the way is played as the first touch instead.
     /// </summary>
     static TouchResult? FirstTouch(PlayerState p, in TickIntent intent, Ball ball, int tick, float now, Tuning t, Pitch? pitch, SimRng rng)
     {
@@ -1906,7 +1912,7 @@ public static class TouchPlanner
         // A free regain also takes a ball beyond reach, out to regain_reach: a toe-poke at the feet, at the stretched errors.
         var trap = TouchModel.TrapKindFor(p.Sheet, p.Position, ball.Position, t);
         bool inReach = trap != null;
-        if (!inReach && !Regain.InRegainReach(p, ball, t)) return null;
+        if (!inReach && !LockOn.InRegainReach(p, ball, t)) return null;
         if (now - p.LastTouchTime < k.TurnMinInterval) return null;
         bool stickActive = intent.Move.Length() >= k.StickThreshold;
         float rel = TouchModel.Flat(ball.Velocity - p.Velocity).Length();
@@ -1916,6 +1922,8 @@ public static class TouchPlanner
         bool push = stickActive && (trap is null or ActionKind.TrapLow)
             && ball.Position.Y <= TouchModel.Profile(ActionKind.First, mode, t).MaxBallHeight;
         var kind = push ? ActionKind.First : trap ?? ActionKind.TrapLow;
+        // A knock-on asked for on the way to the ball: the first touch is the knock-on, toward the stick (a ball at the feet only).
+        if (p.KnockOnRequested && ball.Position.Y <= TouchModel.FeetHeight(t)) kind = ActionKind.KnockOn;
         var a = new BallAction { Kind = kind, PlanTick = tick, ContactTick = tick, Stretched = !inReach };
         a.Foot = p.IsStepping ? p.SwingFoot : TouchModel.ChooseFoot(p.Sheet, p.Position, p.Facing, ball.Position, t);
         p.TouchAction = a;

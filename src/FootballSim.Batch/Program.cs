@@ -41,6 +41,9 @@ using FootballSim.Core;
 //   ... --trace-defender <seed> [--style straight|cut|skill] [--every 12]
 //                                               prints the defender's state through one scripted round
 //   ... --write-defender-replays <dir>          searches scripted rounds for each defender action and writes one replay each
+//   ... --lock-probe [--seeds 1000] [--only behind,still_shot,first_time,flick,gesture,race,slide]
+//                                               scripted loose-ball rounds, one case per lock-on rule, with their targets
+//   ... --lock-probe --trace <case> [--seed 1]  prints one round of a case: the claim, the legs and the events
 //   ... --set defender.overshoot_m=0.6,...     overrides plain tuning numbers by their file names (experiments)
 //   ... --counters off                          the scripted attacker ignores the keeper (no shorter touches, rounding or chips)
 //   ... --close-down off                        the shallow keeper: he never closes down (close_down_range 0), so never charges
@@ -56,7 +59,7 @@ static class Cli
         {
             if (!args[i].StartsWith("--")) { Console.Error.WriteLine($"Unexpected argument '{args[i]}'"); return 2; }
             string key = args[i][2..];
-            if (key is "dump-tuning" or "skill-probe" or "keeper-probe") { opts[key] = "1"; continue; }
+            if (key is "dump-tuning" or "skill-probe" or "keeper-probe" or "lock-probe" or "pass-probe" or "mate-probe") { opts[key] = "1"; continue; }
             if (i + 1 >= args.Length) { Console.Error.WriteLine($"Missing value for --{key}"); return 2; }
             opts[key] = args[++i];
         }
@@ -94,6 +97,9 @@ static class Cli
             return ShotAuditCli.Run(auditPath, opts.TryGetValue("capture", out var capId) ? capId : null, dataDir, tuning);
         if (opts.ContainsKey("skill-probe")) return SkillProbe.Run(opts, dataDir, tuning);
         if (opts.ContainsKey("keeper-probe")) return KeeperProbe.Run(opts, dataDir, tuning);
+        if (opts.ContainsKey("lock-probe")) return LockProbe.Run(opts, dataDir, tuning);
+        if (opts.ContainsKey("pass-probe")) return PassProbe.Run(opts, dataDir, tuning);
+        if (opts.ContainsKey("mate-probe")) return MateProbe.Run(opts, dataDir, tuning);
         if (opts.TryGetValue("write-probe-replays", out var probeDir)) return KeeperProbe.WriteReplays(probeDir, dataDir, tuning);
         if (opts.TryGetValue("probe-replays", out var probeReplays)) return KeeperProbe.RunReplays(probeReplays, dataDir, tuning, opts);
         if (opts.TryGetValue("write-skill-replays", out var skillDir)) return SkillProbe.WriteReplays(skillDir, dataDir, tuning);
@@ -106,6 +112,7 @@ static class Cli
             if (probe == "shots") return ShotDiag.Run(opts, dataDir, tuning);
             if (probe == "shot") return ShotProbe.Run(opts, dataDir, tuning);
             if (probe == "defender") return DefenderProbe.Run(opts, dataDir, tuning);
+            if (probe == "team") return MateProbe.RunTeam(opts, dataDir, tuning);
             if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, sessions, shots, shot, defender)"); return 2; }
             return DribbleProbe.Run(opts, dataDir, tuning);
         }
@@ -129,15 +136,27 @@ static class Cli
             if (defender == null) return 1;
         }
 
+        // A scenario with a team-mate: his sheet (--mate, else the scenario's).
+        PlayerSheet? mateSheet = null;
+        if (sc.Mate != null)
+        {
+            mateSheet = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", (opts.TryGetValue("mate", out var mt) ? mt : sc.DefaultMate) + ".json")));
+            if (mateSheet == null) return 1;
+        }
+
         if (opts.TryGetValue("trace-keeper", out var traceSeed))
             return KeeperReplays.Trace(tuning, sc, attacker, keeper, ulong.Parse(traceSeed, CultureInfo.InvariantCulture),
                 opts.TryGetValue("trace-from", out var tf) ? int.Parse(tf, CultureInfo.InvariantCulture) : -1,
                 opts.TryGetValue("trace-to", out var tt) ? int.Parse(tt, CultureInfo.InvariantCulture) : -1);
 
+        if (opts.TryGetValue("trace-team", out var teamSeed))
+            return MateProbe.TraceTeam(tuning, sc, attacker, keeper, defender, mateSheet, MateScript(opts) ?? new ScriptedAttacker(),
+                ulong.Parse(teamSeed, CultureInfo.InvariantCulture), opts.TryGetValue("every", out var te) ? int.Parse(te, CultureInfo.InvariantCulture) : 12);
+
         if (opts.TryGetValue("save-replay", out var savePath))
         {
             ulong rs = opts.TryGetValue("seed", out var rss) ? ulong.Parse(rss, CultureInfo.InvariantCulture) : 1UL;
-            var report = RoundRunner.RunToReport(tuning, sc, attacker, keeper, rs, out var replay, defender: defender);
+            var report = RoundRunner.RunToReport(tuning, sc, attacker, keeper, rs, out var replay, MateScript(opts), defender: defender, mate: mateSheet);
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(savePath))!);
             replay.Save(savePath);
             Console.WriteLine($"saved {savePath} ({replay.TickCount} ticks), outcome {report.Outcome.Label()}");
@@ -188,7 +207,9 @@ static class Cli
             var sw = Stopwatch.StartNew();
             for (int i = 0; i < n; i++)
             {
-                var r = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i, new ScriptedAttacker { Counters = counters }, followUp: true, defender: defender);
+                var script = MateScript(opts) ?? new ScriptedAttacker();
+                script.Counters = counters;
+                var r = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i, script, followUp: true, defender: defender, mate: mateSheet);
                 counts[(int)r.End]++;
                 stats.Add(r);
             }
@@ -237,12 +258,18 @@ static class Cli
             def = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", (replay.DefenderId ?? sc.DefaultDefender) + ".json")));
             if (def == null) return 1;
         }
+        PlayerSheet? mate = null;
+        if (sc.Mate != null)
+        {
+            mate = Load(DataLoader.LoadPlayer(Path.Combine(dataDir, "players", (replay.MateId ?? sc.DefaultMate) + ".json")));
+            if (mate == null) return 1;
+        }
         if (!replay.MatchesTuning(tuning))
             Console.WriteLine("Tuning has changed since this replay, so the result may differ.");
         if (replay.Partial)
         {
             // a capture or an unfinished round: the recorded ticks, then the shots so far (there is no report)
-            var world = replay.Play(tuning, sc, att, kee, defender: def);
+            var world = replay.Play(tuning, sc, att, kee, defender: def, mate: mate);
             Console.WriteLine($"replay {path}: scenario={replay.ScenarioId} attacker={replay.AttackerId} keeper={replay.KeeperId} seed={replay.Seed} ticks={replay.TickCount}");
             if (replay.Capture is { } c) Console.WriteLine($"capture {c.Id}: {c.Tag}{(c.Note.Length > 0 ? " · " + c.Note : "")}");
             Console.WriteLine($"partial: {replay.TickCount} ticks, no report");
@@ -255,10 +282,23 @@ static class Cli
             if (world.Shots.Count == 0) Console.WriteLine("no shots");
             return 0;
         }
-        var report = replay.Run(tuning, sc, att, kee, def);
+        var report = replay.Run(tuning, sc, att, kee, def, mate);
         Console.WriteLine($"replay {path}: scenario={replay.ScenarioId} attacker={replay.AttackerId} keeper={replay.KeeperId} seed={replay.Seed} ticks={replay.TickCount}");
         Console.WriteLine(report.ToJson());
         return 0;
+    }
+
+    /// <summary>The scripted attacker for --style solo|square|through (a scenario with a team-mate); null without the option.</summary>
+    static ScriptedAttacker? MateScript(Dictionary<string, string> opts)
+    {
+        if (!opts.TryGetValue("style", out var style)) return null;
+        return style switch
+        {
+            "solo" => new ScriptedAttacker { Team = ScriptedAttacker.TeamStyle.Solo },
+            "square" => new ScriptedAttacker { Team = ScriptedAttacker.TeamStyle.Square },
+            "through" => new ScriptedAttacker { Team = ScriptedAttacker.TeamStyle.Through },
+            _ => null,
+        };
     }
 
     static T? Load<T>(LoadResult<T> r) where T : class

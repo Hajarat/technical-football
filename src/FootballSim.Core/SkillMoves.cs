@@ -120,14 +120,17 @@ public static class SkillMoves
     /// In possession the gesture waits (at most meet_wait_seconds) on the touch controller's forecast: while it waits the
     /// controller treats it as a demand and goes to the ball without committing a touch, and the move starts once the ball is
     /// in reach, at the forecast contact at the latest. A touch already committed when the gesture comes is played first (on a
-    /// one-step push), then the move. Without possession it waits buffer_seconds for the ball to come into reach.
+    /// one-step push), then the move. Without possession it waits buffer_seconds for the ball to come into reach, or
+    /// meet_wait_seconds while he holds his team's claim on the loose ball: the move starts once his first touch has given him
+    /// possession.
     /// </para>
     /// </summary>
     internal static SimEvent? TryStart(PlayerState p, Ball ball, bool inPossession, int tick, float now, Tuning t)
     {
         var k = t.Skill;
         if (p.SkillBufTick < 0) return null;
-        if (tick - p.SkillBufTick > Ticks(inPossession ? k.MeetWaitSeconds : k.BufferSeconds, t)) { p.SkillBufTick = -1; return null; }
+        // (on the way to a loose ball he holds the claim on, the gesture is kept as long as one made in possession)
+        if (tick - p.SkillBufTick > Ticks(inPossession || p.LockOnTick >= 0 ? k.MeetWaitSeconds : k.BufferSeconds, t)) { p.SkillBufTick = -1; return null; }
         if (!inPossession || p.SkillAction != null || now < p.SkillCooldownUntil) return null;
         var kind = KindOf(p.SkillBufKind);
         bool mcGeady = p.SkillBufKind == Gesture.McGeady;
