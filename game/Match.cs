@@ -20,6 +20,8 @@ public partial class Match : Node3D
     public PlayerView Mate { get; private set; } = null!;
     /// <summary>The ring under the player the pad drives, in a round with a team-mate.</summary>
     MeshInstance3D _controlRing = null!;
+    /// <summary>The offside line, drawn across the pitch while a scenario that calls offside is in play.</summary>
+    MeshInstance3D _offsideLine = null!;
     public CameraRig Camera { get; private set; } = null!;
     public Hud Hud { get; private set; } = null!;
     public DebugOverlay Overlay { get; private set; } = null!;
@@ -60,6 +62,12 @@ public partial class Match : Node3D
             MaterialOverride = MeshKit.Unshaded(new Color(1f, 1f, 1f, 0.9f)), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
         AddChild(_controlRing);
+        _offsideLine = new MeshInstance3D
+        {
+            Name = "OffsideLine", Visible = false, Mesh = new BoxMesh { Size = new Vector3(0.06f, 0.004f, 1f) },
+            MaterialOverride = MeshKit.Unshaded(new Color(1f, 0.85f, 0.2f, 0.55f)), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(_offsideLine);
         Overlay = new DebugOverlay { Name = "Overlay" }; AddChild(Overlay);
         Camera = new CameraRig { Name = "Camera" }; AddChild(Camera);
         Hud = new Hud { Name = "Hud" }; AddChild(Hud);

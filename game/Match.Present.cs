@@ -374,6 +374,7 @@ public partial class Match
         if (World.Defender is { } def) Defender.Teleport(DefenderFrame(def), false);
         if (World.HasMates) Mate.Teleport(MateFrame(World.Teams[0][1]), false);
         _controlRing.Visible = false;
+        _offsideLine.Visible = false;
         _tackles = 0; _blocks = 0;
         Camera.Snap(Ball.Position);
         UpdateHudText();
@@ -412,6 +413,13 @@ public partial class Match
             _controlRing.Visible = Mate.Visible;
         }
         else _controlRing.Visible = false;
+        // The offside line: across the pitch at the second-last opponent, or the ball when it is further up.
+        _offsideLine.Visible = w.OffsideOn && w.State is RoundState.Live or RoundState.Strike or RoundState.Flight;
+        if (_offsideLine.Visible)
+        {
+            _offsideLine.Position = new Vector3(w.OffsideLine, 0.03f, 0f);
+            _offsideLine.Scale = new Vector3(1f, 1f, w.Pitch.HalfWidth * 2f);
+        }
         Keeper.Apply(KeeperFrame(w.Keeper));
         if (w.Defender is { } def) Defender.Apply(DefenderFrame(def), def.InPossession);
         foreach (var e in w.Events)

@@ -288,21 +288,99 @@ static class PassProbe
         return Line("struck within 2 ticks of the meeting", 100.0 * onTick / seeds, 95, 100);
     }
 
-    /// <summary>A through ball to a team-mate sprinting level with the defender: he takes it in his stride, onside.</summary>
+    /// <summary>
+    /// A through ball to a team-mate sprinting level with the defender: the team-mate runs at the line from 6 to 8 m short of it,
+    /// the pass is pressed so that it is struck as he gets level, and he takes it in his stride, onside. The defender stands.
+    /// </summary>
+    static (World World, Func<World, bool> Press) ThroughStart(Setup s, ulong seed, float beyond = 0f)
+    {
+        var r = new SimRng(seed * 7919UL);
+        float dx = 16f + Jit(r, 1f), dz = Jit(r, 1f);
+        float mz = dz + (r.Uniform(0f, 1f) < 0.5f ? -1f : 1f) * (4.5f + Jit(r, 1f));
+        float mx = beyond > 0f ? dx + beyond : dx - 7f + Jit(r, 1f);
+        var sc = Start(s, 7f + Jit(r, 1f), Jit(r, 2f), mx, mz, (dx, dz), offside: true);
+        // (the carrier faces up the pitch, the ball in front of him)
+        sc.Attacker = new StartSpot { X = sc.Attacker.X, Z = sc.Attacker.Z, FacingDeg = 0f };
+        sc.Ball = new StartSpot { X = sc.Attacker.X + 0.45f, Z = sc.Attacker.Z };
+        var w = Make(s, sc, seed);
+        w.DefenderBotEnabled = false;
+        if (beyond <= 0f) w.MateScript = (_, _) => new TickIntent { MoveX = 1f, Sprint = 1f };
+        // Pressed when the wind-up (a tap: 0.3 s, and more for a pass across his body) will end with him just short of the line.
+        bool Press(World x)
+        {
+            var m = x.Teams[0][1];
+            return beyond > 0f || x.OffsideLine - m.Position.X <= m.Velocity.X * 0.5f + 0.9f;
+        }
+        return (w, Press);
+    }
+
     static bool Through(Setup s, int seeds)
     {
-        Console.WriteLine("through: (measured from milestone 4)");
-        return ThroughImpl?.Invoke(s, seeds) ?? true;
+        int struck = 0, received = 0, inStride = 0, offside = 0;
+        double share = 0;
+        for (ulong seed = 1; seed <= (ulong)seeds; seed++)
+        {
+            var (w, press) = ThroughStart(s, seed);
+            var buf = new TickIntent[w.PlayerCount];
+            var mate = w.Teams[0][1];
+            float top = Movement.TopSpeed(mate.Sheet, s.Tuning);
+            int pressTick = -1;
+            bool passed = false;
+            for (int i = 0; i < 900 && w.State is RoundState.Live or RoundState.Strike; i++)
+            {
+                TickIntent it = default;
+                if (!passed)
+                {
+                    if (pressTick < 0 && i >= 2 && press(w)) pressTick = i;
+                    var aim = Toward(w, 1);
+                    // (pointed ahead of him: the stick up the pitch from the line to him)
+                    aim = Vector2.Normalize(aim + new Vector2(0.6f, 0f));
+                    // (he stands over the ball until the press, so the wind-up is the same length every round)
+                    if (pressTick >= 0) it = new TickIntent { MoveX = aim.X, MoveZ = aim.Y, ThroughHeld = i < pressTick + 6 };
+                }
+                buf[0] = it;
+                w.Step(buf);
+                if (!passed && Has(w, EventKind.Pass, 0)) { passed = true; struck++; }
+                if (!passed) continue;
+                if (Has(w, EventKind.Touch, 0, 1))
+                {
+                    received++;
+                    share += mate.Speed / top;
+                    if (mate.Speed >= 0.8f * top) inStride++;
+                    break;
+                }
+                if (Has(w, EventKind.Touch, 0, 0) || Has(w, EventKind.Save, 1)) break;
+            }
+            if (w.Outcome == Outcome.Offside) offside++;
+        }
+        Console.WriteLine($"through: a through ball to a team-mate sprinting level with the standing defender (struck in {struck}, received in {received}, his speed at the first touch {F(100.0 * share / Math.Max(1, received), 0)}% of his top speed on average)");
+        bool ok = Line("first touch at 80% of his top speed or more", 100.0 * inStride / seeds, 85, 100);
+        ok &= Line("offside", 100.0 * offside / seeds, 0, 0);
+        return ok;
     }
 
+    /// <summary>The named receiver standing a metre beyond the line when the pass is struck: offside on the strike tick.</summary>
     static bool OffsideCase(Setup s, int seeds)
     {
-        Console.WriteLine("offside: (measured from milestone 4)");
-        return OffsideImpl?.Invoke(s, seeds) ?? true;
+        int called = 0, struck = 0;
+        for (ulong seed = 1; seed <= (ulong)seeds; seed++)
+        {
+            var (w, _) = ThroughStart(s, seed, beyond: 1f);
+            var buf = new TickIntent[w.PlayerCount];
+            for (int i = 0; i < 240 && w.State is RoundState.Live or RoundState.Strike; i++)
+            {
+                var aim = Toward(w, 1);
+                buf[0] = new TickIntent { MoveX = aim.X, MoveZ = aim.Y, PassHeld = i >= 2 && i < 8 };
+                w.Step(buf);
+                if (!Has(w, EventKind.Pass, 0)) continue;
+                struck++;
+                if (w.Outcome == Outcome.Offside && Has(w, EventKind.Offside, 0, 1) && w.ControlledIndex == 0) called++;
+                break;
+            }
+        }
+        Console.WriteLine($"offside: a pass to a team-mate standing 1 m beyond the line (struck in {struck})");
+        return Line("offside on the strike tick", 100.0 * called / seeds, 100, 100);
     }
-
-    static readonly Func<Setup, int, bool>? ThroughImpl = null;
-    static readonly Func<Setup, int, bool>? OffsideImpl = null;
 
     // ---- a trace ----
 
@@ -320,6 +398,11 @@ static class PassProbe
                 float along = 0.5f + Jit(r, 0.05f);
                 sc = Start(s, ax, az, mx, mz, (ax + (mx - ax) * along + (on ? 0f : 1f), az + (mz - az) * along));
                 break;
+            }
+            case "through":
+            {
+                var (tw, press) = ThroughStart(s, seed);
+                return TraceThrough(tw, press);
             }
             case "square_shot":
                 sc = Start(s, s.Pitch.Length - 9f + Jit(r, 0.5f), -5f + Jit(r, 0.5f), s.Pitch.Length - 9f + Jit(r, 0.5f), 4f + Jit(r, 0.5f));
@@ -359,6 +442,35 @@ static class PassProbe
             if (w.Passes > 0 && (w.BallController != null || w.Shots.Count > 0) && w.Tick % 6 == 0) break;
         }
         if (w.Pass is { } rec) Console.WriteLine($"pass on its way: receiver {rec.Receiver?.Index}, expected arrival {rec.ExpectedArrivalTick}");
+        return 0;
+    }
+
+    static int TraceThrough(World w, Func<World, bool> press)
+    {
+        var buf = new TickIntent[w.PlayerCount];
+        int pressTick = -1;
+        Console.WriteLine("  tick state   ctl  p0(x,z)        p1(x,z)        v    ball(x,z)      bv   line   claim  events");
+        for (int i = 0; i < 600 && w.State != RoundState.Report; i++)
+        {
+            TickIntent it = default;
+            if (w.Passes == 0)
+            {
+                if (pressTick < 0 && i >= 2 && press(w)) pressTick = i;
+                var aim = Vector2.Normalize(Toward(w, 1) + new Vector2(0.6f, 0f));
+                if (pressTick >= 0) it = new TickIntent { MoveX = aim.X, MoveZ = aim.Y, ThroughHeld = i < pressTick + 6 };
+            }
+            buf[0] = it;
+            w.Step(buf);
+            var p0 = w.Teams[0][0]; var p1 = w.Teams[0][1]; var b = w.Ball;
+            var ev = w.Events.Where(e => e.Kind is EventKind.Touch or EventKind.Pass or EventKind.ControlChanged or EventKind.Offside or EventKind.Save).Select(e => $"{e.Kind}[{e.Team}.{e.PlayerIndex}]").ToList();
+            if (w.Tick % 6 != 0 && ev.Count == 0) continue;
+            var c = w.Claims[0];
+            string claim = c.Player == null ? "    -" : $"{c.Player.Index}@{c.ArriveTick}";
+            Console.WriteLine($"{w.Tick,6} {w.State,-7} {w.ControlledIndex,3}  {F(p0.Position.X).PadLeft(6)},{F(p0.Position.Z).PadLeft(6)}  {F(p1.Position.X).PadLeft(6)},{F(p1.Position.Z).PadLeft(6)} {F(p1.Speed).PadLeft(5)}  {F(b.Position.X).PadLeft(6)},{F(b.Position.Z).PadLeft(6)} {F(b.Velocity.Length()).PadLeft(5)} {F(w.OffsideLine).PadLeft(6)}  {claim,-7} {string.Join(" ", ev)}");
+            if (w.Passes > 0 && w.BallController != null) break;
+        }
+        if (w.Pass is { } rec) Console.WriteLine($"pass on its way: receiver {rec.Receiver?.Index}, target {F(rec.Target.X)},{F(rec.Target.Z)}, expected arrival {rec.ExpectedArrivalTick}");
+        Console.WriteLine($"outcome {w.Outcome}");
         return 0;
     }
 }

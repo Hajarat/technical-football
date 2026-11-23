@@ -167,7 +167,7 @@ public static class PassModel
     /// <summary>
     /// How much later than the ball the opponents are on the lane from <paramref name="from"/> to <paramref name="to"/> at their
     /// best, seconds, for a ball rolled off at <paramref name="speed"/>: at each point of the lane, the earliest opponent's
-    /// arrival (the gap beyond his reach over his top speed, after <paramref name="delay"/>) less the ball's. Negative: one of
+    /// arrival (the gap beyond his reach run from his speed toward it now, see <see cref="RunSeconds"/>, after <paramref name="delay"/>) less the ball's. Negative: one of
     /// them is there first. Infinity with no opponent. The keeper counts only for points he can come to inside his area.
     /// </summary>
     public static float LaneMargin(Vector2 from, Vector2 to, float speed, IReadOnlyList<PlayerState> opponents, float delay, Pitch? pitch, Tuning t)
@@ -181,7 +181,9 @@ public static class PassModel
         {
             bool keeper = o.Role == PlayerRole.Keeper;
             float top = keeper ? Keeper.RushSpeed(o.Sheet, t) : Movement.TopSpeed(o.Sheet, t);
+            float tau = Movement.TimeConstant(o.Sheet, t);
             var op = Flat(o.Position);
+            var ov = Flat(o.Velocity);
             for (float d = 0f; ; d += LaneStep)
             {
                 if (d > len) d = len;
@@ -189,13 +191,29 @@ public static class PassModel
                 if (!keeper || pitch == null || pitch.InPenaltyArea(new Vector3(at.X, 0f, at.Y)))
                 {
                     float ball = TravelSeconds(d, speed, t);
-                    float his = delay + MathF.Max(0f, Vector2.Distance(op, at) - InterceptReach) / MathF.Max(1f, top);
+                    var toAt = at - op;
+                    float gap = toAt.Length();
+                    float closing = gap > 1e-3f ? MathF.Max(0f, Vector2.Dot(ov, toAt / gap)) : 0f;
+                    float his = delay + RunSeconds(MathF.Max(0f, gap - InterceptReach), closing, MathF.Max(1f, top), tau);
                     margin = MathF.Min(margin, his - ball);
                 }
                 if (d >= len) break;
             }
         }
         return margin;
+    }
+
+    /// <summary>
+    /// Seconds a player takes to cover <paramref name="distance"/> metres from <paramref name="speed"/> m/s toward it, speeding
+    /// up to <paramref name="top"/> on the movement law's time constant <paramref name="tau"/> (dv/dt = (top - v) / tau).
+    /// </summary>
+    public static float RunSeconds(float distance, float speed, float top, float tau)
+    {
+        if (distance <= 0f) return 0f;
+        float lack = MathF.Max(0f, top - speed) * MathF.Max(0f, tau);
+        float seconds = distance / top;
+        for (int i = 0; i < 4; i++) seconds = (distance + lack * (1f - MathF.Exp(-seconds / MathF.Max(1e-3f, tau)))) / top;
+        return seconds;
     }
 
     // ---- the target ----
@@ -222,9 +240,11 @@ public static class PassModel
     /// </para>
     /// <para>
     /// Through ball: candidate points along his run pass.through_ahead_seconds ahead of him (toward the goal when he stands),
-    /// fanned up to 15 degrees toward the aim, scored the same way without the closeness.
+    /// fanned up to 15 degrees toward the aim, scored on the defender's lateness and the angle to the aim, and on the ball
+    /// getting there just before he does, so he takes it in his stride.
     /// </para>
-    /// The speed is the least that brings the ball to the target at pass.arrival_speed, raised in steps of pass.speed_step while
+    /// The speed is the least that brings the ball to the target at pass.arrival_speed (for a through ball, also no less than
+    /// gets it there when the receiver does), raised in steps of pass.speed_step while
     /// the defender is still on the lane first, up to the passer's cap; if the cap cannot beat him the pass is played at the cap
     /// anyway. No receiver: a pass into space along the aim at the selection distance.
     /// </summary>
@@ -238,13 +258,16 @@ public static class PassModel
         var receiver = ChooseReceiver(passer, team, ball, aim, charge, kind, offside, t);
         float arrival = k.ArrivalSpeed.For(kind);
 
-        PassPlan To(Vector2 target, PlayerState? who)
+        // (meetSeconds: when the receiver gets there; a ball that would be later than that is struck hard enough to be on time)
+        PassPlan To(Vector2 target, PlayerState? who, float meetSeconds = float.NaN)
         {
             var lane = target - from;
             float len = lane.Length();
             var dir = len > 1e-3f ? lane / len : aim;
             float cap = SpeedCap(passer, kind, MathF.Atan2(dir.Y, dir.X), foot, t) * capScale;
-            float speed = MathF.Min(cap, LaunchSpeed(len, arrival, t));
+            float speed = LaunchSpeed(len, arrival, t);
+            if (float.IsFinite(meetSeconds) && meetSeconds > 0.05f) speed = MathF.Max(speed, len / meetSeconds + 0.5f * t.Ball.RollDeceleration * meetSeconds);
+            speed = MathF.Min(cap, speed);
             float margin = LaneMargin(from, target, speed, opponents, delay, pitch, t);
             while (margin < 0f && speed < cap - 1e-3f)
             {
@@ -270,16 +293,31 @@ public static class PassModel
         void Consider(Vector2 point, bool closeness)
         {
             point = Inside(point, pitch);
-            var plan = To(point, receiver);
-            if (plan.Margin < 0f || !float.IsFinite(plan.ArrivalSeconds)) return;
             // Can he be there by the ball's arrival? (his distance beyond a stride, at his top speed)
             float need = MathF.Max(0f, Vector2.Distance(rp, point) - 0.7f) / top;
+            // (a through ball into the path of a man running away from the passer has to travel faster than he runs)
+            var plan = closeness ? To(point, receiver) : To(point, receiver, need - ThroughBestLeadSeconds);
+            if (plan.Margin < 0f || !float.IsFinite(plan.ArrivalSeconds)) return;
             float spare = plan.ArrivalSeconds - need;
-            if (spare < 0f) return;
             var to = point - from;
             float cos = to.LengthSquared() > 1e-6f ? Vector2.Dot(Vector2.Normalize(to), aim) : 1f;
-            float score = MathF.Min(1f, plan.Margin) + MathF.Min(1f, spare) + cos * cos * cos;
-            if (closeness) score += 1f / (1f + Vector2.Distance(point, will));
+            float score = MathF.Min(1f, plan.Margin) + cos * cos * cos;
+            if (closeness)
+            {
+                // To feet: he must be there by the ball's arrival, the sooner the better.
+                if (spare < 0f) return;
+                score += MathF.Min(1f, spare) + 1f / (1f + Vector2.Distance(point, will));
+            }
+            else
+            {
+                // Into space: the ball should be there just before him, so he takes it in his stride; a point he would wait
+                // at, or one the ball reaches long before him, is not one.
+                if (spare > ThroughWaitSeconds || spare < -ThroughLeadSeconds) return;
+                score += 1f - MathF.Abs(spare + ThroughBestLeadSeconds);
+                // (and the gentler it comes the better: the further ahead, the less it has to outrun him)
+                float arrive = MathF.Sqrt(MathF.Max(0f, plan.Speed * plan.Speed - 2f * t.Ball.RollDeceleration * to.Length()));
+                score -= MathF.Max(0f, arrive - arrival) / 10f;
+            }
             if (score > bestScore) { bestScore = score; best = plan; }
         }
 
@@ -300,7 +338,11 @@ public static class PassModel
                     Consider(rp + new Vector2(MathF.Cos(yaw), MathF.Sin(yaw)) * (top * ahead), closeness: false);
                 }
             }
-            if (bestScore == float.NegativeInfinity) return To(Inside(rp + run * (top * lo), pitch), receiver);
+            if (bestScore == float.NegativeInfinity)
+            {
+                var fallback = Inside(rp + run * (top * hi), pitch);
+                return To(fallback, receiver, MathF.Max(0f, Vector2.Distance(rp, fallback) - 0.7f) / top - ThroughBestLeadSeconds);
+            }
             return best;
         }
 
@@ -315,6 +357,9 @@ public static class PassModel
             }
         return bestScore == float.NegativeInfinity ? To(will, receiver) : best;
     }
+
+    /// <summary>A through ball's target: the receiver may wait for the ball no longer than this, the ball may be there no longer than this before him, and best this long before him, seconds.</summary>
+    const float ThroughWaitSeconds = 0.1f, ThroughLeadSeconds = 0.6f, ThroughBestLeadSeconds = 0.15f;
 
     static readonly float[] Radii = { 1f, 0.85f, 0.95f, 1.1f, 1.25f };
     static readonly float[] Fan = { 0f, -6f, 6f, -12f, 12f };

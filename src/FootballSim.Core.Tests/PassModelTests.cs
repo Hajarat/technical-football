@@ -193,7 +193,15 @@ public class PassModelTests
         Assert.InRange(through.Target.X - 14f, top * T.Pass.ThroughAheadSeconds[0] - 0.5f, top * T.Pass.ThroughAheadSeconds[1] + 0.5f);
         // A ground pass also leads him (in his stride), but arrives slower.
         Assert.True(ground.Target.X > 14.5f);
-        Assert.Equal(T.Pass.ArrivalSpeed.Through, MathF.Sqrt(MathF.Max(0f, through.Speed * through.Speed - 2f * T.Ball.RollDeceleration * Vector2.Distance(new Vector2(Ball.X, Ball.Z), new Vector2(through.Target.X, through.Target.Z)))), 1);
+        // It is struck hard enough to get there when he does (he is running away from the passer), a little before him.
+        float need = MathF.Max(0f, through.Target.X - 14f - 0.7f) / top;
+        Assert.InRange(need - through.ArrivalSeconds, 0f, 0.6f);
+        float len = Vector2.Distance(new Vector2(Ball.X, Ball.Z), new Vector2(through.Target.X, through.Target.Z));
+        Assert.True(through.Speed >= PassModel.LaunchSpeed(len, T.Pass.ArrivalSpeed.Through, T) - 1e-3f);
+        // To a man standing still it arrives at the through ball's arrival speed, ahead of him toward the goal.
+        var stands = Man(1, 14f, 5f);
+        var still = PassModel.Plan(a, new List<PlayerState> { a, stands }, new List<PlayerState>(), Ball, stick, 0.6f, PassKind.Through, Foot.Right, null, 0f, null, T);
+        Assert.True(still.Target.X > 15f);
     }
 
     [Fact]

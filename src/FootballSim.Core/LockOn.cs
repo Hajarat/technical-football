@@ -399,7 +399,7 @@ public static class LockOn
     /// <param name="candidates">Per team, the players who may hold its claim (already filtered by the caller's own rules).</param>
     /// <param name="keeper">The keeper team 0's holder races (team 1's), or null.</param>
     public static void Update(BallForecast f, LockOnClaim[] claims, IReadOnlyList<LockOnCandidate>[] candidates,
-        IReadOnlyList<IReadOnlyList<PlayerState>> teams, PlayerState? keeper, Ball ball, Pitch? pitch, bool live, int now, float nowSeconds, Tuning t)
+        IReadOnlyList<IReadOnlyList<PlayerState>> teams, PlayerState? keeper, Ball ball, Pitch? pitch, bool live, int now, float nowSeconds, Tuning t, bool pass = false)
     {
         foreach (var team in teams)
             foreach (var q in team) { q.Regain = RegainMode.None; q.LockOnTick = -1; }
@@ -418,7 +418,8 @@ public static class LockOn
             claims[0] = default; claims[1] = default;
         }
         else f.Extend(now - 1 + horizon);
-        if (f.EndsInGoal) { claims[0] = default; claims[1] = default; return; }
+        // Nobody goes for a ball on its way into the goal, unless it is a pass (played to be met before it gets there).
+        if (f.EndsInGoal && !pass) { claims[0] = default; claims[1] = default; return; }
 
         int toTick = now + horizon;
         int margin = Math.Max(1, (int)MathF.Round(k.TakeoverMarginSeconds * t.TickRate));
@@ -490,8 +491,9 @@ public static class LockOn
             float maxHeight = float.IsNaN(p.MinArrivalHeight) ? PlayableHeight(t) : p.MinArrivalHeight;
             ref var cache = ref p.LockOnSolve;
             // (a pass on its way to him is met where it was played to, no sooner: the same rule as a queued action's tick)
-            int notBefore = Math.Max(p.MinArrivalTick, p.MeetNotBefore);
+            // (a strike queued on the way is made at its own tick: the first ball he can strike from then on)
             bool strikeReach = p.MinArrivalTick > 0 && p.MinArrivalStrike;
+            int notBefore = strikeReach ? p.MinArrivalTick : Math.Max(p.MinArrivalTick, p.MeetNotBefore);
             bool again = cache.Fresh || claim.SinceTick == now || Math.Abs(notBefore - cache.LaterMin) > ResolveTicks
                 || (notBefore > 0) != (cache.LaterMin > 0) || cache.Final.Found && cache.Final.ArriveTick < now;
             if (again)

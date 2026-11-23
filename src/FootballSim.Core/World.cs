@@ -446,7 +446,7 @@ public sealed partial class World
         }
         // (the named receiver meets the pass where it was played to, at its expected arrival)
         foreach (var m in Teams[0]) m.MeetNotBefore = only == m ? _pass!.ExpectedArrivalTick : 0;
-        LockOn.Update(Forecast, _claims, _candidates, Teams, Keeper, Ball, Pitch, live, Tick + 1, SimTime + _dt, Tuning);
+        LockOn.Update(Forecast, _claims, _candidates, Teams, Keeper, Ball, Pitch, live, Tick + 1, SimTime + _dt, Tuning, pass: _pass != null);
         if (_pass is { PathTick: < 0 } fresh && Forecast.Valid) fresh.PathTick = Forecast.StartTick;
         // (a pass played to him is taken at his feet, not toe-poked from a stride off)
         if (only != null && only.Regain == RegainMode.Free) only.Regain = RegainMode.Contested;
