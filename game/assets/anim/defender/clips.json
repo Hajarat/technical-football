@@ -1,0 +1,2114 @@
+{
+ "fps": 60,
+ "bones": [
+  "mixamorig_Hips",
+  "mixamorig_Spine",
+  "mixamorig_Spine1",
+  "mixamorig_Spine2",
+  "mixamorig_Neck",
+  "mixamorig_Head",
+  "mixamorig_LeftShoulder",
+  "mixamorig_LeftArm",
+  "mixamorig_LeftForeArm",
+  "mixamorig_LeftHand",
+  "mixamorig_LeftUpLeg",
+  "mixamorig_LeftLeg",
+  "mixamorig_LeftFoot",
+  "mixamorig_LeftToeBase",
+  "mixamorig_RightShoulder",
+  "mixamorig_RightArm",
+  "mixamorig_RightForeArm",
+  "mixamorig_RightHand",
+  "mixamorig_RightUpLeg",
+  "mixamorig_RightLeg",
+  "mixamorig_RightFoot",
+  "mixamorig_RightToeBase"
+ ],
+ "skeleton": {
+  "parents": [
+   -1,
+   0,
+   1,
+   2,
+   3,
+   4,
+   3,
+   6,
+   7,
+   8,
+   0,
+   10,
+   11,
+   12,
+   3,
+   14,
+   15,
+   16,
+   0,
+   18,
+   19,
+   20
+  ],
+  "offsets": [
+   [
+    -0.001838,
+    1.017063,
+    0.012588
+   ],
+   [
+    0.0,
+    0.095315,
+    0.0
+   ],
+   [
+    0.0,
+    0.103036,
+    -0.0
+   ],
+   [
+    -0.0,
+    0.138759,
+    -0.0
+   ],
+   [
+    0.0,
+    0.221644,
+    -0.0
+   ],
+   [
+    0.002226,
+    0.038199,
+    0.01986
+   ],
+   [
+    0.066028,
+    0.18751,
+    0.011786
+   ],
+   [
+    -0.0,
+    0.146764,
+    0.0
+   ],
+   [
+    -0.0,
+    0.26458,
+    0.0
+   ],
+   [
+    0.0,
+    0.271822,
+    -0.0
+   ],
+   [
+    0.114476,
+    -0.049465,
+    -0.011858
+   ],
+   [
+    0.0,
+    0.450376,
+    0.0
+   ],
+   [
+    -0.0,
+    0.44869,
+    0.0
+   ],
+   [
+    0.0,
+    0.15664,
+    0.0
+   ],
+   [
+    -0.064371,
+    0.177663,
+    0.017188
+   ],
+   [
+    0.0,
+    0.143275,
+    -0.0
+   ],
+   [
+    -0.0,
+    0.26458,
+    0.0
+   ],
+   [
+    -0.0,
+    0.271822,
+    0.0
+   ],
+   [
+    -0.109236,
+    -0.053779,
+    -0.006703
+   ],
+   [
+    -0.0,
+    0.450376,
+    0.0
+   ],
+   [
+    0.0,
+    0.44869,
+    0.0
+   ],
+   [
+    -0.0,
+    0.15664,
+    -0.0
+   ]
+  ],
+  "rest": [
+   [
+    0.078159,
+    -0.010727,
+    -0.010511,
+    0.996828
+   ],
+   [
+    -0.170575,
+    0.007869,
+    0.011781,
+    0.985243
+   ],
+   [
+    -0.114094,
+    0.001848,
+    0.000212,
+    0.993468
+   ],
+   [
+    0.341759,
+    -0.0,
+    -0.0,
+    0.939788
+   ],
+   [
+    -0.288277,
+    0.0,
+    -0.0,
+    0.957547
+   ],
+   [
+    0.162558,
+    0.004465,
+    0.00607,
+    0.98667
+   ],
+   [
+    0.458345,
+    0.195149,
+    -0.718118,
+    0.485946
+   ],
+   [
+    0.136949,
+    -0.290059,
+    -0.111873,
+    0.940529
+   ],
+   [
+    0.26104,
+    0.056895,
+    0.293132,
+    0.917984
+   ],
+   [
+    0.016357,
+    -0.037773,
+    -0.063097,
+    0.997158
+   ],
+   [
+    0.027102,
+    -0.113702,
+    -0.991118,
+    0.063426
+   ],
+   [
+    -0.054649,
+    0.02864,
+    -0.00156,
+    0.998094
+   ],
+   [
+    0.605674,
+    0.058753,
+    0.095017,
+    0.787832
+   ],
+   [
+    -0.035196,
+    0.983838,
+    -2.2e-05,
+    0.17557
+   ],
+   [
+    0.468355,
+    -0.240496,
+    0.69105,
+    0.495233
+   ],
+   [
+    0.176201,
+    0.320985,
+    0.117595,
+    0.923089
+   ],
+   [
+    0.260092,
+    -0.055756,
+    -0.293973,
+    0.918054
+   ],
+   [
+    0.033568,
+    0.150537,
+    0.068294,
+    0.985671
+   ],
+   [
+    0.047707,
+    0.115635,
+    0.99127,
+    0.04167
+   ],
+   [
+    -0.054649,
+    -0.02865,
+    0.001558,
+    0.998093
+   ],
+   [
+    0.575863,
+    -0.210013,
+    -0.210357,
+    0.761594
+   ],
+   [
+    -0.009999,
+    0.274649,
+    -0.033746,
+    0.9609
+   ]
+  ]
+ },
+ "clips": [
+  {
+   "name": "jockey_side_shuffle_78_29",
+   "file": "jockey_side_shuffle_78_29.kclip",
+   "trial": "78_29",
+   "frames": [
+    1,
+    171
+   ],
+   "set": "jockey",
+   "cut": [],
+   "tags": [
+    "side"
+   ],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 86,
+   "seconds": 1.433,
+   "contacts": {
+    "left": [
+     [
+      0,
+      25
+     ],
+     [
+      43,
+      54
+     ],
+     [
+      71,
+      79
+     ]
+    ],
+    "right": [
+     [
+      16,
+      33
+     ],
+     [
+      51,
+      61
+     ],
+     [
+      79,
+      85
+     ]
+    ]
+   },
+   "notes": "low side shuffle to his right, arms out, facing held (about 2.5 m/s)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1528,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.043,
+    "guarded_frames": {
+     "RightHand": 50,
+     "LeftFoot": 2
+    },
+    "flat_foot_frames": [
+     33,
+     14
+    ],
+    "hips_roll_deg": 2.92,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -1.4,
+     2.8
+    ],
+    "lowest_joint_at": 14
+   }
+  },
+  {
+   "name": "jockey_side_toside_78_30",
+   "file": "jockey_side_toside_78_30.kclip",
+   "trial": "78_30",
+   "frames": [
+    1,
+    703
+   ],
+   "set": "jockey",
+   "cut": [],
+   "tags": [
+    "side"
+   ],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 352,
+   "seconds": 5.867,
+   "contacts": {
+    "left": [
+     [
+      0,
+      23
+     ],
+     [
+      42,
+      48
+     ],
+     [
+      52,
+      80
+     ],
+     [
+      100,
+      105
+     ],
+     [
+      125,
+      127
+     ],
+     [
+      140,
+      165
+     ],
+     [
+      190,
+      198
+     ],
+     [
+      217,
+      225
+     ],
+     [
+      236,
+      270
+     ],
+     [
+      295,
+      298
+     ],
+     [
+      318,
+      338
+     ],
+     [
+      342,
+      351
+     ]
+    ],
+    "right": [
+     [
+      24,
+      30
+     ],
+     [
+      55,
+      72
+     ],
+     [
+      91,
+      98
+     ],
+     [
+      136,
+      139
+     ],
+     [
+      149,
+      176
+     ],
+     [
+      227,
+      263
+     ],
+     [
+      284,
+      289
+     ],
+     [
+      311,
+      318
+     ],
+     [
+      342,
+      351
+     ]
+    ]
+   },
+   "notes": "side shuffles right, left, right with the turns between them, facing held",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.1528,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.024,
+    "guarded_frames": {
+     "RightHand": 41,
+     "RightFoot": 1
+    },
+    "flat_foot_frames": [
+     99,
+     65
+    ],
+    "hips_roll_deg": -4.73,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -2.3,
+     10.1
+    ],
+    "lowest_joint_at": 199
+   }
+  },
+  {
+   "name": "jockey_back_zigzag_78_28",
+   "file": "jockey_back_zigzag_78_28.kclip",
+   "trial": "78_28",
+   "frames": [
+    1,
+    448
+   ],
+   "set": "jockey",
+   "cut": [],
+   "tags": [
+    "back"
+   ],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 224,
+   "seconds": 3.733,
+   "contacts": {
+    "left": [
+     [
+      0,
+      2
+     ],
+     [
+      13,
+      33
+     ],
+     [
+      52,
+      62
+     ],
+     [
+      71,
+      96
+     ],
+     [
+      117,
+      127
+     ],
+     [
+      142,
+      161
+     ],
+     [
+      180,
+      188
+     ],
+     [
+      210,
+      218
+     ]
+    ],
+    "right": [
+     [
+      0,
+      25
+     ],
+     [
+      44,
+      55
+     ],
+     [
+      74,
+      82
+     ],
+     [
+      93,
+      106
+     ],
+     [
+      124,
+      133
+     ],
+     [
+      146,
+      178
+     ],
+     [
+      198,
+      208
+     ]
+    ]
+   },
+   "notes": "dropping off on the diagonal, hips opening one way then the other",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1528,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.042,
+    "guarded_frames": {
+     "RightHand": 5,
+     "LeftFoot": 1
+    },
+    "flat_foot_frames": [
+     60,
+     63
+    ],
+    "hips_roll_deg": -2.63,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -1.8,
+     4.6
+    ],
+    "lowest_joint_at": 27
+   }
+  },
+  {
+   "name": "jockey_back_quick_76_11",
+   "file": "jockey_back_quick_76_11.kclip",
+   "trial": "76_11",
+   "frames": [
+    40,
+    360
+   ],
+   "set": "jockey",
+   "cut": [],
+   "tags": [
+    "back"
+   ],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 161,
+   "seconds": 2.683,
+   "contacts": {
+    "left": [
+     [
+      0,
+      8
+     ],
+     [
+      39,
+      79
+     ],
+     [
+      114,
+      149
+     ]
+    ],
+    "right": [
+     [
+      0,
+      38
+     ],
+     [
+      78,
+      113
+     ],
+     [
+      153,
+      160
+     ]
+    ]
+   },
+   "notes": "quick large steps straight backwards, upright",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1664,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.045,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     71,
+     61
+    ],
+    "hips_roll_deg": -3.83,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -1.0,
+     2.5
+    ],
+    "lowest_joint_at": 147
+   }
+  },
+  {
+   "name": "jockey_back_crouch_136_12",
+   "file": "jockey_back_crouch_136_12.kclip",
+   "trial": "136_12",
+   "frames": [
+    121,
+    600
+   ],
+   "set": "jockey",
+   "cut": [],
+   "tags": [
+    "back"
+   ],
+   "match_bias": 1.0,
+   "verdict": "reject",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 240,
+   "seconds": 4.0,
+   "contacts": {
+    "left": [
+     [
+      0,
+      91
+     ],
+     [
+      143,
+      179
+     ],
+     [
+      195,
+      199
+     ],
+     [
+      234,
+      239
+     ]
+    ],
+    "right": [
+     [
+      0,
+      73
+     ],
+     [
+      96,
+      98
+     ],
+     [
+      102,
+      135
+     ],
+     [
+      191,
+      224
+     ]
+    ]
+   },
+   "notes": "walking backwards crouched (slow)",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.0908,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.045,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     148,
+     146
+    ],
+    "hips_roll_deg": 6.71,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -1.0,
+     5.3
+    ],
+    "lowest_joint_at": 177
+   }
+  },
+  {
+   "name": "jockey_close_left_78_25",
+   "file": "jockey_close_left_78_25.kclip",
+   "trial": "78_25",
+   "frames": [
+    60,
+    300
+   ],
+   "set": "jockey",
+   "cut": [],
+   "tags": [
+    "close"
+   ],
+   "match_bias": 1.0,
+   "verdict": "trim",
+   "side": "left",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 121,
+   "seconds": 2.017,
+   "contacts": {
+    "left": [
+     [
+      0,
+      3
+     ],
+     [
+      20,
+      39
+     ],
+     [
+      60,
+      65
+     ],
+     [
+      82,
+      120
+     ]
+    ],
+    "right": [
+     [
+      0,
+      25
+     ],
+     [
+      47,
+      56
+     ],
+     [
+      76,
+      120
+     ]
+    ]
+   },
+   "notes": "closing down forward and to his left, then stopping low",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.1528,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.04,
+    "guarded_frames": {
+     "RightFoot": 2
+    },
+    "flat_foot_frames": [
+     19,
+     24
+    ],
+    "hips_roll_deg": -8.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -2.3,
+     5.5
+    ],
+    "lowest_joint_at": 25
+   }
+  },
+  {
+   "name": "jockey_close_right_78_27",
+   "file": "jockey_close_right_78_27.kclip",
+   "trial": "78_27",
+   "frames": [
+    50,
+    250
+   ],
+   "set": "jockey",
+   "cut": [],
+   "tags": [
+    "close"
+   ],
+   "match_bias": 1.0,
+   "verdict": "trim",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 101,
+   "seconds": 1.683,
+   "contacts": {
+    "left": [
+     [
+      0,
+      22
+     ],
+     [
+      44,
+      52
+     ],
+     [
+      72,
+      76
+     ]
+    ],
+    "right": [
+     [
+      0,
+      3
+     ],
+     [
+      16,
+      33
+     ],
+     [
+      54,
+      60
+     ],
+     [
+      79,
+      86
+     ],
+     [
+      93,
+      100
+     ]
+    ]
+   },
+   "notes": "closing down forward and to his right, then stopping low",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1528,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.04,
+    "guarded_frames": {
+     "RightHand": 17,
+     "LeftFoot": 1,
+     "Head": 5
+    },
+    "flat_foot_frames": [
+     23,
+     15
+    ],
+    "hips_roll_deg": 7.69,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -4.2,
+     4.0
+    ],
+    "lowest_joint_at": 78
+   }
+  },
+  {
+   "name": "set_low_78_26",
+   "file": "set_low_78_26.kclip",
+   "trial": "78_26",
+   "frames": [
+    200,
+    300
+   ],
+   "set": "set",
+   "cut": [],
+   "tags": [
+    "idle"
+   ],
+   "match_bias": 1.0,
+   "verdict": "trim",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 51,
+   "seconds": 0.85,
+   "contacts": {
+    "left": [
+     [
+      0,
+      50
+     ]
+    ],
+    "right": [
+     [
+      0,
+      39
+     ]
+    ]
+   },
+   "notes": "low defensive stance after closing down: knees bent, arms out, small weight shifts",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1528,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.046,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     51,
+     41
+    ],
+    "hips_roll_deg": -0.07,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.9,
+     -0.0
+    ],
+    "lowest_joint_at": 13
+   }
+  },
+  {
+   "name": "set_ready_77_03",
+   "file": "set_ready_77_03.kclip",
+   "trial": "77_03",
+   "frames": [
+    241,
+    480
+   ],
+   "set": "set",
+   "cut": [],
+   "tags": [
+    "idle"
+   ],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 240,
+   "seconds": 4.0,
+   "contacts": {
+    "left": [
+     [
+      0,
+      104
+     ],
+     [
+      113,
+      239
+     ]
+    ],
+    "right": [
+     [
+      0,
+      239
+     ]
+    ]
+   },
+   "notes": "crouched ready stance with small weight shifts (the keeper's ready stance trial)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1515,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.044,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     228,
+     240
+    ],
+    "hips_roll_deg": -7.61,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.0,
+     0.6
+    ],
+    "lowest_joint_at": 111
+   }
+  },
+  {
+   "name": "lunge_deep_144_17",
+   "file": "lunge_deep_144_17.kclip",
+   "trial": "144_17",
+   "frames": [
+    760,
+    960
+   ],
+   "set": "lunge",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "contact": 44
+   },
+   "fps": 60,
+   "frame_count": 101,
+   "seconds": 1.683,
+   "contacts": {
+    "left": [
+     [
+      0,
+      11
+     ],
+     [
+      20,
+      74
+     ],
+     [
+      83,
+      100
+     ]
+    ],
+    "right": []
+   },
+   "notes": "deep lunge straight forward onto the right foot, then back up",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.2035,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.048,
+    "guarded_frames": {
+     "RightHand": 2
+    },
+    "flat_foot_frames": [
+     19,
+     55
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.5,
+     10.9
+    ],
+    "lowest_joint_at": 93
+   }
+  },
+  {
+   "name": "lunge_deep_144_11",
+   "file": "lunge_deep_144_11.kclip",
+   "trial": "144_11",
+   "frames": [
+    1050,
+    1250
+   ],
+   "set": "lunge",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "left",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "contact": 30
+   },
+   "fps": 60,
+   "frame_count": 101,
+   "seconds": 1.683,
+   "contacts": {
+    "left": [
+     [
+      6,
+      13
+     ],
+     [
+      50,
+      59
+     ],
+     [
+      91,
+      100
+     ]
+    ],
+    "right": [
+     [
+      10,
+      57
+     ],
+     [
+      67,
+      100
+     ]
+    ]
+   },
+   "notes": "deep lunge forward onto the left foot, left arm up",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.2035,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.046,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     63,
+     31
+    ],
+    "hips_roll_deg": 1.03,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.4,
+     6.1
+    ],
+    "lowest_joint_at": 77
+   }
+  },
+  {
+   "name": "lunge_kick_144_05",
+   "file": "lunge_kick_144_05.kclip",
+   "trial": "144_05",
+   "frames": [
+    320,
+    440
+   ],
+   "set": "lunge",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "reject",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "contact": 23
+   },
+   "fps": 60,
+   "frame_count": 61,
+   "seconds": 1.017,
+   "contacts": {
+    "left": [
+     [
+      0,
+      60
+     ]
+    ],
+    "right": []
+   },
+   "notes": "front kick with the right foot from a guard stance (hands up), foot at waist height",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.2035,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.046,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     61,
+     0
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     3.7,
+     4.4
+    ],
+    "lowest_joint_at": 38
+   }
+  },
+  {
+   "name": "lunge_stepkick_135_04",
+   "file": "lunge_stepkick_135_04.kclip",
+   "trial": "135_04",
+   "frames": [
+    289,
+    480
+   ],
+   "set": "lunge",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "reject",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "contact": 41
+   },
+   "fps": 60,
+   "frame_count": 96,
+   "seconds": 1.6,
+   "contacts": {
+    "left": [
+     [
+      0,
+      62
+     ],
+     [
+      75,
+      95
+     ]
+    ],
+    "right": [
+     [
+      0,
+      17
+     ],
+     [
+      63,
+      95
+     ]
+    ]
+   },
+   "notes": "step forward and front kick with the right foot, landing in a long stance",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.073,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.046,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     76,
+     50
+    ],
+    "hips_roll_deg": 0.98,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.6,
+     1.0
+    ],
+    "lowest_joint_at": 46
+   }
+  },
+  {
+   "name": "block_sidestep_83_05",
+   "file": "block_sidestep_83_05.kclip",
+   "trial": "83_05",
+   "frames": [
+    100,
+    300
+   ],
+   "set": "block",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "contact": 35
+   },
+   "fps": 60,
+   "frame_count": 101,
+   "seconds": 1.683,
+   "contacts": {
+    "left": [
+     [
+      0,
+      62
+     ]
+    ],
+    "right": [
+     [
+      76,
+      100
+     ]
+    ]
+   },
+   "notes": "very large step to his right, the right leg stretched out wide",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1896,
+    "max_dir_err_deg": 0.026,
+    "lowest_joint_m": 0.039,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     51,
+     49
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -7.8,
+     10.8
+    ],
+    "lowest_joint_at": 76
+   }
+  },
+  {
+   "name": "block_sidestep_83_13",
+   "file": "block_sidestep_83_13.kclip",
+   "trial": "83_13",
+   "frames": [
+    121,
+    420
+   ],
+   "set": "block",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "contact": 30
+   },
+   "fps": 60,
+   "frame_count": 150,
+   "seconds": 2.5,
+   "contacts": {
+    "left": [
+     [
+      90,
+      149
+     ]
+    ],
+    "right": [
+     [
+      46,
+      149
+     ]
+    ]
+   },
+   "notes": "wide step to his right into a low stance",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1896,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.044,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     60,
+     105
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.9,
+     1.1
+    ],
+    "lowest_joint_at": 69
+   }
+  },
+  {
+   "name": "barge_sidestep_127_14",
+   "file": "barge_sidestep_127_14.kclip",
+   "trial": "127_14",
+   "frames": [
+    1,
+    151
+   ],
+   "set": "barge",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "reject",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {},
+   "fps": 60,
+   "frame_count": 76,
+   "seconds": 1.267,
+   "contacts": {
+    "left": [
+     [
+      14,
+      24
+     ],
+     [
+      45,
+      56
+     ]
+    ],
+    "right": [
+     [
+      0,
+      7
+     ],
+     [
+      27,
+      38
+     ],
+     [
+      62,
+      75
+     ]
+    ]
+   },
+   "notes": "running, a hard step to his right (the nearest CMU has to a shoulder into a runner alongside)",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0504,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.043,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     4,
+     4
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -2.7,
+     5.0
+    ],
+    "lowest_joint_at": 19
+   }
+  },
+  {
+   "name": "slide_baked",
+   "file": "slide_baked.kclip",
+   "source": "baked",
+   "script": "slide",
+   "set": "slide",
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "right",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "takeoff": 5,
+    "contact": 17,
+    "landing": 17
+   },
+   "fps": 60,
+   "frame_count": 69,
+   "seconds": 1.15,
+   "contacts": {
+    "left": [
+     [
+      30,
+      68
+     ]
+    ],
+    "right": []
+   },
+   "notes": "the procedural slide tackle baked for the keeper: down on his side, the right leg out along the ground at the ball (side: the leading leg)"
+  },
+  {
+   "name": "getup_side_140_03",
+   "file": "getup_side_140_03.kclip",
+   "trial": "140_03",
+   "frames": [
+    231,
+    760
+   ],
+   "set": "getup",
+   "cut": [
+    [
+     601,
+     645
+    ]
+   ],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "up": 209
+   },
+   "fps": 60,
+   "frame_count": 242,
+   "seconds": 4.033,
+   "contacts": {
+    "left": [
+     [
+      0,
+      26
+     ],
+     [
+      53,
+      104
+     ],
+     [
+      135,
+      145
+     ],
+     [
+      149,
+      182
+     ],
+     [
+      185,
+      241
+     ]
+    ],
+    "right": [
+     [
+      63,
+      144
+     ],
+     [
+      167,
+      185
+     ]
+    ]
+   },
+   "notes": "get up from lying on his side",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.1599,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.047,
+    "guarded_frames": {
+     "RightHand": 13,
+     "LeftFoot": 1
+    },
+    "flat_foot_frames": [
+     134,
+     72
+    ],
+    "hips_roll_deg": -8.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -6.2,
+     6.8
+    ],
+    "lowest_joint_at": 94
+   }
+  },
+  {
+   "name": "getup_back_140_08",
+   "file": "getup_back_140_08.kclip",
+   "trial": "140_08",
+   "frames": [
+    161,
+    660
+   ],
+   "set": "getup",
+   "cut": [
+    [
+     495,
+     545
+    ]
+   ],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "up": 195
+   },
+   "fps": 60,
+   "frame_count": 224,
+   "seconds": 3.733,
+   "contacts": {
+    "left": [
+     [
+      54,
+      166
+     ],
+     [
+      170,
+      223
+     ]
+    ],
+    "right": [
+     [
+      0,
+      123
+     ],
+     [
+      138,
+      170
+     ]
+    ]
+   },
+   "notes": "get up from lying on his back",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.1599,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.046,
+    "guarded_frames": {
+     "RightHand": 25,
+     "Neck": 1,
+     "Head": 2
+    },
+    "flat_foot_frames": [
+     189,
+     103
+    ],
+    "hips_roll_deg": -8.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -4.4,
+     8.8
+    ],
+    "lowest_joint_at": 87
+   }
+  },
+  {
+   "name": "getup_back_139_18",
+   "file": "getup_back_139_18.kclip",
+   "trial": "139_18",
+   "frames": [
+    141,
+    600
+   ],
+   "set": "getup",
+   "cut": [
+    [
+     371,
+     471
+    ]
+   ],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "up": 129
+   },
+   "fps": 60,
+   "frame_count": 179,
+   "seconds": 2.983,
+   "contacts": {
+    "left": [
+     [
+      0,
+      47
+     ],
+     [
+      70,
+      105
+     ],
+     [
+      115,
+      128
+     ],
+     [
+      146,
+      178
+     ]
+    ],
+    "right": [
+     [
+      123,
+      154
+     ],
+     [
+      162,
+      178
+     ]
+    ]
+   },
+   "notes": "get up from his back, rolling over",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.1515,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.033,
+    "guarded_frames": {
+     "LeftHand": 40
+    },
+    "flat_foot_frames": [
+     107,
+     44
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -5.1,
+     9.0
+    ],
+    "lowest_joint_at": 94
+   }
+  },
+  {
+   "name": "stumble_trip_104_13",
+   "file": "stumble_trip_104_13.kclip",
+   "trial": "104_13",
+   "frames": [
+    60,
+    230
+   ],
+   "set": "stumble",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "recover": 30
+   },
+   "fps": 60,
+   "frame_count": 86,
+   "seconds": 1.433,
+   "contacts": {
+    "left": [
+     [
+      26,
+      41
+     ],
+     [
+      66,
+      72
+     ]
+    ],
+    "right": [
+     [
+      0,
+      14
+     ],
+     [
+      50,
+      54
+     ]
+    ]
+   },
+   "notes": "trips forward, arms flung out, catches himself and goes on",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.1217,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.04,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     15,
+     16
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -4.0,
+     2.8
+    ],
+    "lowest_joint_at": 52
+   }
+  },
+  {
+   "name": "stumble_catch_22_12",
+   "file": "stumble_catch_22_12.kclip",
+   "trial": "22_12",
+   "frames": [
+    1,
+    150
+   ],
+   "set": "stumble",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "recover": 20
+   },
+   "fps": 60,
+   "frame_count": 75,
+   "seconds": 1.25,
+   "contacts": {
+    "left": [
+     [
+      27,
+      57
+     ]
+    ],
+    "right": [
+     [
+      11,
+      27
+     ],
+     [
+      55,
+      60
+     ],
+     [
+      67,
+      74
+     ]
+    ]
+   },
+   "notes": "pitched forward low, catches himself over three steps",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.0481,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.047,
+    "guarded_frames": {},
+    "flat_foot_frames": [
+     23,
+     20
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.1,
+     10.9
+    ],
+    "lowest_joint_at": 39
+   }
+  },
+  {
+   "name": "barged_lurch_104_13",
+   "file": "barged_lurch_104_13.kclip",
+   "trial": "104_13",
+   "frames": [
+    230,
+    420
+   ],
+   "set": "barged",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "reject",
+   "side": "left",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "recover": 30
+   },
+   "fps": 60,
+   "frame_count": 96,
+   "seconds": 1.6,
+   "contacts": {
+    "left": [
+     [
+      5,
+      14
+     ],
+     [
+      50,
+      56
+     ],
+     [
+      90,
+      95
+     ]
+    ],
+    "right": [
+     [
+      28,
+      37
+     ],
+     [
+      72,
+      75
+     ]
+    ]
+   },
+   "notes": "staggers sideways with an arm thrown up, then recovers",
+   "contact_tolerance_cm": 4.0,
+   "checks": {
+    "scale": 1.1217,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.048,
+    "guarded_frames": {
+     "LeftHand": 2,
+     "RightHand": 2,
+     "RightFoot": 6
+    },
+    "flat_foot_frames": [
+     8,
+     5
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -5.0,
+     6.2
+    ],
+    "lowest_joint_at": 76
+   }
+  },
+  {
+   "name": "fall_face_90_16",
+   "file": "fall_face_90_16.kclip",
+   "trial": "90_16",
+   "frames": [
+    400,
+    620
+   ],
+   "set": "fall",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "landing": 26
+   },
+   "fps": 60,
+   "frame_count": 111,
+   "seconds": 1.85,
+   "contacts": {
+    "left": [],
+    "right": []
+   },
+   "notes": "falls forward onto his front (onto a mat) and lies",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0525,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.019,
+    "guarded_frames": {
+     "LeftHand": 6,
+     "LeftFoot": 111,
+     "RightFoot": 111
+    },
+    "flat_foot_frames": [
+     61,
+     53
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     0.2,
+     14.8
+    ],
+    "lowest_joint_at": 23
+   }
+  },
+  {
+   "name": "fall_slip_90_17",
+   "file": "fall_slip_90_17.kclip",
+   "trial": "90_17",
+   "frames": [
+    300,
+    520
+   ],
+   "set": "fall",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "reject",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "landing": 70
+   },
+   "fps": 60,
+   "frame_count": 111,
+   "seconds": 1.85,
+   "contacts": {
+    "left": [
+     [
+      32,
+      35
+     ]
+    ],
+    "right": [
+     [
+      0,
+      16
+     ]
+    ]
+   },
+   "notes": "feet slip out from under him, lands on his back",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0525,
+    "max_dir_err_deg": 0.025,
+    "lowest_joint_m": 0.046,
+    "guarded_frames": {
+     "LeftHand": 66,
+     "RightHand": 2,
+     "LeftArm": 2
+    },
+    "flat_foot_frames": [
+     4,
+     16
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -0.2,
+     3.1
+    ],
+    "lowest_joint_at": 12
+   }
+  },
+  {
+   "name": "fall_rug_90_18",
+   "file": "fall_rug_90_18.kclip",
+   "trial": "90_18",
+   "frames": [
+    61,
+    300
+   ],
+   "set": "fall",
+   "cut": [],
+   "tags": [],
+   "match_bias": 1.0,
+   "verdict": "keep",
+   "side": "none",
+   "kind": "",
+   "loop": false,
+   "events": {
+    "landing": 33
+   },
+   "fps": 60,
+   "frame_count": 120,
+   "seconds": 2.0,
+   "contacts": {
+    "left": [
+     [
+      68,
+      119
+     ]
+    ],
+    "right": [
+     [
+      56,
+      60
+     ],
+     [
+      64,
+      119
+     ]
+    ]
+   },
+   "notes": "legs pulled from under him, lands on his back and lies",
+   "contact_tolerance_cm": 2.0,
+   "checks": {
+    "scale": 1.0525,
+    "max_dir_err_deg": 0.024,
+    "lowest_joint_m": 0.018,
+    "guarded_frames": {
+     "LeftHand": 3,
+     "LeftFoot": 120
+    },
+    "flat_foot_frames": [
+     6,
+     0
+    ],
+    "hips_roll_deg": 0.0,
+    "leg_splay_deg": 0.0,
+    "ground_lift_cm": [
+     -4.9,
+     2.6
+    ],
+    "lowest_joint_at": 34
+   }
+  }
+ ]
+}

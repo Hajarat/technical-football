@@ -72,10 +72,29 @@ public partial class Match
         // The core counts StrikeEta down through the strike delay and fixes StrikeFoot at the button press.
         f.StrikeEta = p.StrikeEta; f.StrikeRight = p.StrikeFoot == Foot.Right;
         // Tackled or barged, he stumbles: drawn with the defending pose of that name.
-        if (Defending.Stumbling(p, w.SimTime))
-            f.Defender = new FigureDefender { Valid = true, Action = DefenderAction.Stumble, ActionTime = 0f };
+        // Brought down by a foul, he falls and lies while the outcome shows.
+        bool fouled = w.Defender != null && w.Outcome == Outcome.Foul;
+        if (fouled || Defending.Stumbling(p, w.SimTime))
+        {
+            // (a barge that lands pushes him: the side it carries him to)
+            var push = p.PushVelocity;
+            bool barged = push.LengthSquared() > 0.25f * 0.25f;
+            float side = -MathF.Sin(p.Facing) * push.X + MathF.Cos(p.Facing) * push.Z;
+            if (barged) _atkBargedSide = side >= 0f ? 1f : -1f;
+            else if (!Defending.Stumbling(p, w.SimTime)) _atkBargedSide = 0f;
+            f.Defender = new FigureDefender
+            {
+                Valid = true, Action = DefenderAction.Stumble, ActionTime = 0f,
+                Reaction = fouled ? FootballSim.Anim.Reaction.Fall : _atkBargedSide != 0f ? FootballSim.Anim.Reaction.Barged : FootballSim.Anim.Reaction.Stumble,
+                ReactionSide = _atkBargedSide,
+            };
+        }
+        else _atkBargedSide = 0f;
         return f;
     }
+
+    /// <summary>The side the barge that has the attacker stumbling pushed him to (0: he stumbles from a tackle).</summary>
+    float _atkBargedSide;
 
     /// <summary>Everything the defender's figure needs this tick: the outfield body's movement and stride, and his defending action.</summary>
     FigureFrame DefenderFrame(PlayerState p)
@@ -94,6 +113,7 @@ public partial class Match
             Side = p.ActionSide == SkillSide.Left ? -1f : p.ActionSide == SkillSide.Right ? 1f : 0f,
             TackleFoot = G(p.TackleFoot), ContactTime = p.TackleContactTime, BlockReach = p.BlockReach, Jockeying = p.Jockeying,
             GetUpSeconds = w.Tuning.Defending.Slide.GetupS,
+            BlockGrowSeconds = w.Tuning.Defending.Block.GrowS.ForRating(p.Sheet.Blocking),
         };
         return f;
     }

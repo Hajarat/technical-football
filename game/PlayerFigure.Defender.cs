@@ -22,6 +22,12 @@ public struct FigureDefender
     public bool Jockeying;
     /// <summary>Seconds the getting-up lasts, and a slide's grounded time left is not needed: the pose only reads the action time.</summary>
     public float GetUpSeconds;
+    /// <summary>Seconds his leg takes to reach all the way out once he is set for a shot (block.grow_s for his blocking).</summary>
+    public float BlockGrowSeconds;
+    /// <summary>The attacker's frame: how the defender got to him (a stumble after a tackle, pushed by a barge, brought down by a foul), for the clip layer.</summary>
+    public FootballSim.Anim.Reaction Reaction;
+    /// <summary>The side a barge pushed him to (-1 his left, +1 his right).</summary>
+    public float ReactionSide;
 }
 
 // The defending poses, laid over the outfield figure's own running body: the jockey's crouch, the lunge, the slide, lying and

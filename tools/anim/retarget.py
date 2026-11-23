@@ -785,6 +785,11 @@ def main(argv: list[str]) -> int:
         if c.get("source") == "baked":
             # recorded from the procedural keeper (tools/anim/bake_procedural.py): listed as it is, never retargeted
             path = out / f"{c['name']}.kclip"
+            if c.get("file_from"):
+                # a clip baked for another folder (the defender's slide is the keeper's): copied here as it is
+                src = REPO / "game/assets/anim" / c["file_from"]
+                if src.exists() and (not path.exists() or path.read_bytes() != src.read_bytes()):
+                    path.write_bytes(src.read_bytes())
             if not path.exists():
                 failed.append(c["name"])
                 print(f"MISSING {c['name']}: run tools/anim/bake_procedural.py first")

@@ -91,7 +91,7 @@ and `ActionSide`; `TackleFoot`, `TackleContactTime`, `BlockReach`, `Jockeying`, 
 - **Bodies.** Attacker and defender are discs of `body_radius_m`. Overlapping, they are pushed apart along the line between
   them, the lighter one further, inside the boards, and each loses the part of his velocity into the other.
 
-The game draws these with poses over the outfield figure; see [animation.md](animation.md#the-defender).
+The game draws these from motion clips where it has them and with poses over the outfield figure otherwise; see [animation.md](animation.md#the-defender).
 
 ## How a round ends
 
