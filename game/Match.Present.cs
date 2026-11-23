@@ -10,6 +10,7 @@ public partial class Match
     bool _hasStrike;
     int _shotId = int.MinValue;   // press tick of the shot whose type the HUD last named
     int _shotsSeen;
+    RoundReport? _reportShown;   // the report the card shows
 
     int _strikeTicks, _touchCount;
     bool _closeControl;
@@ -304,7 +305,7 @@ public partial class Match
         Trail.Clear();
         _shotsSeen = 0;
         Overlay.ClearWedge(); Overlay.ClearAimed(); Overlay.ClearLanded(); Overlay.ClearKeeperReach();
-        Hud.HideReport();
+        Hud.HideReport(); _reportShown = null;
         Hud.SetPower(0); Hud.SetIdealMarker(0, false);
         _strikeTicks = 0; _touchCount = 0;
         _intent = default; _looseSince = int.MinValue;
@@ -369,9 +370,12 @@ public partial class Match
         // a fake shot: the shot's name goes from the tick the core publishes the pending fake (the cancel read)
         if (w.Attacker.PendingSkill != null && w.Attacker.Action is { IsShot: true } || w.Attacker.SkillMove is { Kind: ActionKind.FakeCut or ActionKind.FakeStop }) Hud.HideShotType();
         Hud.SetClock(w.Clock);
+        // the report card's text is made once per report (a RoundReport never changes once made), not on every tick it shows
         if (w.State == RoundState.Report && w.Report != null)
-            Hud.ShowReport(ReportText.Title(w.Report), ReportText.Lines(w.Report));
-        else Hud.HideReport();
+        {
+            if (!ReferenceEquals(w.Report, _reportShown)) { _reportShown = w.Report; Hud.ShowReport(ReportText.Title(w.Report), ReportText.Lines(w.Report)); }
+        }
+        else { _reportShown = null; Hud.HideReport(); }
 
         if (w.State == RoundState.Flight) _flightTicks++;
         if (w.State == RoundState.Live) _liveTicks++;
@@ -384,10 +388,21 @@ public partial class Match
         UpdateOverlay();
     }
 
+    // what the spot line was last made from: it is made again only when one of them changes, not every tick
+    int _spotRound = -1;
+    bool _spotSetup;
+    string? _spotScenario, _spotAttacker, _spotKeeper, _spotDefender;
+
     void UpdateHudText()
     {
         var sc = World.Scenario;
-        string hint = World.State == RoundState.Setup ? "  ·  A/Enter to start" : "";
+        bool setup = World.State == RoundState.Setup;
+        string? def = World.Defender?.Sheet.Name;
+        if (_round == _spotRound && setup == _spotSetup && sc.Name == _spotScenario && World.Attacker.Sheet.Name == _spotAttacker
+            && World.Keeper.Sheet.Name == _spotKeeper && def == _spotDefender) return;
+        _spotRound = _round; _spotSetup = setup; _spotScenario = sc.Name; _spotAttacker = World.Attacker.Sheet.Name;
+        _spotKeeper = World.Keeper.Sheet.Name; _spotDefender = def;
+        string hint = setup ? "  ·  A/Enter to start" : "";
         string defender = World.Defender != null ? $" and {World.Defender.Sheet.Name}" : "";
         Hud.SetSpotLine($"Round {_round}  ·  {sc.Name}  ·  {World.Attacker.Sheet.Name} vs {World.Keeper.Sheet.Name}{defender}{hint}");
     }

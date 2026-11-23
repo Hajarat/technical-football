@@ -88,6 +88,9 @@ public partial class InputReader : Node
     const string Left = "pad_left", Right = "pad_right", Up = "pad_up", Down = "pad_down",
         SprintA = "pad_sprint", ShieldA = "pad_shield",
         RLeft = "pad_rs_left", RRight = "pad_rs_right", RUp = "pad_rs_up", RDown = "pad_rs_down";
+    // the same names as StringNames, made once: polling with a string builds a new StringName on every call
+    static readonly StringName LeftName = Left, RightName = Right, UpName = Up, DownName = Down, SprintAName = SprintA, ShieldAName = ShieldA,
+        RLeftName = RLeft, RRightName = RRight, RUpName = RUp, RDownName = RDown;
     /// <summary>
     /// A knock-on key press stays in the snapshot this long, seconds, so it is not lost when the ball is out of reach on the tick of
     /// the press. The core makes at most one knock-on from it: the ball then leaves reach.
@@ -95,7 +98,18 @@ public partial class InputReader : Node
     const float KnockOnHoldSeconds = 0.25f;
     int _knockOnLeft;
 
-    public bool GamepadConnected => Input.GetConnectedJoypads().Count > 0;
+    // The connected pads, read when Godot reports a pad connecting or going away rather than on every call: asking Input for the
+    // list builds a Godot array (and the name a string) each time, and the HUD asks several times a tick.
+    int _padCount;
+    string _padName = "";
+    void RefreshPads()
+    {
+        var ids = Input.GetConnectedJoypads();
+        _padCount = ids.Count;
+        _padName = ids.Count > 0 ? Input.GetJoyName(ids[0]) : "";
+    }
+
+    public bool GamepadConnected => _padCount > 0;
     /// <summary>False in replay mode: the keyboard must not affect a replay.</summary>
     public bool KeyboardEnabled = true;
     /// <summary>True while the capture panel takes typed text: letter keys type the note, so the face-swap key does nothing.</summary>
@@ -107,14 +121,7 @@ public partial class InputReader : Node
     public InputDevice Device => Mode == "gamepad" ? InputDevice.Gamepad : InputDevice.Keyboard;
     float _mouseTravel;
     /// <summary>Name of the first connected pad, or empty.</summary>
-    public string ActivePadName
-    {
-        get
-        {
-            var ids = Input.GetConnectedJoypads();
-            return ids.Count > 0 ? Input.GetJoyName((int)ids[0]) : "";
-        }
-    }
+    public string ActivePadName => _padName;
 
     readonly System.Collections.Generic.Dictionary<KeyBind, bool> _keyPrev = new();
 
@@ -154,6 +161,8 @@ public partial class InputReader : Node
 
     public override void _Ready()
     {
+        Input.JoyConnectionChanged += (_, _) => RefreshPads();
+        RefreshPads();
         Axis(Left, JoyAxis.LeftX, -1); Axis(Right, JoyAxis.LeftX, 1);
         Axis(Up, JoyAxis.LeftY, -1); Axis(Down, JoyAxis.LeftY, 1);
         Axis(SprintA, JoyAxis.TriggerRight, 1); Axis(ShieldA, JoyAxis.TriggerLeft, 1);
@@ -323,53 +332,53 @@ public partial class InputReader : Node
 
     PadSnapshot PollPad()
     {
-        float x = Input.GetActionRawStrength(Right) - Input.GetActionRawStrength(Left);
-        float y = Input.GetActionRawStrength(Down) - Input.GetActionRawStrength(Up);
+        float x = Input.GetActionRawStrength(RightName) - Input.GetActionRawStrength(LeftName);
+        float y = Input.GetActionRawStrength(DownName) - Input.GetActionRawStrength(UpName);
         var v = new Vector2(x, y);
         float len = v.Length();
         v = len < DeadZone ? Vector2.Zero : v / len * Mathf.Min(1f, (len - DeadZone) / (1f - DeadZone));
         // The right stick goes to the core raw (same axes and radial dead zone as the left); the core reads the gestures.
-        var r = new Vector2(Input.GetActionRawStrength(RRight) - Input.GetActionRawStrength(RLeft),
-            Input.GetActionRawStrength(RDown) - Input.GetActionRawStrength(RUp));
+        var r = new Vector2(Input.GetActionRawStrength(RRightName) - Input.GetActionRawStrength(RLeftName),
+            Input.GetActionRawStrength(RDownName) - Input.GetActionRawStrength(RUpName));
         float rlen = r.Length();
         r = rlen < DeadZone ? Vector2.Zero : r / rlen * Mathf.Min(1f, (rlen - DeadZone) / (1f - DeadZone));
         return new PadSnapshot
         {
             MoveX = v.X,
             MoveZ = v.Y,
-            Sprint = Mathf.Clamp(Input.GetActionRawStrength(SprintA), 0f, 1f),
-            Shield = Input.GetActionRawStrength(ShieldA) > 0.5f,
-            ShootHeld = Input.IsActionPressed(Bindings.Pad.Shoot.Action),
-            Finesse = Input.IsActionPressed(Bindings.Pad.Finesse.Action),
-            Chip = Input.IsActionPressed(Bindings.Pad.Chip.Action),
+            Sprint = Mathf.Clamp(Input.GetActionRawStrength(SprintAName), 0f, 1f),
+            Shield = Input.GetActionRawStrength(ShieldAName) > 0.5f,
+            ShootHeld = Input.IsActionPressed(Bindings.Pad.Shoot.ActionName),
+            Finesse = Input.IsActionPressed(Bindings.Pad.Finesse.ActionName),
+            Chip = Input.IsActionPressed(Bindings.Pad.Chip.ActionName),
             RightX = r.X,
             RightZ = r.Y,
             // A / Cross doubles as confirm, but the round flow reads confirm only in Setup and Report, never while live.
-            Cancel = Input.IsActionPressed(Bindings.Pad.Confirm.Action),
-            OverlayToggle = Input.IsActionJustPressed(Bindings.Pad.Overlay.Action),
-            NextSpot = Input.IsActionJustPressed(Bindings.Pad.NextSpot.Action),
-            PrevSpot = Input.IsActionJustPressed(Bindings.Pad.PrevSpot.Action),
-            NextAttacker = Input.IsActionJustPressed(Bindings.Pad.NextAttacker.Action),
-            NextKeeper = Input.IsActionJustPressed(Bindings.Pad.NextKeeper.Action),
-            Confirm = Input.IsActionJustPressed(Bindings.Pad.Confirm.Action),
-            Retry = Input.IsActionJustPressed(Bindings.Pad.Retry.Action),
-            OpenCapture = Input.IsActionJustPressed(Bindings.Pad.Capture.Action),
-            Pause = Input.IsActionJustPressed(Bindings.Pad.Pause.Action),
+            Cancel = Input.IsActionPressed(Bindings.Pad.Confirm.ActionName),
+            OverlayToggle = Input.IsActionJustPressed(Bindings.Pad.Overlay.ActionName),
+            NextSpot = Input.IsActionJustPressed(Bindings.Pad.NextSpot.ActionName),
+            PrevSpot = Input.IsActionJustPressed(Bindings.Pad.PrevSpot.ActionName),
+            NextAttacker = Input.IsActionJustPressed(Bindings.Pad.NextAttacker.ActionName),
+            NextKeeper = Input.IsActionJustPressed(Bindings.Pad.NextKeeper.ActionName),
+            Confirm = Input.IsActionJustPressed(Bindings.Pad.Confirm.ActionName),
+            Retry = Input.IsActionJustPressed(Bindings.Pad.Retry.ActionName),
+            OpenCapture = Input.IsActionJustPressed(Bindings.Pad.Capture.ActionName),
+            Pause = Input.IsActionJustPressed(Bindings.Pad.Pause.ActionName),
             Editor = new EditorInput
             {
-                Up = Input.IsActionPressed(Bindings.Pad.NextAttacker.Action), Down = Input.IsActionPressed(Bindings.Pad.NextKeeper.Action),
-                Left = Input.IsActionPressed(Bindings.Pad.PrevSpot.Action), Right = Input.IsActionPressed(Bindings.Pad.NextSpot.Action),
-                Minus10 = Input.IsActionJustPressed(Bindings.Pad.Chip.Action), Plus10 = Input.IsActionJustPressed(Bindings.Pad.Finesse.Action),
-                Column = Input.IsActionJustPressed(Bindings.Pad.Retry.Action),
-                Load = Input.IsActionJustPressed(Bindings.Pad.Confirm.Action),
-                Save = Input.IsActionJustPressed(Bindings.Pad.EditorSave.Action),
-                Clear = Input.IsActionJustPressed(Bindings.Pad.Capture.Action),
-                Close = Input.IsActionJustPressed(Bindings.Pad.Shoot.Action) || Input.IsActionJustPressed(Bindings.Pad.Pause.Action),
+                Up = Input.IsActionPressed(Bindings.Pad.NextAttacker.ActionName), Down = Input.IsActionPressed(Bindings.Pad.NextKeeper.ActionName),
+                Left = Input.IsActionPressed(Bindings.Pad.PrevSpot.ActionName), Right = Input.IsActionPressed(Bindings.Pad.NextSpot.ActionName),
+                Minus10 = Input.IsActionJustPressed(Bindings.Pad.Chip.ActionName), Plus10 = Input.IsActionJustPressed(Bindings.Pad.Finesse.ActionName),
+                Column = Input.IsActionJustPressed(Bindings.Pad.Retry.ActionName),
+                Load = Input.IsActionJustPressed(Bindings.Pad.Confirm.ActionName),
+                Save = Input.IsActionJustPressed(Bindings.Pad.EditorSave.ActionName),
+                Clear = Input.IsActionJustPressed(Bindings.Pad.Capture.ActionName),
+                Close = Input.IsActionJustPressed(Bindings.Pad.Shoot.ActionName) || Input.IsActionJustPressed(Bindings.Pad.Pause.ActionName),
             },
             Capture = new CaptureInput
             {
-                Up = Input.IsActionJustPressed(Bindings.Pad.NextAttacker.Action), Down = Input.IsActionJustPressed(Bindings.Pad.NextKeeper.Action),
-                Save = Input.IsActionJustPressed(Bindings.Pad.Confirm.Action), SaveNoNote = Input.IsActionJustPressed(Bindings.Pad.Shoot.Action),
+                Up = Input.IsActionJustPressed(Bindings.Pad.NextAttacker.ActionName), Down = Input.IsActionJustPressed(Bindings.Pad.NextKeeper.ActionName),
+                Save = Input.IsActionJustPressed(Bindings.Pad.Confirm.ActionName), SaveNoNote = Input.IsActionJustPressed(Bindings.Pad.Shoot.ActionName),
             },
         };
     }
