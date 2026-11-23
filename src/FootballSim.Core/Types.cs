@@ -56,6 +56,13 @@ public struct TickIntent
     public bool Slide;
     /// <summary>Without the ball: a shoulder barge on the tick it goes down, when an opponent runs alongside.</summary>
     public bool Barge;
+    /// <summary>
+    /// True while the ground-pass button is held: the hold sets how far along the stick the pass is pointed, the release (or
+    /// pass.charge_seconds) plays it. While a shot winds up the same button is <see cref="Cancel"/> and no pass is read.
+    /// </summary>
+    public bool PassHeld;
+    /// <summary>True while the through-ball button is held (as <see cref="PassHeld"/>, for a pass into the space a team-mate runs to).</summary>
+    public bool ThroughHeld;
 
     public readonly Vector2 Move => new(MoveX, MoveZ);
     /// <summary>The right stick as a ground vector (X, Z).</summary>

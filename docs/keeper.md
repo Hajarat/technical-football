@@ -62,7 +62,8 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
   centre), so he uses all of it.
 - **Rush and smother.** Each tick he races for the ball whenever it is off the attacker's foot (between touches, a long sprint
   touch or a loose ball): the earliest point on its predicted path he can reach (to within `smother_reach`) before it gets
-  there and before the attacker's next planned touch, with a `rush_margin` (by distance, scaled by rushing_out; none for a
+  there and before the attacker's next planned touch (without the ball, the attacker's meeting with it when he holds his
+  team's claim, see lock-on in [dribbling.md](dribbling.md)), with a `rush_margin` (by distance, scaled by rushing_out; none for a
   ball already within a dive, so he lunges at a ball pushed past him, unless the attacker is within `contested_distance` of
   it) and a misjudgement drawn per attacker touch
   (`rush_misjudge`), only within his area's depth of the goal centre (outside it, `slide_beyond_area` past its line). The longer the ball runs ahead of the attacker, the further out he wins
@@ -135,6 +136,13 @@ In a scenario with a defender the keeper yields to him: while the defender is on
 of the keeper's line to the ball, nearer to the ball than the keeper and not beaten, the keeper neither charges nor rushes
 (the trace's race block reads `defender covers`). A ball within a dive of him is still his and his saves are unchanged. See
 [defending.md](defending.md#the-keeper-yields).
+
+## With a team-mate
+
+In a scenario with a second attacker the attacker the keeper reads is the controlled one, so from the strike of a pass it is
+the receiver. While the pass is on its way he sets himself (his arc, his depth) for where it will be met, the receiver's
+meeting point, instead of where the ball is; his rush and his saves still read the ball itself, and a pass winding up is not
+a shot, so he does not plant for it. See [passing.md](passing.md).
 
 ## Diagnostics
 

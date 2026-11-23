@@ -28,14 +28,19 @@ The table uses Xbox names.
 | Right stick: a side flicked from rest and released | Body feint to that side |
 | Right stick: a side held 0.1 s | Ball roll to that side |
 | Right stick: forward flick while sprinting | Knock-on: a heavy touch ahead to sprint onto |
-| Right bumper + left stick away from a loose ball | Let it run: no eager regain (see [dribbling.md](dribbling.md)) |
+| Left stick, without the ball | Lock-on: with a loose ball he can reach first he goes for it by himself. Stick at rest: the earliest point. Stick held toward a later point on the ball's path (within 40 degrees): he meets it there (see [dribbling.md](dribbling.md)) |
+| Right bumper + left stick away from a loose ball | Let it run: he does not go for it |
+| B, a skill gesture or a knock-on on the way to a loose ball | Played at his first contact: a first-time shot (a flick when there is no time for the wind-up), the move after his first touch, a knock-on as his first touch |
 | Left stick back with left and right bumpers held | Drag-back |
 | Right stick: back, then straight on to a side | Elastico toward that side |
 | Right stick: forward flick, rest, back | Heel-to-heel: the ball flicked on straight ahead |
 | Right stick: forward flick, rest, a side | Spin (a roulette) toward that side |
 | Right stick: back flick, rest, a side | McGeady spin: the ball dragged behind, a turn away, out square to that side |
 | Right stick back alone | Nothing (the start of an elastico or a McGeady spin) |
-| A, X, Y, right bumper + A | Nothing during play: there are no passes |
+| A / Cross (tap or hold, with a team-mate) | Ground pass to his feet: the stick aims, and the hold (up to 0.4 s, then released for you) points further along the stick. Control moves to the receiver at the strike (see [passing.md](passing.md)) |
+| Y / Triangle (tap or hold, with a team-mate) | Through ball into the space he is running to; aimed the same way |
+| A, Y or B while a pass is on its way to you | A first-time pass or shot, struck when the ball arrives |
+| X, right bumper + A | Nothing during play |
 | A / Cross | Start the round; at the report, next round (new seed) |
 | Y / Triangle | At the report, retry with the same seed |
 | D-pad left / right | Previous / next start spot |
@@ -80,6 +85,7 @@ Works alongside a gamepad (the larger stick value wins) and when none is detecte
 | E | Curved (finesse) shot, held while shooting |
 | Left Shift | Chip, held while shooting |
 | Right mouse | Cancel: pressed after shoot and before the strike, a fake shot |
+| F / R | Ground pass / through ball, with a team-mate |
 | Back against the run + E + Left Shift | Drag-back, as the pad's left stick back with both bumpers |
 | Space, G | Shoot and cancel again, for keyboard-only play |
 | X | Knock-on |

@@ -33,6 +33,24 @@ public partial class Match
     bool ReportReached => World.State == RoundState.Report;
 
     /// <summary>A skill move as the attacker's figure starts drawing it: which clips (and their blend) or the procedural drawing.</summary>
+    /// <summary>Passes, control changes and offside calls go to the session log as they happen (a live round only, not a replay).</summary>
+    void LogTeamEvent(SimEvent e)
+    {
+        if (_replay != null) return;
+        switch (e.Kind)
+        {
+            case EventKind.Pass:
+                _log?.Write("pass", ("round", _round), ("tick", World.Tick), ("from", e.PlayerIndex), ("to", e.Other), ("speed", Math.Round(e.Speed, 2)));
+                break;
+            case EventKind.ControlChanged:
+                _log?.Write("control", ("round", _round), ("tick", World.Tick), ("team", e.Team), ("from", e.Other), ("to", e.PlayerIndex), ("reason", e.Reason.ToString().ToLowerInvariant()));
+                break;
+            case EventKind.Offside:
+                _log?.Write("offside", ("round", _round), ("tick", World.Tick), ("player", e.PlayerIndex));
+                break;
+        }
+    }
+
     void LogSkill(SkillStart m) => _log?.Write("skill", ("round", _round), ("tick", World.Tick), ("move", m.Move), ("foot", m.Right ? "R" : "L"),
         ("side", m.Side < 0 ? "left" : m.Side > 0 ? "right" : "none"), ("stand_clip", m.StandClip), ("run_clip", m.RunClip),
         ("w_run", Math.Round(m.WRun, 2)), ("entry_speed", Math.Round(m.EntrySpeed, 2)), ("drawing", m.Clips ? "clips" : "procedural"));
@@ -173,13 +191,21 @@ public partial class Match
             def = _data.Attackers.Find(p => p.Id == _defenderId) ?? _data.Attackers.Find(p => p.Id == sc.DefaultDefender);
             if (def == null) _data.Warnings.Add($"{sc.Id}: defender '{_defenderId}' not found in players; a plain sheet is used");
         }
-        World = new World(_data.Tuning, sc, att, kee, _seed, def);
+        // A scenario with a team-mate: his sheet is the scenario's (any outfield player file), else the attacker's own.
+        PlayerSheet? mate = null;
+        if (sc.Mate != null)
+        {
+            mate = _data.Attackers.Find(p => p.Id == sc.DefaultMate);
+            if (mate == null) _data.Warnings.Add($"{sc.Id}: team-mate '{sc.DefaultMate}' not found in players; the attacker's sheet is used");
+        }
+        World = new World(_data.Tuning, sc, att, kee, _seed, def, mate);
         Pitch.Build(World.Pitch);
         // Left edge at the back wall; right edge may reach 0.5 m past the back of the net so the whole goal shows; the bottom
         // edge stops at the near boards.
         Camera.SetLimits(World.Pitch.MinX, World.Pitch.GoalLineX + World.Pitch.NetDepth + 0.5f, World.Pitch.HalfWidth);
-        World.Recorder = new ReplayRecorder(World, att.Id, kee.Id, sc.Id, def?.Id);
+        World.Recorder = new ReplayRecorder(World, att.Id, kee.Id, sc.Id, def?.Id, mate?.Id);
         Defender.Visible = World.Defender != null && _gallery == null && _clipGallery == null && _defenderGallery == null;
+        Mate.Visible = World.HasMates && _gallery == null && _clipGallery == null && _defenderGallery == null;
         if (att.Id == PlayerPresets.CustomId && att == _data.Custom) World.Recorder.Replay.SetAttackerSheet(att);
         _flightTicks = 0; _liveTicks = 0; _beganReplay = false;
         _log?.Write("round_setup", ("round", _round), ("scenario", sc.Id), ("attacker", att.Id), ("keeper", kee.Id), ("defender", World.Defender?.Sheet.Id),
@@ -206,8 +232,8 @@ public partial class Match
         if (_holdAfterCapture)
         {
             // the button that saved (B is also shoot, A also cancel) does nothing in play until it is let go
-            if (!pad.ShootHeld && !pad.Cancel) _holdAfterCapture = false;
-            else { pad.ShootHeld = false; pad.Cancel = false; }
+            if (!pad.ShootHeld && !pad.Cancel && !pad.PassHeld && !pad.ThroughHeld) _holdAfterCapture = false;
+            else { pad.ShootHeld = false; pad.Cancel = false; pad.PassHeld = false; pad.ThroughHeld = false; }
         }
         if (_editor.IsOpen)
         {
@@ -349,7 +375,7 @@ public partial class Match
     {
         MoveX = p.MoveX, MoveZ = p.MoveZ, Sprint = p.Sprint, CloseControl = p.CloseControl,
         ShootHeld = p.ShootHeld, Finesse = p.Finesse, Chip = p.Chip, Driven = p.Driven, KnockOn = p.KnockOn,
-        RightX = p.RightX, RightZ = p.RightZ, Cancel = p.Cancel, SkillKey = p.SkillKey,
+        RightX = p.RightX, RightZ = p.RightZ, Cancel = p.Cancel, PassHeld = p.PassHeld, ThroughHeld = p.ThroughHeld, SkillKey = p.SkillKey,
     };
 
     /// <summary>The round reached Report: save its replay into the session folder, log it, print one console line.</summary>

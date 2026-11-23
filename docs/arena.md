@@ -13,6 +13,10 @@ A file that fails to load keeps its last good version and the HUD warning line n
 The defender duel (`data/scenarios/defender_duel.json`) has `"defenders": 1`: one outfield defender, placed by the scenario's
 `defender` spot and played by the defender bot, with the sheet named in `default_defender`. See [defending.md](defending.md).
 
+Two v one (`data/scenarios/two_v_one.json`) adds a second attacker: `team_size` 2, a `mate` start spot (the team-mate, with
+the sheet named in `default_mate`), one defender and `"offside": true`. The carrier starts at (4, −3) with the ball, the
+team-mate at (5, 5), the defender at (16, 0). See [passing.md](passing.md) and [teammate.md](teammate.md).
+
 ## Loose-ball start spots
 
 Loose-ball start spots (`data/scenarios/loose_*.json`, D-pad left / right in the game) begin with the ball already lost
@@ -28,7 +32,7 @@ Scripted rounds: the batch tool's scripted attacker runs at the goal and, in a s
 inside it once the ball is strikable or its next touch comes early enough in the wind-up; with `strike_distance` (breakaway
 11.3, halfway run 12.4, angled run 11.1 m, the distances the scoring bands were first measured at) it presses only once the
 ball, carried on at his speed to the contact, will be that close at the strike. Within 4 m of the keeper it stops sprinting
-and within 6 m takes close control. Against a defender it plays one of the styles in [defending.md](defending.md#the-probe).
+and within 6 m takes close control. Against a defender it plays one of the styles in [defending.md](defending.md#the-probe); with a team-mate one of solo, square and through ([teammate.md](teammate.md#scripted-styles-and-bands)).
 
 ## How the arena is drawn
 

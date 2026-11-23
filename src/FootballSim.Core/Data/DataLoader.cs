@@ -58,9 +58,13 @@ public static class DataLoader
             {
                 info =>
                 {
+                    // (the team values, added for a round with a team-mate, have their own hash too: see TeamHash)
+                    if (info.Type == typeof(LockOnTuning))
+                        for (int i = info.Properties.Count - 1; i >= 0; i--)
+                            if (info.Properties[i].Name is "reaction_ratio" or "reaction_max_seconds") info.Properties.RemoveAt(i);
                     if (info.Type != typeof(Tuning)) return;
                     for (int i = info.Properties.Count - 1; i >= 0; i--)
-                        if (info.Properties[i].Name is "defender" or "defending") info.Properties.RemoveAt(i);
+                        if (info.Properties[i].Name is "defender" or "defending" or "pass" or "control" or "mate" or "receive") info.Properties.RemoveAt(i);
                 },
             },
         };
@@ -114,6 +118,10 @@ public static class DataLoader
             }
             // The defending ratings came later: a sheet without one reads 50, without a warning.
             foreach (var n in PlayerSheet.DefendingRatingNames)
+                if (root.TryGetProperty(n, out _))
+                    s.SetRating(n, (int)MathF.Round(ReadNumber(root, n, fileLabel, warnings, PlayerSheet.RatingDefault, 1, 99)));
+            // So did the passing ratings.
+            foreach (var n in PlayerSheet.PassingRatingNames)
                 if (root.TryGetProperty(n, out _))
                     s.SetRating(n, (int)MathF.Round(ReadNumber(root, n, fileLabel, warnings, PlayerSheet.RatingDefault, 1, 99)));
             s.HeightM = ReadNumber(root, "height_m", fileLabel, warnings, 1.80f, PlayerSheet.HeightMin, PlayerSheet.HeightMax);
@@ -211,6 +219,11 @@ public static class DataLoader
         s.Pitch.GoalHeight = Fix(s.Pitch.GoalHeight, 0.5f, 6f, "pitch.goal_height");
         s.Pitch.PenaltyAreaDepth = Fix(s.Pitch.PenaltyAreaDepth, 1f, s.Pitch.Length, "pitch.penalty_area_depth");
         s.Pitch.PenaltyAreaWidth = Fix(s.Pitch.PenaltyAreaWidth, s.Pitch.GoalWidth, 200f, "pitch.penalty_area_width");
+        if (s.Mate != null && s.TeamSize < 2)
+        {
+            w.Add(new LoadWarning(fileLabel, "mate", "needs team_size 2 or more; using 2"));
+            s.TeamSize = 2;
+        }
         if (s.TeamSize < 1 || s.TeamSize > 11)
         {
             w.Add(new LoadWarning(fileLabel, "team_size", $"{s.TeamSize} is outside 1..11; clamped"));
@@ -284,6 +297,9 @@ public static class DataLoader
                 ("keeper.catch_range_standing_min", t.Keeper?.CatchRangeStandingMin), ("keeper.catch_range_standing_max", t.Keeper?.CatchRangeStandingMax),
                 ("keeper.catch_range_diving_min", t.Keeper?.CatchRangeDivingMin), ("keeper.catch_range_diving_max", t.Keeper?.CatchRangeDivingMax),
                 ("keeper.catch_range_time", t.Keeper?.CatchRangeTime),
+                ("shot.first_time_error", t.Shot?.FirstTimeError),
+                ("lock_on.reaction_ratio", t.LockOn?.ReactionRatio), ("pass.execution_seconds", t.Pass?.ExecutionSeconds), ("pass.angle_extra_seconds", t.Pass?.AngleExtraSeconds),
+                ("receive.error", t.Receive?.Error), ("receive.cooldown", t.Receive?.Cooldown),
                 ("defender.hold_distance_m", t.Defender.HoldDistanceM), ("defender.hold_offset_min_m", t.Defender.HoldOffsetMinM), ("defender.hold_offset_max_m", t.Defender.HoldOffsetMaxM),
                 ("defender.to_active_after_s", t.Defender.ToActiveAfterS), ("defender.active_max_s", t.Defender.ActiveMaxS),
                 ("defending.auto.radius_walk_m", t.Defending.Auto.RadiusWalkM), ("defending.auto.radius_jockey_m", t.Defending.Auto.RadiusJockeyM), ("defending.auto.angle_deg", t.Defending.Auto.AngleDeg),
@@ -307,7 +323,18 @@ public static class DataLoader
             }
             if (!float.IsFinite(t.Touch.DangerRadius) || t.Touch.DangerRadius < 0f)
                 return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: touch.danger_radius: must be finite and not negative (default tuning in use)" };
+            if (t.LockOn == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: lock_on: must be an object (default tuning in use)" };
             var w = new List<LoadWarning>();
+            // Keys the lock-on replaced: a file that still has them loads, with a warning each.
+            try
+            {
+                using var doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+                if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("possession", out var poss) && poss.ValueKind == JsonValueKind.Object)
+                    foreach (var gone in new[] { "regain_cone_deg", "regain_max_distance" })
+                        if (poss.TryGetProperty(gone, out _))
+                            w.Add(new LoadWarning(fileLabel, "possession." + gone, "removed (lock-on goes for a loose ball from any direction and distance); ignored"));
+            }
+            catch (JsonException) { }
             if (t.TickRate < 1 || t.TickRate > 1000)
             {
                 w.Add(new LoadWarning(fileLabel, "tick_rate", $"{t.TickRate} is outside 1..1000; using 120"));
@@ -335,6 +362,18 @@ public static class DataLoader
     public static string DefendingHash(Tuning t)
     {
         var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(t.Defender, CompactOptions) + JsonSerializer.Serialize(t.Defending, CompactOptions));
+        return Convert.ToHexString(SHA256.HashData(bytes)).Substring(0, 16).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// A short stable hash of the team tuning (passes, control, the team-mate, receiving and the reaction delay), recorded in the
+    /// replay of a round with a team-mate.
+    /// </summary>
+    public static string TeamHash(Tuning t)
+    {
+        var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(t.Pass, CompactOptions) + JsonSerializer.Serialize(t.Control, CompactOptions)
+            + JsonSerializer.Serialize(t.Mate, CompactOptions) + JsonSerializer.Serialize(t.Receive, CompactOptions)
+            + JsonSerializer.Serialize(t.LockOn.ReactionRatio, CompactOptions) + t.LockOn.ReactionMaxSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
         return Convert.ToHexString(SHA256.HashData(bytes)).Substring(0, 16).ToLowerInvariant();
     }
 

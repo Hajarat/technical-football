@@ -49,7 +49,8 @@ public partial class Match
         }
         foreach (var e in w.Events)
         {
-            if (e.Team is not (-1 or 0) || e.PlayerIndex is not (-1 or 0)) continue;
+            if (e.Team is not (-1 or 0) || e.PlayerIndex != -1 && e.PlayerIndex != p.Index) continue;
+            if (e.Kind is EventKind.ControlChanged or EventKind.Pass or EventKind.Offside) continue;
             // a skill move's sole contact also raises a Touch: it is drawn by the move, never as a dribble touch
             if (e.Kind == EventKind.Touch && f.Skill.Valid) f.SkillTouch = true;
             else if (e.Kind == EventKind.Touch) { f.TouchEvent = true; f.EventRight = e.Foot == Foot.Right; f.BallPos = G(e.Position); }
@@ -95,6 +96,44 @@ public partial class Match
 
     /// <summary>The side the barge that has the attacker stumbling pushed him to (0: he stumbles from a tackle).</summary>
     float _atkBargedSide;
+
+    /// <summary>
+    /// Everything the figure of an attacker the pad does not drive needs this tick (the team-mate, or player 0 after control has
+    /// jumped to the team-mate): the outfield body's movement and stride, and the kick he struck before control left him, which
+    /// runs out its recovery.
+    /// </summary>
+    FigureFrame MateFrame(PlayerState p)
+    {
+        var w = World;
+        var f = FigureFrame.At(G(p.Position), p.Facing);
+        f.Velocity = G(p.Velocity + p.PushVelocity);
+        f.HeightM = p.Sheet.HeightM;
+        f.Dt = w.Tuning.Dt;
+        f.BallPos = G(w.Ball.Position); f.BallVel = G(w.Ball.Velocity); f.BallRadius = w.Ball.Radius;
+        f.InPossession = p.InPossession;
+        FillGait(ref f, p);
+        if (p.Action is { IsShot: true, Phase: not ActionPhase.Done } sa)
+            f.Shot = new FigureShot
+            {
+                Valid = true, Kind = (ShotKind)((int)sa.Kind - (int)ActionKind.Power), Right = sa.Foot == Foot.Right, Surface = (BootSurface)(int)sa.Surface,
+                Id = sa.PlanTick, Phase = (TouchPhase)(int)sa.Phase,
+                Elapsed = (p.CurrentTick - sa.PlanTick) * f.Dt, ContactEta = sa.ContactEta(p.CurrentTick, f.Dt), RecoverySeconds = (sa.EndTick - sa.ContactTick) * f.Dt,
+                ContactPoint = G(sa.ContactPoint), BallOutVelocity = G(sa.BallOutVelocity), Made = sa.Made,
+                Held = !sa.Released,
+                Aim = new Vector3(MathF.Cos(sa.AimYaw), 0, MathF.Sin(sa.AimYaw)), AimYaw = sa.AimYaw,
+            };
+        f.NextTouchEta = float.NaN; f.StrikeEta = float.NaN;
+        if (Defending.Stumbling(p, w.SimTime))
+            f.Defender = new FigureDefender { Valid = true, Action = DefenderAction.Stumble, ActionTime = 0f, Reaction = FootballSim.Anim.Reaction.Stumble };
+        return f;
+    }
+
+    /// <summary>The frame of team 0's player <paramref name="index"/>: the pad's player in full, any other as a body that runs.</summary>
+    FigureFrame TeamFrame(int index)
+    {
+        var p = World.Teams[0][index];
+        return p == World.Attacker ? AttackerFrame(p) : MateFrame(p);
+    }
 
     /// <summary>Everything the defender's figure needs this tick: the outfield body's movement and stride, and his defending action.</summary>
     FigureFrame DefenderFrame(PlayerState p)
@@ -323,7 +362,7 @@ public partial class Match
         _hasStrike = false; _shotId = int.MinValue;
         Trail.Clear();
         _shotsSeen = 0;
-        Overlay.ClearWedge(); Overlay.ClearAimed(); Overlay.ClearLanded(); Overlay.ClearKeeperReach();
+        Overlay.ClearWedge(); Overlay.ClearAimed(); Overlay.ClearLanded(); Overlay.ClearKeeperReach(); Overlay.ClearLockOn();
         Hud.HideReport();
         Hud.SetPower(0); Hud.SetIdealMarker(0, false);
         _strikeTicks = 0; _touchCount = 0;
@@ -333,6 +372,9 @@ public partial class Match
         Attacker.Teleport(AttackerFrame(World.Attacker), World.Attacker.InPossession);
         Keeper.Teleport(KeeperFrame(World.Keeper));
         if (World.Defender is { } def) Defender.Teleport(DefenderFrame(def), false);
+        if (World.HasMates) Mate.Teleport(MateFrame(World.Teams[0][1]), false);
+        _controlRing.Visible = false;
+        _offsideLine.Visible = false;
         _tackles = 0; _blocks = 0;
         Camera.Snap(Ball.Position);
         UpdateHudText();
@@ -356,9 +398,28 @@ public partial class Match
         var w = World;
         Ball.Apply(G(w.Ball.Position));
         Ball.SetPossession(w.Attacker.InPossession || w.Keeper.InPossession || w.Defender is { InPossession: true });
-        var af = AttackerFrame(w.Attacker);
+        // (the views belong to the players, not to who the pad drives: Attacker draws player 0, Mate player 1)
+        var f0 = TeamFrame(0);
+        var af = f0;
         FootStats.Tick = _tick;
-        Attacker.Apply(af, w.Attacker.InPossession);
+        Attacker.Apply(f0, w.Teams[0][0].InPossession);
+        if (w.HasMates)
+        {
+            var f1 = TeamFrame(1);
+            Mate.Apply(f1, w.Teams[0][1].InPossession);
+            if (w.ControlledIndex == 1) af = f1;
+            var at = w.Attacker.Position;
+            _controlRing.Position = new Vector3(at.X, 0.045f, at.Z);
+            _controlRing.Visible = Mate.Visible;
+        }
+        else _controlRing.Visible = false;
+        // The offside line: across the pitch at the second-last opponent, or the ball when it is further up.
+        _offsideLine.Visible = w.OffsideOn && w.State is RoundState.Live or RoundState.Strike or RoundState.Flight;
+        if (_offsideLine.Visible)
+        {
+            _offsideLine.Position = new Vector3(w.OffsideLine, 0.03f, 0f);
+            _offsideLine.Scale = new Vector3(1f, 1f, w.Pitch.HalfWidth * 2f);
+        }
         Keeper.Apply(KeeperFrame(w.Keeper));
         if (w.Defender is { } def) Defender.Apply(DefenderFrame(def), def.InPossession);
         foreach (var e in w.Events)
@@ -373,7 +434,7 @@ public partial class Match
                 GD.Print($"FOOT_EVENT tick={_tick} kind={(af.StrikeEvent ? "strike" : "touch")} foot={(af.EventRight ? "R" : "L")} err_m={Attacker.Figure.LastContactError:F3}");
         }
 
-        Hud.SetPower(w.ShotCharge);
+        Hud.SetPower(MathF.Max(w.ShotCharge, w.PassCharge)); // (a pass's hold fills the same bar: how far along the stick it points)
         Hud.SetIdealMarker(w.IdealCharge, w.ShotCharge > 0.001f);
         if (w.Attacker.Action is { IsShot: true } shot && shot.PlanTick != _shotId)
         {
@@ -394,6 +455,7 @@ public partial class Match
         {
             if (e.Kind == EventKind.Strike) { _strikeOrigin = e.Position; _hasStrike = true; }
             Rumble(e);
+            LogTeamEvent(e);
         }
         UpdateOverlay();
     }
@@ -403,13 +465,34 @@ public partial class Match
         var sc = World.Scenario;
         string hint = World.State == RoundState.Setup ? "  ·  A/Enter to start" : "";
         string defender = World.Defender != null ? $" and {World.Defender.Sheet.Name}" : "";
-        Hud.SetSpotLine($"Round {_round}  ·  {sc.Name}  ·  {World.Attacker.Sheet.Name} vs {World.Keeper.Sheet.Name}{defender}{hint}");
+        string mate = World.HasMates ? $" and {World.Teams[0][1].Sheet.Name}" : "";
+        Hud.SetSpotLine($"Round {_round}  ·  {sc.Name}  ·  {World.Teams[0][0].Sheet.Name}{mate} vs {World.Keeper.Sheet.Name}{defender}{hint}");
+    }
+
+    readonly System.Collections.Generic.List<Vector3> _forecastPoints = new();
+
+    /// <summary>The lock-on on the overlay: the loose ball's forecast path from now on and each team's meeting ring.</summary>
+    void UpdateLockOnOverlay()
+    {
+        var w = World;
+        var f = w.Forecast;
+        if (!Overlay.Enabled || !f.Valid || w.State is not (RoundState.Live or RoundState.Strike)) { Overlay.ClearLockOn(); return; }
+        _forecastPoints.Clear();
+        int last = f.RestIndex >= 0 ? f.StartTick + f.RestIndex : f.LastTick;
+        for (int tick = Math.Max(w.Tick, f.StartTick); tick <= last; tick += 6) _forecastPoints.Add(G(f.PositionAt(tick)));
+        Overlay.SetForecastPath(_forecastPoints);
+        for (int team = 0; team < 2; team++)
+        {
+            var c = w.Claims[team];
+            if (c.Player != null) Overlay.SetMeeting(team, G(c.Point)); else Overlay.ClearMeeting(team);
+        }
     }
 
     void UpdateOverlay()
     {
         var w = World;
         float gx = w.Pitch.GoalLineX;
+        UpdateLockOnOverlay();
         if (w.Shots.Count > 0 && _hasStrike)
         {
             var s = w.Shots[^1];

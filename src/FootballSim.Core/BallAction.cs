@@ -211,6 +211,8 @@ public sealed class BallAction
     /// to Done with <see cref="Made"/> false.
     /// </summary>
     public bool IsShot => Kind is >= ActionKind.Power and <= ActionKind.LowFinesse;
+    /// <summary>For a shot action: the kind of pass it is (drawn as a side-foot kick), or None for a shot at goal.</summary>
+    public PassKind Pass { get; internal set; }
     /// <summary>
     /// For a shot: true once shoot was released (charge, type and aim fixed, <see cref="ContactTick"/> final unless the ball is
     /// still out of reach then); false while shoot is held. Always false for touches and skill moves.

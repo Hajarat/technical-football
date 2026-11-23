@@ -38,6 +38,12 @@ public struct ShotContext
     public Foot? Foot;
     /// <summary>With <see cref="Foot"/>: the part of the foot decided with it; null means the shot type's own (see <see cref="ShotModel.SurfaceFor"/>).</summary>
     public FootSurface? Surface;
+    /// <summary>Struck at the meeting with a loose ball, with no trap first.</summary>
+    public bool FirstTime;
+    /// <summary>With <see cref="FirstTime"/>: the multiplier on the spreads for the ball's speed against the shooter (0 reads as 1).</summary>
+    public float FirstTimeError;
+    /// <summary>A flick: struck at the first contact before the wind-up was done (shot.flick_power, shot.flick_error).</summary>
+    public bool Flick;
 }
 
 /// <summary>A shot as struck, with every factor that shaped it. Recorded in the round report.</summary>
@@ -89,6 +95,10 @@ public sealed class ShotResult
     public float ElevationDeg { get; init; }
     /// <summary>Simulation tick of the strike.</summary>
     public int Tick { get; init; }
+    /// <summary>Struck first time: at the meeting with a loose ball, with no trap (its spread factor is named first_time).</summary>
+    public bool FirstTime { get; init; }
+    /// <summary>A flick: a first-time strike made before its wind-up was done (spread factor flick, speed factor flick).</summary>
+    public bool Flick { get; init; }
 
     /// <summary>The value of one named spread factor, or 1 if absent.</summary>
     public float Factor(string name)
@@ -453,9 +463,16 @@ public static class ShotModel
         Foot foot = strike.Foot;
         float distance = new Vector2(pitch.GoalLineX - ball.X, ball.Z).Length();
         var factors = Multipliers(c, strike, yaw0, pitch, t);
+        var speedFactors = SpeedMultipliers(p, strike, yaw0, t);
+        // A first-time strike pays for the ball's speed against him; a flick is weaker and wilder still.
+        if (c.FirstTime) factors = factors.Append(new ShotFactor("first_time", c.FirstTimeError > 0f ? c.FirstTimeError : 1f)).ToArray();
+        if (c.Flick)
+        {
+            factors = factors.Append(new ShotFactor("flick", MathF.Max(0f, k.FlickError))).ToArray();
+            speedFactors = speedFactors.Append(new ShotFactor("flick", MathF.Max(0f, k.FlickPower))).ToArray();
+        }
         float m = 1f;
         foreach (var f in factors) m *= f.Value;
-        var speedFactors = SpeedMultipliers(p, strike, yaw0, t);
         float speedM = 1f;
         foreach (var f in speedFactors) speedM *= f.Value;
         float curl = foot == p.Sheet.PreferredFoot ? 1f : MathF.Max(0f, k.WeakFootCurl.Evaluate(p.Sheet.WeakFoot));
@@ -545,6 +562,8 @@ public static class ShotModel
             PitchErrorDeg = pitchErr,
             ElevationDeg = elev,
             Tick = tick,
+            FirstTime = c.FirstTime,
+            Flick = c.Flick,
         };
     }
 

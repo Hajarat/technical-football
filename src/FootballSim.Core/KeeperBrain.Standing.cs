@@ -99,7 +99,8 @@ public sealed partial class KeeperBrain
         else { _rushing = false; _anticipating = false; if (!holdLine) _tRaceBlock = s.ShotInFlight ? "shot in flight" : "ball dead"; }
 
         var goal = new Vector2(_pitch.GoalLineX, 0f);
-        var ball2 = new Vector2(ball.Position.X, ball.Position.Z);
+        // (a pass on its way: he sets himself for where it will be met)
+        var ball2 = s.Coming is { } coming ? new Vector2(coming.X, coming.Z) : new Vector2(ball.Position.X, ball.Position.Z);
         var feet = new Vector2(_k.Position.X, _k.Position.Z);
         float toBall = Vector2.Distance(ball2, feet);
         bool inFront = Keeper.MouthDistance(ball2, _pitch) > Keeper.MouthDistance(feet, _pitch) + 0.3f;

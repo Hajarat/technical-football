@@ -24,11 +24,31 @@ Any of them is struck with the outside of the foot instead when the foot rules g
   contact tick and foot are fixed. With the ball at the feet at the press (within foot reach, no touch committed) a soft touch
   keeps it there and the strike falls at the earliest strike tick, on the chosen foot, whatever the stride clock's swinging
   foot (the view poses the whole body for the shot itself); if the ball is not strikable then, the chosen foot's next contact
-  strikes it. A shot in possession is never dropped: he keeps running on to the ball and strikes on arrival. A shot pressed
-  without the ball, or one whose ball the keeper took, is struck as soon as the ball is in reach from the earliest tick, or
-  dropped after `round.shoot_buffer`. From the press to the strike the left stick only aims: the legs run on to the ball (the
-  go-get-it legs toward its intercept, holding at least the runner's own running speed), whichever way the stick is swung.
-  The soft touch leaves the ball rolling along the shooter's velocity.
+  strikes it. A shot in possession is never dropped: he keeps running on to the ball and strikes on arrival. From the press to the strike the left stick only aims: in possession the legs run on to the ball (the go-get-it legs
+  toward its intercept, holding at least the runner's own running speed), whichever way the stick is swung. The soft touch
+  leaves the ball rolling along the shooter's velocity.
+- **A shot pressed without the ball** winds up and charges the same way. While the shooter holds his team's claim on the
+  loose ball (see lock-on in [dribbling.md](dribbling.md)) the shot is never dropped: its earliest strike tick is written
+  as the earliest meeting his claim may take (`MinArrivalTick`), his legs run to that meeting, and the clock keeps running
+  while it waits.
+  - *First time.* When the ball reaches him after the wind-up, the shot is struck at the meeting with no trap
+    (`ShotResult.FirstTime`). Its spreads are multiplied by `shot.first_time_error` for the ball's ground speed against
+    him (1 at 0 m/s, 1.25 at 10, 1.6 at 20; the spread factor is named `first_time`).
+  - *Meet it later.* When he could meet the ball before the wind-up is done and the ball is still coming to him (it
+    travels toward where he is, or lies still), he waits for the first sample from the earliest strike tick on that he
+    can reach before the nearest opponent, and strikes it there.
+  - *Flick.* When that sample is not his, or the ball is going across or away from him, the shot is struck at his first
+    contact, within `shot.flick_max_distance_m` (10 m) of the goal centre: shoot counts as let go, the charge is what
+    was built so far, the ball leaves at `shot.flick_power` (0.6) of that charge's speed and the spreads are multiplied
+    by `shot.flick_error` (1.5) on top of the first-time error (`ShotResult.Flick`; spread and speed factors named
+    `flick`).
+  - *No flick.* The same case beyond the flick distance is a plain first touch: he controls the ball and the shot carries
+    on as a shot in possession.
+  - When his claim ends without him getting the ball (he is tackled or stunned, or let it run) the shot waits
+    `round.shoot_buffer` (0.25 s) more and is dropped. The same buffer applies to a shot pressed with no claim at all (a
+    ball on the spot nobody has played, or a shooter still planted from his last strike).
+  - Shoot pressed while the last shot is still in flight, and still held when play is live again, counts as pressed on
+    that tick, the charge from zero. Let go before then, nothing is pressed.
 - The striking foot and the part of it are chosen once (`ShotModel.ChooseStrike`): at the press for the aim the stick has
   then, so the strike is forecast on that foot from the press, and again at the release for the aim it locks. From the
   release the foot does not change, with one exception below. The choice is geometry: the angle from where he faces to the

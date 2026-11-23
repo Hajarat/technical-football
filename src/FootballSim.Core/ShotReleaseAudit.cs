@@ -43,7 +43,7 @@ public sealed class ShotReleaseEntry
     {
         var ic = CultureInfo.InvariantCulture;
         string F(float v, string f = "F0") => v.ToString(f, ic);
-        string strike = Strike is { } s ? $"strike {s.Foot}/{s.Surface} {s.Type}" : "strike none";
+        string strike = Strike is { } s ? $"strike {s.Foot}/{s.Surface} {s.Type}{(s.Flick ? " flick" : s.FirstTime ? " first-time" : "")}" : "strike none";
         return $"shot{index} t{Tick} ({F(Time, "F2")} s) pos ({F(Position.X, "F1")},{F(Position.Y, "F1")}) facing {F(FacingDeg)} " +
                $"stick {F(StickDeg)} |{F(StickSize, "F2")}| aim {F(AimDeg)} | goal dir {F(GoalDeg)} theta {F(ThetaDeg)} cap {F(CapDeg)} " +
                $"| rule {Rule} geo {GeometryFoot}/{GeometrySurface} | aimZ {F(AimZ, "F2")} ball side {F(BallSide, "F2")} fwd {F(BallForward, "F2")} " +

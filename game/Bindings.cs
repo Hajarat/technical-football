@@ -109,6 +109,7 @@ public static class Bindings
     public static readonly KeyBind Finesse = new("E", Key.E);
     public static readonly KeyBind Chip = new("Shift", Key.Shift);
     public static readonly KeyBind KnockOn = new("X", Key.X);
+    public static readonly KeyBind Pass = new("F", Key.F), Through = new("R", Key.R);
     public static readonly KeyBind Cancel = new("Right mouse / G", new[] { Key.G }, new[] { MouseButton.Right });
     public static readonly KeyBind Skill1 = new("1", Key.Key1, Key.Kp1), Skill2 = new("2", Key.Key2, Key.Kp2),
         Skill3 = new("3", Key.Key3, Key.Kp3), Skill4 = new("4", Key.Key4, Key.Kp4);
@@ -202,6 +203,12 @@ public static class Bindings
                 new("Low curved shot", $"{Finesse.Label} + shoot, release, shoot again", $"{rb} + {shoot}, release, {shoot} again"),
                 new("Low chip", $"{Chip.Label} + shoot, release, shoot again (plays as a chip)", $"{lb} + {shoot}, release, {shoot} again (plays as a chip)"),
                 new("Fake shot", $"shoot, then {Cancel.Label}", $"{shoot}, then {cancel}"),
+            }),
+            new("Passing (with a team-mate)", new()
+            {
+                new("Ground pass", $"{Pass.Label} (stick aims, hold points further)", $"{cancel} (stick aims, hold points further)"),
+                new("Through ball", $"{Through.Label} (stick aims, hold points further)", $"{B(Pad.Retry)} (stick aims, hold points further)"),
+                new("First-time pass or shot", "pass or shoot while the pass is on its way", "pass or shoot while the pass is on its way"),
             }),
             new("Skill moves", new()
             {

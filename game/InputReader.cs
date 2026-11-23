@@ -52,8 +52,8 @@ public struct PadSnapshot
     public bool KnockOn;           // keyboard X: true from the press for a short window (see InputReader); the pad's knock-on is a right-stick gesture read by the core
     public float RightX, RightZ;   // -1..1, radial dead zone applied; stick right = +RightX, stick up = -RightZ (read by the core's gesture reader)
     public bool Cancel;            // A / Cross, right mouse or G held: a shot cancelled within the core's window becomes a fake
-    // A, X, Y and right bumper + A are pass buttons on a standard layout: passing is not built, so during play A only
-    // cancels a shot, X does nothing, and Y is read only at the report (retry).
+    public bool PassHeld;          // A / Cross, or F: a ground pass (the core reads it as the fake-shot cancel while a shot winds up)
+    public bool ThroughHeld;       // Y / Triangle, or R: a through ball (the round flow reads Y as retry only at the report)
     public FootballSim.Core.SkillKey SkillKey; // keyboard 1-4 (the pad makes skill moves with the right stick): set for one poll per press
     // One-shot presses: true only on the tick the button went down.
     public bool OverlayToggle;     // right stick click
@@ -281,7 +281,7 @@ public partial class InputReader : Node
         var m = a;
         if (new Vector2(b.MoveX, b.MoveZ).LengthSquared() > new Vector2(a.MoveX, a.MoveZ).LengthSquared()) { m.MoveX = b.MoveX; m.MoveZ = b.MoveZ; }
         m.Sprint = Mathf.Max(a.Sprint, b.Sprint);
-        m.Shield |= b.Shield; m.ShootHeld |= b.ShootHeld; m.Finesse |= b.Finesse; m.Chip |= b.Chip; m.Driven |= b.Driven; m.KnockOn |= b.KnockOn; m.Cancel |= b.Cancel;
+        m.Shield |= b.Shield; m.ShootHeld |= b.ShootHeld; m.Finesse |= b.Finesse; m.Chip |= b.Chip; m.Driven |= b.Driven; m.KnockOn |= b.KnockOn; m.Cancel |= b.Cancel; m.PassHeld |= b.PassHeld; m.ThroughHeld |= b.ThroughHeld;
         if (new Vector2(b.RightX, b.RightZ).LengthSquared() > new Vector2(a.RightX, a.RightZ).LengthSquared()) { m.RightX = b.RightX; m.RightZ = b.RightZ; }
         if (b.SkillKey != FootballSim.Core.SkillKey.None) m.SkillKey = b.SkillKey;
         m.OverlayToggle |= b.OverlayToggle; m.NextSpot |= b.NextSpot; m.PrevSpot |= b.PrevSpot;
@@ -313,6 +313,8 @@ public partial class InputReader : Node
             Chip = Bindings.Chip.Held(),
             KnockOn = Pressed(Bindings.KnockOn),
             Cancel = Bindings.Cancel.Held(),
+            PassHeld = Bindings.Pass.Held(),
+            ThroughHeld = Bindings.Through.Held(),
             SkillKey = SkillKeyPressed(),
             OverlayToggle = Pressed(Bindings.Overlay),
             NextSpot = Pressed(Bindings.NextSpot),
@@ -374,6 +376,8 @@ public partial class InputReader : Node
             RightZ = r.Y,
             // A / Cross doubles as confirm, but the round flow reads confirm only in Setup and Report, never while live.
             Cancel = Input.IsActionPressed(Bindings.Pad.Confirm.Action),
+            PassHeld = Input.IsActionPressed(Bindings.Pad.Confirm.Action),
+            ThroughHeld = Input.IsActionPressed(Bindings.Pad.Retry.Action),
             OverlayToggle = Input.IsActionJustPressed(Bindings.Pad.Overlay.Action),
             NextSpot = Input.IsActionJustPressed(Bindings.Pad.NextSpot.Action),
             PrevSpot = Input.IsActionJustPressed(Bindings.Pad.PrevSpot.Action),

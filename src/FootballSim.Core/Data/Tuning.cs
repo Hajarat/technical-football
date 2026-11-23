@@ -656,21 +656,185 @@ public sealed class PossessionTuning
     public float OffBallTurnBonus { get; set; } = -0.2f;
     /// <summary>How far ahead the touch controller looks for a step that can play the ball, seconds.</summary>
     public float PredictionHorizon { get; set; } = 1.5f;
-    /// <summary>A loose ball within this angle either side of the facing counts as in front of the player (the eager regain), degrees.</summary>
-    public float RegainConeDeg { get; set; } = 75f;
-    /// <summary>A loose ball further than this is not gone for, metres.</summary>
-    public float RegainMaxDistance { get; set; } = 10f;
-    /// <summary>The keeper within this of the ball contests it, metres.</summary>
+    /// <summary>The keeper within this of the loose ball contests it, metres.</summary>
     public float RegainKeeperDistance { get; set; } = 3f;
-    /// <summary>The keeper contests the ball when he would reach it no more than this after the attacker, seconds.</summary>
+    /// <summary>The keeper, or the other team's claim holder, contests the ball when he would reach the meeting no more than this after the holder, seconds.</summary>
     public float RegainKeeperMargin { get; set; } = 0.3f;
     /// <summary>An uncontested regain takes the ball from this far from the body (beyond foot reach, at the stretched errors), metres.</summary>
     public float RegainReach { get; set; } = 1.2f;
 }
 
+/// <summary>Lock-on: the claim on a loose ball (see LockOn). Values marked (ref) are read from reference data.</summary>
+public sealed class LockOnTuning
+{
+    /// <summary>How far ahead the loose ball's path is forecast, seconds (the reference searches 10 s on a full pitch).</summary>
+    public float HorizonSeconds { get; set; } = 4f;
+    /// <summary>The real ball further than this from its forecast sample has left the path: the forecast is rebuilt, metres.</summary>
+    public float RebuildDriftM { get; set; } = 0.05f;
+    /// <summary>A team-mate takes the claim from the holder only by arriving this much earlier, seconds (ref).</summary>
+    public float TakeoverMarginSeconds { get; set; } = 0.1f;
+    /// <summary>The stick slides the meeting to a later sample whose bearing is within this of the stick, degrees (ref).</summary>
+    public float StickSlideDeg { get; set; } = 40f;
+    /// <summary>
+    /// A computer-controlled player's reaction to an opponent's strike: he makes no claim run until the ball has travelled his
+    /// distance to it at the strike times this, by awareness (the shape from reference data). Part of the team hash, not the tuning hash.
+    /// </summary>
+    public Curve ReactionRatio { get; set; } = new((1f, 0.35f), (99f, 0.05f));
+    /// <summary>... or this long has passed, seconds (ref). Part of the team hash.</summary>
+    public float ReactionMaxSeconds { get; set; } = 0.5f;
+}
+
+/// <summary>A value per kind of pass.</summary>
+public sealed class PassPair
+{
+    public float Ground { get; set; }
+    public float Through { get; set; }
+    public float For(PassKind kind) => kind == PassKind.Through ? Through : Ground;
+}
+
+/// <summary>A low and a high end.</summary>
+public sealed class MinMax
+{
+    public float Min { get; set; }
+    public float Max { get; set; }
+}
+
+/// <summary>
+/// Passes (see PassModel). Values marked (ref) are read from reference data; the others are ours, to be set by the pass probe.
+/// The whole block is part of the team hash, not the tuning hash.
+/// </summary>
+public sealed class PassTuning
+{
+    /// <summary>The hold that points the pass at its furthest; the pass is released for the player then, seconds (ref).</summary>
+    public float ChargeSeconds { get; set; } = 0.4f;
+    /// <summary>The nearest a selection point lies along the stick, and the nearest team-mate that can be passed to, metres.</summary>
+    public float MinDistance { get; set; } = 1f;
+    /// <summary>The furthest a selection point lies along the stick, at a full hold, metres.</summary>
+    public PassPair MaxDistance { get; set; } = new() { Ground = 22f, Through = 26f };
+    /// <summary>The speed the ball should still have when it reaches the target, m/s.</summary>
+    public PassPair ArrivalSpeed { get; set; } = new() { Ground = 5f, Through = 6f };
+    /// <summary>The fastest a pass can be struck: min at rating 1, max at 99, m/s (times the body-angle and weak-foot power of a shot).</summary>
+    public MinMax SpeedCap { get; set; } = new() { Min = 14f, Max = 24f };
+    /// <summary>From the press to the strike, by the charge 0..1, seconds (the shape from reference data).</summary>
+    public Curve ExecutionSeconds { get; set; } = new((0f, 0.3f), (1f, 0.4f));
+    /// <summary>Added to it by the body angle to the target, degrees (the shot's body-angle curve).</summary>
+    public Curve AngleExtraSeconds { get; set; } = new((0f, 0f), (45f, 0f), (90f, 0.10f), (135f, 0.20f), (180f, 0.30f));
+    /// <summary>A through ball's target lies this long ahead of the receiver's run: [min, max] seconds.</summary>
+    public float[] ThroughAheadSeconds { get; set; } = { 0.6f, 1.4f };
+    /// <summary>The passer is planted this long after the strike, seconds.</summary>
+    public float StunSeconds { get; set; } = 0.15f;
+    /// <summary>A flicked pass (queued on the way to the ball, no time for it) is struck at this share of the speed cap.</summary>
+    public float FlickSpeed { get; set; } = 0.7f;
+    /// <summary>The speed a pass is raised by per step while the defender still reaches its lane first, m/s.</summary>
+    public float SpeedStep { get; set; } = 1f;
+}
+
+/// <summary>Who the team's intent drives (see World.Controlled). Part of the team hash.</summary>
+public sealed class ControlTuning
+{
+    /// <summary>With the ball loose and no named receiver, control jumps to the team's claim holder once he has held the claim this long, seconds.</summary>
+    public float ClaimJumpSeconds { get; set; } = 0.1f;
+    /// <summary>After a jump the new player's left stick reads as at rest this long, unless it has turned more than 30 degrees since, seconds.</summary>
+    public float StickSettleSeconds { get; set; } = 0.15f;
+}
+
+/// <summary>
+/// The team-mate's bot (see MateBot): the fields he steers by and his run in behind. The shapes are from reference data, scaled
+/// to a 20 m wide arena; the weights are ours, set by the team-mate probe. Part of the team hash.
+/// </summary>
+public sealed class MateTuning
+{
+    /// <summary>The fields are sampled this far either side of him on both axes, metres.</summary>
+    public float SampleM { get; set; } = 2f;
+    /// <summary>Spread: he keeps this far off the carrier (and where the carrier will be in 0.2 s), metres; the layer is clamped at 3 m either way.</summary>
+    public float SpreadRadiusM { get; set; } = 4f;
+    public float SpreadWeight { get; set; } = 1f;
+    /// <summary>Opponents: he keeps this far off each outfield opponent, metres.</summary>
+    public float OpponentRadiusM { get; set; } = 2.5f;
+    public float OpponentWeight { get; set; } = 0.1f;
+    /// <summary>Free space onside: the distance to the nearest opponent or board, zero beyond the offside line.</summary>
+    public float SpaceWeight { get; set; } = 1f;
+    /// <summary>Pass lane: 1 where a ground pass from the ball gets there before the defender reaches its lane.</summary>
+    public float LaneWeight { get; set; } = 1f;
+    /// <summary>Gap: closeness to the widest gap between the defender and the boards beyond the line, while a run is armed.</summary>
+    public float GapWeightArmed { get; set; } = 3f;
+    /// <summary>Offside line: closeness to the line from the onside side, while a run is armed ...</summary>
+    public float LineWeightArmed { get; set; } = 5f;
+    /// <summary>... and on go, when it pushes him on past it.</summary>
+    public float LineWeightGo { get; set; } = -3f;
+    /// <summary>Goal mouth: closeness to the goal centre.</summary>
+    public float GoalWeight { get; set; } = 0.3f;
+    /// <summary>A slope flatter than this leaves him standing, facing the ball, per metre.</summary>
+    public float StillGradient { get; set; } = 0.05f;
+    /// <summary>Moving away from the goal he goes at this share of the jog pace.</summary>
+    public float BackwardJogShare { get; set; } = 0.6f;
+    /// <summary>A run is armed with the ball within this of the offside line, metres.</summary>
+    public float ArmBallToLineM { get; set; } = 10f;
+    /// <summary>... while the attack has got no further than this (0 at the back wall, 1 at attack_full_from_goal_m from the goal) or the carrier is within arm_carrier_to_defender_m of the defender.</summary>
+    public float ArmMaxProgress { get; set; } = 0.5f;
+    public float ArmCarrierToDefenderM { get; set; } = 12f;
+    /// <summary>Attack progress is 1 with the ball this close to the goal line, metres.</summary>
+    public float AttackFullFromGoalM { get; set; } = 8f;
+    /// <summary>He goes once within this of the line, metres.</summary>
+    public float GoWithinM { get; set; } = 0.5f;
+    /// <summary>Armed, he waits this far onside of the line, so a step up by the defender does not catch him, metres.</summary>
+    public float ArmedOnsideM { get; set; } = 0.8f;
+    /// <summary>Back onside by more than this he arms again, metres.</summary>
+    public float RearmOnsideM { get; set; } = 2f;
+    /// <summary>A pass under way cancels his run while he is less than this onside, metres.</summary>
+    public float PassCancelOnsideM { get; set; } = 3.5f;
+    /// <summary>So does the ball within this of the goal line, metres.</summary>
+    public float RunCancelGoalM { get; set; } = 8f;
+    /// <summary>The free-space field counts no more than this distance to the nearest opponent or board, metres: further out he is free enough.</summary>
+    public float SpaceCapM { get; set; } = 4f;
+    /// <summary>He moves at his full asked speed on a slope this steep or steeper, eased in below it, per metre.</summary>
+    public float FullGradient { get; set; } = 0.4f;
+    /// <summary>A run that has been past the line this long with no pass is given up, seconds.</summary>
+    public float GoBeyondSeconds { get; set; } = 0f;
+    /// <summary>After a run he waits this long before he arms again, seconds.</summary>
+    public float RearmSeconds { get; set; } = 4f;
+    /// <summary>He holds to where the line will be this long from now while it comes back up the pitch at him, seconds.</summary>
+    public float LineLeadSeconds { get; set; } = 0.8f;
+    /// <summary>He does not go while the line comes back up the pitch faster than this, m/s.</summary>
+    public float GoMaxLineSpeed { get; set; } = 0.75f;
+    /// <summary>He does not move toward a board nearer than this, metres, nor toward the goal line nearer than goal_line_margin_m.</summary>
+    public float BoardMarginM { get; set; } = 1.5f;
+    public float GoalLineMarginM { get; set; } = 3f;
+    /// <summary>A player within this of his path makes him curve round, until nobody is within body_clear_m, metres.</summary>
+    public float BodyAvoidM { get; set; } = 1f;
+    public float BodyClearM { get; set; } = 2f;
+    /// <summary>After a bump he steers at least this far off it, degrees, for bump_steer_ticks.</summary>
+    public float BumpSteerDeg { get; set; } = 60f;
+    public int BumpSteerTicks { get; set; } = 10;
+}
+
+/// <summary>A received pass: what its speed costs the first touch. Part of the team hash.</summary>
+public sealed class ReceiveTuning
+{
+    /// <summary>The first touch's speed and direction spreads are multiplied by this, against the ball's ground speed relative to him, m/s.</summary>
+    public Curve Error { get; set; } = new((0f, 1f), (10f, 1.3f), (20f, 1.8f));
+    /// <summary>No next touch for this long after the first, against the same speed, seconds.</summary>
+    public Curve Cooldown { get; set; } = new((0f, 0.1f), (10f, 0.2f), (20f, 0.35f));
+    /// <summary>Both are multiplied by this, by first_touch.</summary>
+    public RatingRange Rating { get; set; } = new(1.3f, 0.7f);
+    /// <summary>The cooldown with a shot, pass or skill gesture queued, seconds.</summary>
+    public float QueuedCooldown { get; set; } = 0.1f;
+}
+
 /// <summary>Shot model constants.</summary>
 public sealed class ShotTuning
 {
+    /// <summary>
+    /// A first-time strike (struck at the meeting, no trap): the direction and height spreads are multiplied by this, against the
+    /// ball's ground speed relative to the shooter, m/s.
+    /// </summary>
+    public Curve FirstTimeError { get; set; } = new((0f, 1f), (10f, 1.25f), (20f, 1.6f));
+    /// <summary>A flick (a queued shot struck at the first contact, before its wind-up is done) is made only this close to the goal centre, metres.</summary>
+    public float FlickMaxDistanceM { get; set; } = 10f;
+    /// <summary>A flick's ball speed is the same charge's times this.</summary>
+    public float FlickPower { get; set; } = 0.6f;
+    /// <summary>A flick's direction and height spreads are multiplied by this.</summary>
+    public float FlickError { get; set; } = 1.5f;
     public float BaseSigmaDeg { get; set; } = 4.9f;
     public float SigmaSkillSlope { get; set; } = 4.34f;
     public float VerticalRatio { get; set; } = 0.7f;
@@ -1776,6 +1940,15 @@ public sealed class Tuning
     public MovementTuning Movement { get; set; } = new();
     public TouchTuning Touch { get; set; } = new();
     public PossessionTuning Possession { get; set; } = new();
+    public LockOnTuning LockOn { get; set; } = new();
+    /// <summary>Passes (the team hash).</summary>
+    public PassTuning Pass { get; set; } = new();
+    /// <summary>Who the team's intent drives (the team hash).</summary>
+    public ControlTuning Control { get; set; } = new();
+    /// <summary>The team-mate's bot (the team hash).</summary>
+    public MateTuning Mate { get; set; } = new();
+    /// <summary>Receiving a pass (the team hash).</summary>
+    public ReceiveTuning Receive { get; set; } = new();
     public ShotTuning Shot { get; set; } = new();
     public KeeperTuning Keeper { get; set; } = new();
     public RoundTuning Round { get; set; } = new();

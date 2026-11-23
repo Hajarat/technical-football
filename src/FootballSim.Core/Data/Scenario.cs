@@ -33,8 +33,21 @@ public sealed class Scenario
     public string DefaultAttacker { get; set; } = "striker_a";
     public string DefaultKeeper { get; set; } = "the_wall";
     public PitchSpec Pitch { get; set; } = new();
-    /// <summary>Players per side. Only the first player of each side has behaviour; the rest stand still.</summary>
+    /// <summary>
+    /// Players per side. Without <see cref="Mate"/>, only the first player of each side has behaviour and the rest stand still.
+    /// With it, this is the number of attackers: the one the intents drive and his team-mates (played by the team-mate bot);
+    /// the other side is then the keeper and the defenders only.
+    /// </summary>
     public int TeamSize { get; set; } = 1;
+    /// <summary>
+    /// Where the attacker's team-mate starts (team 0, player 1), facing the goal; null (the default) for no team-mate. Needs a
+    /// <see cref="TeamSize"/> of 2 or more; a third attacker and on start beside him.
+    /// </summary>
+    public StartSpot? Mate { get; set; }
+    /// <summary>The team-mate's sheet when none is chosen.</summary>
+    public string DefaultMate { get; set; } = "team_mate";
+    /// <summary>Offside is called (see Offside): a pass to a team-mate beyond the line at its strike ends the round.</summary>
+    public bool Offside { get; set; }
     /// <summary>Where the ball starts (at rest unless <see cref="BallSpeed"/> is set).</summary>
     public StartSpot Ball { get; set; } = new() { X = 41.5f, Z = 0f };
     /// <summary>The ball's rolling speed when play starts, m/s, along <see cref="BallHeadingDeg"/>.</summary>
@@ -43,7 +56,7 @@ public sealed class Scenario
     public float BallHeadingDeg { get; set; }
     /// <summary>
     /// The ball starts as a lost ball (as after a heavy touch or a parry) instead of a ball on the spot: the attacker goes for it
-    /// eagerly from the first tick (see <see cref="Regain"/>).
+    /// by himself from the first tick (see <see cref="LockOn"/>).
     /// </summary>
     public bool BallLoose { get; set; }
     /// <summary>Where the attacker starts.</summary>
