@@ -1453,6 +1453,27 @@ public sealed class SkillTuning
     /// if that meet comes within this long; at the meet the move starts instead of the touch.
     /// </summary>
     public float MeetWaitSeconds { get; set; } = 1.5f;
+
+    // ---- move sheets (see MoveSheet and SkillMoves) ----
+    /// <summary>
+    /// A sheet-driven move nudges his path by at most this so the sheet's contact point lands on the real ball, metres; what is
+    /// left of the gap is the first ball leg's bias, which fades over the leg.
+    /// </summary>
+    public float MeetCorrectionMax { get; set; } = 0.35f;
+    /// <summary>
+    /// What plays each move: "sheet" (the simulation follows the move's sheet) or "legacy" (the move's own formulas). Keys:
+    /// step_over, body_feint, ball_roll, drag_back, elastico, heel_to_heel, spin, mcgeady, fake_stop, fake_cut. A move that is
+    /// not named, or whose sheet is not loaded, is legacy.
+    /// </summary>
+    public Dictionary<string, string> Driver { get; set; } = new()
+    {
+        ["step_over"] = "legacy", ["body_feint"] = "legacy", ["ball_roll"] = "legacy", ["drag_back"] = "sheet", ["elastico"] = "sheet",
+        ["heel_to_heel"] = "legacy", ["spin"] = "legacy", ["mcgeady"] = "legacy", ["fake_stop"] = "legacy", ["fake_cut"] = "legacy",
+    };
+    /// <summary>The share of a move's sprint sheet against its run sheet by his entry pace (m/s), for the moves that have one.</summary>
+    public Curve SprintBlend { get; set; } = new((5.5f, 0f), (7f, 1f));
+    /// <summary>The share of the drag-back's run sheet against its standing one by his entry pace (m/s).</summary>
+    public Curve DragBackRunBlend { get; set; } = new((1f, 0f), (2.5f, 1f));
     /// <summary>The step-over starts with the ball within this of the player.</summary>
     public float StepOverRadius { get; set; } = 1.0f;
     /// <summary>The other moves start with the ball within this of the player.</summary>
@@ -1957,6 +1978,14 @@ public sealed class Tuning
     public DefenderTuning Defender { get; set; } = new();
     /// <summary>The defending actions of any outfield player (see Defending).</summary>
     public DefendingTuning Defending { get; set; } = new();
+
+    /// <summary>
+    /// The move sheets (data/moves/sheets.json), loaded beside the tuning file (see <see cref="DataLoader.LoadTuning"/>); null when
+    /// none are loaded, and every move is then played by its legacy formulas. Not part of the tuning file or of the tuning hash:
+    /// a replay records the sheets' own hash (<see cref="Replay.SheetsHash"/>).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public MoveSheets? Sheets { get; set; }
 
     /// <summary>Seconds per tick.</summary>
     public float Dt => 1f / TickRate;

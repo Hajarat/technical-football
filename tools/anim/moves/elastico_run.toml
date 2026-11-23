@@ -1,248 +1,354 @@
-# Elastico entered at a run, exit to his left (S = left: the RIGHT foot plays): the same move as elastico.toml (same events at the
-# same normalised times), drawn on the simulation's run: he keeps 80% of his pace through it. After a 0.10 s reach the OUTSIDE of
-# the right foot carries the ball 0.30 m to his right over 0.11 s, the foot wraps round the back of the ball without losing it,
-# and 0.22 s after the contact the INSIDE snaps it back across toward the left as the exit touch. The upper body sells the first
-# direction as fully as the standing clip (hip and shoulder drop to the right, the right arm out), then drives toward the exit.
-# The support (left) foot skips under the travelling body: short stances fixed on the pitch (flagged in [stance], so the runtime
-# holds it where it landed) and two hops between them with the pelvis rising off the ground and settling on each landing; it
-# stands for the snap, then the right foot comes down off the ball across toward the exit as the new support and the left swings
-# through to land ahead. Clips elastico_left_run and its mirror elastico_right_run. Conventions as in ball_roll.toml.
+# Elastico entered at a run (5.3 m/s), exit to his left (S = left: the RIGHT foot plays): the same move as elastico.toml (same
+# events at the same normalised times). He keeps about 0.9 of his pace through it. After a 0.10 s reach the OUTSIDE of the right
+# foot carries the ball 0.50 m to his right over 0.11 s, his hips going 0.19 m with it; the foot stays on the ball, wraps round
+# the back of it, and 0.22 s after the contact the INSIDE whips it back across him toward the left as the exit. The support (left)
+# foot skips under the travelling body in short stances fixed on the pitch (flagged in [stance], so the runtime holds it where it
+# landed), plants for the snap, and he drives off it toward the exit at 2 m/s or more; the right foot comes down off the ball
+# across toward the exit as the new support and the left swings through. Clips elastico_left_run and its mirror
+# elastico_right_run. Conventions as in ball_roll.toml.
 #
-# Laid out on the simulation's path (skill-clips replay elastico-left-jog: entry 4.6 m/s, 5.8 m/s at the contact, 3.7 m/s from
-# the snap): every position is the simulation's (his place, the ball's) less where the clip's root is then; the root runs
-# straight 2.25 m along the run over the clip. Each label gives the key's time, seconds after the move's start tick. The
-# spans give normalised t = 2 x seconds, so frame k (60 fps) is at t = k / 30; the stances begin and end on frames.
+# Written in the ground frame: every position is where he and the ball are on the pitch from under his hips at the start, his
+# real travel. The pelvis keys every 1/30 s are his path (the sheet's root is their low-pass); the ball's keys from the contact
+# to contact2 are its place against him (the sheet's body leg), after contact2 a reference only (the simulation launches it by
+# the exit rule).
 
 name = "elastico"
 move = "elastico"
 side = "left"
 foot = "right"
 entry = "run"
-entry_speed = 2.0
-notes = "elastico at a run: outside push 0.30 m away from the exit, the foot wraps round the ball, inside snaps it back across toward the exit as the exit touch; the left foot skips under him in two hops and stands for the snap, the right comes down off the ball and the left swings through"
-
-[sim]
-reach_s = 0.10
-move_s = 0.26
-push_m = 0.30                     # the outside carries the ball this far away from S ...
-push_s = 0.11                     # ... over this long from the contact
-contact2_s = 0.22                 # the inside snap (the exit touch), from the contact
-run_keep = 0.8                    # he keeps this share of his pace
-entry_speed = 4.6
-ball_radius = 0.11
+entry_speed = 5.3
+notes = "elastico at a run: outside push 0.50 m away from the exit with the hips following 0.19 m, the foot wraps round the ball, the inside whips it back across as the exit; the left foot skips under him and plants for the snap, he drives off it after the ball"
 
 [events]
 start = 0.0
-contact = 0.2                     # the outside meets the ball
-contact2 = 0.64                   # the inside snaps it back (the exit touch)
-release = 0.72                    # the inside leaves it (the move's end tick)
+contact = 0.1667                 # the outside meets the ball
+contact2 = 0.5333                # the inside snaps it back (the exit)
+release = 0.6                 # the move's end tick
 end = 1.0
 
 [[variant]]
 suffix = "_run"
-spans = [0.10, 0.22, 0.04, 0.14]
+spans = [0.10, 0.22, 0.04, 0.24]
 
 [ball]
 radius = 0.11
-touch = { contact = "right", contact2 = "right", release = "right" }
+touch = { contact = "right", contact2 = "right" }
 
 # each foot's stances (normalised times)
 [stance]
-left = [[0.0, 0.134], [0.366, 0.434], [0.59933, 0.734], [0.966, 1.0]]
-right = [[0.866, 0.934]]
+left = [[0, 0.1112], [0.3055, 0.3888], [0.5, 0.6388], [0.9445, 1]]
+right = [[0.7778, 0.8612]]
+
+# The move sheet (data/moves/sheets.json): the ball's legs, the exit rule and how far the left stick may turn its frame.
+[sheet]
+entry_speed = 5.3
+steer_deg = 0
+plant = [[0.275, 0.7333]]           # the plant for the snap ...
+plant_accel = 23                  # ... where the root turns back toward the exit harder than a plant's 20 m/s^2 (the card's 2 m/s by the release needs it)
+
+[[sheet.leg]]
+from = "contact"
+to = "contact2"
+anchor = "body"
+foot = "right"
+surface = "outside"
+
+[[sheet.leg]]
+from = "contact2"
+to = "release"
+anchor = "launch"
+foot = "right"
+surface = "inside"
+
+[sheet.exit]
+kind = "launch"
+min_deg = 40
+max_deg = 75
+rest_deg = 55
+push = "sprint"
+foot = "right"
+surface = "inside"
+
+# The card: what the solved clip must measure (tools/anim/clip_measures.py, card_measures).
+[card]
+out_m = [0.45, 0.55]              # the ball goes this far away from the exit side against him ...
+out_s = [0.08, 0.125]             # ... within this long of the contact
+contact2_s = [0.21, 0.23]
+hips_m = [0.15, 0.20]             # his hips follow the push
+exit_speed = [2.0, 9.0]           # and he drives to the exit side by the release, m/s
+drop_m = [0.06, 0.20]             # the sell: the pelvis drops
+keep = [0.80, 1.5]                # he keeps this share of his pace
+
 
 [[key]]
-t = 0.0
+t = 0
 ease = 0
-label = "start: running, the left foot landing ahead of the hips, the right passing under him; the left foot lands ahead (stance 1) (sim 0.000 s)"
-pelvis = { pos = [0, 0.88, 0], pitch = 13 }
+label = "start: running, the left foot landing ahead of the hips, the ball ahead of the right foot (0.000 s)"
+pelvis = { pos = [0, 0.885, 0], pitch = 13 }
 chest = { pitch = 6 }
 head = { pitch = 26 }
-foot_l = { pos = [0.13, 0.002, 0.38], yaw = 6, pitch = 0, toe = 0, knee = [0.2, 0, 1], ease = 1 }
+foot_l = { pos = [0.13, 0.002, 0.3756], yaw = 6, pitch = 0, toe = 0, knee = [0.2, 0, 1], ease = 1 }
 foot_r = { pos = [-0.1, 0.09, 0.04], yaw = -6, pitch = -5, toe = 0, knee = [-0.15, 0, 1] }
 hand_l = { swing = 30, abduct = 14, bend = 70 }
 hand_r = { swing = -30, abduct = 14, bend = 70 }
-ball = { pos = [-0.041, 0.11, 0.485] }
+ball = { pos = [0.0025, 0.11, 0.51], ease = 0 }
+root = { yaw = 0 }
 
 [[key]]
-t = 0.06667
-label = "over the left foot, low (sim 0.033 s)"
-pelvis = { pos = [0.02, 0.85, 0.15], pitch = 13 }
-ball = { pos = [-0.052, 0.11, 0.641] }
+t = 0.0556
+label = "on the root (0.033 s)"
+pelvis = { pos = [0, 0.8767, 0.1756] }
+root = { yaw = 0 }
 
 [[key]]
-t = 0.11667
-label = "reach: the right foot crosses in front toward the ball's left side (sim 0.058 s)"
+t = 0.0833
+label = "on the root (0.050 s)"
+ball = { pos = [0.0025, 0.11, 0.715], ease = 0 }
+
+[[key]]
+t = 0.0967
+label = "reach: the right foot crosses in front toward the ball's left side (0.058 s)"
 foot_r = { pos = [0.2, -0.04, -0.1], frame = "ball", yaw = 0, pitch = 0, toe = 0, knee = [0.2, 0.2, 1] }
 
 [[key]]
-t = 0.13333
-label = "the left foot pushes off (stance 1 ends) (sim 0.067 s)"
-foot_l = { pos = [0.13, 0.002, 0.38], yaw = 6, pitch = 0, toe = 0, knee = [0.2, 0, 1], ease = 1 }
+t = 0.1111
+label = "on the root (0.067 s)"
+pelvis = { pos = [-0.0019, 0.8683, 0.3489] }
+root = { yaw = 0 }
 
 [[key]]
-t = 0.16667
-label = "the L foot off the ground (sim 0.083 s)"
-foot_l = { pos = [0.116, 0.05, 0.375], ease = [1, 0, 1] }
+t = 0.1112
+label = "on the root (0.067 s)"
+foot_l = { pos = [0.13, 0.002, 0.3756], yaw = 6, pitch = 0, toe = 0, knee = [0.2, 0, 1], ease = 1 }
 
 [[key]]
-t = 0.2
-label = "contact: the outside of the right foot on the ball's left side; the sell begins (hip and shoulder drop away from the exit) (sim 0.100 s)"
-pelvis = { pos = [-0.03, 0.885, 0.45], yaw = -14, pitch = 12, roll = -8 }
-chest = { yaw = -12, pitch = 12, roll = -20 }
+t = 0.1667
+label = "contact: the outside of the right foot on the ball's left side; the sell begins (hip and shoulder drop away from the exit) (0.100 s)"
+pelvis = { pos = [-0.0175, 0.86, 0.52], yaw = -10, pitch = 12, roll = -8 }
+chest = { yaw = -12, pitch = 12, roll = -18 }
 head = { yaw = -18, pitch = 32, roll = -6 }
 foot_r = { pos = [0.145, -0.09, 0], frame = "ball", yaw = 0, pitch = 0, knee = [0, 0.1, 1], ease = 0 }
 hand_l = { swing = 35, abduct = 0, bend = 60 }
 hand_r = { swing = -10, abduct = 62, bend = 30, trail = 100 }
-ball = { pos = [-0.085, 0.11, 0.856] }
+ball = { pos = [0.0025, 0.11, 0.92], ease = 0 }
+root = { yaw = 0 }
 
 [[key]]
-t = 0.25
-label = "hop 1: the left foot in the air under him, the hips up (sim 0.125 s)"
-pelvis = { pos = [-0.06, 0.925, 0.562], yaw = -17, pitch = 12, roll = -10 }
-foot_l = { pos = [0.16, 0.1, 0.582], yaw = 4, pitch = 0, toe = 0, knee = [0.25, 0.1, 1] }
-ball = { pos = [-0.153, 0.11, 0.953] }
+t = 0.2222
+label = "on the root (0.133 s)"
+foot_l = { pos = [0.1014, 0.1, 0.7089], yaw = 4, pitch = 0, toe = 0, knee = [0.25, 0.1, 1] }
 
 [[key]]
-t = 0.34667
-label = "the L foot coming down (sim 0.172 s)"
-foot_l = { pos = [0.172, 0.045, 0.917], ease = [1, 0, 1] }
+t = 0.2222
+label = "on the root (0.133 s)"
+pelvis = { pos = [-0.0486, 0.8464, 0.6889] }
+root = { yaw = 0 }
 
 [[key]]
-t = 0.36667
-label = "the left foot lands under his left hip (stance 2) (sim 0.182 s)"
-foot_l = { pos = [0.17, 0.002, 0.945], yaw = 6, pitch = 0, toe = 0, knee = [0.2, 0, 1], ease = 1 }
+t = 0.2278
+label = "on the root (0.137 s)"
+foot_r = { pos = [0.145, -0.09, 0], frame = "ball", yaw = -4 }
+ball = { pos = [-0.1572, 0.11, 1.0856], ease = 0 }
 
 [[key]]
-t = 0.42
-label = "the outside has carried the ball 0.30 m away from the exit; the sell at its deepest (sim 0.208 s)"
-pelvis = { pos = [-0.1, 0.85, 0.945], yaw = -20, pitch = 13, roll = -12 }
-chest = { yaw = -14, pitch = 12, roll = -28 }
+t = 0.2778
+label = "on the root (0.167 s)"
+pelvis = { pos = [-0.0953, 0.8327, 0.8556] }
+root = { yaw = 0 }
+
+[[key]]
+t = 0.2888
+label = "on the root (0.173 s)"
+foot_r = { pos = [0.145, -0.09, 0], frame = "ball", yaw = -8 }
+ball = { pos = [-0.4418, 0.11, 1.2486], ease = 0 }
+
+[[key]]
+t = 0.3055
+label = "on the root (0.183 s)"
+foot_l = { pos = [0.039, 0.002, 1.0812], yaw = 6, pitch = 0, toe = 0, knee = [0.2, 0, 1], ease = 1 }
+
+[[key]]
+t = 0.3333
+label = "on the root (0.200 s)"
+pelvis = { pos = [-0.1503, 0.8191, 1.0202] }
+root = { yaw = 0 }
+
+[[key]]
+t = 0.35
+label = "the outside has carried the ball 0.50 m away from the exit; the sell at its deepest, the hips gone 0.19 m with it (0.210 s)"
+pelvis = { yaw = -16, pitch = 13, roll = -12 }
+chest = { yaw = -24, pitch = 12, roll = -26 }
 head = { yaw = -22, pitch = 32, roll = -8 }
 foot_r = { pos = [0.145, -0.09, 0], frame = "ball", yaw = -12, pitch = 0, knee = [-0.35, 0.15, 1] }
 hand_l = { swing = 45, abduct = -8, bend = 65 }
 hand_r = { swing = -20, abduct = 82, bend = 22, trail = 100 }
-ball = { pos = [-0.402, 0.11, 1.283] }
+ball = { pos = [-0.623, 0.11, 1.4094], ease = 0 }
 
 [[key]]
-t = 0.43333
-label = "the left foot pushes off again (stance 2 ends) (sim 0.214 s)"
-foot_l = { pos = [0.17, 0.002, 0.945], yaw = 6, pitch = 0, toe = 0, knee = [0.2, 0, 1], ease = 1 }
+t = 0.3888
+label = "on the root (0.233 s)"
+foot_l = { pos = [0.039, 0.002, 1.0812], yaw = 6, pitch = 0, toe = 0, knee = [0.2, 0, 1], ease = 1 }
 
 [[key]]
-t = 0.46667
-label = "the L foot off the ground (sim 0.230 s)"
-foot_l = { pos = [0.164, 0.05, 1.015], ease = [1, 0, 1] }
+t = 0.3889
+label = "on the root (0.233 s)"
+pelvis = { pos = [-0.1841, 0.8092, 1.1836] }
+root = { yaw = 0 }
 
 [[key]]
-t = 0.51
-label = "the right foot wraps round the back of the ball, its toes a few centimetres off it (sim 0.252 s)"
+t = 0.4112
+label = "the right foot wraps round the back of the ball, its toes a few centimetres off it (0.247 s)"
 foot_r = { pos = [0.05, -0.08, -0.23], frame = "ball", yaw = -22, pitch = 5, knee = [0, 0.2, 1] }
+ball = { pos = [-0.6507, 0.11, 1.5687], ease = 0 }
 
 [[key]]
-t = 0.51667
-label = "hop 2: the left foot in the air, the hips up, the weight coming back (sim 0.255 s)"
-pelvis = { pos = [-0.07, 0.925, 1.163], yaw = -10, pitch = 13, roll = -7 }
-foot_l = { pos = [0.19, 0.1, 1.193], yaw = 4, pitch = 0, toe = 0, knee = [0.25, 0.1, 1] }
-ball = { pos = [-0.407, 0.11, 1.472] }
+t = 0.4444
+label = "on the root (0.267 s)"
+pelvis = { pos = [-0.1934, 0.8008, 1.346] }
+root = { yaw = 4 }
 
 [[key]]
-t = 0.58
-label = "and up its right side; the L foot coming down (sim 0.286 s)"
-foot_l = { pos = [0.196, 0.045, 1.452], ease = [1, 0, 1] }
+t = 0.4445
+label = "on the root (0.267 s)"
+foot_l = { pos = [0.0466, 0.09, 1.386], yaw = 4, pitch = 0, toe = 0, knee = [0.25, 0.1, 1] }
+
+[[key]]
+t = 0.4722
+label = "and up its right side (0.283 s)"
 foot_r = { pos = [-0.11, -0.08, -0.19], frame = "ball", yaw = -35, pitch = 3 }
+ball = { pos = [-0.6489, 0.11, 1.7267], ease = 0 }
 
 [[key]]
-t = 0.6
-label = "the left foot lands under his left hip for the snap (stance 3) (sim 0.296 s)"
-foot_l = { pos = [0.19, 0.002, 1.49], yaw = 8, pitch = 0, toe = 0, knee = [0.25, 0, 1], ease = 1 }
+t = 0.5
+label = "on the root (0.300 s)"
+pelvis = { pos = [-0.1783, 0.8, 1.5072] }
+foot_l = { pos = [0.145, 0.002, 1.8072], yaw = 8, pitch = 0, toe = 0, knee = [0.25, 0, 1], ease = 1 }
+root = { yaw = 8 }
 
 [[key]]
-t = 0.64
-label = "contact2: the inside snaps it back across toward the exit (the exit touch), the weight on the left foot, low (sim 0.317 s)"
-pelvis = { pos = [-0.05, 0.85, 1.44], yaw = 0, pitch = 13, roll = -2 }
-chest = { yaw = 4, pitch = 11, roll = -6 }
+t = 0.5333
+label = "contact2: the inside snaps it back across toward the exit (the exit), the weight on the left foot, low (0.320 s)"
+pelvis = { yaw = 4, pitch = 13, roll = -2 }
+chest = { yaw = 10, pitch = 11, roll = -6 }
 head = { yaw = 2, pitch = 32, roll = 0 }
 foot_r = { pos = [-0.115, -0.09, -0.115], frame = "ball", yaw = -40, pitch = 0, knee = [-0.2, 0.1, 1], ease = 0 }
 hand_l = { swing = 15, abduct = 30, bend = 50 }
 hand_r = { swing = 10, abduct = 45, bend = 45 }
-ball = { pos = [-0.408, 0.11, 1.721] }
+ball = { pos = [-0.6175, 0.11, 1.8834], ease = 0 }
+root = { yaw = 12.67 }
 
 [[key]]
-t = 0.72
-label = "release: the ball away to the left-forward, the support foot driving off toward it (sim 0.358 s)"
-pelvis = { pos = [0.02, 0.87, 1.62], yaw = 15, pitch = 13, roll = 5 }
-chest = { yaw = 8, pitch = 10, roll = 8 }
+t = 0.5556
+label = "on the root (0.333 s)"
+pelvis = { pos = [-0.1387, 0.81, 1.6673] }
+root = { yaw = 15.78 }
+
+[[key]]
+t = 0.5612
+label = "the foot whips through after the ball (0.337 s)"
+foot_r = { pos = [-0.16, -0.07, -0.16], frame = "ball", yaw = -34, pitch = 0 }
+
+[[key]]
+t = 0.6
+label = "release: the ball away across him, he drives after it off the left foot (0.360 s)"
+pelvis = { yaw = 24, pitch = 13, roll = 5 }
+chest = { yaw = 14, pitch = 10, roll = 8 }
 head = { yaw = 12, pitch = 26 }
-foot_r = { pos = [-0.115, -0.09, -0.115], frame = "ball", yaw = -35, pitch = 0, ease = 0 }
+foot_r = { pos = [-0.27, -0.04, -0.27], frame = "ball", yaw = -24, pitch = 0 }
 hand_l = { swing = -5, abduct = 40, bend = 45 }
 hand_r = { swing = 25, abduct = 30, bend = 55 }
-ball = { pos = [-0.29, 0.11, 1.925] }
+ball = { pos = [-0.2263, 0.11, 2.1573], ease = 0 }
+root = { yaw = 22 }
 
 [[key]]
-t = 0.73333
-label = "the left foot pushes off toward the exit (stance 3 ends) (sim 0.365 s)"
-foot_l = { pos = [0.19, 0.002, 1.49], yaw = 8, pitch = 0, toe = 0, knee = [0.25, 0, 1], ease = 1 }
+t = 0.6111
+label = "on the root (0.367 s)"
+pelvis = { pos = [-0.0747, 0.8333, 1.8263] }
+root = { yaw = 22.31 }
 
 [[key]]
-t = 0.76667
-label = "the L foot off the ground (sim 0.382 s)"
-foot_l = { pos = [0.105, 0.05, 1.604], ease = [1, 0, 1] }
+t = 0.6388
+label = "on the root (0.383 s)"
+foot_l = { pos = [0.145, 0.002, 1.8072], yaw = 8, pitch = 0, toe = 0, knee = [0.25, 0, 1], ease = 1 }
 
 [[key]]
-t = 0.78
-label = "the right foot follows the ball off (sim 0.389 s)"
-foot_r = { pos = [-0.17, -0.06, -0.17], frame = "ball", yaw = -30, pitch = 0 }
-ball = { pos = [-0.211, 0.11, 2.072] }
+t = 0.6667
+label = "on the root (0.400 s)"
+pelvis = { pos = [0.0137, 0.85, 1.9842] }
+root = { yaw = 23.87 }
 
 [[key]]
-t = 0.83333
-label = "both feet off the ground, the hips up; the left knee drives through (sim 0.415 s)"
-pelvis = { pos = [0.03, 0.915, 1.875], yaw = 12, pitch = 14, roll = 5 }
-foot_l = { pos = [0.17, 0.12, 1.955], yaw = 8, pitch = 0, toe = 0, knee = [0.3, 0.1, 1] }
-ball = { pos = [-0.148, 0.11, 2.2] }
+t = 0.6945
+label = "on the root (0.417 s)"
+foot_r = { pos = [-0.0929, 0.08, 2.1627], yaw = -6, pitch = 0, toe = 0, knee = [-0.1, 0.1, 1] }
 
 [[key]]
-t = 0.84667
-label = "the R foot coming down (sim 0.422 s)"
-foot_r = { pos = [0.036, 0.06, 1.935], ease = [1, 0, 1] }
+t = 0.7
+label = "on the root (0.420 s)"
+ball = { pos = [0.3532, 0.11, 2.5631], ease = 0 }
 
 [[key]]
-t = 0.86667
-label = "the right foot comes down off the ball across toward the exit and takes the weight (its stance) (sim 0.432 s)"
-foot_r = { pos = [0.02, 0.002, 1.97], yaw = -12, pitch = 0, toe = 0, knee = [-0.15, 0, 1], ease = 1 }
+t = 0.7222
+label = "on the root (0.433 s)"
+pelvis = { pos = [0.1266, 0.8667, 2.141] }
+root = { yaw = 25.44 }
 
 [[key]]
-t = 0.9
-label = "over the right foot, low (sim 0.449 s)"
-pelvis = { pos = [0.01, 0.86, 2.025], yaw = 8, pitch = 14, roll = 2 }
-ball = { pos = [-0.078, 0.11, 2.356] }
+t = 0.75
+label = "on the root (0.450 s)"
+foot_l = { pos = [0.3511, 0.12, 2.169], yaw = 8, pitch = 0, toe = 0, knee = [0.3, 0.1, 1] }
 
 [[key]]
-t = 0.93333
-label = "the right foot pushes off (sim 0.465 s)"
-foot_r = { pos = [0.02, 0.002, 1.97], yaw = -12, pitch = 0, toe = 0, knee = [-0.15, 0, 1], ease = 1 }
+t = 0.7778
+label = "on the root (0.467 s)"
+pelvis = { pos = [0.2565, 0.8833, 2.297] }
+root = { yaw = 27 }
 
 [[key]]
-t = 0.94667
-label = "the L foot coming down (sim 0.472 s)"
-foot_l = { pos = [0.188, 0.05, 2.321], ease = [1, 0, 1] }
+t = 0.7778
+label = "on the root (0.467 s)"
+foot_r = { pos = [0.2149, 0.002, 2.474], yaw = -4, pitch = 0, toe = 0, knee = [-0.15, 0, 1], ease = 1 }
 
 [[key]]
-t = 0.96667
-label = "the R foot off the ground; the left foot lands ahead and to the left (sim 0.482 s)"
-foot_l = { pos = [0.17, 0.002, 2.355], yaw = 12, pitch = 0, toe = 0, knee = [0.3, 0, 1], ease = 1 }
-foot_r = { pos = [-0.069, 0.05, 2.052], ease = [1, 0, 1] }
+t = 0.8333
+label = "on the root (0.500 s)"
+pelvis = { pos = [0.3879, 0.89, 2.453] }
+ball = { pos = [1.1121, 0.11, 3.0944], ease = 0 }
+root = { yaw = 27.25 }
 
 [[key]]
-t = 1.0
+t = 0.8612
+label = "on the root (0.517 s)"
+foot_r = { pos = [0.2149, 0.002, 2.474], yaw = -4, pitch = 0, toe = 0, knee = [-0.15, 0, 1], ease = 1 }
+
+[[key]]
+t = 0.8889
+label = "on the root (0.533 s)"
+pelvis = { pos = [0.5205, 0.89, 2.609] }
+root = { yaw = 27.5 }
+
+[[key]]
+t = 0.9444
+label = "on the root (0.567 s)"
+pelvis = { pos = [0.6541, 0.89, 2.765] }
+root = { yaw = 27.75 }
+
+[[key]]
+t = 0.9445
+label = "on the root (0.567 s)"
+foot_l = { pos = [0.8914, 0.002, 2.963], yaw = 12, pitch = 0, toe = 0, knee = [0.3, 0, 1], ease = 1 }
+
+[[key]]
+t = 1
 ease = 0
-label = "end; end: driving away to the left-forward after the ball (his own facing turns that way now), the right foot leaving the ground (sim 0.498 s)"
-pelvis = { pos = [0, 0.885, 2.25], yaw = 4, pitch = 14, roll = 4 }
-chest = { yaw = 6, pitch = 10, roll = 4 }
+label = "end: driving away to the left-forward after the ball (0.600 s)"
+pelvis = { pos = [0.7889, 0.89, 2.921], yaw = 30, pitch = 14, roll = 6 }
+chest = { yaw = 8, pitch = 10, roll = 4 }
 head = { yaw = 10, pitch = 15 }
-foot_l = { pos = [0.17, 0.002, 2.355], yaw = 12, pitch = 0, toe = 0, knee = [0.3, 0, 1], ease = 1 }
-foot_r = { pos = [-0.05, 0.03, 2.13], yaw = 4, pitch = -15, toe = 12, knee = [-0.1, 0, 1] }
+foot_l = { pos = [0.8914, 0.002, 2.963], yaw = 12, pitch = 0, toe = 0, knee = [0.3, 0, 1], ease = 1 }
+foot_r = { pos = [0.7089, 0.06, 2.701], yaw = 4, pitch = -15, toe = 12, knee = [-0.1, 0, 1] }
 hand_l = { swing = -60, abduct = 25, bend = 75 }
 hand_r = { swing = 65, abduct = 10, bend = 75 }
-ball = { pos = [0.016, 0.11, 2.588] }
+ball = { pos = [2.0385, 0.11, 3.7432], ease = 0 }
+root = { yaw = 28 }

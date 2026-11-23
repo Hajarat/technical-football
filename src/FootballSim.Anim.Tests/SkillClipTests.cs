@@ -191,6 +191,42 @@ public class SkillClipTests
             }
     }
 
+    [Fact]
+    public void ASheetDrivenMovesClipsCarryTheSheetsRootAndItsSprintEntryIsPickedByName()
+    {
+        var dir = SkillClipDir();
+        Assert.NotNull(dir);
+        var lib = SkillClipLibrary.Parse(File.ReadAllText(Path.Combine(dir!, "clips.json")), f => File.ReadAllBytes(Path.Combine(dir!, f)));
+        // the drag-back has a third entry; the pair is still its standing and running clips
+        var (stand, run) = lib.Pair("drag_back", 1, 0)!.Value;
+        Assert.Equal("drag_back_right", stand.Clip.Name); Assert.Equal("drag_back_right_run", run.Clip.Name);
+        var sprint = lib.ForEntry("drag_back", 1, 0, "sprint");
+        Assert.Equal("drag_back_right_sprint", sprint!.Clip.Name);
+        Assert.Equal("drag_back_left_sprint", lib.ForEntry("drag_back", 0, 0, "sprint")!.Clip.Name);
+        Assert.Null(lib.ForEntry("elastico", 1, -1, "sprint"));
+        Assert.Equal("elastico_left_run", lib.ForEntry("elastico", 1, -1, "run")!.Clip.Name);
+        foreach (var c in new[] { stand, run, sprint, lib.ForEntry("elastico", 1, -1, "stand")!, lib.ForEntry("elastico", 1, -1, "run")!, lib.ForEntry("elastico", 0, 1, "run")! })
+        {
+            Assert.True(c.HasSheetRoot, c.Clip.Name);
+            // the sheet root starts under the hips, and the hips stay near it throughout: the body goes where the root goes
+            Assert.True((c.SheetRoot(0f) - c.Root(0f)).Length() < 1e-4f, c.Clip.Name);
+            for (int f = 0; f < c.Clip.FrameCount; f++)
+            {
+                float t = f / (float)c.Clip.Fps;
+                var h = c.Clip.Hips(f);
+                Assert.True((new System.Numerics.Vector2(h.X, h.Z) - c.SheetRoot(t)).Length() < 0.12f, $"{c.Clip.Name} frame {f}: the hips are {(new System.Numerics.Vector2(h.X, h.Z) - c.SheetRoot(t)).Length():F2} m off the sheet root");
+            }
+        }
+        // the drag-back opens a quarter turn toward the playing foot by its release (yaw is toward his left)
+        Assert.Equal(-MathF.PI / 2f, run.SheetYaw(run.EventSeconds("release")), 2);
+        Assert.Equal(MathF.PI / 2f, lib.ForEntry("drag_back", 0, 0, "run")!.SheetYaw(run.EventSeconds("release")), 2);
+        Assert.Equal(0f, run.SheetYaw(0f), 3);
+        // his real travel: the running drag-back's root goes forward to the stop and comes back, where the straight line from the
+        // first frame's hips to the last's never leaves its end
+        float furthest = Enumerable.Range(0, run.Clip.FrameCount).Max(f => run.SheetRoot(f / (float)run.Clip.Fps).Y);
+        Assert.True(furthest - run.SheetRoot(run.LastSeconds).Y > 0.2f, $"the root comes back {furthest - run.SheetRoot(run.LastSeconds).Y:F2} m");
+    }
+
     [Theory]
     [InlineData(1, -1, "fake_cut_left")]       // the right foot's cut to the left: the inside hook
     [InlineData(1, 1, "fake_cut_out_right")]   // to its own side: the outside hook

@@ -4,7 +4,7 @@ using FootballSim.Core;
 namespace FootballSim.Core.Tests;
 
 /// <summary>Skill moves through the real world: on an open field (the keeper far away), from scripted stick traces.</summary>
-public class SkillMoveTests
+public partial class SkillMoveTests
 {
     public enum Entry { Standing, Jog, Sprint }
 
@@ -241,9 +241,14 @@ public class SkillMoveTests
             if (p.SkillMove is { } dm && w.Tick == dm.ContactTick) { ballStart = dm.ContactPoint; playerStart = p.Position; }
         }
         Assert.True(end > 0);
-        Assert.InRange(playerStart.X - p.Position.X, 0.1f, 0.6f);    // stepped back about 0.3 m
-        Assert.InRange(ballStart.X - w.Ball.Position.X, 0.5f, 0.8f); // pulled back about 0.65 m
-        Assert.True(p.Speed < 0.1f, $"still moving at {p.Speed} m/s");
+        // (played from its move sheet, at a jog: the card's numbers)
+        Assert.InRange(ballStart.X - w.Ball.Position.X, 0.82f, 0.98f);  // pulled back about 0.90 m along his run
+        Assert.InRange(p.Position.X - w.Ball.Position.X, 0.15f, 0.35f); // to rest behind his hip line
+        Assert.InRange(MathF.Abs(w.Ball.Position.Z - p.Position.Z), 0.05f, 0.22f); // and to the playing foot's side
+        Assert.InRange(MathF.Abs(Movement.WrapAngle(p.Facing)) * 180f / MathF.PI, 85f, 95f); // he has opened a quarter turn: side-on to it
+        Assert.True(playerStart.X - p.Position.X < 0.3f, "he ends near where the sole landed (a short run-on, then the hop back)");
+        Assert.True(p.Speed < 0.3f, $"still moving at {p.Speed} m/s");
+        Assert.True(new Vector2(w.Ball.Velocity.X, w.Ball.Velocity.Z).Length() < 0.01f, "the ball is left at rest");
         Assert.True(p.InPossession);
     }
 
@@ -896,7 +901,8 @@ public class SkillMoveTests
                     Assert.Equal(ActionKind.Elastico, m.Kind);
                     Assert.InRange(m.ContactTick - m.StartTick, 0, 12);          // reach at most 0.10 s
                     Assert.Equal(26, m.Contact2Tick - m.ContactTick);            // the inside's snap 0.22 s after the first contact
-                    Assert.Equal(31, m.EndTick - m.ContactTick);                 // the release at 0.26 s
+                    Assert.Equal(32, m.EndTick - m.ContactTick);                 // the release on the sheet's frame, 0.267 s
+                    Assert.NotNull(m.Sheet);                                     // played from its move sheet
                     Assert.Equal(opposite, m.Foot); Assert.Equal(m.Foot, m.Foot2);
                     Assert.Equal(FootSurface.Outside, m.Surface); Assert.Equal(FootSurface.Inside, m.Surface2);
                     Assert.Equal(-1, m.LiftTick);
@@ -945,8 +951,10 @@ public class SkillMoveTests
             {
                 var s = tr.At[tick];
                 float ground = new Vector2(s.V.X, s.V.Z).Length();
-                // No change of the ground speed faster than 15 m/s^2 inside the move.
-                if (!float.IsNaN(prev)) Assert.True(MathF.Abs(ground - prev) <= 15f * t.Dt + 1e-4f, $"{move} {e} seed {seed} tick +{tick - m.StartTick}: {prev:F2} -> {ground:F2} m/s");
+                // No change of the ground speed faster than 15 m/s^2 inside the move (a move played from its sheet: no faster than
+                // the sheet itself changes his velocity, with the eases onto it).
+                float step = m.Sheet != null ? MathF.Max(15f, SheetAccel(m.Sheet, t) + 2f * t.Movement.BalanceDeceleration) : 15f;
+                if (!float.IsNaN(prev)) Assert.True(MathF.Abs(ground - prev) <= step * t.Dt + 1e-4f, $"{move} {e} seed {seed} tick +{tick - m.StartTick}: {prev:F2} -> {ground:F2} m/s");
                 prev = ground;
                 float fwd = s.V.X * m.RunDirection.X + s.V.Z * m.RunDirection.Y;
                 if (tick == m.ContactTick) fwd0 = fwd;
@@ -963,6 +971,14 @@ public class SkillMoveTests
                     float keepS = t.Skill.SpinRunKeep * tr.Entry;
                     Assert.True(fwd >= MathF.Max(keepS, tr.Entry - t.Skill.SpinRunBrake * t.Dt * (tick - m.StartTick + 1)) - 0.1f, $"{move} {e} tick +{tick - m.StartTick}: forward {fwd:F2} from {tr.Entry:F2}");
                     Assert.True(fwd >= 0.6f * tr.Entry, $"{move} {e} tick +{tick - m.StartTick}: forward {fwd:F2} from {tr.Entry:F2}");
+                    continue;
+                }
+                if (move == "elastico" && m.Sheet != null)
+                {
+                    // Played from its sheet: the running speed is held at nothing (his ground velocity is the sheet's step), and
+                    // at a run he keeps 0.80 of his pace or more.
+                    Assert.Equal(0f, s.Run);
+                    if (e != Entry.Standing) Assert.True(ground >= 0.80f * tr.Entry - 0.05f, $"{move} {e} tick +{tick - m.StartTick}: {ground:F2} m/s from {tr.Entry:F2}");
                     continue;
                 }
                 if (move == "elastico" && e != Entry.Standing)
@@ -999,14 +1015,19 @@ public class SkillMoveTests
         var s = new Vector2(-f.Y, f.X) * side;
         float Lat(Vector3 v) => v.X * s.X + v.Z * s.Y;
         float Along(Vector3 v) => v.X * f.X + v.Z * f.Y;
-        var b0 = tr.At[m.ContactTick].B;
-        // The outside's push: about 0.30 m away from the side by 0.11 s, held there as the foot wraps round it.
-        float push = Lat(tr.At[m.ContactTick + 13].B - b0), wrap = Lat(tr.At[m.Contact2Tick - 1].B - b0);
-        Assert.True(push is > -0.35f and < -0.25f && wrap is > -0.35f and < -0.25f, $"push {push:F3} wrap {wrap:F3}");
-        // The inside plays it on toward the stick (45 degrees to the side) at the second contact: that is the exit touch, so none
-        // is made on the end tick; the next touch is an ordinary one, at least a windup after the second contact.
+        // (against him: the ball's place in his frame, which does not turn with his facing)
+        Vector3 Rel(int tick) => tr.At[tick].B - tr.At[tick].P;
+        var b0 = Rel(Math.Max(m.StartTick, m.ContactTick - 1));
+        // The outside's push: about 0.50 m away from the side against him by 0.11 s, held there as the foot wraps round it.
+        float push = Lat(Rel(m.ContactTick + 13) - b0), wrap = Lat(Rel(m.Contact2Tick - 1) - b0);
+        Assert.True(push is > -0.58f and < -0.42f && wrap is > -0.58f and < -0.42f, $"push {push:F3} wrap {wrap:F3}");
+        // His hips go with the push, then he drives back toward the side.
+        float hips = Enumerable.Range(m.StartTick, m.Contact2Tick - m.StartTick).Min(k => Lat(tr.At[k].P - tr.At[m.StartTick].P));
+        Assert.True(hips is > -0.40f and < -0.08f, $"hips {hips:F3}");
+        // The inside plays it on toward the stick (45 degrees to the side, held inside the sheet's 40 to 75) at the second contact:
+        // that is the exit, so no touch is made on the end tick; the next touch is an ordinary one, at least a windup after the second contact.
         float deg = MathF.Atan2(Lat(tr.BallV2), Along(tr.BallV2)) * 180f / MathF.PI;
-        Assert.InRange(deg, 30f, 60f);
+        Assert.InRange(deg, 38f, 77f);
         Assert.True(new Vector2(tr.BallV2.X, tr.BallV2.Z).Length() > 1f, $"ball {tr.BallV2} after the second contact");
         Assert.True(tr.NextTouch > m.EndTick, $"next touch on {tr.NextTouch}, the move ends on {m.EndTick}");
         Assert.True(tr.NextTouch - m.Contact2Tick >= TouchPlanner.WindupTicks(t), $"next touch {tr.NextTouch - m.Contact2Tick} ticks after the second contact");
@@ -1014,7 +1035,7 @@ public class SkillMoveTests
         Assert.False(tr.Lost);
         // He comes out of it driving toward the side.
         var end = tr.At[m.EndTick - 1];
-        Assert.True(Lat(end.V) > 0.5f, $"sideways {Lat(end.V):F2} m/s at the end");
+        Assert.True(Lat(end.V) > 1.8f, $"sideways {Lat(end.V):F2} m/s at the end");
     }
 
     [Theory]

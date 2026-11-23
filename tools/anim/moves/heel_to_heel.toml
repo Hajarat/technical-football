@@ -43,6 +43,32 @@ spans = [0.1167, 0.1, 0.1333, 0.12]
 radius = 0.11
 touch = { contact = "right", contact2 = "left" }
 
+# The move sheet (data/moves/sheets.json): the ball's legs, the exit rule and how far the left stick may turn its frame.
+[sheet]
+steer_deg = 0
+
+[[sheet.leg]]
+from = "contact"
+to = "contact2"
+anchor = "body"
+foot = "right"
+surface = "heel"
+
+[[sheet.leg]]
+from = "contact2"
+to = "release"
+anchor = "launch"
+foot = "left"
+surface = "inside"
+
+[sheet.exit]
+kind = "launch"
+min_deg = 0
+max_deg = 0
+push = "knock_on"
+foot = "left"
+surface = "inside"
+
 [[key]]
 t = 0
 ease = 1

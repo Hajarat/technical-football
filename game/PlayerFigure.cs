@@ -99,6 +99,13 @@ public struct FigureSkill
     public BootSurface Surface2;
     /// <summary>A drag-back the touch controller made as its own turn at the feet (not a skill gesture of the player's).</summary>
     public bool FeetTurn;
+    /// <summary>
+    /// The simulation plays the move from its move sheet: the two entries it blends ("stand", "run", "sprint") and the share of
+    /// the second. Its clips are then drawn on the sheet's root with that same blend.
+    /// </summary>
+    public bool Sheet;
+    public string SheetEntryA, SheetEntryB;
+    public float SheetShare;
 }
 
 /// <summary>Plain-value input for one figure for one physics tick. The figure never sees the simulation types.</summary>

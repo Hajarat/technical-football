@@ -383,7 +383,8 @@ public static class TouchPlanner
         p.SetForecast(p.SkillAction is { Made: false } sk && sk.ContactTick >= tick ? sk.ContactTick : -1, p.SkillAction?.Foot ?? Foot.Right,
             p.SkillAction?.ContactPoint ?? Vector3.Zero);
         // A spin's turn moves him by its step alone (see SkillMoves.SpinTick), its ground velocity planned to run on smoothly.
-        if (p.SkillAction is { Kind: ActionKind.Spin } spin && tick >= spin.ContactTick)
+        // (so does a sheet-driven move: he goes where its sheet takes him)
+        if (p.SkillAction is { Kind: ActionKind.Spin, Sheet: null } spin && tick >= spin.ContactTick || p.SkillAction is { Sheet: not null })
         {
             p.PlannerSteer = Vector2.Zero;
             p.SteerCarry = StepOffBoards(p, m.Carry, pitch, t);
@@ -1276,8 +1277,12 @@ public static class TouchPlanner
         if (p.SkillExitTick == tick && a is not { Pending: true } && intent.Move.Length() >= t.Touch.StickThreshold && TouchModel.InReach(p, ball, t))
         {
             p.SkillExitTick = -1;
+            // (a sheet-driven move's exit: the stick held inside the sheet's angle band, its foot and its push profile)
+            var rule = p.SkillExitRule;
+            p.SkillExitRule = null;
+            if (rule != null) intent = SkillMoves.ExitIntent(rule, p.SkillExitFwd, p.SkillExitSide, intent, t);
             var exit = new BallAction { Kind = ModeKind(TouchModel.ModeFor(intent, t)), PlanTick = tick, ContactTick = tick };
-            exit.Foot = p.IsStepping ? p.SwingFoot : TouchModel.ChooseFoot(p.Sheet, p.Position, p.Facing, ball.Position, t);
+            exit.Foot = rule?.Foot ?? (p.IsStepping ? p.SwingFoot : TouchModel.ChooseFoot(p.Sheet, p.Position, p.Facing, ball.Position, t));
             Install(p, exit, tick, t);
             return Execute(p, exit, intent, ball, tick, now, t, pitch, rng, immediate: true, opponents);
         }

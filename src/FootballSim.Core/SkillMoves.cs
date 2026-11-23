@@ -19,6 +19,12 @@ namespace FootballSim.Core;
 /// </list>
 /// A move ends with an exit burst through the touch boost: larger for a better effective skill and for an exit away from the
 /// side the move sold. Moves chained within chain_window use chain_multiplier times the previous effective skill.
+/// <para>
+/// A move whose driver (skill.driver) is "sheet" is not played by the formulas above: the simulation follows its move sheet
+/// (<see cref="MoveSheet"/>) for the body, the ball and the exit (see "the follower" below: <see cref="SheetFor"/>,
+/// SheetTick, SheetStep, SheetRelease). The elastico and the drag-back are; the gesture rules, the reach, the cooldowns, the chain
+/// and the exit burst are the same for both.
+/// </para>
 /// </summary>
 public static class SkillMoves
 {
@@ -57,6 +63,7 @@ public static class SkillMoves
         p.SkillBufTick = -1;
         p.SkillBufFakeFrom = -1;
         p.SkillExitTick = -1;
+        p.SkillExitRule = null;
         p.SkillBurstAtTick = -1;
         p.SkillCooldownUntil = -100f;
         p.SkillChainUntil = -100f;
@@ -374,6 +381,8 @@ public static class SkillMoves
         Vector2 fwd = GestureReader.FrameForward(p, t);
         float entry = MathF.Max(0f, Vector2.Dot(new Vector2(p.Velocity.X, p.Velocity.Z), fwd));
         int dur = Ticks(MoveSeconds(p, kind, entry, new Vector2(ball.Velocity.X, ball.Velocity.Z).Length(), false, t, mcGeady), t);
+        var held = SheetFor(kind, p.SkillBufSide, foot, entry, mcGeady, t);
+        if (held != null) dur = SheetTicks(held, "release", t);
         bool contactless = kind is ActionKind.StepOver or ActionKind.BodyFeint;
         return new BallAction
         {
@@ -391,6 +400,7 @@ public static class SkillMoves
             HoldDirection = fwd,
             SkillCut = p.SkillBufCut,
             McGeady = mcGeady,
+            Sheet = held,
         };
     }
 
@@ -427,6 +437,9 @@ public static class SkillMoves
             : contactless ? (int)MathF.Round(CloseInTicks(p, ball, fwd, entry, t) * (1f - DummyRunShare(entry, t))) : 0;
         // A two-contact move's contacts are fixed from its start (the heel-to-heel's from the start, the others' from the first).
         if (kind == ActionKind.HeelToHeel) dur = Ticks(k.HeelToHeelSeconds, t) - reach;
+        // A sheet-driven move runs its sheet's own time from the contact to the release.
+        var play = feetTurn || fakeFrom >= 0 ? null : SheetFor(kind, side, foot, entry, mcGeady, t);
+        if (play != null) dur = SheetTicks(play, "release", t);
         FootSurface surface = SurfaceFor(kind, side, foot);
         var a = new BallAction
         {
@@ -466,6 +479,8 @@ public static class SkillMoves
             a.Surface2 = kind == ActionKind.Spin ? (mcGeady ? FootSurface.Outside : FootSurface.Sole) : FootSurface.Inside;
             if (kind == ActionKind.Spin) a.LiftTick = c1 + Ticks(mcGeady ? k.McGeadyLiftSeconds * seconds / k.McGeadySeconds : k.SpinLiftSeconds, t);
         }
+        if (play != null) InitSheet(p, a, play, ball, t);
+        p.SkillExitRule = null;
         if (p.TouchAction is { Made: true } prev && prev.PhaseAt(tick, TouchPlanner.WindupTicks(t), TouchPlanner.WindupTicks(t)) != ActionPhase.Done)
             p.PrevTouchAction = prev;
         else p.PrevTouchAction = null;
@@ -490,6 +505,7 @@ public static class SkillMoves
         legs = new TickIntent { MoveX = face.X, MoveZ = face.Y, Sprint = 1f };
         float cap = Possession.SpeedCap(p, true, false, Possession.SpeedStyleLegs, t);
         float entry = a.SkillEntry;
+        if (a.Sheet != null) return SheetTick(p, a, tick, cap, t, ref legs);
         if (Reaches(a.Kind) && tick < a.ContactTick) return ReachTick(p, a, ball, tick, cap, t);
         int from = MoveFrom(a);
         int dur = a.EndTick - from;
@@ -1060,6 +1076,7 @@ public static class SkillMoves
     {
         var a = p.SkillAction!;
         var k = t.Skill;
+        if (a.Sheet != null) return SheetStep(p, a, intent, ball, tick, now, t, pitch);
         TouchResult? made = null;
         bool carried = Reaches(a.Kind);
         float miss = 0f;
@@ -1158,7 +1175,8 @@ public static class SkillMoves
     internal static BallAction? ExitForecast(PlayerState p, in TickIntent intent, Ball ball, int tick, Tuning t)
     {
         var a = p.SkillAction;
-        if (a == null || a.Kind is ActionKind.HeelToHeel or ActionKind.Elastico || a.Phase == ActionPhase.Done) return null;
+        if (a == null || a.Sheet == null && a.Kind is ActionKind.HeelToHeel or ActionKind.Elastico || a.Phase == ActionPhase.Done) return null;
+        if (a.Sheet != null && a.Sheet.Lead.Exit.Kind != SheetExitKind.Touch) return null;
         int n = a.EndTick - tick;
         if (n < 1 || n * t.Dt > ExitForecastSeconds + 1e-5f) return null;
         if (intent.Move.Length() < t.Touch.StickThreshold) return null;
@@ -1167,7 +1185,24 @@ public static class SkillMoves
         // The player on the end tick (he moves before the touch on it), the ball where it is left after the tick before.
         var feet = p.Position + pv * (n * dt);
         Vector3 b;
-        if (Reaches(a.Kind) && tick >= a.ContactTick)
+        if (a.Sheet != null)
+        {
+            // where the sheet has him and the ball as the move ends
+            float tauNow = SheetTauAfter(a, tick - 1, t), tauEnd = SheetTauAfter(a, a.EndTick - 1, t);
+            RootRow r0 = a.Sheet.Root(tauNow), r1 = a.Sheet.Root(tauEnd);
+            var d = SheetWorld(a, r1.X - r0.X, r1.Z - r0.Z);
+            feet = p.Position + new Vector3(d.X, 0f, d.Y);
+            b = ball.Position;
+            int last = LastDrivenLeg(a.Sheet);
+            if (last >= 0 && tick >= a.ContactTick)
+            {
+                var tr = a.Sheet.Track(last, 1f);
+                var w = SheetWorld(a, tr.X, tr.Z);
+                if (a.Sheet.Leg(last).Anchor == LegAnchor.Pitch && a.SheetLeg == last) b = a.LegBall0 + new Vector3(w.X, 0f, w.Y);
+                else if (a.Sheet.Leg(last).Anchor == LegAnchor.Body) b = feet + new Vector3(w.X, 0f, w.Y);
+            }
+        }
+        else if (Reaches(a.Kind) && tick >= a.ContactTick)
         {
             b = CarriedBall(p, a, a.EndTick - 1, t);
             // (the carried ball goes with the player: moved on with him to the tick before the end)
@@ -1179,7 +1214,7 @@ public static class SkillMoves
 
         // The ball's travel as Finish leaves it.
         Vector2 fwd = a.HoldDirection;
-        Vector3 bv = a.Kind switch
+        Vector3 bv = a.Sheet != null ? Vector3.Zero : a.Kind switch
         {
             ActionKind.BallRoll => RollReleaseVelocity(a, intent.Move, new Vector2(pv.X, pv.Z), t),
             ActionKind.DragBack or ActionKind.FakeStop => Vector3.Zero,
@@ -1187,12 +1222,14 @@ public static class SkillMoves
             ActionKind.StepOver or ActionKind.BodyFeint => DummyRelease(p, a, ball, t) with { Y = 0f },
             _ => new Vector3(ball.Velocity.X, 0f, ball.Velocity.Z),
         };
-        float run = a.Kind == ActionKind.Spin ? FacedPace(p).Length() : p.RunSpeed;
-        Foot foot = p.IsStepping ? Gait.SwingFoot((p.GaitPhase + p.StepFrequency * n * dt) % 2f)
+        float run = a.Kind == ActionKind.Spin || a.Sheet != null ? FacedPace(p).Length() : p.RunSpeed;
+        var stickIntent = intent;
+        if (a.Sheet != null) stickIntent = ExitIntent(a.Sheet.Lead.Exit, a.HoldDirection, ExitSideOf(a), intent, t);
+        Foot foot = a.Sheet?.Lead.Exit.Foot is { } sheetFoot ? sheetFoot : p.IsStepping ? Gait.SwingFoot((p.GaitPhase + p.StepFrequency * n * dt) % 2f)
             : TouchModel.ChooseFoot(p.Sheet, feet, p.Facing, b, t);
         var k = t.Touch;
-        var wanted = Vector3.Normalize(new Vector3(intent.Move.X, 0f, intent.Move.Y));
-        ActionKind kind = p.KnockOnRequested ? ActionKind.KnockOn : TouchPlanner.ModeKind(TouchModel.ModeFor(intent, t));
+        var wanted = Vector3.Normalize(new Vector3(stickIntent.Move.X, 0f, stickIntent.Move.Y));
+        ActionKind kind = p.KnockOnRequested ? ActionKind.KnockOn : TouchPlanner.ModeKind(TouchModel.ModeFor(stickIntent, t));
         float turnSign = 0f;
         if (kind != ActionKind.KnockOn)
         {
@@ -1451,9 +1488,11 @@ public static class SkillMoves
         var a = p.SkillAction!;
         var k = t.Skill;
         p.SkillAction = null;
+        p.SkillExitRule = null;
         a.Phase = ActionPhase.Done;
         Vector2 fwd = a.HoldDirection;
-        switch (a.Kind)
+        if (a.Sheet != null) SheetRelease(p, a, ball);
+        else switch (a.Kind)
         {
             case ActionKind.BallRoll:
             {
@@ -1510,7 +1549,7 @@ public static class SkillMoves
         // The exit burst rides on the exit touch (the planner's next touch), like a touch boost: started here it would make
         // the legs outrun a ball at the feet before that touch could be planned.
         // (The elastico's for the way its second contact played the ball on.)
-        float scale = a.Kind == ActionKind.Elastico && !float.IsNaN(a.ExitBurstScale) ? a.ExitBurstScale : ExitScale(a, intent.Move, t);
+        float scale = !float.IsNaN(a.ExitBurstScale) ? a.ExitBurstScale : ExitScale(a, intent.Move, t);
         if (scale > 0f)
         {
             bool roll = a.Kind == ActionKind.BallRoll;
@@ -1519,8 +1558,9 @@ public static class SkillMoves
             p.SkillBoostCap = k.BurstSpeedCap.ForRating(a.SkillEffective) * scale;
             p.SkillBoostUntil = now + ExitTouchWithin;
         }
-        if (a.Kind is ActionKind.HeelToHeel or ActionKind.Elastico)
+        if (a.Sheet != null ? a.Sheet.Lead.Exit.Kind != SheetExitKind.Touch : a.Kind is ActionKind.HeelToHeel or ActionKind.Elastico)
         {
+            // (A sheet-driven move whose exit is a launch or leaves the ball at rest hands no exit touch on either.)
             // The heel-to-heel's flick or the elastico's inside was the exit touch (the ball is already played on): the burst
             // starts once he has moved this tick (as after an exit touch), and the controller plans the next touch as usual (after
             // the flick he runs on to the ball as after a knock-on).
@@ -1528,6 +1568,413 @@ public static class SkillMoves
             return;
         }
         p.SkillExitTick = tick;
+        if (a.Sheet != null)
+        {
+            p.SkillExitRule = a.Sheet.Lead.Exit;
+            p.SkillExitFwd = a.HoldDirection;
+            p.SkillExitSide = ExitSideOf(a);
+        }
+    }
+
+    // ---- the follower: a move played from its sheet (see MoveSheet) ----
+
+    /// <summary>A reach shorter than the sheet's by more than this many times starts the sheet part way in.</summary>
+    const float SheetMaxRate = 1.5f;
+    /// <summary>His facing over the sheet's as a move starts eases out at this, rad/s (the post-turn rate).</summary>
+    const float SheetEaseTurn = 9.42f;
+
+    /// <summary>The nudge onto the ball, and his velocity over the sheet's as a move starts, ease in and out at this, m/s^2: balance_deceleration, as the rest of his run.</summary>
+    static float SheetEase(Tuning t) => t.Movement.BalanceDeceleration;
+
+    /// <summary>The move's name in the driver map and the sheets.</summary>
+    internal static string SheetName(ActionKind kind, bool mcGeady) => kind switch
+    {
+        ActionKind.StepOver => "step_over", ActionKind.BodyFeint => "body_feint", ActionKind.BallRoll => "ball_roll", ActionKind.DragBack => "drag_back",
+        ActionKind.Elastico => "elastico", ActionKind.HeelToHeel => "heel_to_heel", ActionKind.Spin => mcGeady ? "mcgeady" : "spin",
+        ActionKind.FakeStop => "fake_stop", _ => "fake_cut",
+    };
+
+    /// <summary>The share of a move's run sheet against its standing one for an entry pace.</summary>
+    static float SheetRunShare(ActionKind kind, bool mcGeady, float entry, Tuning t)
+    {
+        var k = t.Skill;
+        var curve = kind switch
+        {
+            ActionKind.StepOver or ActionKind.BodyFeint => k.StepOverRunBlend,
+            ActionKind.BallRoll => k.BallRollRunBlend,
+            ActionKind.Elastico => k.ElasticoRunBlend,
+            ActionKind.HeelToHeel => k.HeelToHeelRunBlend,
+            ActionKind.Spin => mcGeady ? k.McGeadyRunBlend : k.SpinRunBlend,
+            _ => k.DragBackRunBlend,
+        };
+        return Math.Clamp(curve.Evaluate(entry), 0f, 1f);
+    }
+
+    /// <summary>
+    /// The sheet a move is played from, or null when it is played by its legacy formulas: its driver is not "sheet", the sheets
+    /// are not loaded, or there is none for its foot and side. The two sheets either side of his entry pace are blended at one
+    /// share for the whole move: the run sheet's by the move's run blend, the sprint sheet's (a move that has one) by sprint_blend.
+    /// Only moves that reach for the ball and then carry it are followed so far (the pilot: elastico and drag-back).
+    /// </summary>
+    internal static SheetPlay? SheetFor(ActionKind kind, SkillSide side, Foot foot, float entry, bool mcGeady, Tuning t)
+    {
+        if (t.Sheets == null || !Reaches(kind)) return null;
+        string name = SheetName(kind, mcGeady);
+        if (!t.Skill.Driver.TryGetValue(name, out var driver) || driver != "sheet") return null;
+        if (t.Sheets.Find(name, kind is ActionKind.DragBack or ActionKind.FakeStop ? SkillSide.None : side, foot) is not { } set) return null;
+        MoveSheet a = set.Stand, b = set.Run ?? set.Stand;
+        float w = set.Run != null ? SheetRunShare(kind, mcGeady, entry, t) : 0f;
+        float sprint = set.Sprint != null && set.Run != null ? Math.Clamp(t.Skill.SprintBlend.Evaluate(entry), 0f, 1f) : 0f;
+        if (sprint > 0f) { a = set.Run!; b = set.Sprint!; w = sprint; }
+        if (!SheetPlay.Compatible(a, b) || a.Legs.Length == 0 || a.Legs[0].From != "contact") return null;
+        return new SheetPlay(a, b, w, entry, t.TickRate);
+    }
+
+    /// <summary>The ticks from the sheet's contact to its event <paramref name="e"/>.</summary>
+    static int SheetTicks(SheetPlay s, string e, Tuning t) =>
+        Math.Max(1, (int)MathF.Round((s.EventSeconds(e) - s.EventSeconds("contact")) * t.TickRate));
+
+    /// <summary>A sheet vector (x to his left, z along his run) on the ground of the world (X, Z), in the move's frame.</summary>
+    static Vector2 SheetWorld(BallAction a, float x, float z) => a.HoldDirection * z - GestureReader.RightOf(a.HoldDirection) * x;
+
+    /// <summary>
+    /// The sheet time once he has moved on tick <paramref name="k"/>. The time up to the first contact is one linear squeeze of the
+    /// sheet's start..contact onto the reach (he is on the sheet's contact as the contact tick begins); from the contact one tick
+    /// is one tick of sheet time.
+    /// </summary>
+    internal static float SheetTauAfter(BallAction a, int k, Tuning t)
+    {
+        float ec = a.Sheet!.EventSeconds("contact");
+        if (k >= a.ContactTick - 1) return ec + (k + 1 - a.ContactTick) * t.Dt;
+        if (k < a.PlanTick) return a.SheetS0;
+        return a.SheetS0 + (k + 1 - a.PlanTick) / (float)(a.ContactTick - a.PlanTick) * (ec - a.SheetS0);
+    }
+
+    /// <summary>
+    /// How far the sheet moves him on tick <paramref name="k"/> (world X, Z): the root's step over the tick's sheet time, at the
+    /// root's own pace (squeezed time changes how long he travels, not how fast).
+    /// </summary>
+    static Vector2 SheetStepOf(BallAction a, int k, Tuning t)
+    {
+        float tauA = SheetTauAfter(a, k - 1, t), tauB = SheetTauAfter(a, k, t);
+        if (tauB - tauA < 1e-6f) return Vector2.Zero;
+        RootRow r0 = a.Sheet!.Root(tauA), r1 = a.Sheet.Root(tauB);
+        return SheetWorld(a, r1.X - r0.X, r1.Z - r0.Z) * (t.Dt / (tauB - tauA));
+    }
+
+    /// <summary>The unit ground direction toward the exit side: the move's side, or the playing foot's side for a move without one (the side a drag-back opens to).</summary>
+    static Vector2 ExitSideOf(BallAction a) =>
+        a.Side != SkillSide.None ? SideOf(a) : GestureReader.RightOf(a.HoldDirection) * (a.Foot == Foot.Left ? -1f : 1f);
+
+    static int LastDrivenLeg(SheetPlay s)
+    {
+        for (int i = s.LegCount - 1; i >= 0; i--) if (s.Leg(i).Driven) return i;
+        return -1;
+    }
+
+    /// <summary>The tick a sheet's event falls on.</summary>
+    static int SheetEventTick(BallAction a, string e, Tuning t) =>
+        e == "contact" ? a.ContactTick : a.ContactTick + SheetTicks(a.Sheet!, e, t);
+
+    /// <summary>The leg under way on <paramref name="tick"/> (from its first event's tick up to its last's), or -1.</summary>
+    static int SheetLegAt(BallAction a, int tick, Tuning t)
+    {
+        var s = a.Sheet!;
+        for (int i = 0; i < s.LegCount; i++)
+        {
+            var leg = s.Leg(i);
+            int from = leg.From == "start" ? a.PlanTick : SheetEventTick(a, leg.From, t);
+            int to = SheetEventTick(a, leg.To, t);
+            if (tick >= from && tick < to) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// A sheet-driven move starts: its second contact's tick, foot and surface from the sheet, where the sheet starts for the
+    /// reach planned, and the meet: the ball predicted at the contact tick against the sheet's contact point on his predicted
+    /// path. His path is nudged by that gap, at most meet_correction_max; the rest is left to the first leg's bias.
+    /// </summary>
+    static void InitSheet(PlayerState p, BallAction a, SheetPlay play, Ball ball, Tuning t)
+    {
+        a.Sheet = play;
+        int reach = a.ContactTick - a.PlanTick;
+        float ec = play.EventSeconds("contact");
+        a.SheetS0 = reach > 0 ? MathF.Max(play.Event(0), ec - SheetMaxRate * reach * t.Dt) : ec;
+        if (play.Leg(0).Surface is { } s0) a.Surface = s0;
+        a.Contact2Tick = -1;
+        a.LiftTick = play.HasEvent("lift") ? SheetEventTick(a, "lift", t) : -1;
+        if (play.HasEvent("contact2"))
+        {
+            a.Contact2Tick = SheetEventTick(a, "contact2", t);
+            for (int i = 1; i < play.LegCount; i++)
+                if (play.Leg(i).From == "contact2")
+                {
+                    a.Foot2 = play.Leg(i).Foot ?? a.Foot;
+                    a.Surface2 = play.Leg(i).Surface ?? FootSurface.Inside;
+                }
+        }
+        // the meet
+        var at = new Vector2(p.Position.X, p.Position.Z);
+        for (int k = a.PlanTick; k < a.ContactTick; k++) at += SheetStepOf(a, k, t);
+        var b = ball.ScratchA();
+        for (int k = 0; k < reach; k++) b.Step(t.Dt, null, null);
+        var off = play.ContactOffset();
+        var meet = new Vector2(b.Position.X, b.Position.Z) - (at + SheetWorld(a, off.X, off.Z));
+        float len = meet.Length(), max = MathF.Max(0f, t.Skill.MeetCorrectionMax);
+        a.SheetCorrection = reach == 0 ? Vector2.Zero : len > max ? meet * (max / len) : meet;
+        a.ContactPoint = new Vector3(b.Position.X, t.Ball.Radius, b.Position.Z);
+    }
+
+    /// <summary>
+    /// A tick of a sheet-driven move: he moves as the sheet's root does (its step this tick, turned into the move's frame), plus
+    /// the meet's nudge spread over the ticks left to the contact (no faster than sole_reach_steer, eased in and out; made up
+    /// after the contact when the first leg is fixed to the pitch), plus what
+    /// his velocity was over the sheet's as the move started, easing out (no slower than the sheet itself changes his velocity
+    /// then); his facing is the frame's with the sheet's yaw. The
+    /// bookkeeping is the spin's: the running speed is held at nothing and his ground velocity is the move's step.
+    /// </summary>
+    static MoveAssist SheetTick(PlayerState p, BallAction a, int tick, float cap, Tuning t, ref TickIntent legs)
+    {
+        var plan = SheetStepOf(a, tick, t) / t.Dt;
+        float baseFacing = MathF.Atan2(a.HoldDirection.Y, a.HoldDirection.X);
+        float yaw = a.Sheet!.Root(SheetTauAfter(a, tick, t)).YawDeg * MathF.PI / 180f;
+        if (!a.SheetBegun)
+        {
+            a.SheetBegun = true;
+            a.SheetResidual = new Vector2(p.Velocity.X, p.Velocity.Z) - plan;
+            a.SheetPlanPrev = plan;
+            float yaw0 = a.Sheet.Root(SheetTauAfter(a, tick - 1, t)).YawDeg * MathF.PI / 180f;
+            a.SheetFacingOff = Movement.WrapAngle(p.Facing - (baseFacing - yaw0));
+        }
+        // The eases (the nudge in and out, what he came in with over the sheet's velocity) run within balance_deceleration, or as
+        // hard as the sheet itself is changing his velocity then: a sheet that stops him hard is not left to run on.
+        float ease = MathF.Max(SheetEase(t), (plan - a.SheetPlanPrev).Length() / t.Dt);
+        a.SheetPlanPrev = plan;
+        // the nudge: what is left of it over the ticks left before the contact
+        // (a first leg fixed to the pitch does not travel with him, so what is left of the nudge at the contact is made after it;
+        // one that travels with him takes the rest as its bias)
+        Vector2 wantNudge = Vector2.Zero;
+        if (tick < a.ContactTick || a.Sheet.Leg(0).Anchor == LegAnchor.Pitch)
+        {
+            var left = a.SheetCorrection - a.SheetApplied;
+            wantNudge = left / (Math.Max(1, a.ContactTick - tick) * t.Dt);
+            // (no faster than sole_reach_steer, nor than it can ease out of over what is left: it comes to rest on the spot)
+            float l = wantNudge.Length(), max = MathF.Min(t.Skill.SoleReachSteer, MathF.Sqrt(2f * SheetEase(t) * left.Length()));
+            if (l > max) wantNudge *= max / l;
+        }
+        a.SheetCorrVel = Ease(a.SheetCorrVel, wantNudge, ease * t.Dt);
+        a.SheetApplied += a.SheetCorrVel * t.Dt;
+        a.SheetResidual = Ease(a.SheetResidual, Vector2.Zero, ease * t.Dt);
+        float turn = SheetEaseTurn * t.Dt;
+        a.SheetFacingOff = MathF.Abs(a.SheetFacingOff) <= turn ? 0f : a.SheetFacingOff - MathF.Sign(a.SheetFacingOff) * turn;
+        float facing = Movement.WrapAngle(baseFacing - yaw + a.SheetFacingOff);
+        legs = new TickIntent { MoveX = MathF.Cos(facing), MoveZ = MathF.Sin(facing), Sprint = 1f };
+        return new MoveAssist(cap, 1f, Vector2.Zero, 0f, Carry: plan + a.SheetCorrVel + a.SheetResidual, Facing: facing);
+    }
+
+    static Vector2 Ease(Vector2 from, Vector2 to, float maxStep)
+    {
+        var d = to - from;
+        float l = d.Length();
+        return l <= maxStep ? to : from + d * (maxStep / l);
+    }
+
+    /// <summary>Where a driven leg has the ball once he has moved on <paramref name="tick"/> (the leg's track in its anchor's frame, its bias fading over the leg).</summary>
+    static Vector3 SheetBallTarget(PlayerState p, BallAction a, int leg, int tick, Tuning t)
+    {
+        var s = a.Sheet!;
+        float tau = SheetTauAfter(a, tick, t), u = s.LegShare(leg, tau);
+        var tr = s.Track(leg, u);
+        float fade = 1f - Smooth(u);
+        switch (s.Leg(leg).Anchor)
+        {
+            case LegAnchor.Pitch:
+            {
+                var tr0 = s.Track(leg, 0f);
+                var w = SheetWorld(a, tr.X - tr0.X, tr.Z - tr0.Z);
+                return new Vector3(a.LegBall0.X + w.X, t.Ball.Radius + tr.Y, a.LegBall0.Z + w.Y);
+            }
+            case LegAnchor.Facing:
+            {
+                var face = new Vector2(MathF.Cos(p.Facing), MathF.Sin(p.Facing));
+                var w = face * tr.Z - GestureReader.RightOf(face) * tr.X;
+                return new Vector3(p.Position.X + w.X, t.Ball.Radius + tr.Y, p.Position.Z + w.Y) + a.LegBias * fade;
+            }
+            default:
+            {
+                var w = SheetWorld(a, tr.X, tr.Z);
+                return new Vector3(p.Position.X + w.X, t.Ball.Radius + tr.Y, p.Position.Z + w.Y) + a.LegBias * fade;
+            }
+        }
+    }
+
+    /// <summary>
+    /// After he has moved on a tick of a sheet-driven move: the leg under way drives the ball (its velocity takes it onto the
+    /// leg's target by the end of the tick, kept off the boards), a launch leg sets its velocity once by the exit rule, and the
+    /// contacts raise the same touch results and last-touch fields as a legacy move's, on their ticks. A leg starts from where
+    /// the ball is: what it is off the track then is the leg's bias (a pitch leg is measured from there).
+    /// </summary>
+    static TouchResult? SheetStep(PlayerState p, BallAction a, in TickIntent intent, Ball ball, int tick, float now, Tuning t, Pitch? pitch)
+    {
+        var s = a.Sheet!;
+        TouchResult? made = null;
+        int leg = tick >= a.ContactTick ? SheetLegAt(a, tick, t) : -1;
+        Vector3 contactBall = ball.Position;
+        bool first = leg >= 0 && leg != a.SheetLeg;
+        if (first)
+        {
+            a.SheetLeg = leg;
+            a.LegBall0 = ball.Position;
+            a.LegBias = Vector3.Zero;
+            if (s.Leg(leg).Anchor is LegAnchor.Body or LegAnchor.Facing)
+            {
+                // against him as the tick began (the ball has not moved yet this tick, he has)
+                var was = p.Position;
+                p.Position -= new Vector3(p.Velocity.X, 0f, p.Velocity.Z) * t.Dt;
+                float tau0 = SheetTauAfter(a, tick - 1, t);
+                var tr = s.Track(leg, s.LegShare(leg, tau0));
+                Vector2 w;
+                if (s.Leg(leg).Anchor == LegAnchor.Facing)
+                {
+                    var face = new Vector2(MathF.Cos(p.Facing), MathF.Sin(p.Facing));
+                    w = face * tr.Z - GestureReader.RightOf(face) * tr.X;
+                }
+                else w = SheetWorld(a, tr.X, tr.Z);
+                a.LegBias = new Vector3(ball.Position.X - (p.Position.X + w.X), 0f, ball.Position.Z - (p.Position.Z + w.Y));
+                p.Position = was;
+            }
+            if (tick == a.Contact2Tick) a.Contact2PathMiss = new Vector2(ball.Position.X - a.LastTarget.X, ball.Position.Z - a.LastTarget.Z).Length();
+        }
+        if (leg >= 0 && s.Leg(leg).Driven)
+        {
+            Vector3 target = SheetBallTarget(p, a, leg, tick, t);
+            a.LastTarget = target;
+            // (a ball on the ground on a track along the ground keeps its own vertical pace, as a legacy carry does)
+            bool flat = target.Y - t.Ball.Radius < 1e-3f && ball.Position.Y - t.Ball.Radius < 1e-3f;
+            var v = OffBoards(ball, new Vector3((target.X - ball.Position.X) / t.Dt, flat ? ball.Velocity.Y : (target.Y - ball.Position.Y) / t.Dt,
+                (target.Z - ball.Position.Z) / t.Dt), pitch, t);
+            ball.Velocity = v;
+            ball.Spin = ball.RollingSpin(v);
+        }
+        else if (first && s.Leg(leg).Anchor == LegAnchor.Launch)
+        {
+            var v = SheetLaunch(p, a, intent, ball, tick, now, t, pitch);
+            ball.Velocity = v;
+            ball.Spin = ball.RollingSpin(v);
+        }
+        if (first && tick == a.ContactTick)
+        {
+            p.LastTouchTime = now;
+            p.LastTouchFoot = a.Foot;
+            p.LastTouchKind = a.Kind;
+            a.Made = true;
+            a.ContactMiss = new Vector2(a.LegBias.X, a.LegBias.Z).Length();
+            a.ContactPoint = new Vector3(contactBall.X, t.Ball.Radius, contactBall.Z);
+            a.BallOutVelocity = ball.Velocity;
+            a.BallOutSpin = ball.Spin;
+            made = new TouchResult(a.Kind, a.Foot, ball.Position, ball.Velocity, 0f);
+        }
+        else if (first && tick == a.Contact2Tick)
+        {
+            p.LastTouchTime = now;
+            p.LastTouchFoot = a.Foot2;
+            p.LastTouchKind = a.Kind;
+            made = new TouchResult(a.Kind, a.Foot2, contactBall, ball.Velocity, 0f);
+        }
+        TouchPlanner.UpdatePhases(p, tick, t);
+        return made;
+    }
+
+    /// <summary>
+    /// A sheet's exit rule on the left stick: its angle off the run toward the exit side held inside the rule's band (outside it,
+    /// to its nearest edge), and the rule's push profile (a sprint touch, a jog touch, a close-control touch). The stick at rest
+    /// stays at rest.
+    /// </summary>
+    internal static TickIntent ExitIntent(SheetExit rule, Vector2 fwd, Vector2 side, in TickIntent intent, Tuning t)
+    {
+        var user = intent;
+        Vector2 stick = intent.Move;
+        float mag = stick.Length();
+        if (mag < t.Touch.StickThreshold) return user;
+        float ang = MathF.Atan2(Vector2.Dot(stick, side), Vector2.Dot(stick, fwd)) * 180f / MathF.PI;
+        if (ang < rule.MinDeg || ang > rule.MaxDeg)
+        {
+            float toMin = MathF.Abs(Movement.WrapAngle((ang - rule.MinDeg) * MathF.PI / 180f)), toMax = MathF.Abs(Movement.WrapAngle((ang - rule.MaxDeg) * MathF.PI / 180f));
+            ang = toMin <= toMax ? rule.MinDeg : rule.MaxDeg;
+        }
+        float rad = ang * MathF.PI / 180f;
+        var dir = (fwd * MathF.Cos(rad) + side * MathF.Sin(rad)) * mag;
+        user.MoveX = dir.X; user.MoveZ = dir.Y;
+        switch (rule.Push)
+        {
+            case "sprint": user.Sprint = 1f; user.CloseControl = false; break;
+            case "jog": user.Sprint = 0f; user.CloseControl = false; break;
+            case "close": user.Sprint = 0f; user.CloseControl = true; break;
+        }
+        return user;
+    }
+
+    /// <summary>
+    /// A launch leg's first tick: the exit rule sets the ball's velocity once. The ball goes toward the left stick held inside the
+    /// rule's band off the run toward the exit side (the rule's rest angle with the stick released), pushed as a touch of the
+    /// rule's profile made at once that way would push it (TouchPlanner.SkillExitPush), onto a swing at least a windup after the
+    /// move's end. Readies the exit burst's scale for that direction.
+    /// </summary>
+    static Vector3 SheetLaunch(PlayerState p, BallAction a, in TickIntent intent, Ball ball, int tick, float now, Tuning t, Pitch? pitch)
+    {
+        var rule = a.Sheet!.Lead.Exit;
+        Vector2 fwd = a.HoldDirection, side = ExitSideOf(a);
+        bool held = intent.Move.Length() >= t.Touch.StickThreshold;
+        var user = intent;
+        if (!held)
+        {
+            float rest = (float.IsNaN(rule.RestDeg) ? 0.5f * (rule.MinDeg + rule.MaxDeg) : rule.RestDeg) * MathF.PI / 180f;
+            var d0 = fwd * MathF.Cos(rest) + side * MathF.Sin(rest);
+            user.MoveX = d0.X; user.MoveZ = d0.Y;
+        }
+        user = ExitIntent(rule, fwd, side, user, t);
+        var dir = Vector2.Normalize(user.Move);
+        a.ExitBurstScale = ExitScale(a, held ? dir : Vector2.Zero, t);
+        int minJ = Math.Max(0, a.EndTick - tick) + TouchPlanner.WindupTicks(t);
+        // (the push is solved for the run his ground speed is: during the move the running speed is held at nothing)
+        float run = p.RunSpeed; var steer = p.SteerVelocity;
+        HandBackRun(p);
+        var v = TouchPlanner.SkillExitPush(p, user, dir, ball, minJ, now, t, pitch, out int steps);
+        p.RunSpeed = run; p.SteerVelocity = steer;
+        p.PushSteps = steps;
+        p.StepsSinceTouch = 0;
+        return v;
+    }
+
+    /// <summary>His ground velocity as a run again: the running speed is his ground speed along his facing, the rest is the step.</summary>
+    static void HandBackRun(PlayerState p)
+    {
+        var face = new Vector2(MathF.Cos(p.Facing), MathF.Sin(p.Facing));
+        var v = new Vector2(p.Velocity.X, p.Velocity.Z);
+        float pace = MathF.Max(0f, Vector2.Dot(v, face));
+        var rest = v - face * pace;
+        p.RunSpeed = pace;
+        p.SteerVelocity = new Vector3(rest.X, 0f, rest.Y);
+    }
+
+    /// <summary>
+    /// A sheet-driven move's release: a touch exit leaves the ball as its last leg had it (a pitch leg's at rest) for the touch
+    /// planner's exit touch, a launch already played it, a rest exit stops it. He leaves at the velocity the sheet gave him: his
+    /// running speed is his ground speed along his facing, and the rest of his velocity is carried and eases out.
+    /// </summary>
+    static void SheetRelease(PlayerState p, BallAction a, Ball ball)
+    {
+        var s = a.Sheet!;
+        int last = LastDrivenLeg(s);
+        bool stop = s.Lead.Exit.Kind == SheetExitKind.Rest || s.Lead.Exit.Kind == SheetExitKind.Touch && last >= 0 && s.Leg(last).Anchor == LegAnchor.Pitch;
+        if (stop)
+        {
+            ball.Velocity = new Vector3(0f, ball.Velocity.Y, 0f);
+            ball.Spin = Vector3.Zero;
+        }
+        HandBackRun(p);
+        p.SteerCarry = new Vector2(p.SteerVelocity.X, p.SteerVelocity.Z);
     }
 
     /// <summary>

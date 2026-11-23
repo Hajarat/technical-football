@@ -219,3 +219,84 @@ def test_every_move_file_passes_and_pairs_its_entries(rig):
         by.setdefault(m["move"], []).append(m)
     for name, ms in by.items():
         assert len({tuple(m["events"].items()) for m in ms}) == 1, name
+
+
+# ---------------------------------------------------------------------------------------------------------------- move sheets
+
+def test_low_pass_keeps_a_straight_run_and_its_end_pace():
+    t = np.arange(40)[:, None] / A.FPS
+    line = np.concatenate([0.0 * t, 4.6 * t], axis=1)
+    out = A.low_pass(line, A.ROOT_SIGMA_S * A.FPS)
+    assert np.allclose(out, line, atol=1e-9)
+    # a quick sway on top of the run (6 Hz, 3 cm) is mostly taken out of the root, and the root still comes in at the run's pace
+    sway = line + np.concatenate([0.03 * np.sin(2 * np.pi * 6.0 * t), 0.0 * t], axis=1)
+    root = A.sheet_root(np.concatenate([sway[:, :1], 0.9 + 0 * t, sway[:, 1:]], axis=1), np.zeros(len(t)))
+    assert np.abs(root[5:-5, 0] - root[5:-5, 0].mean()).max() < 0.01
+    assert (root[1, 1] - root[0, 1]) * A.FPS == pytest.approx(4.6, abs=0.01)
+    assert np.allclose(root[0], 0)
+
+
+def test_every_move_file_has_a_sheet_whose_hash_its_clips_carry(rig, tmp_path):
+    moves = [A.load_move(p) for p in sorted(A.MOVES.glob("*.toml"))]
+    clips = A.build(moves, rig)
+    sheets = A.sheets_of(clips)
+    assert len(sheets) == len(moves)
+    names = [n.replace(":", "_") for n in rig.t.names]
+    by = {(s["name"], s["entry"]): s for s in sheets}
+    for c in clips:
+        s = by[(c.move["name"], c.move.get("entry", "stand"))]
+        assert c.sheet_sha == s["sha"] == A.sheet_sha(s)
+        entry = A.write(c, tmp_path, names)
+        assert entry["sheet"] == {"name": s["name"], "entry": s["entry"], "sha": s["sha"]}
+        assert len(entry["root"]) == len(c.hips) and entry["root"][0] == [0.0, 0.0, entry["root"][0][2]]
+    for s in sheets:
+        ev = s["events"]
+        assert list(ev)[0] == "start" and list(ev)[-1] == "end" and "contact" in ev and "release" in ev
+        assert len(s["root"]) == round(ev["end"] * A.FPS) + 1
+        for leg in s["legs"]:
+            frames = round((ev[leg["to"]] - ev[leg["from"]]) * A.FPS) + 1
+            assert len(leg.get("track", [])) == (frames if leg["anchor"] in A.DRIVEN else 0)
+            # a pitch leg is measured from where the ball is as it starts
+            if leg["anchor"] == "pitch":
+                assert leg["track"][0][0] == 0 and leg["track"][0][2] == 0
+    # the hash is the content's
+    changed = dict(sheets[0], steer_deg=sheets[0]["steer_deg"] + 1)
+    assert A.sheet_sha(changed) != sheets[0]["sha"]
+
+
+def test_the_mirrored_clips_root_is_the_mirror(rig):
+    m = A.load_move(A.MOVES / "elastico_run.toml")
+    left, right = A.build([m], rig)[:2]
+    assert np.allclose(left.root[:, 0], -right.root[:, 0], atol=1e-9) and np.allclose(left.root[:, 1], right.root[:, 1], atol=1e-9)
+    assert np.allclose(left.root[:, 2], -right.root[:, 2])
+    # the sheet is the authored side's; the mirror's feet are swapped
+    assert left.sheet_owner and not right.sheet_owner
+    assert [l.get("foot") for l in left.sheet["legs"]] == ["right", "right"] and [l.get("foot") for l in right.sheet["legs"]] == ["left", "left"]
+
+
+def test_a_card_band_that_is_missed_refuses_the_clip(rig):
+    m = A.load_move(A.MOVES / "elastico.toml")
+    m["card"] = dict(m.get("card", {}), lift_m=[0.5, 0.6])
+    c = A.solve(m, m["variant"][0], rig)
+    assert any("card lift_m" in p for p in c.problems), c.problems
+    m["card"] = {"drop_m": [0.0, 1.0], "snap_deg": [0, 999], "drive_m": [0, 9], "no_such": [0, 1]}
+    c = A.solve(m, m["variant"][0], rig)
+    assert any("unknown measure 'no_such'" in p for p in c.problems), c.problems
+
+
+def test_a_root_that_brakes_too_hard_is_refused_outside_a_plant_span(rig):
+    def move(plant):
+        key = lambda t, z: {"t": t, "pelvis": {"pos": [0, float(rig.rest_mid[1]) - 0.06 * (t == 0.5), z]},
+                            "foot_l": {"pos": [float(rig.sole[0][0]), 0.3, z]}, "foot_r": {"pos": [float(rig.sole[1][0]), 0.3, z]}}
+        # 0.6 s: he comes in at 3 m/s and is stopped 0.2 s later (15 m/s^2)
+        zs = [(0.0, 0.0), (1 / 3, 0.3), (0.5, 0.3), (1.0, 0.3)]
+        keys = [key(t, z) for t, z in zs]
+        keys[0]["ease"] = 0
+        return {"name": "brake", "move": "brake", "side": "left", "foot": "right", "path": "x", "entry": "run",
+                "events": {"start": 0, "contact": 0.5, "release": 0.75, "end": 1}, "variant": [{"spans": [0.3, 0.15, 0.15]}], "key": keys,
+                "sheet": {"entry_speed": 3.0, "plant": plant, "leg": [], "exit": {"kind": "rest"}},
+                "card": {"drop_m": [0, 1], "snap_deg": [0, 999], "drive_m": [0, 9]}}
+    hard = A.solve(move([]), {"spans": [0.3, 0.15, 0.15]}, rig)
+    assert any("root accelerates" in p for p in hard.problems), hard.problems
+    planted = A.solve(move([[0.0, 0.75]]), {"spans": [0.3, 0.15, 0.15]}, rig)
+    assert not any("root accelerates" in p for p in planted.problems), planted.problems

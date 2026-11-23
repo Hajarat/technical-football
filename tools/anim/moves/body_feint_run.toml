@@ -44,6 +44,22 @@ radius = 0.11
 left = [[0.25861, 0.41529], [0.81287, 0.90713]]
 right = [[0.03176, 0.13028], [0.50235, 0.65047], [0.95287, 1.0]]
 
+# The move sheet (data/moves/sheets.json): the ball's legs, the exit rule and how far the left stick may turn its frame.
+[sheet]
+entry_speed = 4.33             # the pace the root comes in at, m/s
+steer_deg = 45
+
+[[sheet.leg]]
+from = "start"
+to = "release"
+anchor = "free"
+
+[sheet.exit]
+kind = "touch"
+min_deg = 45
+max_deg = 90
+push = "sprint"
+
 [[key]]
 t = 0.0
 ease = 0

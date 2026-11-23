@@ -81,6 +81,7 @@ REPO = HERE.parent.parent
 GLB = REPO / "game/assets/characters/player.glb"
 MOVES = HERE / "moves"
 OUT = REPO / "game/assets/anim/attacker/skills"
+SHEETS = REPO / "data/moves/sheets.json"
 FPS = 60
 MAX_TURN_DEG_S = 1500.0
 MAX_SOLE_OFF = 0.01
@@ -298,7 +299,7 @@ def load_rig(path: Path = GLB) -> Rig:
 
 # ---------------------------------------------------------------------------------------------------------------- move files
 
-GROUPS = ("pelvis", "chest", "head", "foot_l", "foot_r", "hand_l", "hand_r", "ball")
+GROUPS = ("pelvis", "chest", "head", "foot_l", "foot_r", "hand_l", "hand_r", "ball", "root")
 VEC = {"pos", "knee", "elbow"}
 
 
@@ -366,6 +367,12 @@ def mirror_move(m: dict) -> dict:
         bl["on"] = [[a, b, other[f]] for a, b, f in bl["on"]]
     if "touch" in bl:
         bl["touch"] = {e: other[f] for e, f in bl["touch"].items()}
+    sh = out.get("sheet", {})
+    for leg in sh.get("leg", []):
+        if "foot" in leg:
+            leg["foot"] = other[leg["foot"]]
+    if "foot" in sh.get("exit", {}):
+        sh["exit"]["foot"] = other[sh["exit"]["foot"]]
     keys = []
     for k in out["key"]:
         nk = {}
@@ -473,6 +480,14 @@ class Clip:
     curl: np.ndarray            # (n,2)
     problems: list[str] = field(default_factory=list)
     stats: dict = field(default_factory=dict)
+    pel: np.ndarray | None = None       # (n,3) the pelvis point (between the hip joints), ground frame
+    root_yaw: np.ndarray | None = None  # (n,) the keyed root yaw, degrees
+    leg_ext: np.ndarray | None = None   # (n,2) hip-to-ankle distance as a share of the leg's length
+    sheet: dict | None = None           # the move sheet made from this clip (see sheet_of)
+    sheet_owner: bool = False           # this clip's sheet is the file's (written to sheets.json)
+    sheet_sha: str = ""                 # the hash of the sheet the simulation loads for it (the authored side's first variant)
+    root: np.ndarray | None = None      # (n,3) the sheet root: x, z (metres, from under the hips at the start), yaw (degrees)
+    measures: dict = field(default_factory=dict)
 
 
 def solve(m: dict, variant: dict, rig: Rig) -> Clip:
@@ -482,6 +497,7 @@ def solve(m: dict, variant: dict, rig: Rig) -> Clip:
     n = int(round(tl.seconds * FPS)) + 1
     k = rig.idx
     G = np.zeros((n, 22, 3, 3)); hips = np.zeros((n, 3)); ball = np.zeros((n, 3)); curl = np.zeros((n, 2))
+    pels = np.zeros((n, 3)); root_yaw = np.zeros(n); leg_ext = np.zeros((n, 2))
     stretch = []
     R0 = t_.rest_glob_r
 
@@ -493,6 +509,7 @@ def solve(m: dict, variant: dict, rig: Rig) -> Clip:
         b = get("ball.pos", t, [0, 0.11, 0])
         ball[i] = b
         pel = get("pelvis.pos", t, rig.rest_mid)
+        pels[i] = pel; root_yaw[i] = get("root.yaw", t, 0)[0]
         Rp = euler(get("pelvis.yaw", t, 0)[0], get("pelvis.pitch", t, 0)[0], get("pelvis.roll", t, 0)[0])
         Rc = euler(get("chest.yaw", t, 0)[0], get("chest.pitch", t, 0)[0], get("chest.roll", t, 0)[0])
         Rh = euler(get("head.yaw", t, 0)[0], get("head.pitch", t, 0)[0], get("head.roll", t, 0)[0])
@@ -542,6 +559,7 @@ def solve(m: dict, variant: dict, rig: Rig) -> Clip:
             hip = place(S + "UpLeg")
             knee_hint = Ryaw @ get(g + ".knee", t, rig.knee_rest[s])
             knee, over, ax1 = two_bone(hip, ankle, rig.leg[0], rig.leg[1], knee_hint)
+            leg_ext[i, s] = float(np.linalg.norm(ankle - hip)) / (rig.leg[0] + rig.leg[1])
             if over > STRETCH_TOL:
                 stretch.append((i, S, over))
             # bone frames: (direction, hinge axis) at rest -> now
@@ -602,8 +620,13 @@ def solve(m: dict, variant: dict, rig: Rig) -> Clip:
     qd = np.stack([rt.decode_quats(rt.encode_quats(q[:, b])) for b in range(22)], axis=1)
     events = {nm: int(round(s * FPS)) for nm, s in tl.events.items()}
     suffix = variant.get("suffix", "")
-    clip = Clip(f"{m['name']}_{m['side'] if m['side'] != 'none' else m['foot']}{suffix}{m.get('ending', '')}", m, tl, hips, qd, np.zeros((n, 2), bool), events, ball, curl)
+    clip = Clip(f"{m['name']}_{m['side'] if m['side'] != 'none' else m['foot']}{suffix}{m.get('ending', '')}", m, tl, hips, qd, np.zeros((n, 2), bool), events, ball, curl,
+                pel=pels, root_yaw=root_yaw, leg_ext=leg_ext)
+    clip.root = sheet_root(pels, root_yaw)
     check(clip, rig, stretch)
+    if "sheet" in m:
+        clip.sheet = sheet_of(clip)
+        check_sheet(clip, rig)
     return clip
 
 
@@ -702,6 +725,176 @@ def check(c: Clip, rig: Rig, stretch: list) -> None:
                "touch_gap_m": touches}
 
 
+# ---------------------------------------------------------------------------------------------------------------- move sheets
+
+ROOT_SIGMA_S = 0.05          # the sheet root is the pelvis' ground point low-passed with a Gaussian of this width
+ROOT_ACCEL = 12.0            # m/s^2: balance_deceleration
+ROOT_ACCEL_PLANT = 20.0      # inside the spans the file marks plant
+MAX_LEG_JOIN = 0.02
+MAX_LEG_REACH = 0.96
+MAX_KEY_GAP_S = 0.05
+SNAP_DEG = 20.0
+DRIVE_M = 0.25
+ANCHORS = ("body", "pitch", "facing", "free", "launch")
+DRIVEN = ("body", "pitch", "facing")
+
+
+def low_pass(v: np.ndarray, sigma_frames: float) -> np.ndarray:
+    """A Gaussian low-pass along the first axis. Before the first frame and after the last the motion is continued at the pace
+    it has there (the first and last frame steps), so he comes in and leaves at his own velocity."""
+    r = max(1, int(math.ceil(3 * sigma_frames)))
+    n = len(v)
+    if n < 3:
+        return v.astype(float).copy()
+    k = np.exp(-0.5 * (np.arange(-r, r + 1) / sigma_frames) ** 2); k /= k.sum()
+    steps = np.arange(1, r + 1)[:, None]
+    before = v[0] - steps[::-1] * (v[1] - v[0])
+    after = v[-1] + steps * (v[-1] - v[-2])
+    ext = np.concatenate([before, v, after]).astype(float)
+    return np.stack([np.convolve(ext[:, c], k, mode="valid") for c in range(v.shape[1])], axis=1)
+
+
+def sheet_root(pel: np.ndarray, yaw: np.ndarray) -> np.ndarray:
+    """The sheet root per frame: x, z (the pelvis' ground point low-passed, from under the hips at the first frame) and the keyed
+    root yaw (degrees). Stride sway stays in the clip and out of the simulation."""
+    xz = low_pass(pel[:, [0, 2]], ROOT_SIGMA_S * FPS)
+    xz = xz - xz[0]
+    return np.concatenate([xz, yaw[:, None]], axis=1)
+
+
+def _in_anchor(anchor: str, ball: np.ndarray, root: np.ndarray, a: int, b: int, radius: float) -> list[list[float]]:
+    """The ball's centre over frames a..b in a leg's anchor frame: x to his left, y the lift above rest, z along the run."""
+    rows = []
+    for i in range(a, b + 1):
+        d = np.array([ball[i, 0], ball[i, 1] - radius, ball[i, 2]])
+        if anchor == "pitch":
+            d = d - np.array([ball[a, 0], 0.0, ball[a, 2]])
+        else:
+            d = d - np.array([root[i, 0], 0.0, root[i, 1]])
+            if anchor == "facing":
+                d = ry(-root[i, 2]) @ d
+        rows.append([round(float(x), 4) for x in d])
+    return rows
+
+
+def _from_anchor(leg: dict, k: int, ball0: np.ndarray, root_row: np.ndarray, radius: float) -> np.ndarray:
+    """A leg's track row k back in the ground frame (the inverse of _in_anchor), for the join check."""
+    d = np.array(leg["track"][k], float)
+    if leg["anchor"] == "pitch":
+        p = d + np.array([ball0[0], 0.0, ball0[2]])
+    else:
+        if leg["anchor"] == "facing":
+            d = ry(root_row[2]) @ d
+        p = d + np.array([root_row[0], 0.0, root_row[1]])
+    return p + np.array([0.0, radius, 0.0])
+
+
+def sheet_of(c: Clip) -> dict:
+    """The move sheet of a solved clip: its events (seconds), root, ball legs (each track in its anchor's frame), exit rule and
+    steer, with a content hash. Its frame is the move file's ground frame from under the hips at the start."""
+    m = c.move; sh = m["sheet"]
+    radius = float(m.get("ball", {}).get("radius", 0.11))
+    ev = {k: round(v / FPS, 6) for k, v in c.events.items()}
+    legs = []
+    for leg in sh.get("leg", []):
+        if leg["anchor"] not in ANCHORS:
+            raise ValueError(f"{m['name']}: unknown leg anchor {leg['anchor']!r}")
+        out = {"from": leg["from"], "to": leg["to"], "anchor": leg["anchor"]}
+        for k in ("foot", "surface"):
+            if k in leg:
+                out[k] = leg[k]
+        if leg["anchor"] in DRIVEN:
+            out["track"] = _in_anchor(leg["anchor"], c.ball, c.root, c.events[leg["from"]], c.events[leg["to"]], radius)
+        legs.append(out)
+    at = c.events["contact"]
+    sheet = {"name": m["name"], "move": m["move"], "entry": m.get("entry", "stand"),
+             "entry_speed": float(sh.get("entry_speed", m.get("entry_speed", 0.0))),
+             "side": m["side"], "foot": m["foot"], "events": ev,
+             "root": [[round(float(r[0]), 4), round(float(r[1]), 4), round(float(r[2]), 2)] for r in c.root],
+             "ball0": [round(float(c.ball[at, 0]), 4), round(float(c.ball[at, 1] - radius), 4), round(float(c.ball[at, 2]), 4)],
+             "legs": legs, "exit": dict(sh.get("exit", {"kind": "touch"})), "steer_deg": float(sh.get("steer_deg", 0.0))}
+    sheet["sha"] = sheet_sha(sheet)
+    return sheet
+
+
+def sheet_sha(sheet: dict) -> str:
+    import hashlib
+    body = {k: v for k, v in sheet.items() if k != "sha"}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:16]
+
+
+def check_sheet(c: Clip, rig: Rig) -> None:
+    """The sheet's checks. Leg joins always; a file with a [card] table (one authored to the clip standard) also has its root's
+    start and acceleration, the leg's reach on the ball, its key density and every band of its card checked."""
+    m = c.move; sh = c.sheet; p = c.problems
+    radius = float(m.get("ball", {}).get("radius", 0.11))
+    driven = [l for l in sh["legs"] if l["anchor"] in DRIVEN]
+    for a, b in zip(driven, driven[1:]):
+        if a["to"] != b["from"]:
+            continue
+        f = c.events[a["to"]]
+        end = _from_anchor(a, len(a["track"]) - 1, c.ball[c.events[a["from"]]], c.root[f], radius)
+        start = _from_anchor(b, 0, c.ball[f], c.root[f], radius)
+        gap = float(np.linalg.norm(end - start))
+        if gap > MAX_LEG_JOIN:
+            p.append(f"the ball jumps {gap * 100:.1f} cm from the leg ending at {a['to']} to the next")
+    if "card" not in m:
+        return
+    import clip_measures as cm
+    rel = c.events["release"]
+    entry = sh["entry_speed"]
+    # the root at the start: on the run's line, running along it at the entry speed
+    v0 = (c.root[1, :2] - c.root[0, :2]) * FPS
+    if abs(v0[0]) > 0.1 or abs(v0[1] - entry) > max(0.15, 0.08 * entry):
+        p.append(f"the root starts at {v0[1]:.2f} m/s along the run and {v0[0]:.2f} m/s across it; the entry speed is {entry:.2f}")
+    # its acceleration up to the release (after it the run takes over)
+    xz = c.root[: rel + 1, :2]
+    acc = np.linalg.norm(np.diff(xz, 2, axis=0), axis=1) * FPS * FPS if rel >= 2 else np.zeros(0)
+    plant = np.zeros(len(acc), bool)
+    for a_u, b_u in m["sheet"].get("plant", []):
+        fa, fb = c.tl.sec(float(a_u)) * FPS, c.tl.sec(float(b_u)) * FPS
+        plant |= (np.arange(len(acc)) + 1 >= fa - 1e-6) & (np.arange(len(acc)) + 1 <= fb + 1e-6)
+    # (plant_accel: a file's own limit inside its plant spans, for a move that must stop harder than a plant does: the drag-back)
+    plant_limit = float(m["sheet"].get("plant_accel", ROOT_ACCEL_PLANT))
+    over = acc - np.where(plant, plant_limit, ROOT_ACCEL)
+    c.stats["root_accel_max"] = round(float(acc.max()), 1) if len(acc) else 0.0
+    if len(over) and over.max() > 1e-6:
+        i = int(over.argmax())
+        p.append(f"the root accelerates at {acc[i]:.1f} m/s^2 at frame {i + 1} (limit {plant_limit if plant[i] else ROOT_ACCEL:.0f})")
+    # a driven leg's foot is within reach of the ball
+    for leg in driven:
+        if "foot" not in leg:
+            continue
+        s = SIDES.index(leg["foot"][0])
+        a, b = c.events[leg["from"]], c.events[leg["to"]]
+        ext = float(c.leg_ext[a:b + 1, s].max())
+        if ext > MAX_LEG_REACH + 1e-6:
+            p.append(f"the {leg['foot']} leg is at {ext:.3f} of its length on the ball (limit {MAX_LEG_REACH}) at frame {a + int(c.leg_ext[a:b + 1, s].argmax())}")
+    # key density between the first and the last contact
+    last = "contact2" if "contact2" in c.events else "release"
+    t0, t1 = c.tl.events["contact"], c.tl.events[last]
+    times = sorted({round(c.tl.sec(float(k["t"])), 5) for k in m["key"]})
+    inside = [t for t in times if t0 - 1e-6 <= t <= t1 + 1e-6]
+    gaps = np.diff([t0] + inside + [t1]) if inside else np.array([t1 - t0])
+    if len(gaps) and gaps.max() > MAX_KEY_GAP_S + 1e-6:
+        p.append(f"no key for {gaps.max():.3f} s between the contact and the {last} (at most {MAX_KEY_GAP_S})")
+    # the card's bands and the three beats
+    gr, gt = fk_points(rig, c.local_q, c.hips)
+    c.measures = cm.card_measures(c.events, c.ball, c.root, c.pel, gr, gt, rig.t, m["side"], m["foot"], radius, entry, FPS)
+    bands = dict(m["card"])
+    bands.setdefault("snap_deg", [SNAP_DEG, 1e9])
+    bands.setdefault("drive_m", [DRIVE_M, 1e9])
+    if "drop_m" not in bands:
+        p.append("the card has no drop_m band (the sell beat)")
+    for name, (lo, hi) in bands.items():
+        if name not in c.measures:
+            p.append(f"the card names an unknown measure {name!r}")
+            continue
+        v = c.measures[name]
+        if not (lo - 1e-6 <= v <= hi + 1e-6):
+            p.append(f"card {name} = {v:.3f}, outside {lo} to {hi}")
+
+
 # ---------------------------------------------------------------------------------------------------------------- output
 
 def write(c: Clip, out: Path, names: list[str]) -> dict:
@@ -720,6 +913,9 @@ def write(c: Clip, out: Path, names: list[str]) -> dict:
              "entry": m.get("entry", "stand"), "entry_speed": float(m.get("entry_speed", 0.0)),
              "sim": m.get("sim", {}),
              "checks": {k: v for k, v in c.stats.items() if k not in ("frames", "seconds")}}
+    if c.sheet is not None:
+        entry["sheet"] = {"name": c.sheet["name"], "entry": c.sheet["entry"], "sha": c.sheet_sha}
+        entry["root"] = [[round(float(r[0]), 4), round(float(r[1]), 4), round(float(r[2]), 2)] for r in c.root]
     if m.get("ending"):
         entry["ending"] = m["ending"].lstrip("_")
     if "stance" in m:
@@ -728,13 +924,27 @@ def write(c: Clip, out: Path, names: list[str]) -> dict:
 
 
 def build(moves: list[dict], rig: Rig) -> list[Clip]:
+    """Every clip of every move file. A file with a [sheet] table has one move sheet (see sheets_of): from its authored side, its
+    own ending and its first variant (the other side is mirrored when the simulation loads it); each clip of the file carries
+    that sheet's hash."""
     clips = []
     for m0 in moves:
+        mine = []
         for m in endings(m0):
             for side_m in (m, mirror_move(m)):
                 for v in m.get("variant", []):
-                    clips.append(solve(side_m, v, rig))
+                    mine.append(solve(side_m, v, rig))
+        if mine[0].sheet is not None:
+            mine[0].sheet_owner = True
+            for c in mine:
+                c.sheet_sha = mine[0].sheet["sha"]
+        clips += mine
     return clips
+
+
+def sheets_of(clips: list[Clip]) -> list[dict]:
+    """The move sheets of built clips, one per move file that has one."""
+    return [c.sheet for c in clips if c.sheet_owner]
 
 
 def main(argv: list[str]) -> int:
@@ -742,13 +952,17 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--moves-dir", type=Path, default=MOVES)
     ap.add_argument("--model", type=Path, default=GLB)
     ap.add_argument("--out", type=Path, default=OUT)
+    ap.add_argument("--sheets", type=Path, help="where the move sheets are written (default data/moves/sheets.json; beside --out when that is given)")
     args = ap.parse_args(argv)
+    sheets_path = args.sheets or (SHEETS if args.out == OUT else args.out / "sheets.json")
     rig = load_rig(args.model)
     names = [nm.replace(":", "_") for nm in rig.t.names]
     args.out.mkdir(parents=True, exist_ok=True)
     moves = [load_move(p) for p in sorted(args.moves_dir.glob("*.toml"))]
     index, failed = [], []
-    for c in build(moves, rig):
+    clips = build(moves, rig)
+    sheets = sheets_of(clips)
+    for c in clips:
         if c.problems:
             failed.append(c.name)
             print(f"REFUSED {c.name}: " + "; ".join(c.problems))
@@ -764,6 +978,9 @@ def main(argv: list[str]) -> int:
         print(f"{len(failed)} clip(s) refused: {', '.join(failed)}; clips.json left as it was")
         return 1
     (args.out / "clips.json").write_text(json.dumps({"fps": FPS, "bones": names, "skeleton": skeleton, "clips": index}, indent=1) + "\n")
+    sheets_path.parent.mkdir(parents=True, exist_ok=True)
+    sheets_path.write_text(json.dumps({"fps": FPS, "sheets": sheets}, separators=(",", ":")).replace('{"name"', '\n{"name"') + "\n")
+    print(f"wrote {len(sheets)} move sheets to {sheets_path}")
     keep = {e["file"] for e in index}
     for old in args.out.glob("*.kclip"):
         if old.name not in keep:

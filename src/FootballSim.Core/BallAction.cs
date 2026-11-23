@@ -270,6 +270,26 @@ public sealed class BallAction
     internal float Contact2PathMiss = float.NaN;
     /// <summary>Elastico: the exit burst's scale for the way its second contact played the ball on (NaN before it).</summary>
     internal float ExitBurstScale = float.NaN;
+    // ---- a sheet-driven move (see SkillMoves, "the follower") ----
+    /// <summary>The blended move sheet the simulation follows for this move; null for a move played by its legacy formulas.</summary>
+    public SheetPlay? Sheet { get; internal set; }
+    /// <summary>The sheet time the move starts at (the sheet's start, or later for a reach much shorter than the sheet's), seconds.</summary>
+    internal float SheetS0;
+    /// <summary>The nudge that brings the sheet's contact point onto the real ball (world X, Z, metres), how much of it has been made, and its pace now.</summary>
+    internal Vector2 SheetCorrection, SheetApplied, SheetCorrVel;
+    /// <summary>For a sheet-driven move: the nudge planned at its start to bring the sheet's contact point onto the ball (world X, Z, metres), and how much of it has been made.</summary>
+    public Vector2 MeetNudge => SheetCorrection;
+    public Vector2 MeetNudgeMade => SheetApplied;
+    /// <summary>For a sheet-driven move: what the ball was off the current leg's track on the leg's first tick (world, metres); it fades over the leg.</summary>
+    public Vector3 MeetBias => LegBias;
+    /// <summary>His velocity over the sheet's own as the move started (world X, Z); it eases out. And the sheet's velocity on the tick before.</summary>
+    internal Vector2 SheetResidual, SheetPlanPrev;
+    /// <summary>His facing over the sheet's as the move started, radians; it eases out.</summary>
+    internal float SheetFacingOff;
+    internal bool SheetBegun;
+    /// <summary>The ball leg under way (-1 before the first), where the ball was on its first tick, and what the ball was off the leg's track then (it fades over the leg).</summary>
+    internal int SheetLeg = -1;
+    internal Vector3 LegBall0, LegBias;
     /// <summary>A fake cut's direction (unit X, Z).</summary>
     internal Vector2 SkillCut;
     /// <summary>The effective skill_moves rating the move was made with.</summary>

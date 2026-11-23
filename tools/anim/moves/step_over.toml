@@ -35,6 +35,23 @@ spans = [0.22, 0.20, 0.25]
 [ball]
 radius = 0.11
 
+# The move sheet (data/moves/sheets.json): the ball's legs, the exit rule and how far the left stick may turn its frame.
+[sheet]
+steer_deg = 45
+
+[[sheet.leg]]
+from = "start"
+to = "release"
+anchor = "free"
+
+[sheet.exit]
+kind = "touch"
+min_deg = 35
+max_deg = 70
+push = "sprint"
+foot = "right"
+surface = "outside"
+
 [[key]]
 t = 0.0
 ease = 1.0

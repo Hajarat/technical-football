@@ -57,6 +57,26 @@ left = [[0.0, 0.13889], [0.34166, 0.44584], [0.57083, 0.69584]]
 right = [[0.81599, 0.91601]]
 
 # ------------------------------------------------------------------------------------------------ start: mid-stride
+# The move sheet (data/moves/sheets.json): the ball's legs, the exit rule and how far the left stick may turn its frame.
+[sheet]
+entry_speed = 3.38             # the pace the root comes in at, m/s
+steer_deg = 0
+
+[[sheet.leg]]
+from = "contact"
+to = "release"
+anchor = "body"
+foot = "right"
+surface = "sole"
+
+[sheet.exit]
+kind = "touch"
+min_deg = 0
+max_deg = 60
+push = "jog"
+foot = "left"
+surface = "inside"
+
 [[key]]
 t = 0.0
 ease = 0.0
