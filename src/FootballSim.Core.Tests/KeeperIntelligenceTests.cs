@@ -390,6 +390,7 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
 
     // ---- commitment ----
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void StartingWellOffHisLineHeDoesNotGoBackAndForth()
     {

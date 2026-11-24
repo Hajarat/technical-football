@@ -37,6 +37,7 @@ public class CalibrationTests
 
     // ---- hard requirement 1: more shooting skill never lowers the scoring rate ----
 
+    [Trait("Category", "Slow")]
     [Theory]
     [InlineData("penalty", "finishing", 60)]
     [InlineData("penalty", "finishing", 78)]
@@ -63,6 +64,7 @@ public class CalibrationTests
 
     // ---- hard requirement 2: a better keeper never lets in more ----
 
+    [Trait("Category", "Slow")]
     [Theory]
     [InlineData("penalty")]
     [InlineData("breakaway")]
@@ -253,6 +255,7 @@ public class CalibrationTests
     /// edge of the box 9.8, tight angle 2.1, breakaway 29.2, halfway run 17.4, angled run 22.2 and keeper rush 36.3; all held.
     /// The real bands per shot type are set once the keeper is rebuilt.
     /// </summary>
+    [Trait("Category", "Slow")]
     [Theory]
     [InlineData("penalty", 72.0, 80.0)]
     [InlineData("edge_of_box", 6.0, 14.0)]
@@ -310,6 +313,7 @@ public class CalibrationTests
 
     // ---- reported, not asserted ----
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void ReportMeasuredScoringRates()
     {

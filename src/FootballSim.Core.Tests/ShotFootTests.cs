@@ -680,6 +680,7 @@ public class ShotFootTests
         Assert.Equal(new StrikeChoice(Foot.Left, FootSurface.Laces), new StrikeChoice(r2.Foot, r2.Surface));
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void InADribbleTheStrikeWaitsForTheFootChosenAtTheReleaseAndNeverChangesIt()
     {

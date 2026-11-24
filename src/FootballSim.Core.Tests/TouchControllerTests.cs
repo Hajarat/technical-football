@@ -117,6 +117,7 @@ public class TouchControllerTests
 
     // ---- smoothness (smoothness) ----
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void TheSteeringNeverStepsTheVelocity()
     {
@@ -252,6 +253,7 @@ public class TouchControllerTests
         }
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void ACommittedTouchKeepsItsFootSurfaceAndKindToItsContact()
     {
@@ -285,6 +287,7 @@ public class TouchControllerTests
         Assert.True(touches > 300, $"{touches} committed touches");
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void APlayerInPossessionIsAlwaysBackOnTheBallWithinOneAndAHalfSeconds()
     {
@@ -323,6 +326,7 @@ public class TouchControllerTests
         }
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void AStickTurnAtAnyMomentOfASprintPushIsPlayedWithinTheLatencyBound()
     {
@@ -354,6 +358,7 @@ public class TouchControllerTests
         }
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void ASharpStopPicksAStopTouchAndNeverReachesBack()
     {
@@ -391,6 +396,7 @@ public class TouchControllerTests
         Assert.Equal(30, stops);
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void StickAndSprintReleasedTogetherEndInAPlayedStopTouch()
     {
@@ -413,6 +419,7 @@ public class TouchControllerTests
         }
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void AStraightJogAtDribblingOneNeverDipsUnderEightyFivePercent()
     {

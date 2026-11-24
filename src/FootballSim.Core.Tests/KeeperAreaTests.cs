@@ -118,6 +118,7 @@ public class KeeperAreaTests
         Assert.True(ball.Velocity.X < 0f, "blocked back out");
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void AWorldRoundNeverHasTheKeeperHoldTheBallOutsideHisArea()
     {

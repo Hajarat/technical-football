@@ -231,11 +231,16 @@ static class Cli
             var counts = new int[Enum.GetValues<ShotEnd>().Length];
             var stats = new KeeperStats();
             var sw = Stopwatch.StartNew();
-            for (int i = 0; i < n; i++)
+            // The rounds in parallel (each depends only on its seed), then counted in round order.
+            var results = new RoundRunner.Result[n];
+            Parallel.For(0, n, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
             {
                 var script = MateScript(opts) ?? new ScriptedAttacker();
                 script.Counters = counters;
-                var r = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i, script, followUp: true, defender: defender, mate: mateSheet);
+                results[i] = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed + (ulong)i, script, followUp: true, defender: defender, mate: mateSheet);
+            });
+            foreach (var r in results)
+            {
                 counts[(int)r.End]++;
                 stats.Add(r);
             }

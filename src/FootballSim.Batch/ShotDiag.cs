@@ -43,74 +43,38 @@ static class ShotDiag
         var noShot = new Dictionary<string, int>();
         int wide = 0, wideAimOut = 0, wideError = 0;
         int sprintPushes = 0, cutPushes = 0;
-        for (int r = 0; r < n; r++)
+        // The rounds in parallel (each depends only on its seed), then gathered in round order.
+        var reads = new RoundRead[n];
+        Parallel.For(0, n, new ParallelOptions { MaxDegreeOfParallelism = 4 }, r =>
+            reads[r] = ReadRound(tuning, sc, att, kee, seed0 + (ulong)r, Script, list));
+        foreach (var rd in reads)
         {
-            var w = new World(tuning, sc, att, kee, seed0 + (ulong)r);
-            var script = Script();
-            w.Begin();
-            var buf = new TickIntent[w.PlayerCount];
-            int cap = (int)((tuning.Round.MaxSeconds + 10f) * tuning.TickRate);
-            var p = w.Attacker;
-            Vector3 ballPrev = default, posPrev = default; float facePrev = 0f, speedPrev = 0f, fatiguePrev = 0f; Foot footPrev = Foot.Right;
-            int touches = 0;
-            bool shot = false;
-            int pressTick = -1;
-            for (int i = 0; i < cap; i++)
+            sprintPushes += rd.SprintPushes; cutPushes += rd.CutPushes;
+            if (rd.NoShot is { } why)
             {
-                if (p.ShotAction is { Made: false } sa) pressTick = sa.PlanTick;
-                ballPrev = w.Ball.Position; posPrev = p.Position; facePrev = p.Facing; speedPrev = p.Speed; footPrev = p.StrikeFoot; fatiguePrev = p.TurnFatigue;
-                buf[0] = script.Next(w);
-                w.Step(buf);
-                touches += w.Events.Count(e => e.Kind == EventKind.Touch && e.Team == 0);
-                if (p.TouchAction is { Made: true, Kind: ActionKind.Sprint } push && push.ContactTick == w.Tick)
-                {
-                    sprintPushes++;
-                    if (push.DangerCut > 0f) cutPushes++;
-                }
-                if (w.Shots.Count > 0) { shot = true; break; }
-                if (w.State is RoundState.Outcome or RoundState.Report) break;
-            }
-            if (!shot)
-            {
-                string why = w.KeeperReport.WonBall ? "keeper won the ball" : w.BallController == p ? "in possession, no shot (time)" : "ball loose / lost";
                 noShot[why] = noShot.GetValueOrDefault(why) + 1;
                 continue;
             }
-            var s = w.Shots[0];
-            // The ball at the strike tick, before it was struck, from the feet and from the striking foot's contact point.
-            var rel = new Vector2(ballPrev.X - posPrev.X, ballPrev.Z - posPrev.Z);
-            var fwd = new Vector2(MathF.Cos(facePrev), MathF.Sin(facePrev));
-            var cp = TouchPlanner.ContactPointFor(p, s.Foot, tuning);
-            dist.Add(s.Distance); speed.Add(speedPrev); charge.Add(s.Charge); chargeMiss.Add(s.ChargeMissDeg); sigmaH.Add(s.SigmaH);
-            offFeet.Add(rel.Length()); ahead.Add(Vector2.Dot(rel, fwd));
-            offFoot.Add(new Vector2(ballPrev.X - cp.X, ballPrev.Z - cp.Z).Length());
-            touchesBefore.Add(touches); timeToShot.Add(w.SimTime); fatigue.Add(fatiguePrev);
-            foreach (var f in s.Factors) { if (!factors.TryGetValue(f.Name, out var l)) factors[f.Name] = l = new(); l.Add(f.Value); }
-            foreach (var f in s.SpeedFactors) { if (!factors.TryGetValue("speed x " + f.Name, out var l)) factors["speed x " + f.Name] = l = new(); l.Add(f.Value); }
-            launch.Add(s.Speed); bodyAngle.Add(s.BodyAngleDeg);
-            // On target: the ball as struck, flying free of the keeper, goes in.
-            if (ShotModel.FliesIn(w.Ball.Position, w.Ball.Velocity, w.Ball.Spin, w.Pitch, tuning)) onTarget++;
-            adjust.Add(s.AdjustDeg);
-            float crossed = CrossedZ(s, w.Pitch, tuning);
-            if (!float.IsNaN(crossed)) { drift.Add(crossed - s.Aimed.X); absDrift.Add(MathF.Abs(crossed - s.Aimed.X)); }
-            if (list) Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"  seed {seed0 + (ulong)r}: {s.Type} {s.Foot}/{s.Surface} rule {w.StrikeGeometry.Rule} from {s.Distance:F1} m aimed z {s.Aimed.X:F2} adjust {s.AdjustDeg:F2} deg yaw error {s.YawErrorDeg:F2} deg crossed z {crossed:F2} drift {crossed - s.Aimed.X:F2} m"));
-            if (pressTick >= 0) pressToStrike.Add((s.Tick - pressTick) * tuning.Dt);
-            string how = (s.Foot == att.PreferredFoot ? "strong " : "weak ") + s.Surface.ToString().ToLowerInvariant();
-            feet[how] = feet.GetValueOrDefault(how) + 1;
-            // The decision of the release still stands at the strike. A foot that differs from it was handed over: by the
-            // dead-ahead swap when Ahead decided, otherwise because the chosen foot had no contact.
-            var decision = w.StrikeGeometry;
-            rules[decision.Rule] = rules.GetValueOrDefault(decision.Rule) + 1;
-            if (decision.Rule == StrikeRule.FarPost) farPost++;
-            if (s.Foot != decision.Choice.Foot) { if (decision.Rule == StrikeRule.Ahead) swapped++; else noContact++; }
-            var res = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed0 + (ulong)r, Script());
-            ends[res.End.ToString()] = ends.GetValueOrDefault(res.End.ToString()) + 1;
-            if (res.End == ShotEnd.Wide)
+            dist.Add(rd.Distance); speed.Add(rd.Speed); charge.Add(rd.Charge); chargeMiss.Add(rd.ChargeMiss); sigmaH.Add(rd.SigmaH);
+            offFeet.Add(rd.OffFeet); ahead.Add(rd.Ahead);
+            offFoot.Add(rd.OffFoot);
+            touchesBefore.Add(rd.Touches); timeToShot.Add(rd.TimeToShot); fatigue.Add(rd.Fatigue);
+            foreach (var (name, value) in rd.Factors) { if (!factors.TryGetValue(name, out var l)) factors[name] = l = new(); l.Add(value); }
+            launch.Add(rd.Launch); bodyAngle.Add(rd.BodyAngle);
+            if (rd.OnTarget) onTarget++;
+            adjust.Add(rd.Adjust);
+            if (!float.IsNaN(rd.Crossed)) { drift.Add(rd.Crossed - rd.AimedZ); absDrift.Add(MathF.Abs(rd.Crossed - rd.AimedZ)); }
+            if (rd.ListLine != null) Console.WriteLine(rd.ListLine);
+            if (rd.PressToStrike is float pts) pressToStrike.Add(pts);
+            feet[rd.How] = feet.GetValueOrDefault(rd.How) + 1;
+            rules[rd.Rule] = rules.GetValueOrDefault(rd.Rule) + 1;
+            if (rd.Rule == StrikeRule.FarPost) farPost++;
+            if (rd.HandedOver) { if (rd.Rule == StrikeRule.Ahead) swapped++; else noContact++; }
+            ends[rd.End.ToString()] = ends.GetValueOrDefault(rd.End.ToString()) + 1;
+            if (rd.End == ShotEnd.Wide)
             {
                 wide++;
-                // Aimed outside the posts already, or aimed inside and sent wide by the error.
-                if (MathF.Abs(s.Aimed.X) > w.Pitch.GoalHalfWidth) wideAimOut++; else wideError++;
+                if (rd.AimedOut) wideAimOut++; else wideError++;
             }
         }
         string F(List<float> l) => l.Count == 0 ? "-" : $"{l.Average():F2} (p10 {Q(l, 0.1):F2}, p90 {Q(l, 0.9):F2})";
@@ -134,6 +98,88 @@ static class ShotDiag
         foreach (var kv in factors.OrderBy(kv => kv.Key)) Console.WriteLine($"  factor {kv.Key}: {F(kv.Value)}");
         Console.WriteLine($"  wide {wide}: aimed outside the posts {wideAimOut}, aimed inside and sent wide {wideError}");
         return 0;
+    }
+
+    /// <summary>What one round gave the diagnostic: the push counts, and either why it had no shot or the reads at the strike.</summary>
+    sealed class RoundRead
+    {
+        public int SprintPushes, CutPushes;
+        public string? NoShot;
+        public float Distance, Speed, Charge, ChargeMiss, SigmaH, OffFeet, Ahead, OffFoot, Touches, TimeToShot, Fatigue, Launch, BodyAngle;
+        public readonly List<(string Name, float Value)> Factors = new();
+        public bool OnTarget, HandedOver, AimedOut;
+        public float Adjust, Crossed, AimedZ;
+        public string? ListLine;
+        public float? PressToStrike;
+        public string How = "";
+        public StrikeRule Rule;
+        public ShotEnd End;
+    }
+
+    /// <summary>Plays one scripted round to its first strike and reads it there (then plays it again to see how the shot ended).</summary>
+    static RoundRead ReadRound(Tuning tuning, Scenario sc, PlayerSheet att, PlayerSheet kee, ulong seed, Func<ScriptedAttacker> Script, bool list)
+    {
+        var rd = new RoundRead();
+        var w = new World(tuning, sc, att, kee, seed);
+        var script = Script();
+        w.Begin();
+        var buf = new TickIntent[w.PlayerCount];
+        int cap = (int)((tuning.Round.MaxSeconds + 10f) * tuning.TickRate);
+        var p = w.Attacker;
+        Vector3 ballPrev = default, posPrev = default; float facePrev = 0f, speedPrev = 0f, fatiguePrev = 0f; Foot footPrev = Foot.Right;
+        int touches = 0;
+        bool shot = false;
+        int pressTick = -1;
+        for (int i = 0; i < cap; i++)
+        {
+            if (p.ShotAction is { Made: false } sa) pressTick = sa.PlanTick;
+            ballPrev = w.Ball.Position; posPrev = p.Position; facePrev = p.Facing; speedPrev = p.Speed; footPrev = p.StrikeFoot; fatiguePrev = p.TurnFatigue;
+            buf[0] = script.Next(w);
+            w.Step(buf);
+            touches += w.Events.Count(e => e.Kind == EventKind.Touch && e.Team == 0);
+            if (p.TouchAction is { Made: true, Kind: ActionKind.Sprint } push && push.ContactTick == w.Tick)
+            {
+                rd.SprintPushes++;
+                if (push.DangerCut > 0f) rd.CutPushes++;
+            }
+            if (w.Shots.Count > 0) { shot = true; break; }
+            if (w.State is RoundState.Outcome or RoundState.Report) break;
+        }
+        if (!shot)
+        {
+            rd.NoShot = w.KeeperReport.WonBall ? "keeper won the ball" : w.BallController == p ? "in possession, no shot (time)" : "ball loose / lost";
+            return rd;
+        }
+        var s = w.Shots[0];
+        // The ball at the strike tick, before it was struck, from the feet and from the striking foot's contact point.
+        var rel = new Vector2(ballPrev.X - posPrev.X, ballPrev.Z - posPrev.Z);
+        var fwd = new Vector2(MathF.Cos(facePrev), MathF.Sin(facePrev));
+        var cp = TouchPlanner.ContactPointFor(p, s.Foot, tuning);
+        rd.Distance = s.Distance; rd.Speed = speedPrev; rd.Charge = s.Charge; rd.ChargeMiss = s.ChargeMissDeg; rd.SigmaH = s.SigmaH;
+        rd.OffFeet = rel.Length(); rd.Ahead = Vector2.Dot(rel, fwd);
+        rd.OffFoot = new Vector2(ballPrev.X - cp.X, ballPrev.Z - cp.Z).Length();
+        rd.Touches = touches; rd.TimeToShot = w.SimTime; rd.Fatigue = fatiguePrev;
+        foreach (var f in s.Factors) rd.Factors.Add((f.Name, f.Value));
+        foreach (var f in s.SpeedFactors) rd.Factors.Add(("speed x " + f.Name, f.Value));
+        rd.Launch = s.Speed; rd.BodyAngle = s.BodyAngleDeg;
+        // On target: the ball as struck, flying free of the keeper, goes in.
+        rd.OnTarget = ShotModel.FliesIn(w.Ball.Position, w.Ball.Velocity, w.Ball.Spin, w.Pitch, tuning);
+        rd.Adjust = s.AdjustDeg;
+        float crossed = CrossedZ(s, w.Pitch, tuning);
+        rd.Crossed = crossed; rd.AimedZ = s.Aimed.X;
+        if (list) rd.ListLine = string.Create(CultureInfo.InvariantCulture,
+            $"  seed {seed}: {s.Type} {s.Foot}/{s.Surface} rule {w.StrikeGeometry.Rule} from {s.Distance:F1} m aimed z {s.Aimed.X:F2} adjust {s.AdjustDeg:F2} deg yaw error {s.YawErrorDeg:F2} deg crossed z {crossed:F2} drift {crossed - s.Aimed.X:F2} m");
+        if (pressTick >= 0) rd.PressToStrike = (s.Tick - pressTick) * tuning.Dt;
+        rd.How = (s.Foot == att.PreferredFoot ? "strong " : "weak ") + s.Surface.ToString().ToLowerInvariant();
+        // The decision of the release still stands at the strike. A foot that differs from it was handed over: by the
+        // dead-ahead swap when Ahead decided, otherwise because the chosen foot had no contact.
+        var decision = w.StrikeGeometry;
+        rd.Rule = decision.Rule;
+        rd.HandedOver = s.Foot != decision.Choice.Foot;
+        rd.End = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed, Script()).End;
+        // Aimed outside the posts already, or aimed inside and sent wide by the error.
+        rd.AimedOut = MathF.Abs(s.Aimed.X) > w.Pitch.GoalHalfWidth;
+        return rd;
     }
 
     /// <summary>Where a shot as struck crosses the goal line (Z), flying over the ground alone (no frame, boards or keeper); NaN if it never does.</summary>

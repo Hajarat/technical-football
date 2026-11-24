@@ -97,6 +97,7 @@ public class TouchTests
         Assert.Equal(1f * 0.4f, TouchModel.DirectionSigmaDeg(s, 0f, T), 4);
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void TouchSpeedErrorsStillFollowTheRatings()
     {

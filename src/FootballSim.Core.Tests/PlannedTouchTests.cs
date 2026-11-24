@@ -106,6 +106,7 @@ public class PlannedTouchTests
         Assert.True(left > 0 && right > 0, $"feet L {left} R {right}");
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void JogThenTurnNinetyDegreesKeepsPossession()
     {
@@ -326,6 +327,7 @@ public class PlannedTouchTests
         Assert.Equal(TouchPlanner.WindupTicks(flat), TouchPlanner.ExecutionTicks(p, w.Ball, flat));
     }
 
+    [Trait("Category", "Slow")]
     [Theory]
     [InlineData(0f)]
     [InlineData(1f)]
