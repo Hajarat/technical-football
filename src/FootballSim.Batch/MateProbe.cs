@@ -156,7 +156,7 @@ static class MateProbe
             var scene = MateBot.SceneOf(w, mate);
             var g = MateBot.Gradient(Flat(mate.Position), scene, tuning);
             var c = w.Attacker.Position; var p = mate.Position; var df = w.Defender!.Position;
-            Console.WriteLine($"{w.Tick,6}  {F(c.X).PadLeft(6)},{F(c.Z).PadLeft(6)}  {F(p.X).PadLeft(6)},{F(p.Z).PadLeft(6)} {F(mate.Speed).PadLeft(5)}  {mate.MateRun,-7} {F(w.OffsideLine).PadLeft(6)} {F(w.OffsideLine - p.X).PadLeft(6)}  {F(g.X).PadLeft(6)},{F(g.Y).PadLeft(6)}  {MateBot.Lane(Flat(p), scene, tuning),4}  {F(df.X).PadLeft(6)},{F(df.Z).PadLeft(6)} {w.Defender.DefenderAction}");
+            Console.WriteLine($"{w.Tick,6}  {F(c.X).PadLeft(6)},{F(c.Z).PadLeft(6)}  {F(p.X).PadLeft(6)},{F(p.Z).PadLeft(6)} {F(mate.Speed).PadLeft(5)}  {mate.MateRun,-7} {F(w.OffsideLine).PadLeft(6)} {F(w.OffsideLine - p.X).PadLeft(6)}  {F(g.X).PadLeft(6)},{F(g.Y).PadLeft(6)}  {MateBot.Lane(Flat(p), scene, tuning),4}  {F(df.X).PadLeft(6)},{F(df.Z).PadLeft(6)} {w.Defender.DefenderAction} {w.DefenderBot?.Mode}");
         }
         Console.WriteLine($"outcome {w.Outcome} at tick {w.Tick}, runs {mate.MateRuns}");
         return 0;
@@ -191,10 +191,15 @@ static class MateProbe
     }
 
     /// <summary>
-    /// The bands of the team probe: rounds that end in a goal, percent, per scripted style (set from the measured rates), and
-    /// how far the square pass has to beat playing alone, points.
+    /// The bands of the team probe: rounds that end in a goal, percent, per scripted style (regression rows set about five points
+    /// either side of the measured rates, not difficulty targets; the legacy defender bot keeps its own), and how far the square
+    /// pass has to beat playing alone, points.
     /// </summary>
     public static readonly Dictionary<string, (float Lo, float Hi)> GoalBands = new()
+    {
+        ["solo"] = (2f, 12f), ["square"] = (18f, 28f), ["through"] = (0f, 9f),
+    };
+    public static readonly Dictionary<string, (float Lo, float Hi)> LegacyGoalBands = new()
     {
         ["solo"] = (3f, 10f), ["square"] = (13f, 24f), ["through"] = (15f, 28f),
     };
@@ -247,7 +252,7 @@ static class MateProbe
             Console.WriteLine($"  {style,-8} {F(Pct(Outcome.Goal), 1),6} {F(Pct(Outcome.Held), 1),6} {F(Pct(Outcome.Dispossessed), 1),14} {F(Pct(Outcome.Offside), 1),9} {F(Pct(Outcome.TimeUp), 1),9} {F(other, 1),7} {F((double)passes / n, 2),14} {F(100.0 * received / Math.Max(1, passes), 1),10} {F((double)shots / n, 2),12} {F(clock / n, 1),14}");
         }
         foreach (string style in styles)
-            if (GoalBands.TryGetValue(style, out var band)) ok &= Line($"{style}: rounds that end in a goal", goal[style], band.Lo, band.Hi);
+            if ((tuning.Defender.Brain == "legacy" ? LegacyGoalBands : GoalBands).TryGetValue(style, out var band)) ok &= Line($"{style}: rounds that end in a goal", goal[style], band.Lo, band.Hi);
         if (goal.ContainsKey("solo") && goal.ContainsKey("square"))
             ok &= Line("square over solo, points", goal["square"] - goal["solo"], SquareOverSolo, 100, "");
         if (opts.ContainsKey("speed"))

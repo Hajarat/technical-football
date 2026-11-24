@@ -99,8 +99,8 @@ static class DefenceReport
         if (withDef.Count > 0)
         {
             Console.WriteLine();
-            Console.WriteLine($"past the defender (the ball {World.PastMarginM.ToString("F1", Ic)} m nearer the goal centre than he is, the attackers still on it " +
-                              $"{World.PastHoldS.ToString("F1", Ic)} s later; by pass: within {World.PastByPassS.ToString("F1", Ic)} s of a pass):");
+            Console.WriteLine($"past the defender (the ball {World.PastMarginM.ToString("F1", Ic)} m nearer the goal centre than he is with an attacker on it or their pass on its way, " +
+                              $"the defender not on the ball for {World.PastHoldS.ToString("F1", Ic)} s; by pass: within {World.PastByPassS.ToString("F1", Ic)} s of a pass):");
             foreach (var g in withDef.GroupBy(r => r.Scenario).OrderBy(g => g.Key, StringComparer.Ordinal))
             {
                 var past = g.Where(r => r.Measured!.Defender!.BeatenS != null).ToList();

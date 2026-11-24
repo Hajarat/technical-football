@@ -448,7 +448,7 @@ static class HumanProbe
         string F(float x, int wd = 6) => x.ToString("F2", Ic).PadLeft(wd);
         var a = w.Attacker; var b = w.Ball.Position; var k = w.Keeper.Position;
         string ctl = w.BallController == null ? "-" : w.BallController.Team == 0 ? $"att{w.BallController.Index}" : w.BallController == w.Keeper ? "kee" : "def";
-        string def = w.Defender is { } d ? $"def {F(d.Position.X)},{F(d.Position.Z)} {d.DefenderAction,-9}" : "";
+        string def = w.Defender is { } d ? $"def {F(d.Position.X)},{F(d.Position.Z)} {d.DefenderAction,-9} {w.DefenderBot?.Mode,-8}" : "";
         string stick = $"stick {F(it.MoveX, 5)},{F(it.MoveZ, 5)} spr {it.Sprint:F0}{(it.CloseControl ? " cc" : "")}{(it.ShootHeld ? " SHOOT" : "")}{(it.PassHeld ? " PASS" : "")}{(it.RightX != 0 || it.RightZ != 0 ? $" rs {it.RightX:F1},{it.RightZ:F1}" : "")}";
         Console.WriteLine($"{w.Tick,5} {F(w.SimTime)} {w.State,-7} ph {h.Phase} att{w.ControlledIndex} {F(a.Position.X)},{F(a.Position.Z)} v {F(a.Speed, 5)} ball {F(b.X)},{F(b.Z)} {ctl,-4} {def} kee {F(k.X)},{F(k.Z)} {w.Keeper.KeeperAction,-9} | {stick} {string.Join(" ", ev)}");
     }
@@ -469,13 +469,32 @@ static class HumanProbe
         return 0;
     }
 
-    /// <summary>Checks the --brain option: null when it is fine (legacy, or none), else the exit code (contain is not built yet).</summary>
+    /// <summary>The tuning's brain keys: --brain legacy sets each of them to "legacy".</summary>
+    static readonly string[] BrainKeys = { "defender.brain" };
+
+    /// <summary>Checks the --brain option: null when it is fine (legacy, contain, or none), else the exit code.</summary>
     public static int? CheckBrain(Dictionary<string, string> opts)
     {
-        if (!opts.TryGetValue("brain", out var b) || b == "legacy") return null;
-        if (b == "contain") { Console.Error.WriteLine("--brain contain: the containing defender and the home-first keeper are not built yet; only --brain legacy exists"); return 2; }
-        Console.Error.WriteLine($"--brain: unknown brain '{b}' (known: legacy; contain is not built yet)");
+        if (!opts.TryGetValue("brain", out var b) || b is "legacy" or "contain") return null;
+        Console.Error.WriteLine($"--brain: unknown brain '{b}' (known: contain, legacy)");
         return 2;
+    }
+
+    /// <summary>--brain legacy: the tuning with every brain key set to legacy; otherwise the tuning as it is.</summary>
+    public static Tuning ApplyBrain(Dictionary<string, string> opts, Tuning tuning)
+    {
+        if (!opts.TryGetValue("brain", out var b) || b != "legacy") return tuning;
+        var node = System.Text.Json.Nodes.JsonNode.Parse(DataLoader.TuningToJson(tuning))!;
+        foreach (var key in BrainKeys)
+        {
+            var keys = key.Split('.');
+            var at = node;
+            for (int i = 0; i < keys.Length - 1; i++) at = at![keys[i]];
+            at![keys[^1]] = "legacy";
+        }
+        var again = DataLoader.ParseTuning(node.ToJsonString(), "--brain");
+        again.Value!.Sheets = tuning.Sheets;
+        return again.Value!;
     }
 
     public static int Run(Dictionary<string, string> opts, string dataDir, Tuning tuning)
@@ -501,9 +520,9 @@ static class HumanProbe
         var sheets = new Dictionary<string, PlayerSheet>();
         foreach (var (name, id) in Attackers) if (P(id) is { } s) sheets[name] = s; else return 1;
 
-        Console.WriteLine($"human probe: n={n} seed={seed} brain=legacy (today's defender bot and keeper){(comparison ? ", a comparison run: marks printed, exit 0" : "")}");
+        Console.WriteLine($"human probe: n={n} seed={seed} brain={(comparison ? "legacy (the legacy defender bot and keeper), a comparison run: marks printed, exit 0" : $"shipped (defender {tuning.Defender.Brain})")}");
         Console.WriteLine($"attackers: even={Attackers[0].Sheet} fast={Attackers[1].Sheet}; first attacks only; past = the ball {World.PastMarginM.ToString("F1", Ic)} m nearer the goal centre than the defender, " +
-                          $"the attackers still on it {World.PastHoldS.ToString("F1", Ic)} s later");
+                          $"with an attacker on it (or their pass on its way) and the defender not on the ball for {World.PastHoldS.ToString("F1", Ic)} s");
         Console.WriteLine("scenario       plan         attacker      n   goal   miss   held   disp   foul   offs   time  |   past  fa_goals");
 
         var results = new Dictionary<(Plan, string), List<Rec>>();

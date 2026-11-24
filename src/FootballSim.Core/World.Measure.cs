@@ -9,7 +9,7 @@ public sealed partial class World
 {
     /// <summary>The ball must be at least this much nearer the goal centre than the defender to be past him, metres.</summary>
     public const float PastMarginM = 0.5f;
-    /// <summary>The attacking side must still have the ball this long after it went past the defender, seconds.</summary>
+    /// <summary>The defender must not win, touch or control the ball for this long after it went past him, seconds.</summary>
     public const float PastHoldS = 0.5f;
     /// <summary>The ball went past the defender within this long of a pass: past by the pass, seconds.</summary>
     public const float PastByPassS = 1.5f;
@@ -18,7 +18,6 @@ public sealed partial class World
 
     FirstAttackEnd? _faEnd;         // how the first attack ended (null while it is on)
     int _faTick;
-    int _lastTeam;                  // the team that last had or played the ball (0 the attackers, 1 the keeper's side)
     int _pastCandidate;             // the tick the ball went past the defender, waiting for the attackers to keep it (-1 none)
     int _pastTick;                  // the first confirmed tick past him (-1 not yet)
     bool _pastByPass, _candidateByPass; // whether it went past him within PastByPassS of a pass
@@ -40,7 +39,6 @@ public sealed partial class World
     void ResetMeasures()
     {
         _faEnd = null; _faTick = 0;
-        _lastTeam = 0;
         _pastCandidate = -1; _pastTick = -1; _pastByPass = _candidateByPass = false;
         _passTick = int.MinValue / 2; _passesSeen = 0;
         _roundedTick = -1; _backTick = -1;
@@ -49,8 +47,9 @@ public sealed partial class World
     }
 
     /// <summary>
-    /// The ball is past the defender: at least <see cref="PastMarginM"/> nearer the goal centre than he is. (It counts once the
-    /// attacking side still has the ball <see cref="PastHoldS"/> later: see <see cref="ObserveMeasures"/>.)
+    /// The ball is past the defender: at least <see cref="PastMarginM"/> nearer the goal centre than he is. (It counts on a tick
+    /// the attacking side has the ball, and stands when the defender does not win, touch or control it for
+    /// <see cref="PastHoldS"/>: see <see cref="ObserveMeasures"/>.)
     /// </summary>
     public static bool IsPast(Vector2 ball, Vector2 defender, Vector2 goal) =>
         Vector2.Distance(ball, goal) + PastMarginM <= Vector2.Distance(defender, goal);
@@ -83,20 +82,19 @@ public sealed partial class World
     void ObserveMeasures()
     {
         if (State is not (RoundState.Live or RoundState.Strike or RoundState.Flight)) return;
-        bool lost = false;
-        foreach (var e in _events)
-        {
-            if (e.Kind is EventKind.Tackle or EventKind.Block or EventKind.Save) lost = true;
-            else if (e.Kind is EventKind.Strike or EventKind.Pass) _lastTeam = 0;
-        }
-        if (_controller != null) { if (_controller.Team != 0) lost = true; else _lastTeam = 0; }
-        if (lost) _lastTeam = 1;
         if (_passes != _passesSeen) { _passesSeen = _passes; _passTick = Tick; }
 
+        // Past the defender: on a tick the attackers have the ball (one of them controls it, or a pass they struck is on its way;
+        // a shot in flight is not theirs) it is at least PastMarginM nearer the goal centre than he is, and over the next
+        // PastHoldS he does not win, touch or control it. A shot, a goal or a save after that tick does not undo it.
         if (Defender is { } d && _pastTick < 0)
         {
-            if (_lastTeam != 0) _pastCandidate = -1;
-            else if (_pastCandidate < 0 && IsPast(Flat(Ball.Position), Flat(d.Position), GoalCentre))
+            bool his = _controller == d;
+            foreach (var e in _events)
+                if (e.Kind is EventKind.Tackle or EventKind.Block && e.Team == d.Team && e.PlayerIndex == d.Index) his = true;
+            bool theirs = _controller is { Team: 0 } || _controller == null && _pass != null;
+            if (his) _pastCandidate = -1;
+            else if (_pastCandidate < 0 && theirs && IsPast(Flat(Ball.Position), Flat(d.Position), GoalCentre))
             {
                 _pastCandidate = Tick;
                 _candidateByPass = Tick - _passTick <= Ticks(PastByPassS);
@@ -121,10 +119,13 @@ public sealed partial class World
         _faTick = Tick;
     }
 
-    /// <summary>The round's outcome is decided: it ends the first attack if still on, and settles a pass of the defender in waiting.</summary>
+    /// <summary>
+    /// The round's outcome is decided: it ends the first attack if still on, and settles a pass of the defender in waiting (it
+    /// stands unless the round ends with him controlling the ball).
+    /// </summary>
     void NoteOutcome(Outcome outcome)
     {
-        if (_pastTick < 0 && _pastCandidate >= 0 && outcome == Outcome.Goal) { _pastTick = _pastCandidate; _pastByPass = _candidateByPass; }
+        if (_pastTick < 0 && _pastCandidate >= 0 && outcome != Outcome.Dispossessed) { _pastTick = _pastCandidate; _pastByPass = _candidateByPass; }
         if (_faEnd != null) return;
         _faTick = Tick;
         _faEnd = outcome switch

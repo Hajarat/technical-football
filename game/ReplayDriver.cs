@@ -25,11 +25,4 @@ public sealed class ReplayDriver
         GD.PrintErr($"Replay file not found: {path}");
         return null;
     }
-
-    /// <summary>The attacker's recorded intent for a tick (ticks counted from Begin); idle once the recording ends.</summary>
-    public TickIntent IntentAt(int tick)
-    {
-        int per = System.Math.Max(1, Replay.PlayersPerTick);
-        return tick < Replay.TickCount ? Replay.Intents[tick * per].ToIntent() : default;
-    }
 }

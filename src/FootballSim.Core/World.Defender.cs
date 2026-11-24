@@ -26,6 +26,12 @@ public sealed partial class World
     /// intent passed to <see cref="Step"/> (a recorded bot, or later a human).
     /// </summary>
     public bool DefenderBotEnabled { get; set; } = true;
+    /// <summary>
+    /// With the bot off: true makes it still read the world every tick (its mode, its numbers in the report, its own draws) while
+    /// the defender follows the intent passed in, as a replay of recorded defender intents does, so the round's report is the one
+    /// recorded and the bot can take over where the recording ends. False (the default): the bot does nothing while it is off.
+    /// </summary>
+    public bool DefenderBotShadow { get; set; }
     /// <summary>The defender's numbers so far this round, or null without a defender.</summary>
     public DefenderReport? DefenderReport => _defReport;
 
@@ -38,7 +44,7 @@ public sealed partial class World
         _obstacles.Clear();
         if (Defender is not { } p) return;
         _defRng = new SimRng(seed ^ DefenderSeedSalt);
-        _bot = new DefenderBot(seed ^ DefenderBotSeedSalt);
+        _bot = new DefenderBot(seed ^ DefenderBotSeedSalt, legacy: Tuning.Defender.Brain == "legacy");
         _defReport = new DefenderReport();
         p.Position = ClampToPitch(new Vector3(Scenario.Defender.X, 0f, Scenario.Defender.Z));
         var toAttacker = Flat(Attacker.Position) - Flat(p.Position);
@@ -452,7 +458,9 @@ public sealed partial class World
         var p = Defender!;
         var d = p.Def;
         float now = SimTime;
-        var mode = _bot?.Mode ?? DefenderMode.Hold;
+        var mode = _bot?.Mode ?? DefenderMode.Drop;
+        // (the legacy bot shows a run as Recover; the containing bot's modes each have their own action)
+        bool legacy = _bot == null || _bot.Legacy;
         var action = d.Tackle == TackleKind.Lunge ? DefenderAction.Lunge
             : d.Tackle == TackleKind.Slide ? DefenderAction.Slide
             : now < d.GroundedUntil ? DefenderAction.Grounded
@@ -461,8 +469,10 @@ public sealed partial class World
             : now < d.BargeUntil ? DefenderAction.Barge
             : d.Blocking ? DefenderAction.Block
             : mode == DefenderMode.Collect ? DefenderAction.Collect
-            : mode == DefenderMode.Press ? DefenderAction.Press
-            : !it.Jockey && it.Sprint > 0f ? DefenderAction.Recover
+            : mode is DefenderMode.Win or DefenderMode.RunWith ? DefenderAction.Press
+            : mode == DefenderMode.Recover ? DefenderAction.Recover
+            : mode == DefenderMode.Contain ? DefenderAction.Jockey
+            : legacy && !it.Jockey && it.Sprint > 0f ? DefenderAction.Recover
             : p.Jockeying && p.Speed > 0.5f ? DefenderAction.Jockey
             : DefenderAction.Hold;
         if (action != p.DefenderAction) { p.DefenderAction = action; p.DefenderActionTime = 0f; }
@@ -474,7 +484,15 @@ public sealed partial class World
 
     DefenderReport? FinishDefenderReport()
     {
-        if (_defReport != null && _bot != null) _defReport.TimeActive = _bot.TimeActive;
+        if (_defReport != null && _bot != null)
+        {
+            _defReport.TimeActive = _bot.TimeActive;
+            _defReport.TimeContain = _bot.TimeContain;
+            _defReport.TimeRunWith = _bot.TimeRunWith;
+            _defReport.WinsLoose = _bot.WinsLoose;
+            _defReport.WinsSlow = _bot.WinsSlow;
+            _defReport.WinsLastLine = _bot.WinsLastLine;
+        }
         FinishDefenderMeasures(_defReport);
         return _defReport;
     }

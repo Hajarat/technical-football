@@ -12,11 +12,13 @@ namespace FootballSim.Core.Tests;
 public class RoundMeasureTests
 {
     static readonly Tuning T = TestData.Tuning();
+    /// <summary>The legacy hold-and-press defender bot, for a test of what that bot reports.</summary>
+    static readonly Tuning LegacyT = new() { Sheets = T.Sheets, Defender = new DefenderTuning { Brain = "legacy" } };
     static float Dt => T.Dt;
 
     /// <summary>One tick as the test saw it after the step.</summary>
     sealed record Seen(int Tick, RoundState Before, RoundState After, EventKind[] Events, Vector2 Ball, Vector2 Keeper, Vector2? Defender,
-        int ControllerTeam, bool Rounded, int Shots, int Passes, Vector2? StrikeAt);
+        int ControllerTeam, bool Rounded, int Shots, int Passes, Vector2? StrikeAt, bool DefenderOn = false, bool PassOn = false);
 
     sealed record Observed(RoundReport Report, List<Seen> Ticks)
     {
@@ -50,34 +52,36 @@ public class RoundMeasureTests
             w.Step(buf);
             ticks.Add(new Seen(w.Tick, before, w.State, w.Events.Select(e => e.Kind).ToArray(), G(w.Ball.Position), G(w.Keeper.Position),
                 w.Defender is { } d ? G(d.Position) : null, w.BallController?.Team ?? -1, w.KeeperReport.Rounded, w.Shots.Count, w.Passes,
-                w.Events.Where(e => e.Kind == EventKind.Strike).Select(e => (Vector2?)G(e.Position)).FirstOrDefault()));
+                w.Events.Where(e => e.Kind == EventKind.Strike).Select(e => (Vector2?)G(e.Position)).FirstOrDefault(),
+                w.Defender is { } dd && (w.BallController == dd || w.Events.Any(e => e.Kind is EventKind.Tackle or EventKind.Block && e.Team == dd.Team && e.PlayerIndex == dd.Index)),
+                w.Pass != null));
         }
         Assert.NotNull(w.Report);
         return new Observed(w.Report!, ticks);
     }
 
-    static World NewWorld(string scenario, ulong seed, string? attacker = null)
+    static World NewWorld(string scenario, ulong seed, string? attacker = null, Tuning? tuning = null)
     {
         var sc = TestData.Scenario(scenario);
-        return new World(T, sc, TestData.Player(attacker ?? sc.DefaultAttacker), TestData.Player(sc.DefaultKeeper), seed,
+        return new World(tuning ?? T, sc, TestData.Player(attacker ?? sc.DefaultAttacker), TestData.Player(sc.DefaultKeeper), seed,
             sc.Defenders > 0 ? TestData.Player(sc.DefaultDefender) : null, sc.Mate != null ? TestData.Player(sc.DefaultMate) : null);
     }
 
-    static Observed Scripted(string scenario, ulong seed, ScriptedAttacker? script = null)
+    static Observed Scripted(string scenario, ulong seed, ScriptedAttacker? script = null, Tuning? tuning = null)
     {
-        var w = NewWorld(scenario, seed);
+        var w = NewWorld(scenario, seed, tuning: tuning);
         script ??= new ScriptedAttacker();
         w.Begin();
         return Run(w, script.Next);
     }
 
     /// <summary>The first scripted round over the seeds that matches, or fails the test.</summary>
-    static (Observed Round, ulong Seed) Find(string[] scenarios, int seeds, Func<Observed, bool> match, Func<ScriptedAttacker>? script = null)
+    static (Observed Round, ulong Seed) Find(string[] scenarios, int seeds, Func<Observed, bool> match, Func<ScriptedAttacker>? script = null, Tuning? tuning = null)
     {
         for (ulong seed = 1; seed <= (ulong)seeds; seed++)
             foreach (var sc in scenarios)
             {
-                var o = Scripted(sc, seed, script?.Invoke());
+                var o = Scripted(sc, seed, script?.Invoke(), tuning);
                 if (match(o)) return (o, seed);
             }
         Assert.Fail($"no round over {seeds} seeds of {string.Join(", ", scenarios)} shows it");
@@ -158,35 +162,56 @@ public class RoundMeasureTests
 
     /// <summary>
     /// The first tick the ball was past the defender, worked out from what the test saw: the ball at least 0.5 m nearer the goal
-    /// centre than he is while the attackers had the ball last (they control it, or played it last: no tackle, block or save
-    /// since), and nothing of theirs lost for 0.5 s after (a goal inside that time counts). -1 when never.
+    /// centre than he is on a tick the attackers have it (one of them controls it, or a pass they struck is on its way; a shot
+    /// in flight is not theirs), and the defender does not win, touch or control it in the 0.5 s after (the round ending
+    /// inside that time counts, unless it ends with him controlling the ball). -1 when never.
     /// </summary>
     static int SeenPastTick(Observed o)
     {
         var goal = new Vector2(30f, 0f);
         int hold = (int)MathF.Round(World.PastHoldS / Dt);
         var live = o.Ticks.Where(s => s.After is RoundState.Live or RoundState.Strike or RoundState.Flight || s.Events.Contains(EventKind.Goal)).ToList();
-        int last = 0;
-        var ours = new bool[live.Count];
         for (int i = 0; i < live.Count; i++)
         {
             var s = live[i];
-            bool lost = s.Events.Any(e => e is EventKind.Tackle or EventKind.Block or EventKind.Save) || s.ControllerTeam == 1;
-            if (s.Events.Any(e => e is EventKind.Strike or EventKind.Pass) || s.ControllerTeam == 0) last = 0;
-            if (lost) last = 1;
-            ours[i] = last == 0;
-        }
-        for (int i = 0; i < live.Count; i++)
-        {
-            var s = live[i];
-            if (!ours[i] || !World.IsPast(s.Ball, s.Defender!.Value, goal)) continue;
+            bool theirs = s.ControllerTeam == 0 || s.ControllerTeam == -1 && s.PassOn;
+            if (!theirs || s.DefenderOn || !World.IsPast(s.Ball, s.Defender!.Value, goal)) continue;
             bool kept = true;
-            for (int j = i + 1; j < live.Count && live[j].Tick - s.Tick <= hold; j++) if (!ours[j]) { kept = false; break; }
-            bool reached = live.Any(x => x.Tick >= s.Tick + hold) || live[^1].Events.Contains(EventKind.Goal);
+            for (int j = i + 1; j < live.Count && live[j].Tick - s.Tick <= hold; j++) if (live[j].DefenderOn) { kept = false; break; }
+            bool reached = live.Any(x => x.Tick >= s.Tick + hold) || o.Report.Outcome != Outcome.Dispossessed;
             if (kept && reached) return s.Tick;
-            // (a candidate that is lost waits for the next past tick with the ball theirs again)
+            // (a candidate he wins back waits for the next past tick with the ball theirs again)
         }
         return -1;
+    }
+
+    [Fact]
+    public void AShotStruckFromInFrontOfHimThatGoesInIsNotPast()
+    {
+        // The scripted shooter strikes as soon as the defender is in front within 6 m: the ball flies by him, but a shot in
+        // flight is not the attackers' ball, so it never makes him past.
+        var (o, _) = Find(new[] { "defender_duel" }, 300, o => o.Report.Outcome == Outcome.Goal && o.Report.Shots.Count == 1
+            && o.Ticks.Where(s => s.Tick <= o.Ticks.First(t => t.Events.Contains(EventKind.Strike)).Tick).All(s => s.Ball.X < s.Defender!.Value.X),
+            () => new ScriptedAttacker { Style = ScriptedAttacker.AttackStyle.Shoot });
+        Assert.Null(o.Report.Defender!.BeatenS);
+        Assert.Equal(BeatenBy.None, o.Report.Defender.BeatenBy);
+        Assert.Equal(-1, SeenPastTick(o));
+    }
+
+    [Fact]
+    public void ADribblePastHimFollowedByAShotInsideHalfASecondIsPast()
+    {
+        // Past him on the ball, then the shot struck before 0.5 s had run: he was past all the same.
+        var (o, _) = Find(new[] { "defender_duel" }, 400, o =>
+        {
+            if (o.Report.Defender!.BeatenS is not float b) return false;
+            int t = (int)MathF.Round(b / Dt);
+            return o.Ticks.Any(s => s.Events.Contains(EventKind.Strike) && s.Tick > t && s.Tick - t < (int)MathF.Round(World.PastHoldS / Dt));
+        }, () => new ScriptedAttacker { Style = ScriptedAttacker.AttackStyle.Cut });
+        int tick = (int)MathF.Round(o.Report.Defender!.BeatenS!.Value / Dt);
+        Assert.Equal(0, o.Ticks.First(s => s.Tick == tick).ControllerTeam);
+        Assert.Equal(BeatenBy.Dribble, o.Report.Defender.BeatenBy);
+        Assert.Equal(SeenPastTick(o), tick);
     }
 
     [Fact]
@@ -219,7 +244,7 @@ public class RoundMeasureTests
     public void ARoundTheDefenderNeverGotPastReportsNone()
     {
         var (o, _) = Find(new[] { "defender_duel" }, 50, o => o.Report.Outcome == Outcome.Dispossessed && o.Ticks.All(s => s.Ball.X < s.Defender!.Value.X),
-            () => new ScriptedAttacker { Style = ScriptedAttacker.AttackStyle.Straight });
+            () => new ScriptedAttacker { Style = ScriptedAttacker.AttackStyle.Straight }, LegacyT);
         Assert.Null(o.Report.Defender!.BeatenS);
         Assert.Equal(BeatenBy.None, o.Report.Defender.BeatenBy);
         Assert.Equal(0f, o.Report.Defender.TimeContain);

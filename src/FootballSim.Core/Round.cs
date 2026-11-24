@@ -113,7 +113,7 @@ public sealed class DefenderReport
     public int BargesWon { get; set; }
     /// <summary>Lunges or slides that met the attacker's body before the ball.</summary>
     public int Fouls { get; set; }
-    /// <summary>Seconds his bot spent pressing (active).</summary>
+    /// <summary>Seconds his bot spent going for the ball (mode Win; for the legacy bot, pressing).</summary>
     public float TimeActive { get; set; }
     /// <summary>True if he controlled a loose ball (the round ended DISPOSSESSED).</summary>
     public bool Collected { get; set; }
@@ -125,10 +125,10 @@ public sealed class DefenderReport
     /// </summary>
     public float? BeatenS { get; set; }
     public BeatenBy BeatenBy { get; set; }
-    /// <summary>Seconds his bot spent containing and running with the carrier (no such states yet: 0).</summary>
+    /// <summary>Seconds his bot spent containing and running with the carrier (0 for the legacy bot, which has no such modes).</summary>
     public float TimeContain { get; set; }
     public float TimeRunWith { get; set; }
-    /// <summary>Times his bot went to win the ball on a loose touch, a slow carrier or his last line (no such triggers yet: 0).</summary>
+    /// <summary>Times his bot went to win the ball on a loose touch, a slow carrier or his last line (0 for the legacy bot).</summary>
     public int WinsLoose { get; set; }
     public int WinsSlow { get; set; }
     public int WinsLastLine { get; set; }

@@ -187,9 +187,31 @@ public sealed class Replay
         }
     }
 
+    /// <summary>True when the replay holds the defender's intents for <paramref name="w"/>: he is one of the players recorded each tick.</summary>
+    public bool HoldsDefender(World w) => w.Defender != null && PlayersPerTick > w.Teams[0].Count + w.Defender.Index;
+
+    /// <summary>
+    /// The recorded intents of tick <paramref name="tick"/> (ticks counted from Begin) into <paramref name="buf"/>, idle once the
+    /// recording ends. While the replay holds the defender's intents his bot is off and he plays them, so a round recorded with
+    /// any bot plays back unchanged; the bot still reads the world meanwhile (<see cref="World.DefenderBotShadow"/>), so the
+    /// report's numbers of his bot are the recorded ones and it can take over where the recording ends, as it does without them.
+    /// </summary>
+    public void Feed(World w, int tick, Span<TickIntent> buf)
+    {
+        int per = Math.Max(1, PlayersPerTick);
+        bool recorded = tick < TickCount;
+        buf.Clear();
+        if (recorded)
+            for (int p = 0; p < buf.Length && p < per; p++) buf[p] = Intents[tick * per + p].ToIntent();
+        if (w.Defender == null) return;
+        w.DefenderBotEnabled = !(recorded && HoldsDefender(w));
+        w.DefenderBotShadow = !w.DefenderBotEnabled;
+    }
+
     /// <summary>
     /// Plays the recorded ticks in a fresh world (Begin, then each tick) and returns the world after the last of them, with no idle
-    /// tail: a partial replay ends where it was cut. <paramref name="afterStep"/>, when given, sees the world after every step with
+    /// tail: a partial replay ends where it was cut. The defender plays his recorded intents when the replay holds them (see
+    /// <see cref="Feed"/>); the world is handed back with his bot on. <paramref name="afterStep"/>, when given, sees the world after every step with
     /// the attacker's intent of that tick. The sheets and scenario must be the ones named in the replay.
     /// </summary>
     /// <param name="defender">The defender's sheet, in a scenario with one (a default sheet when null).</param>
@@ -199,16 +221,14 @@ public sealed class Replay
     {
         var world = new World(tuning, scenario, attacker, keeper, Seed, defender, mate);
         world.Begin();
-        int n = world.PlayerCount;
-        var buf = new TickIntent[n];
-        int per = Math.Max(1, PlayersPerTick);
+        var buf = new TickIntent[world.PlayerCount];
         for (int tick = 0; tick < TickCount; tick++)
         {
-            Array.Clear(buf);
-            for (int p = 0; p < n && p < per; p++) buf[p] = Intents[tick * per + p].ToIntent();
+            Feed(world, tick, buf);
             world.Step(buf);
             afterStep?.Invoke(world, buf[0]);
         }
+        if (world.Defender != null) { world.DefenderBotEnabled = true; world.DefenderBotShadow = false; }
         return world;
     }
 

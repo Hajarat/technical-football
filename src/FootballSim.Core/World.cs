@@ -77,10 +77,16 @@ public sealed partial class World
         /// <summary>The earliest contact: the wind-up after the press (longer by the body angle at the release) and the lead after the release.</summary>
         public int ContactTick;
         /// <summary>
-        /// Past this tick with the ball still out of reach, a shot without possession is dropped (a shot in possession never is:
+        /// Past this tick with the ball still out of reach, a shot without possession is dropped (a shot in possession is not:
         /// set when possession is lost).
         /// </summary>
         public int DeadlineTick;
+        /// <summary>
+        /// In possession past the earliest contact, the tick (plus one; 0: none) from which the controller has had no contact
+        /// planned for the strike with him and the ball nearly still: a wind-up that cannot be struck, dropped StuckSeconds
+        /// after it.
+        /// </summary>
+        public int UnplannedFrom;
         /// <summary>The kind of pass this is, or None for a shot at goal.</summary>
         public PassKind Pass;
     }
@@ -409,6 +415,7 @@ public sealed partial class World
         {
             int flat = Teams[0].Count + Defender.Index;
             def = DefenderBotEnabled && State != RoundState.Outcome ? _bot!.Next(this) : IntentFor(intents, 1, Defender.Index);
+            if (!DefenderBotEnabled && DefenderBotShadow && State != RoundState.Outcome) _bot!.Next(this);
             if (_recorder != null)
             {
                 Span<TickIntent> all = stackalloc TickIntent[PlayerCount];
@@ -1074,9 +1081,11 @@ public sealed partial class World
     /// <summary>
     /// The released shot, every tick until it is struck. Without possession (pressed without the ball, or the keeper took it
     /// away): struck from the earliest tick as soon as the ball is strikable, dropped after round.shoot_buffer. In possession it
-    /// is never dropped: with the ball held at the feet it is struck at the earliest tick if strikable then (otherwise it goes
-    /// on as below); else it is struck at the controller's committed contact if the ball is strikable there and the chosen
-    /// foot is the swinging foot in its contact window, and a contact missed is let go for that foot's next one.
+    /// is not dropped while a contact is planned for it: with the ball held at the feet it is struck at the earliest tick if
+    /// strikable then (otherwise it goes on as below); else it is struck at the controller's committed contact if the ball is
+    /// strikable there and the chosen foot is the swinging foot in its contact window, and a contact missed is let go for that
+    /// foot's next one; with no contact planned and he and the ball nearly still (under 0.5 m/s) for 2 s past the earliest
+    /// contact, it is dropped.
     /// </summary>
     void TryStrike()
     {
@@ -1115,12 +1124,30 @@ public sealed partial class World
             _strikeUntimed = true;
             return;
         }
-        if (a.StrikeContactTick < 0 || Tick < a.StrikeContactTick) return;
+        if (a.StrikeContactTick < 0)
+        {
+            // No contact planned for the strike and he and the ball both nearly still (the ball pinned against a board, or out of
+            // his reach): left so for StuckSeconds, nothing will bring a contact, so the wind-up is dropped like one that lost the
+            // ball and the round goes on (the clock stands still while a shot is under way).
+            bool stuck = Tick >= _pending.ContactTick && a.Speed < StuckSpeed && Ball.Velocity.Length() < StuckSpeed;
+            if (!stuck) _pending.UnplannedFrom = 0;
+            else if (_pending.UnplannedFrom == 0) _pending.UnplannedFrom = Tick + 1;
+            else if (Tick + 1 - _pending.UnplannedFrom >= Ticks(StuckSeconds)) DropShot();
+            return;
+        }
+        _pending.UnplannedFrom = 0;
+        if (Tick < a.StrikeContactTick) return;
         Foot foot = a.StrikeContactFoot;
         a.StrikeContactTick = -1;
         if (!ShotModel.CanStrike(a, Ball, Tuning) || !TouchPlanner.FootInWindow(a, foot)) return;
         ExecuteStrike();
     }
+
+    /// <summary>
+    /// A wind-up in possession with no contact planned for it, the shooter and the ball both slower than StuckSpeed (m/s) for
+    /// StuckSeconds, cannot be struck: it is dropped. (Wind-ups that are struck in the end have been still so for 1.5 s at most.)
+    /// </summary>
+    const float StuckSpeed = 0.5f, StuckSeconds = 2f;
 
     /// <summary>
     /// The left stick that aims a shot released now: the stick itself, or, at rest, its last pushed direction if that push was
