@@ -216,12 +216,12 @@ public static class Bindings
             }),
             new("Skill moves", new()
             {
-                new("Step-over", $"{Skill1.Label} (side from {Left.Label} / {Right.Label})", "Right stick ↑ then → or ← (no return to centre)"),
-                new("Body feint", $"{Skill2.Label} (side from {Left.Label} / {Right.Label})", "Right stick → or ← flicked from centre, back to centre"),
-                new("Ball roll", $"{Skill3.Label} (side from {Left.Label} / {Right.Label})", "Right stick → or ← held"),
+                new("Step-over", $"{Skill1.Label} (side from {Left.Label} / {Right.Label})", "Right stick ↑ then round to → or ← (no return to centre), sprint let go"),
+                new("Body feint", $"{Skill2.Label} (side from {Left.Label} / {Right.Label})", "Right stick → or ← flicked and let go"),
+                new("Ball roll", $"{Skill3.Label} (side from {Left.Label} / {Right.Label})", "Right stick → or ← held 0.17 s"),
                 new("Drag-back", $"{Skill4.Label}, or back + {Finesse.Label} + {Chip.Label}", $"Left stick ↓ + {lb} + {rb}"),
-                new("Knock-on", KnockOn.Label, "Right stick ↑ flick while sprinting"),
-                new("Elastico", "no key", "Right stick ↓ then → or ←"),
+                new("Knock-on (heavy touch)", KnockOn.Label, "Right stick flicked any way while sprinting: the next touch goes there"),
+                new("Elastico", "no key", "Right stick ↓ then round to → or ← (no return to centre)"),
                 new("Heel-to-heel", "no key", "Right stick ↑ flick, centre, then ↓"),
                 new("Spin and go", "no key", "Right stick ↑ flick, centre, then → or ←"),
             }),

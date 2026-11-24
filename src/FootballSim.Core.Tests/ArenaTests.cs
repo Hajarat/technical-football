@@ -352,7 +352,7 @@ public class ArenaTests
         {
             case "step_over": right = i < 6 ? ahead : i < 12 ? sideV : Vector2.Zero; break;
             case "body_feint": right = i < 6 ? sideV : Vector2.Zero; break;
-            case "ball_roll": right = i < 20 ? sideV : Vector2.Zero; break;
+            case "ball_roll": right = i < 26 ? sideV : Vector2.Zero; break;
             case "elastico": right = i < 6 ? -ahead : i < 12 ? sideV : Vector2.Zero; break;
             case "heel_to_heel": right = i < 5 ? ahead : i is >= 9 and < 14 ? -ahead : Vector2.Zero; break;
             case "spin": right = i < 5 ? ahead : i is >= 9 and < 13 ? sideV : Vector2.Zero; break;
@@ -389,10 +389,12 @@ public class ArenaTests
         {
             if (g0 < 0 && gained && (along ? tick >= (sprint > 0f ? 264 : 180) : BallGap() <= d)) g0 = tick;
             var it = new TickIntent { MoveX = head.X, MoveZ = head.Y, Sprint = sprint };
-            if (g0 > 0 && tick - g0 < 20)
+            if (g0 > 0 && tick - g0 < 30)
             {
                 var local = it with { MoveX = 1f, MoveZ = 0f };
                 MoveTrace(ref local, move, tick - g0, side);
+                // No stick gesture registers with sprint held: it is let go of until the gesture has registered.
+                if (move is not ("fake_stop" or "fake_cut") && p.LastGestureTick < g0) local.Sprint = 0f;
                 var l = Turned(new Vector2(local.MoveX, local.MoveZ), head);
                 var r = Turned(new Vector2(local.RightX, local.RightZ), head);
                 it = local with { MoveX = l.X, MoveZ = l.Y, RightX = r.X, RightZ = r.Y };

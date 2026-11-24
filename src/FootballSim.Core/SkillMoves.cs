@@ -97,7 +97,7 @@ public static class SkillMoves
     public static float Radius(ActionKind kind, Tuning t) => kind == ActionKind.StepOver ? t.Skill.StepOverRadius : t.Skill.ExecutionRadius;
 
     /// <summary>
-    /// A recognised skill gesture: it waits (at most buffer_seconds) for the move to be able to start. A fake shot comes here on
+    /// A skill gesture taken up (see <see cref="CanTakeUp"/>): it waits for the move to be able to start. A fake shot comes here on
     /// its contact tick with <paramref name="fakeFrom"/> the shoot press's tick.
     /// </summary>
     internal static void Request(PlayerState p, in GestureRead g, int tick, int fakeFrom = -1)
@@ -107,6 +107,29 @@ public static class SkillMoves
         p.SkillBufCut = g.CutDirection;
         p.SkillBufTick = tick;
         p.SkillBufFakeFrom = fakeFrom;
+    }
+
+    /// <summary>
+    /// Whether a gesture registered or still held on this tick is taken up (it then waits for its start as
+    /// <see cref="TryStart"/> describes): he has the ball or his team's claim on a loose one, no move is under way, the
+    /// step-over, body feint and drag-back are past the last move's cooldown, the ball in his possession is low enough, and it
+    /// is slower than sole_max_ball_speed (ball roll, drag-back) or two_contact_max_ball_speed (elastico, heel-to-heel, the
+    /// spins). A gesture not taken up is gone.
+    /// </summary>
+    internal static bool CanTakeUp(PlayerState p, Gesture g, Ball ball, bool inPossession, bool claimed, float now, Tuning t)
+    {
+        var k = t.Skill;
+        // (the touch controller's own turn at the feet is no move of his: a gesture is taken up through it)
+        if (!inPossession && !claimed || p.SkillAction is { FeetTurn: false }) return false;
+        if (g is Gesture.StepOver or Gesture.BodyFeint or Gesture.DragBack && now < p.SkillCooldownUntil) return false;
+        if (inPossession && ball.Position.Y >= k.MaxBallHeight) return false;
+        float speed = new Vector2(ball.Velocity.X, ball.Velocity.Z).Length();
+        return g switch
+        {
+            Gesture.BallRoll or Gesture.DragBack => speed < k.SoleMaxBallSpeed,
+            Gesture.Elastico or Gesture.HeelToHeel or Gesture.SpinAndGo or Gesture.McGeady => speed < k.TwoContactMaxBallSpeed,
+            _ => true,
+        };
     }
 
     /// <summary>The move under way is abandoned (possession lost, a strike): no exit burst, nothing buffered.</summary>

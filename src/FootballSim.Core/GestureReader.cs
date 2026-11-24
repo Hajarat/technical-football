@@ -16,61 +16,110 @@ public readonly record struct GestureRead(Gesture Kind, SkillSide Side, Vector2 
 }
 
 /// <summary>
-/// Reads skill-move gestures tick by tick, in the player's frame: forward is the running direction while the player moves
-/// faster than frame_min_speed, otherwise the facing. A pushed right stick (min_actuation or more) belongs to its nearest
-/// direction (forward, back, left or right); below that it is neutral. Every side gesture works to either side.
+/// Reads skill-move gestures tick by tick. Each move is a short list of steps for one stick: a direction (or the stick at
+/// rest), how long it must be held, how soon after the step before it must begin and how far off the direction it may be.
+/// Every move is followed at once, each sided move in both its versions. Directions are taken against the player's facing,
+/// fixed for a gesture when its first direction step completes, so turning during the gesture does not bend it. The stick
+/// counts as pushed from min_actuation; below that it is at rest.
 /// <list type="bullet">
-/// <item>Step-over: forward, then straight on (without passing neutral) to a side within step_over_window, the side within
-/// step_over_side_tolerance_deg of square.</item>
-/// <item>Body feint: from neutral, a side flick held at least a tick and back at neutral within feint_max_hold (and before
-/// it became a roll).</item>
-/// <item>Ball roll: a side held roll_min_hold (so a quick flick is a feint and a hold is a roll).</item>
-/// <item>Drag-back: the left stick drag_back_stick_deg or more from forward with both shoulder buttons held
-/// (<see cref="TickIntent.Finesse"/> and <see cref="TickIntent.Chip"/>), on the tick the three come together; it replaces a turn at
-/// the feet the touch controller began within drag_back_over_feet_turn. The right stick back alone does nothing.</item>
-/// <item>Knock-on: a forward flick past knock_on_actuation while sprinting, fired knock_on_wait later unless the stick went to
-/// a side or back (a step-over, spin or heel-to-heel) or another gesture came first; a flick released to neutral also waits
-/// while a spin or heel-to-heel could still follow (combo_step_window). Not sprinting, a forward flick does nothing.</item>
-/// <item>Elastico: back, then straight on to a side as for the step-over. Heel-to-heel: from neutral a forward flick, neutral,
-/// then back. Spin: from neutral a forward flick, neutral, then a side. McGeady spin: from neutral a back flick, neutral, then
-/// the side he comes out to. Each step of the last three within combo_step_window.</item>
-/// <item>Fake shot (<see cref="ReadFakeShot"/>): cancel pressed any time from the shoot press until fake_shot_cutoff before the
-/// shot's planned strike; the left stick released is a fake stop, pushed a fake cut that way.</item>
+/// <item>Drag-back: the left stick back (drag_back_stick_deg or more from his facing) with both shoulder buttons held
+/// (<see cref="TickIntent.Finesse"/> and <see cref="TickIntent.Chip"/>).</item>
+/// <item>Ball roll: a side held roll_min_hold.</item>
+/// <item>Step-over: forward, then round to a side (within step_over_side_tolerance_deg of square) within roll_step_window,
+/// without the stick coming to rest on the way.</item>
+/// <item>Heel-to-heel: a forward flick (held flick_hold), rest, then a back flick, each step within combo_step_window.</item>
+/// <item>Spin: a forward flick, rest, then a side flick (the side within roll_step_window).</item>
+/// <item>Elastico: back, then round to a side as for the step-over.</item>
+/// <item>Body feint: a side flick and back to rest within combo_step_window (held on, it is a ball roll).</item>
+/// <item>McGeady spin: a back flick, rest, then a flick to the side he comes out to.</item>
 /// </list>
-/// A skill key skips the stick. Recognised gestures are at least gesture_gap apart. Reading draws no random numbers and changes
-/// nothing but the reader's own state, so a stick at rest leaves the simulation exactly as it was.
+/// A completed gesture registers unless sprint is held or another registered within gesture_cooldown before it (it is then
+/// dropped, not kept); when two complete on one tick the first in the list above wins. A registered gesture stays held for
+/// gesture_cooldown (<see cref="Held"/>). A skill key registers its move directly, sprinting or not.
+/// <para>
+/// With sprint held the right stick asks for a heavy touch instead (<see cref="ReadHeavyTouch"/>), and a cancelled shot is a
+/// fake (<see cref="ReadFakeShot"/>). Reading draws no random numbers and changes nothing but the reader's own state, so a
+/// stick at rest leaves the simulation exactly as it was.
+/// </para>
 /// </summary>
 public static class GestureReader
 {
-    /// <summary>Where the right stick is: at rest, pushed toward one of the four directions, or pushed between them.</summary>
-    internal enum Zone : byte { Neutral, Forward, Back, Left, Right, Between }
+    /// <summary>A step's direction, against the gesture's forward; <see cref="Rest"/> is the stick below the actuation.</summary>
+    internal enum Dir : byte { Rest, Forward, Left, Right, Back }
 
-    static int Ticks(float seconds, Tuning t) => Math.Max(1, (int)MathF.Round(seconds * t.TickRate));
+    /// <summary>How long a step is held: not at all, a flick (flick_hold) or the ball roll's hold (roll_min_hold).</summary>
+    enum HoldOf : byte { None, Flick, Roll }
 
-    /// <summary>Clears the reader (a new round).</summary>
+    /// <summary>How soon after the step before it a step must begin: combo_step_window or roll_step_window.</summary>
+    enum WithinOf : byte { Step, Long }
+
+    /// <summary>How far off its direction a step may be: angle_tolerance_deg, step_over_side_tolerance_deg, or the drag-back's.</summary>
+    enum TolOf : byte { Default, Tight, Drag }
+
+    readonly record struct Section(Dir Dir, HoldOf Hold = HoldOf.None, WithinOf Within = WithinOf.Step, TolOf Tol = TolOf.Default);
+
+    /// <param name="Flip">The move has a mirrored version (left and right swapped).</param>
+    /// <param name="Side">The side the unmirrored version gives.</param>
+    /// <param name="LeftStick">Read from the left stick, against the facing of the moment.</param>
+    /// <param name="Shoulders">Needs both shoulder buttons held.</param>
+    sealed record Combo(Gesture Kind, bool Flip, SkillSide Side, bool LeftStick, bool Shoulders, Section[] Steps);
+
+    /// <summary>One followed gesture (a move, plain or mirrored): where it is in its steps.</summary>
+    internal struct Progress
+    {
+        /// <summary>Index of the step being waited for.</summary>
+        public int Section;
+        /// <summary>World tick the step before completed (0: no clock runs).</summary>
+        public int PrevDone;
+        /// <summary>World tick the current step was entered (0: not yet).</summary>
+        public int Entered;
+        /// <summary>The gesture's forward is fixed at <see cref="RefYaw"/>.</summary>
+        public bool Latched;
+        public float RefYaw;
+    }
+
+    static readonly Section Rest = new(Dir.Rest);
+
+    // In the order they win when two complete on one tick.
+    static readonly Combo[] Combos =
+    {
+        new(Gesture.DragBack, false, SkillSide.None, true, true, new[] { new Section(Dir.Back, Tol: TolOf.Drag) }),
+        new(Gesture.BallRoll, true, SkillSide.Right, false, false, new[] { new Section(Dir.Right, HoldOf.Roll) }),
+        new(Gesture.StepOver, true, SkillSide.Right, false, false,
+            new[] { new Section(Dir.Forward), new Section(Dir.Right, HoldOf.None, WithinOf.Long, TolOf.Tight) }),
+        new(Gesture.HeelToHeel, false, SkillSide.None, false, false,
+            new[] { Rest, new Section(Dir.Forward, HoldOf.Flick), Rest, new Section(Dir.Back, HoldOf.Flick) }),
+        new(Gesture.SpinAndGo, true, SkillSide.Right, false, false,
+            new[] { Rest, new Section(Dir.Forward, HoldOf.Flick), Rest, new Section(Dir.Right, HoldOf.Flick, WithinOf.Long) }),
+        // The elastico goes out to the side its stick ends on.
+        new(Gesture.Elastico, true, SkillSide.Left, false, false,
+            new[] { new Section(Dir.Back), new Section(Dir.Left, HoldOf.None, WithinOf.Long, TolOf.Tight) }),
+        new(Gesture.BodyFeint, true, SkillSide.Right, false, false, new[] { Rest, new Section(Dir.Right, HoldOf.Flick), Rest }),
+        new(Gesture.McGeady, true, SkillSide.Right, false, false,
+            new[] { Rest, new Section(Dir.Back, HoldOf.Flick), Rest, new Section(Dir.Right, HoldOf.Flick, WithinOf.Long) }),
+    };
+
+    /// <summary>Followed gestures: every move, plain and mirrored (<see cref="PlayerState.GProg"/>'s length).</summary>
+    internal const int ProgressCount = 16;
+
+    static int Ticks(float seconds, Tuning t) => Math.Max(0, (int)MathF.Round(seconds * t.TickRate));
+
+    /// <summary>Clears the reader (a new round, a new controlled player).</summary>
     internal static void Reset(PlayerState p)
     {
-        p.GZone = Zone.Neutral;
-        p.GPrevZone = Zone.Neutral;
-        p.GZoneStart = 0;
-        p.GFwdLastTick = int.MinValue / 2;
-        p.GFwdStart = int.MinValue / 2;
-        p.GFwdFromNeutral = false;
-        p.GBackLastTick = int.MinValue / 2;
-        p.GBackStart = int.MinValue / 2;
-        p.GBackFromNeutral = false;
-        p.GHist0 = Zone.Neutral;
-        p.GHist1 = Zone.Neutral;
-        p.GDragHeld = false;
-        p.GSideConsumed = false;
-        p.GKnockUsed = false;
-        p.GKnockWaitTick = -1;
+        Array.Clear(p.GProg);
+        p.GDetKind = Gesture.None;
+        p.GDetSide = SkillSide.None;
+        p.GDetTick = 0;
+        p.GPrevRight = Vector2.Zero;
+        p.GHeavyTick = -1;
+        p.GHeavyDir = Vector2.Zero;
         p.GPrevCancel = false;
         p.LastGesture = Gesture.None;
         p.LastGestureTick = int.MinValue / 2;
     }
 
-    /// <summary>The gesture frame's forward: the running direction when moving, else the facing (unit X, Z).</summary>
+    /// <summary>A move's own forward: the running direction when moving, else the facing (unit X, Z).</summary>
     public static Vector2 FrameForward(PlayerState p, Tuning t)
     {
         var v = new Vector2(p.Velocity.X, p.Velocity.Z);
@@ -85,166 +134,167 @@ public static class GestureReader
     internal static SkillSide KeySide(in TickIntent it, Vector2 fwd, Tuning t) =>
         Vector2.Dot(it.Move, RightOf(fwd)) < -t.Skill.KeySideThreshold ? SkillSide.Left : SkillSide.Right;
 
-    /// <summary>
-    /// The forward flick just released could still start a spin or heel-to-heel: it came from neutral, lasted no longer than
-    /// combo_step_window, and the stick (at neutral since) can still make the next flick within that window.
-    /// </summary>
-    static bool ComboPending(PlayerState p, Zone z, int tick, Tuning t)
+    static int HoldTicks(in Section s, Tuning t) => s.Hold switch
     {
-        if (z is not (Zone.Neutral or Zone.Between) || !p.GFwdFromNeutral) return false;
-        int step = Ticks(t.Skill.ComboStepWindow, t);
-        int fwdEnd = p.GFwdLastTick + 1;
-        return fwdEnd - p.GFwdStart <= step && tick - fwdEnd < step;
+        HoldOf.Flick => Ticks(t.Skill.FlickHold, t),
+        HoldOf.Roll => Ticks(t.Skill.RollMinHold, t),
+        _ => 0,
+    };
+
+    static int WithinTicks(in Section s, Tuning t) => Ticks(s.Within == WithinOf.Long ? t.Skill.RollStepWindow : t.Skill.ComboStepWindow, t);
+
+    static float ToleranceDeg(in Section s, Tuning t) => s.Tol switch
+    {
+        TolOf.Tight => t.Skill.StepOverSideToleranceDeg,
+        TolOf.Drag => 180f - t.Skill.DragBackStickDeg,
+        _ => t.Skill.AngleToleranceDeg,
+    };
+
+    /// <summary>A step's direction in degrees from forward, positive toward the right; the mirrored version swaps the sides.</summary>
+    static float TargetDeg(Dir d, bool flip) => d switch
+    {
+        Dir.Forward => 0f,
+        Dir.Back => 180f,
+        Dir.Right => flip ? -90f : 90f,
+        _ => flip ? 90f : -90f,
+    };
+
+    /// <summary>
+    /// The gesture starts over. After a failed step that followed a rest, a gesture that opens with a rest goes straight back
+    /// to its first direction step, as if the opening rest had just been met.
+    /// </summary>
+    static void Rearm(ref Progress r, Combo c)
+    {
+        bool afterRest = r.Section > 0 && c.Steps[r.Section - 1].Dir == Dir.Rest && c.Steps[0].Dir == Dir.Rest;
+        r = default;
+        if (afterRest) r.Section = 1;
+    }
+
+    /// <summary>Moves one followed gesture on by a tick. True on the tick its last step completes.</summary>
+    static bool Step(ref Progress r, Combo c, bool flip, in TickIntent it, float facing, int now, Tuning t)
+    {
+        if (c.Shoulders && !(it.Finesse && it.Chip)) { Rearm(ref r, c); return false; }
+        var steps = c.Steps;
+        Vector2 stick = c.LeftStick ? it.Move : it.Right;
+        bool pushed = stick.Length() >= t.Skill.MinActuation;
+
+        // Too slow to begin this step: the gesture starts over (and may begin again on this tick).
+        if (r.PrevDone != 0 && r.Entered == 0 && now > r.PrevDone + WithinTicks(steps[r.Section], t)) r = default;
+
+        int i = r.Section;
+        Section s = steps[i];
+        bool isDir = s.Dir != Dir.Rest;
+        bool inTol = false;
+        if (isDir && pushed)
+        {
+            float yaw = c.LeftStick || !r.Latched ? facing : r.RefYaw;
+            float cos = MathF.Cos(yaw), sin = MathF.Sin(yaw);
+            float deg = MathF.Atan2(stick.Y * cos - stick.X * sin, stick.X * cos + stick.Y * sin) * 180f / MathF.PI;
+            float off = MathF.Abs(deg - TargetDeg(s.Dir, flip));
+            if (off > 180f) off = 360f - off;
+            inTol = off <= ToleranceDeg(s, t);
+        }
+
+        // Leaving the step early: a rest pushed out of, two directions in a row not rolled straight through (the stick came
+        // to rest between them), or a direction let go of or left.
+        if (!isDir && r.Entered != 0 && pushed) { Rearm(ref r, c); return false; }
+        if (isDir && r.Entered == 0 && i > 0 && steps[i - 1].Dir != Dir.Rest && !pushed) { r = default; return false; }
+        if (isDir && r.Entered != 0 && !inTol) { Rearm(ref r, c); return false; }
+
+        if (r.Entered == 0 && (isDir ? inTol : !pushed)) r.Entered = now;
+        if (r.Entered == 0 || now < r.Entered + HoldTicks(s, t)) return false;
+        if (i == 0 && !isDir)
+        {
+            // The opening rest starts no clock: the first flick may come any time after it.
+            r.Section = 1; r.PrevDone = 0; r.Entered = 0;
+            return false;
+        }
+        r.Section = i + 1; r.PrevDone = now; r.Entered = 0;
+        if (!r.Latched) { r.Latched = true; r.RefYaw = facing; }
+        if (r.Section < steps.Length) return false;
+        r = default;
+        return true;
     }
 
     /// <summary>
-    /// The stick has just come to a side or back from a forward flick that started from neutral, through neutral, each step
-    /// within combo_step_window: the last flick of a spin (side) or heel-to-heel (back).
-    /// </summary>
-    static bool ComboFinish(PlayerState p, int tick, Tuning t)
-    {
-        if (p.GHist0 != Zone.Neutral || p.GHist1 != Zone.Forward || !p.GFwdFromNeutral) return false;
-        int step = Ticks(t.Skill.ComboStepWindow, t);
-        int fwdEnd = p.GFwdLastTick + 1;
-        return fwdEnd - p.GFwdStart <= step && tick - fwdEnd <= step;
-    }
-
-    /// <summary>
-    /// The stick has just come to a side from a back flick that started from neutral, through neutral, each step within
-    /// combo_step_window: the last flick of a McGeady spin. (A back push that ended a heel-to-heel is not its start, and back
-    /// straight on to the side, without neutral, is an elastico.)
-    /// </summary>
-    static bool McGeadyFinish(PlayerState p, int tick, Tuning t)
-    {
-        if (p.GHist0 != Zone.Neutral || p.GHist1 != Zone.Back || !p.GBackFromNeutral) return false;
-        int step = Ticks(t.Skill.ComboStepWindow, t);
-        int backEnd = p.GBackLastTick + 1;
-        return backEnd > p.GBackStart && backEnd - p.GBackStart <= step && tick - backEnd <= step;
-    }
-
-    /// <summary>
-    /// Reads this tick's sticks, shoulder buttons and skill key. Returns the gesture recognised on this tick, or
+    /// Reads this tick's sticks, shoulder buttons and skill key. Returns the gesture registered on this tick, or
     /// <see cref="GestureRead.None"/>. Call once per tick for the player, before he moves.
     /// </summary>
     public static GestureRead Read(PlayerState p, in TickIntent it, int tick, Tuning t)
     {
         var k = t.Skill;
         if (tick <= 1) Reset(p);
-        Vector2 fwd = FrameForward(p, t), right = RightOf(fwd);
-        Vector2 s = it.Right;
-        float mag = s.Length();
-        Zone z = Zone.Neutral;
-        float angle = 0f; // degrees from forward, positive toward the right
-        if (mag >= k.MinActuation)
-        {
-            angle = MathF.Atan2(Vector2.Dot(s, right), Vector2.Dot(s, fwd)) * 180f / MathF.PI;
-            float a = MathF.Abs(angle);
-            z = a <= 45f ? Zone.Forward : a >= 135f ? Zone.Back : angle > 0f ? Zone.Right : Zone.Left;
-            // Off its nearest direction by more than the tolerance (only possible below 45 degrees): no direction at all.
-            float off = z == Zone.Forward ? a : z == Zone.Back ? 180f - a : MathF.Abs(a - 90f);
-            if (off > k.AngleToleranceDeg) z = Zone.Between;
-        }
-
-        Gesture found = Gesture.None;
-        SkillSide side = SkillSide.None;
-
-        if (z != p.GZone)
-        {
-            // A side flick from neutral, back at neutral before it became a roll: a body feint.
-            if (p.GZone is Zone.Left or Zone.Right && z == Zone.Neutral && !p.GSideConsumed && p.GPrevZone == Zone.Neutral
-                && tick - p.GZoneStart >= 1 && tick - p.GZoneStart <= Ticks(k.FeintMaxHold, t))
-            {
-                found = Gesture.BodyFeint; side = p.GZone == Zone.Left ? SkillSide.Left : SkillSide.Right;
-            }
-            if (p.GZone != Zone.Between) { p.GHist1 = p.GHist0; p.GHist0 = p.GZone; }
-            p.GPrevZone = p.GZone;
-            p.GZone = z;
-            p.GZoneStart = tick;
-            p.GSideConsumed = false;
-            if (z == Zone.Forward)
-            {
-                p.GKnockUsed = false;
-                p.GFwdStart = tick;
-                p.GFwdFromNeutral = p.GHist0 == Zone.Neutral;
-            }
-            // From neutral a forward flick, neutral, then back: a heel-to-heel. It is not an elastico's start.
-            if (z == Zone.Back && found == Gesture.None && ComboFinish(p, tick, t)) found = Gesture.HeelToHeel;
-            if (z == Zone.Back)
-            {
-                p.GBackStart = tick;
-                p.GBackFromNeutral = p.GHist0 == Zone.Neutral;
-            }
-        }
-        if (z == Zone.Forward) p.GFwdLastTick = tick;
-        // A back push that ended a heel-to-heel does not start an elastico.
-        if (z == Zone.Back && found != Gesture.HeelToHeel && !(p.LastGesture == Gesture.HeelToHeel && p.LastGestureTick >= p.GZoneStart))
-            p.GBackLastTick = tick;
-
-        bool sideZone = z is Zone.Left or Zone.Right;
-        if (found == Gesture.None && sideZone && !p.GSideConsumed)
-        {
-            SkillSide zs = z == Zone.Left ? SkillSide.Left : SkillSide.Right;
-            float off = MathF.Abs(MathF.Abs(angle) - 90f);
-            int window = Ticks(k.StepOverWindow, t);
-            // Straight on from forward (a step-over) or back (an elastico) to the side, or the last flick after neutral of a spin
-            // (after a forward flick) or a McGeady spin (after a back flick).
-            if (p.GHist0 == Zone.Forward && tick - p.GFwdLastTick <= window && off <= k.StepOverSideToleranceDeg)
-            { found = Gesture.StepOver; side = zs; }
-            else if (p.GHist0 == Zone.Back && tick - p.GBackLastTick <= window && off <= k.StepOverSideToleranceDeg)
-            { found = Gesture.Elastico; side = zs; }
-            else if (ComboFinish(p, tick, t)) { found = Gesture.SpinAndGo; side = zs; }
-            else if (McGeadyFinish(p, tick, t)) { found = Gesture.McGeady; side = zs; }
-            else if (tick - p.GZoneStart + 1 >= Ticks(k.RollMinHold, t)) { found = Gesture.BallRoll; side = zs; }
-        }
-
-        // The drag-back: the left stick back (drag_back_stick_deg or more from forward) with both shoulder buttons held, on the
-        // tick they first are all three.
-        bool drag = false;
-        float lmag = it.Move.Length();
-        if (it.Finesse && it.Chip && lmag >= k.MinActuation)
-            drag = MathF.Abs(MathF.Atan2(Vector2.Dot(it.Move, right), Vector2.Dot(it.Move, fwd))) * 180f / MathF.PI >= k.DragBackStickDeg;
-        if (drag && !p.GDragHeld && found == Gesture.None) found = Gesture.DragBack;
-        p.GDragHeld = drag;
-
-        // The knock-on: armed by a strong forward flick while sprinting, fired after the wait unless a side, back or another
-        // gesture took over, and not while the released flick could still start a spin or heel-to-heel.
         bool sprinting = it.Sprint >= t.Touch.SprintThreshold;
-        if (z == Zone.Forward && mag >= k.KnockOnActuation && sprinting && !p.GKnockUsed && p.GKnockWaitTick < 0)
+        int cooldown = Ticks(k.GestureCooldown, t);
+        bool free = p.GDetTick == 0 || tick > p.GDetTick + cooldown;
+        var found = GestureRead.None;
+        for (int c = 0; c < Combos.Length; c++)
         {
-            p.GKnockWaitTick = tick;
-            p.GKnockUsed = true;
-        }
-        if (p.GKnockWaitTick >= 0)
-        {
-            if (sideZone || z == Zone.Back || found != Gesture.None) p.GKnockWaitTick = -1;
-            else if (tick - p.GKnockWaitTick >= Ticks(k.KnockOnWait, t) && !ComboPending(p, z, tick, t))
+            var combo = Combos[c];
+            for (int f = 0; f < (combo.Flip ? 2 : 1); f++)
             {
-                p.GKnockWaitTick = -1;
-                found = Gesture.KnockOn;
+                if (!Step(ref p.GProg[2 * c + f], combo, f == 1, it, p.Facing, tick, t)) continue;
+                if (!free || sprinting || found.Kind != Gesture.None) continue;
+                var side = combo.Side == SkillSide.None ? SkillSide.None
+                    : (combo.Side == SkillSide.Right) != (f == 1) ? SkillSide.Right : SkillSide.Left;
+                found = new GestureRead(combo.Kind, side, Vector2.Zero);
             }
         }
 
         // A skill key skips the stick (its side from the left stick).
-        if (it.SkillKey != SkillKey.None)
+        if (it.SkillKey != SkillKey.None && free)
         {
-            found = it.SkillKey switch
+            var kind = it.SkillKey switch
             {
                 SkillKey.StepOver => Gesture.StepOver,
                 SkillKey.BodyFeint => Gesture.BodyFeint,
                 SkillKey.BallRoll => Gesture.BallRoll,
                 _ => Gesture.DragBack,
             };
-            side = found == Gesture.DragBack ? SkillSide.None : KeySide(it, fwd, t);
+            found = new GestureRead(kind, kind == Gesture.DragBack ? SkillSide.None : KeySide(it, FrameForward(p, t), t), Vector2.Zero);
         }
 
-        if (found == Gesture.None) return GestureRead.None;
-        // Too soon after the previous gesture: dropped. A side still held (step-over, elastico, either spin or roll) is tried again
-        // next tick; a gesture made on a change (feint, drag-back, heel-to-heel) or a knock-on is gone.
-        if (tick - p.LastGestureTick < Ticks(k.GestureGap, t)) return GestureRead.None;
-        if (sideZone && found is Gesture.StepOver or Gesture.BallRoll or Gesture.Elastico or Gesture.SpinAndGo or Gesture.McGeady && it.SkillKey == SkillKey.None)
-            p.GSideConsumed = true;
-        if (found == Gesture.StepOver) p.GKnockWaitTick = -1;
-        return Commit(p, new GestureRead(found, side, Vector2.Zero), tick);
+        if (found.Kind == Gesture.None) return GestureRead.None;
+        p.GDetKind = found.Kind;
+        p.GDetSide = found.Side;
+        p.GDetTick = tick;
+        return Commit(p, found, tick);
+    }
+
+    /// <summary>
+    /// The registered gesture while it is still held: from the tick it registered for gesture_cooldown. The step-over and the
+    /// ball roll may start on any of those ticks; the other moves only on the first (the one <see cref="Read"/> returns it on).
+    /// </summary>
+    public static GestureRead Held(PlayerState p, int tick, Tuning t) =>
+        p.GDetTick != 0 && tick >= p.GDetTick && tick <= p.GDetTick + Ticks(t.Skill.GestureCooldown, t)
+            ? new GestureRead(p.GDetKind, p.GDetSide, Vector2.Zero) : GestureRead.None;
+
+    /// <summary>
+    /// The heavy touch: with sprint held, the right stick flicked past knock_on_actuation (below it on the tick before) arms
+    /// one, aimed where the stick points; let go of, the aim is where it pointed last. His next touch is the heavy one, along
+    /// that aim (see <see cref="PlayerState.KnockOnRequested"/>). It is dropped when sprint is let go of or
+    /// heavy_touch_max_delay passes with no touch. Call every tick (it tracks the stick). True on the tick one is armed.
+    /// </summary>
+    /// <param name="canArm">Play is live and he has the ball, or his team's claim on a loose one.</param>
+    public static bool ReadHeavyTouch(PlayerState p, in TickIntent it, int tick, bool canArm, Tuning t)
+    {
+        var k = t.Skill;
+        Vector2 now = it.Right, prev = p.GPrevRight;
+        p.GPrevRight = now;
+        float nowLen = now.Length(), prevLen = prev.Length();
+        bool sprinting = it.Sprint >= t.Touch.SprintThreshold;
+        if (p.GHeavyTick >= 0)
+        {
+            if (!p.KnockOnRequested) p.GHeavyTick = -1; // played, or dropped with the ball
+            else if (!sprinting || tick - p.GHeavyTick > Ticks(k.HeavyTouchMaxDelay, t)) { p.GHeavyTick = -1; p.KnockOnRequested = false; }
+            else if (nowLen < k.KnockOnActuation && prevLen >= k.KnockOnActuation) p.GHeavyDir = prev / prevLen;
+        }
+        if (p.GHeavyTick >= 0 || !canArm || !sprinting || nowLen < k.KnockOnActuation || prevLen >= k.KnockOnActuation) return false;
+        p.GHeavyTick = tick;
+        p.GHeavyDir = now / nowLen;
+        p.KnockOnRequested = true;
+        Commit(p, new GestureRead(Gesture.KnockOn, SkillSide.None, Vector2.Zero), tick);
+        return true;
     }
 
     /// <summary>
@@ -259,7 +309,6 @@ public static class GestureReader
         bool press = it.Cancel && !p.GPrevCancel;
         p.GPrevCancel = it.Cancel;
         if (!press || !shotUnderWay || strikeTick < 0 || tick > strikeTick - Ticks(t.Skill.FakeShotCutoff, t)) return GestureRead.None;
-        if (tick - p.LastGestureTick < Ticks(t.Skill.GestureGap, t)) return GestureRead.None;
         Vector2 stick = it.Move;
         float len = stick.Length();
         if (len < t.Touch.StickThreshold) return Commit(p, new GestureRead(Gesture.FakeStop, SkillSide.None, Vector2.Zero), tick);

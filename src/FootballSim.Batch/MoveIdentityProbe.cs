@@ -182,6 +182,7 @@ static class MoveIdentityProbe
                 var s = move.Trace(Math.Min(i, SkillProbe.TraceTicks - 1), move.Side);
                 if (i < SkillProbe.TraceTicks) { it.RightX = s.Right.X; it.RightZ = s.Right.Y; it.ShootHeld = s.Shoot; it.Cancel = s.Cancel; it.Finesse = it.Chip = s.Shoulders; }
                 if (s.Left is Vector2 l) { it.MoveX = l.X; it.MoveZ = l.Y; }
+                if (SkillProbe.SprintOff(move, p, i, g0)) it.Sprint = 0f;
             }
             buf[0] = it;
             var before = new Vector2(p.Position.X, p.Position.Z);

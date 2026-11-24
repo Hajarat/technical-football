@@ -1407,45 +1407,52 @@ public sealed class SkillTuning
     // ---- gestures (GestureReader) ----
     /// <summary>The right stick counts as pushed from this deflection; below it, it is neutral.</summary>
     public float MinActuation { get; set; } = 0.5f;
-    /// <summary>
-    /// Default angle tolerance of a gesture direction around its forward, back or side direction. A pushed stick belongs to
-    /// its nearest of the four directions when within this of it, so at 45 or more every pushed stick has a direction.
-    /// </summary>
-    public float AngleToleranceDeg { get; set; } = 60f;
-    /// <summary>The step-over's side flick must be within this of the exact side.</summary>
+    /// <summary>A gesture step's direction is met within this of forward, back or the exact side.</summary>
+    public float AngleToleranceDeg { get; set; } = 45f;
+    /// <summary>The side a step-over or an elastico is rolled round to must be within this of the exact side.</summary>
     public float StepOverSideToleranceDeg { get; set; } = 30f;
-    /// <summary>Two recognised gestures are at least this far apart; a gesture sooner than this is ignored.</summary>
-    public float GestureGap { get; set; } = 0.08f;
-    /// <summary>A step-over is forward then the side within this long.</summary>
-    public float StepOverWindow { get; set; } = 0.25f;
-    /// <summary>A body feint is a side flick from neutral that is back at neutral within this long.</summary>
-    public float FeintMaxHold { get; set; } = 0.1f;
+    /// <summary>
+    /// A registered gesture stays held this long (the step-over and the ball roll may start any time in it), and no other
+    /// gesture registers until it has passed: one completed sooner is dropped.
+    /// </summary>
+    public float GestureCooldown { get; set; } = 0.1667f;
+    /// <summary>
+    /// The longer step window: a step-over's or an elastico's side after its first direction, and the last flick of a spin
+    /// or a McGeady spin after the rest before it, begin within this long.
+    /// </summary>
+    public float RollStepWindow { get; set; } = 0.3333f;
+    /// <summary>A flick counts once the stick has stayed on its direction this long.</summary>
+    public float FlickHold { get; set; } = 0.0167f;
     /// <summary>A side held this long is a ball roll (shorter and released, a body feint).</summary>
-    public float RollMinHold { get; set; } = 0.1f;
-    /// <summary>A forward flick at least this far while sprinting asks for a knock-on.</summary>
+    public float RollMinHold { get; set; } = 0.1667f;
+    /// <summary>With sprint held, the right stick flicked at least this far arms a heavy touch (the knock-on).</summary>
     public float KnockOnActuation { get; set; } = 0.85f;
-    /// <summary>The knock-on waits this long before it fires, so a step-over can start with the same forward flick.</summary>
-    public float KnockOnWait { get; set; } = 0.15f;
+    /// <summary>An armed heavy touch waits this long for his next touch, then is dropped, seconds.</summary>
+    public float HeavyTouchMaxDelay { get; set; } = 2f;
     /// <summary>
     /// Cancel pressed any time from the shoot press until this long before the shot's planned strike turns it into a fake shot,
     /// seconds.
     /// </summary>
     public float FakeShotCutoff { get; set; } = 0.05f;
-    /// <summary>The drag-back's left stick: at least this far from forward (degrees), with both shoulder buttons held.</summary>
-    public float DragBackStickDeg { get; set; } = 120f;
+    /// <summary>The drag-back's left stick: at least this far from his facing (degrees), with both shoulder buttons held.</summary>
+    public float DragBackStickDeg { get; set; } = 135f;
     /// <summary>A drag-back asked for within this long of the touch controller's own turn at the feet starting replaces it, seconds.</summary>
     public float DragBackOverFeetTurn { get; set; } = 0.1f;
     /// <summary>
-    /// Each step of a heel-to-heel or a spin (a flick held, the stick back at neutral, the next flick) comes within this long
-    /// of the one before. A sprinting forward flick released to neutral holds its knock-on while the next step may still come.
+    /// Each step of a flick gesture (the stick back at rest, the next flick) begins within this long of the one before; the
+    /// first flick may come any time after the stick has rested.
     /// </summary>
-    public float ComboStepWindow { get; set; } = 0.125f;
-    /// <summary>Above this speed the gesture frame's forward is the running direction, below it the facing, m/s.</summary>
+    public float ComboStepWindow { get; set; } = 0.1667f;
+    /// <summary>Above this speed a move's own forward is the running direction, below it the facing, m/s.</summary>
     public float FrameMinSpeed { get; set; } = 1.0f;
     /// <summary>A keyboard skill key takes its side from the left stick's sideways deflection beyond this (else right).</summary>
     public float KeySideThreshold { get; set; } = 0.2f;
 
     // ---- starting a move (SkillMoves) ----
+    /// <summary>A ball roll or a drag-back is not taken up while the ball moves faster than this, m/s.</summary>
+    public float SoleMaxBallSpeed { get; set; } = 15f;
+    /// <summary>An elastico, a heel-to-heel or either spin is not taken up while the ball moves faster than this, m/s.</summary>
+    public float TwoContactMaxBallSpeed { get; set; } = 10f;
     /// <summary>A gesture made with the ball out of reach and no meet planned waits this long for it, then is dropped.</summary>
     public float BufferSeconds { get; set; } = 0.3f;
     /// <summary>

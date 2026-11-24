@@ -42,7 +42,7 @@ static class SkillProbe
     // Traces, in world axes for a player running along +X: forward = (1, 0), his right = (0, 1).
     static Script StepOver(int i, int side) => new(i < 6 ? Ahead : i < 12 ? new Vector2(0f, side) : Vector2.Zero, null, false, false);
     static Script Feint(int i, int side) => new(i < 6 ? new Vector2(0f, side) : Vector2.Zero, null, false, false);
-    static Script Roll(int i, int side) => new(i < 20 ? new Vector2(0f, side) : Vector2.Zero, null, false, false);
+    static Script Roll(int i, int side) => new(i < 26 ? new Vector2(0f, side) : Vector2.Zero, null, false, false);
     // The drag-back is the left stick back with both shoulder buttons held (the right stick back alone does nothing).
     static Script DragBack(int i, int side) => i < 8 ? new(Vector2.Zero, new Vector2(-1f, 0f), false, false, true) : new(Vector2.Zero, null, false, false);
     static Script Knock(int i, int side) => new(i < 8 ? Ahead : Vector2.Zero, null, false, false);
@@ -79,7 +79,16 @@ static class SkillProbe
         new("mcgeady", Gesture.McGeady, -1, AllEntries, McGeady, Rot(Ahead, -90f)),
     };
 
-    internal const int TraceTicks = 20;
+    internal const int TraceTicks = 30;
+
+    /// <summary>
+    /// True while a sprinting entry lets go of sprint for the move's stick gesture: no gesture registers with sprint held, so
+    /// sprint is off from the trace's first tick until the gesture has registered (the heavy touch needs sprint, and a fake shot
+    /// is no stick gesture: neither lets go).
+    /// </summary>
+    internal static bool SprintOff(Move move, PlayerState p, int i, int g0) =>
+        i >= 0 && i < TraceTicks && move.Expect is not (Gesture.KnockOn or Gesture.FakeStop or Gesture.FakeCut)
+        && !(p.LastGesture == move.Expect && p.LastGestureTick > g0);
 
     /// <summary>The left stick before the gesture. Standing: a short jog to take the ball, then the stick released (a stop).</summary>
     internal static TickIntent EntryIntent(string entry, int tick, int tickRate) => entry switch
@@ -254,6 +263,7 @@ static class SkillProbe
                 var s = move.Trace(Math.Min(i, TraceTicks - 1), move.Side);
                 if (i < TraceTicks) { it.RightX = s.Right.X; it.RightZ = s.Right.Y; it.ShootHeld = s.Shoot; it.Cancel = s.Cancel; it.Finesse = it.Chip = s.Shoulders; }
                 if (s.Left is Vector2 l) { it.MoveX = l.X; it.MoveZ = l.Y; }
+                if (SprintOff(move, p, i, g0)) it.Sprint = 0f;
             }
             buf[0] = it;
             float sp0 = p.Speed, face0 = p.Facing;
@@ -419,6 +429,7 @@ static class SkillProbe
                     it.RightX = r.X; it.RightZ = r.Y;
                     if (s.Left is Vector2 l) { var lw = Rot(l, turn); it.MoveX = lw.X; it.MoveZ = lw.Y; }
                     it.ShootHeld = s.Shoot; it.Cancel = s.Cancel; it.Finesse = it.Chip = s.Shoulders;
+                    if (SprintOff(move, p, i, g0)) it.Sprint = 0f;
                 }
                 else if (tick > runEnd && tick <= runEnd + shootTicks) it.ShootHeld = true;
                 buf[0] = it;

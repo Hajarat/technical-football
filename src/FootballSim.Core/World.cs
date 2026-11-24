@@ -758,9 +758,16 @@ public sealed partial class World
         // Skill gestures are read every tick so their timing runs on through every state. A fake shot is recognised on the
         // cancel, but the shot winds up on as a real one (the same legs, the same shot action the keeper reads) until the fake's
         // contact, on the tick the strike was planned for when the cancel came (at least fake_contact_after_cancel after it):
-        // only then is the shot aborted and the fake move made, its contact on that tick. A knock-on flick asks for a knock-on
-        // like the knock-on button.
+        // only then is the shot aborted and the fake move made, its contact on that tick.
         var gesture = GestureReader.Read(p, it, Tick, tuning);
+        // A gesture is taken up on the tick it registers, or not at all; the step-over and the ball roll on any tick it is held.
+        bool claimed = _claims[0].Player == p && p.LockOnTick >= 0;
+        if (gesture.Kind == Gesture.None && p.SkillBufTick < 0 && GestureReader.Held(p, Tick, tuning) is { Kind: Gesture.StepOver or Gesture.BallRoll } still)
+            gesture = still;
+        if (gesture.Kind != Gesture.None && !SkillMoves.CanTakeUp(p, gesture.Kind, Ball, inPossession, claimed, SimTime, tuning))
+            gesture = GestureRead.None;
+        // With sprint held the right stick arms a heavy touch (the knock-on) for his next touch.
+        GestureReader.ReadHeavyTouch(p, it, Tick, State == RoundState.Live && (inPossession || claimed), tuning);
         bool shotUnderWay = State == RoundState.Strike && _pending.Active || State == RoundState.Live && _shootWasHeld;
         int strikeTick = _shotStartTick >= 0 && p.ShotAction is { Made: false } planned ? planned.ContactTick : -1;
         var fake = GestureReader.ReadFakeShot(p, it, Tick, _fakeTick < 0 ? strikeTick : -1, shotUnderWay, tuning);
@@ -782,8 +789,7 @@ public sealed partial class World
         }
         if (!it.ShootHeld) _shotCancelled = false;
         bool shootHeld = it.ShootHeld && !_shotCancelled;
-        bool knockGesture = gesture.Kind == Gesture.KnockOn;
-        if (gesture.Kind is not (Gesture.None or Gesture.KnockOn)) SkillMoves.Request(p, gesture, Tick, fakeFrom);
+        if (gesture.Kind != Gesture.None) SkillMoves.Request(p, gesture, Tick, fakeFrom);
         if (gesture.Kind == Gesture.DragBack && inPossession) TouchPlanner.YieldFeetTurn(p, Tick, tuning);
         if (State == RoundState.Strike && _pending.Active && shootHeld && !_shootWasHeld) PressShootAgain(p, it);
         if (State == RoundState.Live && !shootHeld && _passKind == PassKind.None
@@ -833,7 +839,7 @@ public sealed partial class World
         if (State == RoundState.Live)
         {
             // A knock-on asked for on the way to a ball he has the claim on is kept: his first touch is the knock-on.
-            if ((it.KnockOn || knockGesture) && (inPossession || holder)) TouchPlanner.RequestKnockOn(p);
+            if (it.KnockOn && (inPossession || holder)) TouchPlanner.RequestKnockOn(p);
 
             if (shootHeld)
             {

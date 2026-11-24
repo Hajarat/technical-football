@@ -374,29 +374,18 @@ public sealed class PlayerState
     internal int TouchCadenceCount;
 
     // Gesture reader (see GestureReader).
-    internal GestureReader.Zone GZone, GPrevZone;
-    /// <summary>World tick the right stick entered its current zone.</summary>
-    internal int GZoneStart;
-    /// <summary>Latest world tick the right stick was forward.</summary>
-    internal int GFwdLastTick = int.MinValue / 2;
-    /// <summary>World tick the right stick last entered forward, and whether it came there from neutral.</summary>
-    internal int GFwdStart = int.MinValue / 2;
-    internal bool GFwdFromNeutral;
-    /// <summary>Latest world tick the right stick was back (the start of an elastico).</summary>
-    internal int GBackLastTick = int.MinValue / 2;
-    /// <summary>World tick the right stick last entered back, and whether it came there from neutral (the start of a McGeady spin).</summary>
-    internal int GBackStart = int.MinValue / 2;
-    internal bool GBackFromNeutral;
-    /// <summary>The last two directions the right stick held before its current one, newest first (in-between zones skipped).</summary>
-    internal GestureReader.Zone GHist0, GHist1;
-    /// <summary>The left stick back with both shoulder buttons held, on the previous tick (the drag-back fires on the change).</summary>
-    internal bool GDragHeld;
-    /// <summary>The side held now has already given a step-over or a roll.</summary>
-    internal bool GSideConsumed;
-    /// <summary>The forward push held now has already armed a knock-on.</summary>
-    internal bool GKnockUsed;
-    /// <summary>World tick a knock-on was armed and is waiting to fire, or -1.</summary>
-    internal int GKnockWaitTick = -1;
+    /// <summary>Where each followed gesture is in its steps: two per move (plain, mirrored), in the reader's order.</summary>
+    internal readonly GestureReader.Progress[] GProg = new GestureReader.Progress[GestureReader.ProgressCount];
+    /// <summary>The gesture last registered, its side and its world tick (0: none): held for gesture_cooldown.</summary>
+    internal Gesture GDetKind;
+    internal SkillSide GDetSide;
+    internal int GDetTick;
+    /// <summary>The right stick on the previous tick.</summary>
+    internal Vector2 GPrevRight;
+    /// <summary>World tick a heavy touch was armed by a right-stick flick and waits for his next touch, or -1.</summary>
+    internal int GHeavyTick = -1;
+    /// <summary>The armed heavy touch's aim (unit, world X, Z).</summary>
+    internal Vector2 GHeavyDir;
     /// <summary>The cancel button on the previous tick.</summary>
     internal bool GPrevCancel;
 
@@ -453,11 +442,9 @@ public sealed class PlayerState
         LockOnPoint = o.LockOnPoint; LockOnTick = o.LockOnTick; MinArrivalTick = o.MinArrivalTick; MinArrivalHeight = o.MinArrivalHeight;
         LockOnBallVelocity = o.LockOnBallVelocity; LockOnResting = o.LockOnResting; LockOnSlack = o.LockOnSlack;
         LastTouchKind = o.LastTouchKind; StunUntil = o.StunUntil; ShotAction = o.ShotAction; TurnFatigue = o.TurnFatigue;
-        GZone = o.GZone; GPrevZone = o.GPrevZone; GZoneStart = o.GZoneStart; GFwdLastTick = o.GFwdLastTick;
-        GFwdStart = o.GFwdStart; GFwdFromNeutral = o.GFwdFromNeutral; GBackLastTick = o.GBackLastTick;
-        GBackStart = o.GBackStart; GBackFromNeutral = o.GBackFromNeutral;
-        GHist0 = o.GHist0; GHist1 = o.GHist1; GDragHeld = o.GDragHeld;
-        GSideConsumed = o.GSideConsumed; GKnockUsed = o.GKnockUsed; GKnockWaitTick = o.GKnockWaitTick; GPrevCancel = o.GPrevCancel;
+        Array.Copy(o.GProg, GProg, GProg.Length);
+        GDetKind = o.GDetKind; GDetSide = o.GDetSide; GDetTick = o.GDetTick; GPrevRight = o.GPrevRight;
+        GHeavyTick = o.GHeavyTick; GHeavyDir = o.GHeavyDir; GPrevCancel = o.GPrevCancel;
         LastGesture = o.LastGesture; LastGestureTick = o.LastGestureTick; SkillEffective = o.SkillEffective; SkillChainCount = o.SkillChainCount;
         SkillAction = o.SkillAction; SkillBufKind = o.SkillBufKind; SkillBufSide = o.SkillBufSide; SkillBufCut = o.SkillBufCut;
         SkillBufTick = o.SkillBufTick; SkillBufFakeFrom = o.SkillBufFakeFrom; SkillExitTick = o.SkillExitTick; SkillExitRule = o.SkillExitRule; SkillExitFwd = o.SkillExitFwd; SkillExitSide = o.SkillExitSide; SkillBurstAtTick = o.SkillBurstAtTick; SkillCooldownUntil = o.SkillCooldownUntil; SkillChainUntil = o.SkillChainUntil;
