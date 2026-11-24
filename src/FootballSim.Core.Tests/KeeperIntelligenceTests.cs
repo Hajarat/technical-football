@@ -11,6 +11,8 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
     static readonly Pitch P = new(new PitchSpec(), T.Frame);
     static float Dt => T.Dt;
     static readonly PlayerSheet Striker = TestData.Player("striker_a");
+    /// <summary>The legacy keeper (keeper.brain legacy), for the charge and jockey he alone makes.</summary>
+    static readonly Tuning Legacy = new() { Keeper = { Brain = "legacy" } };
 
     static (KeeperBrain Brain, PlayerState Keeper, Ball Ball) Rig(PlayerSheet sheet, Vector3 ball, Vector3 keeperAt, Tuning? t = null)
     {
@@ -204,7 +206,7 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
         var s = TestData.Player("the_wall");
         var keeperAt = new Vector3(P.GoalLineX - 4f, 0f, 0f);
         var ballAt = new Vector3(P.GoalLineX - 13f, 0.11f, 0f);
-        var (brain, keeper, ball) = Rig(s, ballAt, keeperAt);
+        var (brain, keeper, ball) = Rig(s, ballAt, keeperAt, Legacy);
         var rng = new SimRng(6);
         const float v = 3f;
         bool charged = false, jockeyed = false;
@@ -238,7 +240,7 @@ public class KeeperIntelligenceTests(ITestOutputHelper output)
         // 3 m/s, he gives ground no faster than jockey_retreat_speed.
         var s = TestData.Player("the_wall");
         var ballAt = new Vector3(P.GoalLineX - 16f, 0.11f, 0f);
-        var (brain, keeper, ball) = Rig(s, ballAt, new Vector3(P.GoalLineX - 5f, 0f, 0f));
+        var (brain, keeper, ball) = Rig(s, ballAt, new Vector3(P.GoalLineX - 5f, 0f, 0f), Legacy);
         var rng = new SimRng(8);
         int tick = 0;
         void Step(Vector3 vel, int i)

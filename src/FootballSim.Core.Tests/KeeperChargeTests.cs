@@ -11,6 +11,8 @@ public class KeeperChargeTests(ITestOutputHelper output)
     static readonly Pitch P = new(new PitchSpec(), T.Frame);
     static float Dt => T.Dt;
     static readonly PlayerSheet Striker = TestData.Player("striker_a");
+    /// <summary>The legacy keeper (keeper.brain legacy), for the charge he alone makes.</summary>
+    static readonly Tuning Legacy = new() { Keeper = { Brain = "legacy" } };
 
     static PlayerSheet Keeper(int rushing)
     {
@@ -19,11 +21,11 @@ public class KeeperChargeTests(ITestOutputHelper output)
         return s;
     }
 
-    static (KeeperBrain Brain, PlayerState Keeper, Ball Ball) Rig(PlayerSheet sheet, Vector3 ball, Vector3 keeperAt)
+    static (KeeperBrain Brain, PlayerState Keeper, Ball Ball) Rig(PlayerSheet sheet, Vector3 ball, Vector3 keeperAt, Tuning? t = null)
     {
         var b = new Ball(T.Ball) { Position = ball };
         var k = new PlayerState(1, 0, PlayerRole.Keeper, sheet) { Position = keeperAt, Facing = MathF.PI };
-        return (new KeeperBrain(k, P, T, false, Striker), k, b);
+        return (new KeeperBrain(k, P, t ?? T, false, Striker), k, b);
     }
 
     static float Depth(PlayerState k) => P.GoalLineX - k.Position.X;
@@ -72,7 +74,7 @@ public class KeeperChargeTests(ITestOutputHelper output)
     static float ChargeStartsAt(PlayerSheet s, float speed, ulong seed)
     {
         var start = new Vector3(P.GoalLineX - 24f, 0.11f, 0f);
-        var (brain, keeper, ball) = Rig(s, start, Core.Keeper.ArcTarget(start, P, T, s));
+        var (brain, keeper, ball) = Rig(s, start, Core.Keeper.ArcTarget(start, P, T, s), Legacy);
         var rng = new SimRng(seed);
         var vel = new Vector3(speed, 0f, 0f);
         while (P.GoalLineX - ball.Position.X > 9f)
@@ -103,7 +105,7 @@ public class KeeperChargeTests(ITestOutputHelper output)
         // within 3 m of it by the time it is 12 m out.
         var s = Keeper(88);
         var start = new Vector3(P.GoalLineX - 22f, 0.11f, 0f);
-        var (brain, keeper, ball) = Rig(s, start, Core.Keeper.ArcTarget(start, P, T, s));
+        var (brain, keeper, ball) = Rig(s, start, Core.Keeper.ArcTarget(start, P, T, s), Legacy);
         var rng = new SimRng(3);
         var vel = new Vector3(4.5f, 0f, 0f);
         float band = 0f, at12 = float.NaN;
@@ -128,7 +130,7 @@ public class KeeperChargeTests(ITestOutputHelper output)
         // charge and gives ground back to within his judged chip-safe depth.
         var s = Keeper(88);
         var start = new Vector3(P.GoalLineX - 20f, 0.11f, 0f);
-        var (brain, keeper, ball) = Rig(s, start, new Vector3(P.GoalLineX - 4f, 0f, 0f));
+        var (brain, keeper, ball) = Rig(s, start, new Vector3(P.GoalLineX - 4f, 0f, 0f), Legacy);
         var rng = new SimRng(5);
         var vel = new Vector3(7f, 0f, 0f);
         bool charged = false;
@@ -183,7 +185,7 @@ public class KeeperChargeTests(ITestOutputHelper output)
         {
             var s = Keeper(88);
             var ballAt = new Vector3(P.GoalLineX - 14f, 0.11f, 0f);
-            var (brain, keeper, ball) = Rig(s, ballAt, new Vector3(ballAt.X + gap, 0f, 0f));
+            var (brain, keeper, ball) = Rig(s, ballAt, new Vector3(ballAt.X + gap, 0f, 0f), Legacy);
             var vel = new Vector3(4f, 0f, 0f);
             var rng = new SimRng(2);
             // Get him charging first.

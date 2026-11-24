@@ -445,6 +445,7 @@
     "outside_speed": 0.92
   },
   "keeper": {
+    "brain": "home",
     "reaction": {
       "at1": 0.34,
       "at99": 0.145
@@ -570,7 +571,33 @@
     },
     "backpedal_catch_factor": 0.4,
     "pre_spread_range": 3.5,
-    "engage_range": 8.5,
+    "engage_range": 4.5,
+    "legacy_engage_range": 8.5,
+    "home_depth_m": [
+      [8, 6],
+      [12, 5],
+      [16, 3.6],
+      [20, 2.6],
+      [25, 1.7],
+      [30, 1.2]
+    ],
+    "set_gap_m": 6,
+    "set_speed": 0.5,
+    "mirror_speed": {
+      "at1": 3.5,
+      "at99": 5.5
+    },
+    "mirror_lead_m": 1.75,
+    "pounce_reach_m": {
+      "at1": 2,
+      "at99": 2.8
+    },
+    "pounce_margin_s": {
+      "at1": 0.12,
+      "at99": 0.02
+    },
+    "rounded_margin_m": 0.5,
+    "recover_depth_m": 1,
     "charge_range": 20,
     "charge_time": {
       "at1": 0.35,

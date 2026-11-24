@@ -851,7 +851,7 @@ public class DefenderTests
         // The same breakaway run at the keeper, the defender kept either on the keeper's line to the ball or far out wide.
         bool Charged(bool covering)
         {
-            var w = Live(seed: 11);
+            var w = Live(seed: 11, tuning: new Tuning { Keeper = { Brain = "legacy" } });
             w.DefenderBotEnabled = false;
             var buf = new TickIntent[w.PlayerCount];
             for (int i = 0; i < 1500 && w.Outcome == Outcome.None; i++)

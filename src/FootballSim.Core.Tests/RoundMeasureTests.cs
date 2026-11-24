@@ -278,7 +278,8 @@ public class RoundMeasureTests
     public void TheKeepersRecoveryRunsFromTakenRoundToBackOnTheLine()
     {
         var goal = new Vector2(30f, 0f);
-        var (o, _) = Find(new[] { "breakaway", "halfway_run", "keeper_rush" }, 300, o => o.Ticks.Any(s => s.Rounded));
+        // (the scripted attacker takes round only a keeper who charges at him: the legacy keeper)
+        var (o, _) = Find(new[] { "breakaway", "halfway_run", "keeper_rush" }, 300, o => o.Ticks.Any(s => s.Rounded), tuning: new Tuning { Sheets = TestData.Sheets, Keeper = { Brain = "legacy" } });
         int rounded = o.Ticks.First(s => s.Rounded).Tick;
         var back = o.Ticks.FirstOrDefault(s => s.Tick > rounded && s.After is RoundState.Live or RoundState.Strike or RoundState.Flight
             && World.BackOnLine(s.Keeper, s.Ball, goal));

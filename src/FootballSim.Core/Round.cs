@@ -66,7 +66,10 @@ public sealed class KeeperReport
     public int DepthReversalsFirst2S { get; set; }
 
     // Measured over the whole round (filled at its end; reports saved before these existed read them as their defaults).
-    /// <summary>True if he pounced on a ball pushed off the attacker's foot this round, and won it (no pounce exists yet: false).</summary>
+    /// <summary>
+    /// True if he pounced (the home keeper, set on the carrier, smothered at a ball off his foot) before the first strike this
+    /// round, and whether that smother met the ball.
+    /// </summary>
     public bool Pounced { get; set; }
     public bool PounceWon { get; set; }
     /// <summary>The furthest he stood off his goal line at any tick of play this round, metres.</summary>

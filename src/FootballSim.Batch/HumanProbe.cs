@@ -470,7 +470,7 @@ static class HumanProbe
     }
 
     /// <summary>The tuning's brain keys: --brain legacy sets each of them to "legacy".</summary>
-    static readonly string[] BrainKeys = { "defender.brain" };
+    static readonly string[] BrainKeys = { "defender.brain", "keeper.brain" };
 
     /// <summary>Checks the --brain option: null when it is fine (legacy, contain, or none), else the exit code.</summary>
     public static int? CheckBrain(Dictionary<string, string> opts)
@@ -520,7 +520,7 @@ static class HumanProbe
         var sheets = new Dictionary<string, PlayerSheet>();
         foreach (var (name, id) in Attackers) if (P(id) is { } s) sheets[name] = s; else return 1;
 
-        Console.WriteLine($"human probe: n={n} seed={seed} brain={(comparison ? "legacy (the legacy defender bot and keeper), a comparison run: marks printed, exit 0" : $"shipped (defender {tuning.Defender.Brain})")}");
+        Console.WriteLine($"human probe: n={n} seed={seed} brain={(comparison ? "legacy (the legacy defender bot and keeper), a comparison run: marks printed, exit 0" : $"shipped (defender {tuning.Defender.Brain}, keeper {tuning.Keeper.Brain})")}");
         Console.WriteLine($"attackers: even={Attackers[0].Sheet} fast={Attackers[1].Sheet}; first attacks only; past = the ball {World.PastMarginM.ToString("F1", Ic)} m nearer the goal centre than the defender, " +
                           $"with an attacker on it (or their pass on its way) and the defender not on the ball for {World.PastHoldS.ToString("F1", Ic)} s");
         Console.WriteLine("scenario       plan         attacker      n   goal   miss   held   disp   foul   offs   time  |   past  fa_goals");

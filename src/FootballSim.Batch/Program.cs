@@ -50,7 +50,7 @@ using FootballSim.Core;
 //   ... --defence-report <session dir|replay> [--any-tuning 1]
 //                                               recorded rounds from their saved reports and replays: goals per round and per first
 //                                               attack, past the defender, the keeper at each goal's strike
-//   ... --brain legacy|contain                 with any run: legacy sets every brain key of the tuning (defender.brain) to
+//   ... --brain legacy|contain                 with any run: legacy sets every brain key of the tuning (defender.brain, keeper.brain) to
 //                                               legacy, the older bots; contain (or no flag) plays the shipped tuning
 //   ... --lock-probe [--seeds 1000] [--only behind,still_shot,first_time,flick,gesture,race,slide]
 //                                               scripted loose-ball rounds, one case per lock-on rule, with their targets
