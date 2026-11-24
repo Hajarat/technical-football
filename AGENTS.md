@@ -24,6 +24,19 @@ Run the cheapest check that answers the question, and climb only when it calls f
 - Do not use `dotnet run --no-build` on a build you did not just make.
 - Keep the box's limit of 4 threads for anything parallel.
 
+## Test cards: agree a run before it counts
+
+Seeds alone are noise, not a test. Before any run whose numbers will be reported as evidence that a change works, the agent writes a test card in chat and agrees it with the user, revising it until the user says go. Quick runs while building need no card. Every card has:
+
+1. **The complaint**, in the user's words.
+2. **The situation that produces it**: the scenario, probe or human plan that actually puts the player there. If none does, building it comes first; never run the closest one in its place.
+3. **What varies besides seeds**: the change on and off, a rating sweep, attacker styles, human plans.
+4. **The number that measures the complaint itself**, plus guard numbers (the bands that must not move).
+5. **A prediction**: what should move, and roughly how much.
+6. **Whether a script can hide the change**: a scripted actor that adapts to the change (for example one that times its press from the wind-up) shows nothing; say how the run avoids that.
+
+The report then answers the card: the measured numbers against the prediction, and what to test next.
+
 ## Clutter
 
 `tools/clean.sh` removes Claude Code scratch folders for this repo and its worktrees, and entries in `out/` and `game/out/`, that nothing has written to for 3 days (`--days N`, `--dry-run`), and lists worktrees already merged into main. It never touches `sessions/`.
