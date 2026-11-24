@@ -87,6 +87,19 @@ public partial class Match
             _log?.Write("controls", ("vibration", on), ("reason", "toggle"));
             Hud.Toast(on ? "Vibration: on" : "Vibration: off");
         };
+        Pad.AimAssistChanged += level =>
+        {
+            // A round keeps the level it was set up with (its replay's header names it), so a change during play waits for
+            // the next round; one made before the round begins applies to it.
+            bool now = _replay == null && _args.AimAssist == null && World is { State: RoundState.Setup };
+            if (now)
+            {
+                World.AimAssist = level;
+                if (World.Recorder != null) World.Recorder.Replay.AimAssist = level;
+            }
+            _log?.Write("controls", ("aim_assist", level.ToString().ToLowerInvariant()), ("applies_now", now), ("reason", "toggle"));
+            Hud.Toast($"Aim assist: {level}" + (now || _replay != null || _args.AimAssist != null ? "" : " (from the next round)"));
+        };
         Input.JoyConnectionChanged += (device, connected) => { LogPads(); GD.Print($"PADS device {device} {(connected ? "connected" : "disconnected")}"); };
 
         if (_data.Scenarios.Count == 0 || _data.Attackers.Count == 0 || _data.Keepers.Count == 0)
@@ -198,7 +211,8 @@ public partial class Match
             mate = _data.Attackers.Find(p => p.Id == sc.DefaultMate);
             if (mate == null) _data.Warnings.Add($"{sc.Id}: team-mate '{sc.DefaultMate}' not found in players; the attacker's sheet is used");
         }
-        World = new World(_data.Tuning, sc, att, kee, _seed, def, mate);
+        // The aim assistance level: a replay's own, else the tool argument, else the person's saved setting.
+        World = new World(_data.Tuning, sc, att, kee, _seed, def, mate) { AimAssist = _replay?.Replay.AimAssist ?? _args.AimAssist ?? Pad.AimAssist };
         Pitch.Build(World.Pitch);
         // Left edge at the back wall; right edge may reach 0.5 m past the back of the net so the whole goal shows; the bottom
         // edge stops at the near boards.
@@ -209,7 +223,7 @@ public partial class Match
         if (att.Id == PlayerPresets.CustomId && att == _data.Custom) World.Recorder.Replay.SetAttackerSheet(att);
         _flightTicks = 0; _liveTicks = 0; _beganReplay = false;
         _log?.Write("round_setup", ("round", _round), ("scenario", sc.Id), ("attacker", att.Id), ("keeper", kee.Id), ("defender", World.Defender?.Sheet.Id),
-            ("seed", _seed.ToString()), ("retry_of", retryOf > 0 ? retryOf : null));
+            ("aim_assist", World.AimAssist.ToString().ToLowerInvariant()), ("seed", _seed.ToString()), ("retry_of", retryOf > 0 ? retryOf : null));
         ResetPresentation();
         PrewarmRound();
         return true;
@@ -384,7 +398,7 @@ public partial class Match
         }
         Hud.SetControlsHint(_hintText);
         bool show = ((forced && !_args.ControlsHintOnly) || _paused || _controlsOn) && !_editor.IsOpen && !_capture.IsOpen;
-        if (show) Hud.Controls.Open(device, kind, padName, swapped);
+        if (show) Hud.Controls.Open(device, kind, padName, swapped, _replay?.Replay.AimAssist ?? _args.AimAssist ?? Pad.AimAssist);
         else Hud.Controls.Close();
     }
 

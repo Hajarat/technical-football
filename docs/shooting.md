@@ -7,13 +7,15 @@ before the strike (the gamepad's low shot) counts as driven held.
 | Type | Flight | Foot |
 | --- | --- | --- |
 | Power | Loft by charge, a light curl to a random side | Laces |
-| Finesse | Curls away from the striking foot, slower | Inside |
+| Finesse | Curls in toward the goal centre (struck with the foot that bends it in), slower | Inside |
 | Driven | Flat (about 3.5-5 degrees), 5% faster, a little less accurate, little spin | Laces |
-| Low finesse | Finesse curl kept low (1-4 degrees) | Inside |
+| Low finesse | The finesse's curl in, kept low (1-4 degrees) | Inside |
 | Chip | High loft with backspin | Inside |
 
 Any of them is struck with the outside of the foot instead when the foot rules give it (below): 15% wider spread, 8% slower
-(`outside_accuracy`, `outside_speed`), and a finesse then curls the other way.
+(`outside_accuracy`, `outside_speed`). A ball struck with the instep bends away from that foot's side (a right foot's bends
+toward -Z when he shoots toward +X) and one struck with the outside bends the other way; the spin's side follows the foot and
+surface alone.
 
 - Charge fills 0 to 1 in 0.3 s while shoot is held and is frozen at the release (or at 1). The strike comes no sooner than
   0.45 s after the press (the wind-up) and 0.12 s after the release (the earliest strike tick), and it takes the place of the
@@ -66,6 +68,19 @@ Any of them is struck with the outside of the foot instead when the foot rules g
   5. Weak: toward his own side beyond his outside cap: the weak foot, the type's own surface.
   6. FarPost: within the cap, where the far-post rule below applies: the strong foot, the type's own surface.
   7. Outside: within the cap otherwise: the outside of the strong foot.
+  - **A finesse or low finesse at goal always curls in.** Those two types skip the list above (a pass, which is struck like
+    a finesse, keeps it) and take the curl-in rule (`ShotModel.ChooseCurlIn`), read from the aimed point on the goal line
+    after the aim pull:
+    1. CurlIn: aimed within `curl_in_centre_m` (0.5 m) of the goal centre: the strong foot's instep.
+    2. CurlIn: otherwise the ball must bend toward the centre, and the instep that bends it there is the right foot's for
+       an aim at the +Z half and the left foot's for the -Z half. When that is his strong foot: that foot's instep.
+    3. CurlInOutside: when it is his weak foot, he has the `outside_foot` trait, and the aim is toward his strong side of
+       his facing by no more than his outside cap: the outside of the strong foot, which bends the same way.
+    4. CurlIn: otherwise the weak foot's instep, at the weak foot's price (spread, speed and curl, below).
+    So a right-footer's finesse at the +Z post is his right instep and at the -Z post his left; the foot is the one for
+    the aim at the release and does not follow the stick after it. A second press that takes the shot into or out of the
+    finesse family (finesse held on it after a power shot, chip after a finesse) chooses the foot and surface again for
+    the new type and the locked aim, unless the strike is already committed.
   - The outside cap (`ShotModel.OutsideCapDeg`) is `outside_max_deg` by the `curve` rating (30 degrees at 1, 67.5 at 99; 57
     at 72), wider by `outside_foot_bonus_deg` (12) with the `outside_foot` trait, never past the type's ceiling
     (`open_max_deg`, 67.5; `finesse_open_max_deg`, 79, for a finesse or low finesse). Everyone has one.
@@ -87,6 +102,9 @@ Any of them is struck with the outside of the foot instead when the foot rules g
     the foot otherwise: outside the dead-ahead zone a strike waits for the chosen foot however much sooner the other would
     swing.
   - The swap is taken only when the foot is chosen fresh: the forecast while shoot is held, and the choice at the release.
+  - A strike the curl-in rule decided never takes the swap: it waits for its foot. In the no-contact case the other foot
+    strikes with the opposite surface (its outside in place of an instep, its instep in place of an outside), so the ball
+    still bends in.
   - The exception: a foot chosen while a dribble touch was still to be played, or with the ball held at the feet and then
     lost from them, goes through the contact check once more when each foot's next contact is known, unless the strike is
     already committed. After the release the decision made there stands (`World.StrikeGeometry`, the geometry's choice and
@@ -110,12 +128,38 @@ Any of them is struck with the outside of the foot instead when the foot rules g
   strike tick (while shoot is held, as if it were let go on the next tick with the aim as it is) and the controller's
   forecast contact on the chosen foot, then the committed strike; once published it may move later (by whole steps, while
   the run cannot reach the ball) but never more than a tick earlier. The shot action's `ContactTick`, `Foot`, `Surface` and
-  `AimYaw` (the intended direction after the aim assist, following the stick until the release and fixed from then on)
+  `AimYaw` (the intended direction after the aim pull, following the stick until the release and fixed from then on)
   carry the same estimate, and the keeper reads the contact tick.
-- Aim is the left stick at the release; a stick at rest then uses its last pushed direction if that was within 0.5 s. It is
-  locked from the release to the contact. The stick is cast from the ball to the goal line and the aimed point clamped to
-  `max_target_z` (8 m) either side of the centre, wider than the frame, so a wild aim misses. Aim assist still applies (within
-  1.5 m outside a post).
+- Aim is free: the left stick at the release, a ray from the ball; a stick at rest then uses its last pushed direction if
+  that was within 0.5 s, and where he faces otherwise. It is locked from the release to the contact. The ray is cast to the
+  goal line and the aimed point clamped to `max_target_z` (8 m) either side of the centre, wider than the frame, so a wild
+  aim misses and the boards can be aimed at.
+- **The aim pull** (`ShotModel.AimTargetZ`) helps a stick that points wide of the frame, by the round's assistance level
+  (`World.AimAssist`: Off, Low, Medium or High; a person's setting, see [controls.md](controls.md); every batch run, probe
+  and test runs at Off, and the scripted attacker aims inside the frame, so its numbers do not depend on it):
+  - A ray that meets the goal line between the posts is never touched, at any level: placing the corner stays a skill.
+    At Off nothing is touched, nor is anything from a ball on or behind the goal line.
+  - Otherwise the pull is measured as an angle from the ball: `phi`, how far the ray points wide of the nearer post's
+    bearing. Up to the level's `capture_deg` the aim is the safe point, `shot.aim_assist.inset_m` (1.0 m) inside that
+    post: on target, but not the corner. From there to `release_deg` the aim's bearing turns outward in a line from the
+    safe point's bearing to the ray itself, and beyond `release_deg` the ray is the aim.
+  - Low captures to 8 degrees and fades by 20, Medium (the default for a person) 15 and 35, High 30 and 60
+    (`shot.aim_assist.low`, `.medium`, `.high`).
+  - The pull has no step at `capture_deg` or `release_deg`. At a post there is one: a ray on the post is honoured, a ray
+    just outside it goes to the safe point.
+  - The level is written in a replay's header (`aim_assist`; left out at Off, and a replay without it runs at Off), so a
+    recorded round aims as it did.
+- **The launch solve** (`ShotModel.LaunchTurn`): every shot is turned against its own bend, so a shot with no random error
+  crosses the goal line where it was aimed (within 5 cm, for every type). All the random numbers are drawn first, in the
+  order yaw, pitch, speed, spin. Then a copy of the ball is flown straight at the aimed point with the drawn speed and
+  spin, through the real ball physics at the simulation tick, over the ground alone (no boards, frame, keeper or
+  players), until its ground distance from the start reaches the aimed point's (or 3 s pass: then there is no turn). The
+  launch is turned by that flight's sideways drift, the other way, and the spin is built again for the turned direction;
+  drag, bounce and a spin that turns with the launch are the same in every direction, so one flight is exact. Only then
+  are the drawn yaw and pitch errors added. `ShotResult.AdjustDeg` is the turn; `Aimed` and `IntendedYaw` stay the aimed
+  point and the bearing to it; `StickYaw` and `Origin` are the stick's own direction and where the ball was struck from.
+  The solve is skipped for a ball on or behind the goal line. It follows the ball physics, so retuning drag or spin
+  needs no second set of numbers.
 - Each distance to the goal centre has an ideal charge (`shot.ideal_charge`; the HUD marks it from `World.IdealCharge`).
   Charging past it lifts the shot and charging short keeps it low, `shot.charge_miss_pitch_deg` degrees per unit of charge;
   a chip's miss changes how far it carries instead (`shot.chip_charge_miss_speed`). Speed grows with charge and `shot_power`.
@@ -134,6 +178,17 @@ Any of them is struck with the outside of the foot instead when the foot rules g
   foot and surface, how often the far-post rule decided the strike (`far_post`: yes only for the FarPost rule), the
   `run_speed` factor, the share of strikes each rule decided (`rule:`, read at the strike from `World.StrikeGeometry`), the
   share handed to the other foot (`handed over:` `swap`, the Ahead rule decided and the other foot struck; `no contact`,
-  the foot differs for any other reason), and every spread and speed factor by name. `--write-shot-replays` prints the
-  rule and `far_post` for each replay it writes.
+  the foot differs for any other reason), the launch solve's turn (`adjust`) and the drift (where the shot crossed the
+  goal line, flying free of the keeper and the frame, minus where it was aimed: the drawn error alone), and every spread
+  and speed factor by name. `--type finesse` (or `power`, `driven`, `low_finesse`, `chip`) and `--side 1` or `-1` (the +Z
+  or -Z post) set the scripted shot, and `--list 1` prints the turn and the drift of every shot. `--write-shot-replays`
+  prints the rule and `far_post` for each replay it writes.
+- `--probe aim` reads the recorded aims kept with the tests (`src/FootballSim.Core.Tests/TestData/aims/recorded_aims.json`:
+  a person's struck shots, the ball and the stick's direction) and prints, per level, what becomes of the aims that missed
+  the frame: captured, eased, left free, and how many end inside the posts. None may at Off; Low, Medium and High must
+  put at least 35%, 55% and 75% of them inside (exit code 3 otherwise). `--probe aim --record sessions` writes the file
+  again from session folders: each shot is kept while its round still plays as it was recorded.
+- Scripted finesse shots at either post are on target within 10 points of each other, the weak-foot post the lower one
+  (measured 2026-11-24, 1,000 rounds a post: 95 and 88% from the penalty spot, 80 and 73% from the edge of the box; before
+  the curl-in foot and the launch solve, 99 and 1%).
 - Every number is in the `shot` section of `data/tuning/default.json`.

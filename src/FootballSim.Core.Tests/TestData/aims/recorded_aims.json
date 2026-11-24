@@ -1,0 +1,287 @@
+{
+  "note": "Struck shots from play-test sessions, recorded 2026-11-24: 106 rounds in the session logs, 99 with a replay file, 35 of their 83 shots still struck as recorded (same tick, type and charge) when replayed.",
+  "goal_line_x": 30,
+  "goal_half_width": 3.66,
+  "aims": [
+    {
+      "session": "20261118-090034",
+      "round": "round-004-penalty-time_up",
+      "type": "power",
+      "ball_x": 19.285,
+      "ball_z": 3.86,
+      "stick_deg": 66.23
+    },
+    {
+      "session": "20261118-090034",
+      "round": "round-004-penalty-time_up",
+      "type": "finesse",
+      "ball_x": 21.254,
+      "ball_z": 3.722,
+      "stick_deg": 48.33
+    },
+    {
+      "session": "20261118-124736",
+      "round": "round-007-halfway_run-held",
+      "type": "power",
+      "ball_x": 19,
+      "ball_z": 0,
+      "stick_deg": 0
+    },
+    {
+      "session": "20261119-093448",
+      "round": "round-003-penalty-held",
+      "type": "power",
+      "ball_x": 20.285,
+      "ball_z": 0.875,
+      "stick_deg": 21.29
+    },
+    {
+      "session": "20261119-144024",
+      "round": "round-004-penalty-held",
+      "type": "chip",
+      "ball_x": 21.594,
+      "ball_z": 0.1,
+      "stick_deg": 0
+    },
+    {
+      "session": "20261119-151333",
+      "round": "round-003-penalty-held",
+      "type": "power",
+      "ball_x": 19,
+      "ball_z": 0,
+      "stick_deg": 0
+    },
+    {
+      "session": "20261119-151333",
+      "round": "round-005-penalty-goal",
+      "type": "power",
+      "ball_x": 22.924,
+      "ball_z": 0.007,
+      "stick_deg": 0
+    },
+    {
+      "session": "20261120-105945",
+      "round": "round-001-penalty-goal",
+      "type": "power",
+      "ball_x": 27.055,
+      "ball_z": -2.145,
+      "stick_deg": 2.18
+    },
+    {
+      "session": "20261120-112450",
+      "round": "round-004-penalty-time_up",
+      "type": "power",
+      "ball_x": 22.594,
+      "ball_z": 1.167,
+      "stick_deg": 25.36
+    },
+    {
+      "session": "20261120-161056",
+      "round": "round-005-penalty-goal",
+      "type": "finesse",
+      "ball_x": 19.147,
+      "ball_z": -0.408,
+      "stick_deg": -20.28
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-003-penalty-held",
+      "type": "finesse",
+      "ball_x": 19.465,
+      "ball_z": -0.229,
+      "stick_deg": -10.92
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-004-penalty-goal",
+      "type": "low_finesse",
+      "ball_x": 19.588,
+      "ball_z": -0.015,
+      "stick_deg": 13.72
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-005-penalty-goal",
+      "type": "low_finesse",
+      "ball_x": 19.136,
+      "ball_z": -0.34,
+      "stick_deg": -7.07
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-006-penalty-held",
+      "type": "finesse",
+      "ball_x": 19.062,
+      "ball_z": -0.353,
+      "stick_deg": -6.85
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-007-penalty-goal",
+      "type": "finesse",
+      "ball_x": 21.501,
+      "ball_z": -0.846,
+      "stick_deg": -13.01
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-008-penalty-goal",
+      "type": "power",
+      "ball_x": 19.881,
+      "ball_z": -0.009,
+      "stick_deg": 13.51
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-009-penalty-goal",
+      "type": "finesse",
+      "ball_x": 19.675,
+      "ball_z": -0.238,
+      "stick_deg": -11.03
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-012-two_v_one-goal",
+      "type": "power",
+      "ball_x": 22.961,
+      "ball_z": -5.834,
+      "stick_deg": 38.38
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-014-two_v_one-goal",
+      "type": "power",
+      "ball_x": 25.701,
+      "ball_z": 3.96,
+      "stick_deg": -27.35
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-017-two_v_one-goal",
+      "type": "power",
+      "ball_x": 23.923,
+      "ball_z": -7.788,
+      "stick_deg": 35.16
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-018-two_v_one-goal",
+      "type": "power",
+      "ball_x": 18.052,
+      "ball_z": 7.642,
+      "stick_deg": -7.07
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-019-two_v_one-goal",
+      "type": "power",
+      "ball_x": 18.47,
+      "ball_z": -2.659,
+      "stick_deg": 25.67
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-027-two_v_one-goal",
+      "type": "power",
+      "ball_x": 28.745,
+      "ball_z": -2.887,
+      "stick_deg": 20.59
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-029-two_v_one-goal",
+      "type": "power",
+      "ball_x": 27.462,
+      "ball_z": -3.985,
+      "stick_deg": 38.04
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-030-two_v_one-goal",
+      "type": "power",
+      "ball_x": 28.254,
+      "ball_z": -7.052,
+      "stick_deg": 48.37
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-031-two_v_one-dispossessed",
+      "type": "power",
+      "ball_x": 26.006,
+      "ball_z": -6.685,
+      "stick_deg": 31.55
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-032-two_v_one-goal",
+      "type": "power",
+      "ball_x": 18.27,
+      "ball_z": -4.026,
+      "stick_deg": 42.97
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-039-two_v_one-goal",
+      "type": "power",
+      "ball_x": 24.949,
+      "ball_z": -1.144,
+      "stick_deg": 4.08
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-040-two_v_one-goal",
+      "type": "power",
+      "ball_x": 19.463,
+      "ball_z": 2.594,
+      "stick_deg": 5.49
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-041-two_v_one-offside",
+      "type": "power",
+      "ball_x": 20.846,
+      "ball_z": -0.557,
+      "stick_deg": 22.63
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-044-two_v_one-dispossessed",
+      "type": "power",
+      "ball_x": 15.749,
+      "ball_z": -3.702,
+      "stick_deg": 23.49
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-045-two_v_one-goal",
+      "type": "power",
+      "ball_x": 16.619,
+      "ball_z": -4.84,
+      "stick_deg": 24.44
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-047-two_v_one-dispossessed",
+      "type": "power",
+      "ball_x": 14.043,
+      "ball_z": -3.914,
+      "stick_deg": 30.32
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-049-two_v_one-goal",
+      "type": "power",
+      "ball_x": 22.341,
+      "ball_z": 9.145,
+      "stick_deg": 18.54
+    },
+    {
+      "session": "20261124-002355",
+      "round": "round-050-two_v_one-dispossessed",
+      "type": "power",
+      "ball_x": 26.333,
+      "ball_z": -0.282,
+      "stick_deg": 11.16
+    }
+  ]
+}

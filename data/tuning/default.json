@@ -1,7 +1,6 @@
 {
   "tick_rate": 120,
   "error_scale": 1,
-  "aim_assist": 0.3,
   "ball": {
     "mass": 0.45,
     "radius": 0.115,
@@ -419,8 +418,22 @@
     "chip_backspin_min_rev": 4,
     "chip_backspin_max_rev": 6,
     "max_target_z": 8,
-    "assist_range": 1.5,
-    "assist_inset": 0.6,
+    "aim_assist": {
+      "inset_m": 1,
+      "low": {
+        "capture_deg": 8,
+        "release_deg": 20
+      },
+      "medium": {
+        "capture_deg": 15,
+        "release_deg": 35
+      },
+      "high": {
+        "capture_deg": 30,
+        "release_deg": 60
+      }
+    },
+    "curl_in_centre_m": 0.5,
     "strike_reach_margin": 0.2,
     "strike_max_height": 0.6,
     "foot_by_side_deg": 150,
