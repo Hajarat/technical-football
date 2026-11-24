@@ -56,28 +56,28 @@ public class RoundMeasureTests
         return new Observed(w.Report!, ticks);
     }
 
-    static World NewWorld(string scenario, ulong seed, string? attacker = null)
+    static World NewWorld(string scenario, ulong seed, string? attacker = null, Tuning? t = null)
     {
         var sc = TestData.Scenario(scenario);
-        return new World(T, sc, TestData.Player(attacker ?? sc.DefaultAttacker), TestData.Player(sc.DefaultKeeper), seed,
+        return new World(t ?? T, sc, TestData.Player(attacker ?? sc.DefaultAttacker), TestData.Player(sc.DefaultKeeper), seed,
             sc.Defenders > 0 ? TestData.Player(sc.DefaultDefender) : null, sc.Mate != null ? TestData.Player(sc.DefaultMate) : null);
     }
 
-    static Observed Scripted(string scenario, ulong seed, ScriptedAttacker? script = null)
+    static Observed Scripted(string scenario, ulong seed, ScriptedAttacker? script = null, Tuning? t = null)
     {
-        var w = NewWorld(scenario, seed);
+        var w = NewWorld(scenario, seed, t: t);
         script ??= new ScriptedAttacker();
         w.Begin();
         return Run(w, script.Next);
     }
 
     /// <summary>The first scripted round over the seeds that matches, or fails the test.</summary>
-    static (Observed Round, ulong Seed) Find(string[] scenarios, int seeds, Func<Observed, bool> match, Func<ScriptedAttacker>? script = null)
+    static (Observed Round, ulong Seed) Find(string[] scenarios, int seeds, Func<Observed, bool> match, Func<ScriptedAttacker>? script = null, Tuning? t = null)
     {
         for (ulong seed = 1; seed <= (ulong)seeds; seed++)
             foreach (var sc in scenarios)
             {
-                var o = Scripted(sc, seed, script?.Invoke());
+                var o = Scripted(sc, seed, script?.Invoke(), t);
                 if (match(o)) return (o, seed);
             }
         Assert.Fail($"no round over {seeds} seeds of {string.Join(", ", scenarios)} shows it");
@@ -253,7 +253,8 @@ public class RoundMeasureTests
     public void TheKeepersRecoveryRunsFromTakenRoundToBackOnTheLine()
     {
         var goal = new Vector2(30f, 0f);
-        var (o, _) = Find(new[] { "breakaway", "halfway_run", "keeper_rush" }, 300, o => o.Ticks.Any(s => s.Rounded));
+        // (the scripted attacker takes round only a keeper who charges at him: the legacy keeper)
+        var (o, _) = Find(new[] { "breakaway", "halfway_run", "keeper_rush" }, 300, o => o.Ticks.Any(s => s.Rounded), t: new Tuning { Sheets = TestData.Sheets, Keeper = { Brain = "legacy" } });
         int rounded = o.Ticks.First(s => s.Rounded).Tick;
         var back = o.Ticks.FirstOrDefault(s => s.Tick > rounded && s.After is RoundState.Live or RoundState.Strike or RoundState.Flight
             && World.BackOnLine(s.Keeper, s.Ball, goal));

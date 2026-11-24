@@ -469,13 +469,30 @@ static class HumanProbe
         return 0;
     }
 
-    /// <summary>Checks the --brain option: null when it is fine (legacy, or none), else the exit code (contain is not built yet).</summary>
+    /// <summary>The tuning keys (section.key) that --brain legacy sets to "legacy".</summary>
+    static readonly string[] BrainKeys = { "keeper.brain" };
+
+    /// <summary>Checks the --brain option: null when it is fine (legacy, contain, or none), else the exit code.</summary>
     public static int? CheckBrain(Dictionary<string, string> opts)
     {
-        if (!opts.TryGetValue("brain", out var b) || b == "legacy") return null;
-        if (b == "contain") { Console.Error.WriteLine("--brain contain: the containing defender and the home-first keeper are not built yet; only --brain legacy exists"); return 2; }
-        Console.Error.WriteLine($"--brain: unknown brain '{b}' (known: legacy; contain is not built yet)");
+        if (!opts.TryGetValue("brain", out var b) || b is "legacy" or "contain") return null;
+        Console.Error.WriteLine($"--brain: unknown brain '{b}' (known: contain, legacy)");
         return 2;
+    }
+
+    /// <summary>--brain legacy: the tuning with every brain key set to "legacy"; otherwise the tuning as it is.</summary>
+    public static Tuning ApplyBrain(Dictionary<string, string> opts, Tuning tuning)
+    {
+        if (!opts.TryGetValue("brain", out var b) || b != "legacy") return tuning;
+        var node = System.Text.Json.Nodes.JsonNode.Parse(DataLoader.TuningToJson(tuning))!;
+        foreach (var key in BrainKeys)
+        {
+            var path = key.Split('.');
+            node[path[0]]![path[1]] = "legacy";
+        }
+        var t = DataLoader.ParseTuning(node.ToJsonString(), "--brain legacy").Value!;
+        t.Sheets = tuning.Sheets;
+        return t;
     }
 
     public static int Run(Dictionary<string, string> opts, string dataDir, Tuning tuning)
@@ -501,7 +518,7 @@ static class HumanProbe
         var sheets = new Dictionary<string, PlayerSheet>();
         foreach (var (name, id) in Attackers) if (P(id) is { } s) sheets[name] = s; else return 1;
 
-        Console.WriteLine($"human probe: n={n} seed={seed} brain=legacy (today's defender bot and keeper){(comparison ? ", a comparison run: marks printed, exit 0" : "")}");
+        Console.WriteLine($"human probe: n={n} seed={seed} brain={(comparison ? "legacy" : "as loaded")} (keeper.brain={tuning.Keeper.Brain}){(comparison ? ", a comparison run: marks printed, exit 0" : "")}");
         Console.WriteLine($"attackers: even={Attackers[0].Sheet} fast={Attackers[1].Sheet}; first attacks only; past = the ball {World.PastMarginM.ToString("F1", Ic)} m nearer the goal centre than the defender, " +
                           $"the attackers still on it {World.PastHoldS.ToString("F1", Ic)} s later");
         Console.WriteLine("scenario       plan         attacker      n   goal   miss   held   disp   foul   offs   time  |   past  fa_goals");

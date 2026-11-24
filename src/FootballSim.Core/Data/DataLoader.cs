@@ -313,6 +313,7 @@ public static class DataLoader
             if (t.Touch == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: touch: must be an object (default tuning in use)" };
             if (t.Skill == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: skill: must be an object (default tuning in use)" };
             if (t.Keeper == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: keeper: must be an object (default tuning in use)" };
+            if (t.Keeper.Brain is not ("home" or "legacy")) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: keeper.brain: must be home or legacy (default tuning in use)" };
             if (t.Shot == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: shot: must be an object (default tuning in use)" };
             if (t.Defender == null) return new LoadResult<Tuning> { Value = new Tuning(), Error = $"{fileLabel}: defender: must be an object (default tuning in use)" };
             if (t.Defending?.Auto == null || t.Defending.Stand == null || t.Defending.Slide == null || t.Defending.Barge == null || t.Defending.Block == null)
@@ -336,7 +337,7 @@ public static class DataLoader
                 ("keeper.counter_momentum_penalty", t.Keeper?.CounterMomentumPenalty),
                 ("keeper.catch_range_standing_min", t.Keeper?.CatchRangeStandingMin), ("keeper.catch_range_standing_max", t.Keeper?.CatchRangeStandingMax),
                 ("keeper.catch_range_diving_min", t.Keeper?.CatchRangeDivingMin), ("keeper.catch_range_diving_max", t.Keeper?.CatchRangeDivingMax),
-                ("keeper.catch_range_time", t.Keeper?.CatchRangeTime),
+                ("keeper.catch_range_time", t.Keeper?.CatchRangeTime), ("keeper.home_depth_m", t.Keeper?.HomeDepthM),
                 ("shot.first_time_error", t.Shot?.FirstTimeError),
                 ("lock_on.reaction_ratio", t.LockOn?.ReactionRatio), ("pass.execution_seconds", t.Pass?.ExecutionSeconds), ("pass.angle_extra_seconds", t.Pass?.AngleExtraSeconds),
                 ("receive.error", t.Receive?.Error), ("receive.cooldown", t.Receive?.Cooldown),

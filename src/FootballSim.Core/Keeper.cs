@@ -229,6 +229,24 @@ public static partial class Keeper
         return arcDistance + extra * t.Keeper.CloseDownPositioning.ForRating(s.Positioning);
     }
 
+    /// <summary>
+    /// How far out from the goal mouth the home keeper wants to be closing down an attacker on the ball
+    /// <paramref name="ballMouthDistance"/> metres from the mouth: the arc distance plus <c>home_depth_m</c>'s excess over it,
+    /// scaled by <c>close_down_positioning</c>.
+    /// </summary>
+    public static float HomeDistance(PlayerSheet s, Tuning t, float ballMouthDistance, float arcDistance)
+    {
+        float extra = MathF.Max(0f, t.Keeper.HomeDepthM.Evaluate(ballMouthDistance) - arcDistance);
+        return arcDistance + extra * t.Keeper.CloseDownPositioning.ForRating(s.Positioning);
+    }
+
+    /// <summary>The home keeper's side-step pace while mirroring the carrier, m/s (positioning).</summary>
+    public static float MirrorSpeed(PlayerSheet s, Tuning t) => t.Keeper.MirrorSpeed.ForRating(s.Positioning);
+    /// <summary>How far beyond his hull he pounces on a ball, metres (diving).</summary>
+    public static float PounceReach(PlayerSheet s, Tuning t) => t.Keeper.PounceReachM.ForRating(s.Diving);
+    /// <summary>How much sooner than the attacker's next touch his hands must get to a ball he pounces on, seconds (reflexes).</summary>
+    public static float PounceMargin(PlayerSheet s, Tuning t) => t.Keeper.PounceMarginS.ForRating(s.Reflexes);
+
     /// <summary>Backpedalling speed, m/s (positioning).</summary>
     public static float BackpedalSpeed(PlayerSheet s, Tuning t) => t.Keeper.BackpedalSpeed.ForRating(s.Positioning);
 

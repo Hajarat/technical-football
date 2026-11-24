@@ -50,7 +50,8 @@ using FootballSim.Core;
 //   ... --defence-report <session dir|replay> [--any-tuning 1]
 //                                               recorded rounds from their saved reports and replays: goals per round and per first
 //                                               attack, past the defender, the keeper at each goal's strike
-//   ... --brain legacy                         today's defender bot and keeper (the only brain yet; contain exits 2)
+//   ... --brain legacy                         every brain key (keeper.brain) set to legacy: the keeper as before the home keeper;
+//                                               --brain contain (or none) runs the tuning as loaded
 //   ... --lock-probe [--seeds 1000] [--only behind,still_shot,first_time,flick,gesture,race,slide]
 //                                               scripted loose-ball rounds, one case per lock-on rule, with their targets
 //   ... --lock-probe --trace <case> [--seed 1]  prints one round of a case: the claim, the legs and the events
@@ -103,8 +104,9 @@ static class Cli
             tuning = again.Value!;
         }
 
-        // --brain: only legacy (today's defender bot and keeper) exists yet; it changes nothing.
+        // --brain legacy: every brain key set to legacy; contain (or none): the tuning as loaded.
         if (HumanProbe.CheckBrain(opts) is int badBrain) return badBrain;
+        tuning = HumanProbe.ApplyBrain(opts, tuning);
 
         if (opts.TryGetValue("replay", out var replayPath)) return RunReplay(replayPath, dataDir, tuning);
         if (opts.TryGetValue("defence-report", out var defencePath)) return DefenceReport.Run(defencePath, dataDir, tuning,

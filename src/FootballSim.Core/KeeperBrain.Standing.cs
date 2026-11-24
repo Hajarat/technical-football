@@ -54,6 +54,8 @@ public sealed partial class KeeperBrain
 
         if (!holdLine && !s.ShotInFlight && !s.BallDead)
         {
+            // The home keeper, set on the carrier, pounces on a ball pushed off his foot within his reach.
+            if (HomeBrain && _set && TryPounce(ball, s, rng, out var pounceAt)) { StartPounce(pounceAt); Think(KeeperMode.Pounce); return; }
             var race = Race(ball, s, rng);
             var play = AreaPlayFor(race);
             // A defender covers the ball: the keeper leaves it to him and holds his arc. Only a ball within a dive is still his.
@@ -63,6 +65,7 @@ public sealed partial class KeeperBrain
                 race = race with { Win = false, Anticipate = false };
                 _tRaceBlock = "defender covers";
             }
+            if (play != AreaPlay.None || race.Win || race.Anticipate) { _set = false; _settled = false; }
             switch (play)
             {
                 case AreaPlay.Smother:
@@ -106,6 +109,8 @@ public sealed partial class KeeperBrain
         bool inFront = Keeper.MouthDistance(ball2, _pitch) > Keeper.MouthDistance(feet, _pitch) + 0.3f;
         bool close = !holdLine && inFront && toBall < k.PreSpreadRange;
         bool inRange = Vector2.Distance(ball2, goal) <= k.SetRange;
+        // The home keeper taken round runs back to his line, through a wind-up too.
+        if (HomeBrain && !holdLine && !s.BallDead && !s.ShotInFlight && StepRecover(dt, ball2)) { Think(KeeperMode.Recover); return; }
         // He plants for the strike: in its last plant_lead, or earlier if he needs longer than that to brake to a stop.
         float brake = new Vector2(_k.Velocity.X, _k.Velocity.Z).Length() / k.PlantDecel + 0.05f;
         bool blocking = _charging && s.Windup && BlockReach(toBall, ball2, feet, s) <= k.ChargeBlockDistance;
@@ -117,6 +122,13 @@ public sealed partial class KeeperBrain
             _shuffling = false;
             SetAction(close ? KeeperAction.Spread : KeeperAction.Planted);
             Think(KeeperMode.Plant);
+            return;
+        }
+
+        // The home keeper sets on a carrier closing on him, then mirrors him.
+        if (HomeBrain && !holdLine && !s.BallDead && !s.ShotInFlight && SetOn(s, ball2, feet, toBall, inFront))
+        {
+            Think(StepSet(dt, ball2, feet, toBall));
             return;
         }
 
@@ -152,6 +164,7 @@ public sealed partial class KeeperBrain
         // rather than dropping back to his arc only to come out again a moment later.
         else if (!holdLine && !s.BallDead && !s.ShotInFlight && s.AttackerHasBall && inFront) ideal = CloseDownSpot(look, ideal, rng, advance: false);
         if (!holdLine && s.AttackerHasBall && !s.BallDead) ideal = Committed(ideal);
+        if (HomeBrain && !holdLine) ideal = CapHome(ideal, look);
         if (!_hasSpot || Vector3.Distance(ideal, _spotIdeal) > k.RepositionThreshold) TakeSpot(ideal, look, holdLine, rng);
         float dist = new Vector2(_spot.X - _k.Position.X, _spot.Z - _k.Position.Z).Length();
         // Getting back goal-side (recovering after being drawn out or rounded) close to goal is a run, not a jog.
@@ -201,8 +214,11 @@ public sealed partial class KeeperBrain
         var b = new Vector2(look.X, look.Z);
         float bMouth = Keeper.MouthDistance(b, _pitch);
         float arcD = Keeper.MouthDistance(new Vector2(arc.X, arc.Z), _pitch);
-        float want = advance ? Keeper.CloseDownDistance(_k.Sheet, _t, bMouth, arcD) : arcD;
-        float chipCap = MathF.Min(ChipSafeJudged(Vector2.Distance(b, new Vector2(_pitch.GoalLineX, 0f)), rng), k.HoldGroundMaxOut);
+        bool home = HomeBrain;
+        float want = !advance ? arcD : home ? Keeper.HomeDistance(_k.Sheet, _t, bMouth, arcD) : Keeper.CloseDownDistance(_k.Sheet, _t, bMouth, arcD);
+        // (the home keeper's limit is his home depth; the legacy keeper's hold_ground_max_out)
+        float outCap = home ? HomeCap(bMouth) : k.HoldGroundMaxOut;
+        float chipCap = MathF.Min(ChipSafeJudged(Vector2.Distance(b, new Vector2(_pitch.GoalLineX, 0f)), rng), outCap);
         float mine = Keeper.MouthDistance(new Vector2(_k.Position.X, _k.Position.Z), _pitch);
         float cap = MathF.Min(chipCap, bMouth - k.CloseDownGap);
         float lo = MathF.Max(arcD, MathF.Min(want, cap));
@@ -214,7 +230,7 @@ public sealed partial class KeeperBrain
             : got > lo + 1e-3f ? KeeperLimit.Kept
             : want <= cap ? KeeperLimit.Want
             : bMouth - k.CloseDownGap < chipCap ? KeeperLimit.Gap
-            : chipCap >= k.HoldGroundMaxOut - 1e-3f ? KeeperLimit.HoldCap : KeeperLimit.ChipCap;
+            : chipCap >= outCap - 1e-3f ? (home ? KeeperLimit.HomeCap : KeeperLimit.HoldCap) : KeeperLimit.ChipCap;
         return Keeper.CoverSpot(look, _pitch, _t, Math.Clamp(mine, lo, hi), halfWay: false);
     }
 
@@ -233,6 +249,8 @@ public sealed partial class KeeperBrain
     bool ChargeDecision(Ball ball, in KeeperSituation s, float toBall, Vector2 feet, SimRng rng)
     {
         var k = _t.Keeper;
+        // The home keeper weighs no charge: only an attacker on the ball within engage_range of him.
+        if (HomeBrain) return toBall <= k.EngageRange;
         var b = new Vector2(ball.Position.X, ball.Position.Z);
         float bd = Vector2.Distance(b, new Vector2(_pitch.GoalLineX, 0f));
         float range = k.ChargeRange + (_charging ? 2f : 0f);
@@ -254,7 +272,7 @@ public sealed partial class KeeperBrain
         if (excess > k.ChargeChipAllowance.ForRating(_k.Sheet.RushingOut) + (_charging ? k.ChargeChipHysteresis : 0f)) return false;
         // Just outside the range, a charge he would make soon keeps him where he is rather than giving ground first.
         if (bd > range) { _chargeSoon = tClose <= tol; return false; }
-        if (toBall <= k.EngageRange) return true;
+        if (toBall <= k.LegacyEngageRange) return true;
         return _charging ? tClose <= tol * k.ChargeDropFactor + 0.25f : tClose <= tol;
     }
 
@@ -272,7 +290,10 @@ public sealed partial class KeeperBrain
         float bMouth = Keeper.MouthDistance(lb, _pitch);
         var arc = Keeper.ArcTarget(look, _pitch, _t, _k.Sheet);
         float arcD = Keeper.MouthDistance(new Vector2(arc.X, arc.Z), _pitch);
-        float to = MathF.Max(arcD, MathF.Min(bMouth - k.JockeyDistance, ChargeMaxOut));
+        // (the home keeper comes no closer than set_gap_m to the ball and stays inside his home depth)
+        bool home = HomeBrain;
+        float gap = home ? k.SetGapM : k.JockeyDistance;
+        float to = MathF.Max(arcD, MathF.Min(MathF.Min(bMouth - gap, ChargeMaxOut), home ? HomeCap(bMouth) : float.PositiveInfinity));
         var target = Keeper.CoverSpot(look, _pitch, _t, to, halfWay: false);
         var pos = new Vector2(_k.Position.X, _k.Position.Z);
         var d = Keeper.CapTarget(pos, new Vector2(target.X, target.Z), k.MoveTargetCap) - pos;
@@ -291,7 +312,7 @@ public sealed partial class KeeperBrain
         _hasSpot = false;
         _shuffling = false;
         if (!_struck) { _roundCharged = true; Report.Charged = true; }
-        SetAction(toBall > k.JockeyDistance + 1f ? KeeperAction.Charge : KeeperAction.Jockey);
+        SetAction(toBall > gap + 1f ? KeeperAction.Charge : KeeperAction.Jockey);
     }
 
     /// <summary>
@@ -390,6 +411,7 @@ public sealed partial class KeeperBrain
         var lateral = new Vector2(-cover.Y, cover.X);
         var p = new Vector2(ideal.X, ideal.Z) + lateral * across + cover * along;
         if (!holdLine) p.X = MathF.Min(p.X, _pitch.GoalLineX - k.ArcMinFromLine);
+        if (!holdLine && HomeBrain) p.X = CapHome(new Vector3(p.X, 0f, p.Y), ball).X;
         float lim = _pitch.GoalHalfWidth + 1f;
         p.Y = Math.Clamp(p.Y, -lim, lim);
         _spot = new Vector3(p.X, 0f, p.Y);

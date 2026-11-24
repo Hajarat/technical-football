@@ -147,6 +147,8 @@ public sealed partial class KeeperBrain
             Smothered = _roundSmother,
             Slid = _roundSlid,
             WonBall = _roundWon,
+            Pounced = _roundPounced,
+            PounceWon = _roundPounceWon,
             Rounded = _roundRounded,
             DepthAtBandM = (float[])_bandDepth.Clone(),
             DepthReversals = _reversals,
@@ -592,6 +594,7 @@ public sealed partial class KeeperBrain
         bool back = _fromBackpedal && _phase == Phase.Diving;
         float difficulty = _phase == Phase.Diving && !early ? _difficulty : 0f;
         if (!_struck) { _roundWon = true; Report.WonBall = true; }
+        if (smother && _pounce && !_struck) { _roundPounceWon = true; Report.PounceWon = true; }
         bool held;
         if (smother) held = speedAtContact < k.SmotherHoldSpeed;
         else if (body) held = speedAtContact < k.BodyHoldSpeed;

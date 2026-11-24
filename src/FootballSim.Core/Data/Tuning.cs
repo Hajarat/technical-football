@@ -989,6 +989,13 @@ public sealed class ShotTuning
 /// <summary>Keeper model constants.</summary>
 public sealed class KeeperTuning
 {
+    /// <summary>
+    /// Which keeper plays: "home" (he stays inside his home depth, sets before the carrier is close, mirrors him and pounces on a
+    /// ball pushed off his foot: <see cref="HomeDepthM"/> to <see cref="RecoverDepthM"/>) or "legacy" (the keeper before it:
+    /// closing down to <see cref="CloseDownDepth"/> and <see cref="HoldGroundMaxOut"/>, charging and jockeying from
+    /// <see cref="LegacyEngageRange"/>). Allowed: home | legacy.
+    /// </summary>
+    public string Brain { get; set; } = "home";
     public RatingRange Reaction { get; set; } = new(0.34f, 0.145f);
     public float ReactionNoise { get; set; } = 0.02f;
     /// <summary>Reaction noise is clamped to this many standard deviations, so the reaction time has hard bounds.</summary>
@@ -1096,7 +1103,7 @@ public sealed class KeeperTuning
     public RatingRange RushMarginRating { get; set; } = new(3.5f, 2.5f);
     /// <summary>Each movement decision moves toward a point at most this far away, metres (3.5, from reference data).</summary>
     public float MoveTargetCap { get; set; } = 3.5f;
-    /// <summary>Closing down never takes him (or holds him) further than this from the goal mouth, metres.</summary>
+    /// <summary>Closing down never takes the legacy keeper (or holds him) further than this from the goal mouth, metres.</summary>
     public float HoldGroundMaxOut { get; set; } = 8.5f;
     /// <summary>Seconds of slack in a rush race inside which he starts toward the ball before he is sure (anticipation), by rushing_out.</summary>
     public RatingRange RushAnticipation { get; set; } = new(0.0f, 0.25f);
@@ -1105,11 +1112,12 @@ public sealed class KeeperTuning
 
     // ---- closing down ----
     /// <summary>
-    /// Closing down: how far out from the goal mouth he comes, metres, by the ball's distance from the mouth, once an attacker
-    /// comes in with the ball (scaled by <see cref="CloseDownPositioning"/>; never shallower than his arc).
+    /// Closing down (the legacy keeper): how far out from the goal mouth he comes, metres, by the ball's distance from the mouth,
+    /// once an attacker comes in with the ball (scaled by <see cref="CloseDownPositioning"/>; never shallower than his arc). The
+    /// home keeper reads <see cref="HomeDepthM"/> instead.
     /// </summary>
     public Curve CloseDownDepth { get; set; } = new((8f, 5.0f), (12f, 4.6f), (16f, 3.6f), (20f, 2.6f), (25f, 1.7f), (30f, 1.2f));
-    /// <summary>Multiplier on <see cref="CloseDownDepth"/> beyond the arc by positioning: a poorly positioned keeper comes out less.</summary>
+    /// <summary>Multiplier on <see cref="CloseDownDepth"/> (or <see cref="HomeDepthM"/>) beyond the arc by positioning: a poorly positioned keeper comes out less.</summary>
     public RatingRange CloseDownPositioning { get; set; } = new(0.6f, 1.0f);
     /// <summary>He starts closing down once the ball is within this distance of the goal mouth...</summary>
     public float CloseDownRange { get; set; } = 30f;
@@ -1144,10 +1152,55 @@ public sealed class KeeperTuning
     /// <summary>Within this distance of an attacker on the ball that he cannot beat to it, he stops and spreads (makes himself big), metres.</summary>
     public float PreSpreadRange { get; set; } = 3.5f;
     /// <summary>
-    /// Closing down an attacker on the ball who is within this distance of him and in front, he always charges him (to
-    /// <see cref="JockeyDistance"/>) instead of keeping <see cref="CloseDownGap"/>, metres.
+    /// The home keeper's charge: only with an attacker on the ball in front of him within this distance, and then to
+    /// <see cref="SetGapM"/> from the ball rather than <see cref="JockeyDistance"/>, metres (range 3.5-6).
     /// </summary>
-    public float EngageRange { get; set; } = 8.5f;
+    public float EngageRange { get; set; } = 4.5f;
+    /// <summary>
+    /// The legacy keeper: closing down an attacker on the ball who is within this distance of him and in front, he always charges
+    /// him (to <see cref="JockeyDistance"/>) instead of keeping <see cref="CloseDownGap"/>, metres.
+    /// </summary>
+    public float LegacyEngageRange { get; set; } = 8.5f;
+
+    // ---- staying home (brain home) ----
+    /// <summary>
+    /// The most the home keeper stands off his line, metres, by the ball's distance from the goal mouth: the limit on closing
+    /// down (scaled by <see cref="CloseDownPositioning"/> beyond the arc as what he wants; never below his arc). A rush race he
+    /// wins may take him further. Range: the first two points 4-7, the rest fixed.
+    /// </summary>
+    public Curve HomeDepthM { get; set; } = new((8f, 6.0f), (12f, 5.0f), (16f, 3.6f), (20f, 2.6f), (25f, 1.7f), (30f, 1.2f));
+    /// <summary>
+    /// With the attacker on the ball in front of him and closing, he sets (brakes at <see cref="PlantDecel"/> to under
+    /// <see cref="SetSpeed"/> and holds his stance) once the ball is within this distance plus the gap that closes while he brakes,
+    /// metres (range 4-7)...
+    /// </summary>
+    public float SetGapM { get; set; } = 6.0f;
+    /// <summary>...so that he is under this speed before the ball is that close, m/s (range 0.5-1.5).</summary>
+    public float SetSpeed { get; set; } = 0.5f;
+    /// <summary>Set, he side-steps onto the ball's line to goal at up to this pace, m/s, by positioning (range 3.0-4.0 at 1, 5.0-6.0 at 99).</summary>
+    public RatingRange MirrorSpeed { get; set; } = new(3.5f, 5.5f);
+    /// <summary>
+    /// Set, he gives ground (at up to <see cref="BackpedalSpeed"/>) so as to stay this much nearer the goal centre than the ball,
+    /// once the ball comes that close to level with him, metres (range 0.5-2).
+    /// </summary>
+    public float MirrorLeadM { get; set; } = 1.75f;
+    /// <summary>
+    /// Set, he pounces (a smother) on a low ball in his penalty area that comes within this distance of his hull (<see cref="HullRadius"/>),
+    /// metres, by diving (range 1.2-2.0 at 1, 2.0-2.8 at 99)...
+    /// </summary>
+    public RatingRange PounceReachM { get; set; } = new(2.0f, 2.8f);
+    /// <summary>
+    /// ...when his hands get to it at least this much sooner than the attacker's next touch (judged with
+    /// <see cref="RushMisjudge"/>), seconds, by reflexes (range 0.06-0.24 at 1, 0.01-0.04 at 99).
+    /// </summary>
+    public RatingRange PounceMarginS { get; set; } = new(0.12f, 0.02f);
+    /// <summary>
+    /// With the ball nearer his goal line than he is by more than this (taken round) and no save under way, he runs back at
+    /// <see cref="RushSpeed"/>, metres (range 0.3-1)...
+    /// </summary>
+    public float RoundedMarginM { get; set; } = 0.5f;
+    /// <summary>...to the point this far off his line on the line from the ball to the goal centre, metres (range 0.6-2).</summary>
+    public float RecoverDepthM { get; set; } = 1.0f;
 
     // ---- charging and jockeying ----
     /// <summary>
