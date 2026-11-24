@@ -103,6 +103,23 @@ static class DribbleProbe
         public int AlignMissed;
         public float MinSpeedPct = float.PositiveInfinity;
         public readonly SpeedSteps Steps = new();
+
+        /// <summary>Adds one run's metrics, as if that run had been gathered here after the runs already in.</summary>
+        public void Add(Stats o)
+        {
+            TurnMiss.AddRange(o.TurnMiss);
+            Runs += o.Runs; Kept += o.Kept;
+            TouchesPerSecond += o.TouchesPerSecond;
+            Ahead.AddRange(o.Ahead); Miss.AddRange(o.Miss);
+            Left += o.Left; Right += o.Right; NotInSwing += o.NotInSwing;
+            MaxSteer = MathF.Max(MaxSteer, o.MaxSteer);
+            foreach (var (k, c) in o.Kinds) Kinds[k] = Kinds.GetValueOrDefault(k) + c;
+            Drops += o.Drops; Stretched += o.Stretched; Clamped += o.Clamped;
+            Latency.AddRange(o.Latency); Align.AddRange(o.Align);
+            AlignMissed += o.AlignMissed;
+            MinSpeedPct = MathF.Min(MinSpeedPct, o.MinSpeedPct);
+            Steps.Add(o.Steps);
+        }
     }
 
     public static int Run(Dictionary<string, string> opts, string dataDir, Tuning tuning)
@@ -163,7 +180,14 @@ static class DribbleProbe
                 var sheet = baseSheet.Clone();
                 sheet.CloseDribbling = sheet.SprintDribbling = rating;
                 var st = new Stats();
-                for (int i = 0; i < seeds; i++) RunOne(probe, tuning, sheet, keeper, seed0 + (ulong)i, i, st);
+                // The seeds in parallel (each run depends only on its seed), then gathered in seed order.
+                var runs = new Stats[seeds];
+                Parallel.For(0, seeds, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
+                {
+                    runs[i] = new Stats();
+                    RunOne(probe, tuning, sheet, keeper, seed0 + (ulong)i, i, runs[i]);
+                });
+                foreach (var run in runs) st.Add(run);
                 allKept &= st.Kept == st.Runs;
                 st.Ahead.Sort(); st.Miss.Sort(); st.TurnMiss.Sort(); st.Latency.Sort(); st.Align.Sort();
                 lat.AddRange(st.Latency); align.AddRange(st.Align); drops += st.Drops;
