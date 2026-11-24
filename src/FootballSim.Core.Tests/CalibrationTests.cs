@@ -105,8 +105,9 @@ public class CalibrationTests
 
     static (double Sd, double Mean) YawError(ShotResult[] shots)
     {
-        // Measured from the launch velocity itself, not from the recorded error.
-        var errs = shots.Select(s => (double)(MathF.Atan2(s.Launch.Z, s.Launch.X) - s.IntendedYaw) * 180.0 / Math.PI).ToArray();
+        // Measured from the launch velocity itself, not from the recorded error: its yaw off the solved launch (the intended
+        // yaw turned against the shot's own bend, see ShotModel.LaunchTurn).
+        var errs = shots.Select(s => (double)(MathF.Atan2(s.Launch.Z, s.Launch.X) - s.IntendedYaw) * 180.0 / Math.PI - s.AdjustDeg).ToArray();
         double mean = errs.Average();
         double sd = Math.Sqrt(errs.Sum(e => (e - mean) * (e - mean)) / (errs.Length - 1));
         return (sd, mean);
@@ -240,12 +241,17 @@ public class CalibrationTests
     /// halfway run measured 7.6%, most of the rest parried; its band was five points either side. With the dead-ahead swap
     /// (2026-11-22: aimed within dead_ahead_deg of his facing, a weak foot that swings at least dead_ahead_swap_s, 0.1 s,
     /// sooner takes the shot; 83% of halfway run's strikes, 0.50 s from the press again) halfway run measured 19.6%; its band
-    /// is back at 16-26. The other bands held.
+    /// is back at 16-26. The other bands held. With the launch solve (2026-11-24: every shot is turned against its own bend,
+    /// so the scripted shots stop drifting off their aim; the old aim assist is gone, which the scripted attacker never
+    /// used) the seven measured (2,000 rounds; before it in brackets) penalty 75.2 (72.4), edge of the box 9.6 (6.8), tight
+    /// angle 2.0 (2.3), breakaway 10.2 (10.2), halfway run 20.4 (19.9), angled run 32.0 (30.9) and keeper rush 38.6 (38.5).
+    /// All stayed inside their bands; tight angle sat on the edge of its 2-8, so its band is 0.5-6 around the measured value.
+    /// The real bands per shot type are set once the keeper is rebuilt.
     /// </summary>
     [Theory]
     [InlineData("penalty", 72.0, 80.0)]
     [InlineData("edge_of_box", 6.0, 14.0)]
-    [InlineData("tight_angle", 2.0, 8.0)]
+    [InlineData("tight_angle", 0.5, 6.0)]
     [InlineData("breakaway", 7.0, 17.0)]
     [InlineData("halfway_run", 16.0, 26.0)]
     [InlineData("angled_run", 27.0, 37.0)]
@@ -255,6 +261,46 @@ public class CalibrationTests
         var r = TestData.Rate(TestData.Scenario(scenario), TestData.Player("striker_a"), TestData.Player("the_wall"), N, 1);
         _out.WriteLine($"{scenario}: {Pct(r):F1}% (band {lo}-{hi})");
         Assert.InRange(Pct(r), lo, hi);
+    }
+
+    /// <summary>
+    /// A scripted finesse is as much on target at one post as at the other (on target: the shot as struck, flying free of the
+    /// keeper, goes in). Before the curl-in foot and the launch solve a right-footer's finesse was 99% on target at the +Z post
+    /// and 1% at the -Z post from the penalty spot (its bend carried the second one wide). Now each post takes the foot that
+    /// curls the ball in and the launch allows for the bend, so the two shares are within 10 points; the post his weak foot
+    /// takes (the -Z post for the right-footed striker_a) is the lower one, by his weak-foot accuracy. 1,000 rounds per post.
+    /// </summary>
+    [Theory]
+    [InlineData("penalty")]
+    [InlineData("edge_of_box")]
+    public void AScriptedFinesseIsOnTargetAtEitherPost(string scenario)
+    {
+        const int n = 1000;
+        var t = new Tuning();
+        var sc = TestData.Scenario(scenario);
+        var att = TestData.Player("striker_a"); var kee = TestData.Player("the_wall");
+        Assert.Equal(Foot.Right, att.PreferredFoot);
+        double Share(int side, out Foot foot)
+        {
+            int on = 0, shots = 0, left = 0;
+            Parallel.For(0, n, i =>
+            {
+                var w = new World(t, sc, att, kee, 500 + (ulong)i);
+                var s = RoundRunner.RunFirstShot(t, sc, att, kee, 500 + (ulong)i, new ScriptedAttacker { Type = ShotType.Finesse, Side = side, Counters = false }).Shot;
+                if (s == null) return;
+                Interlocked.Increment(ref shots);
+                if (s.Foot == Foot.Left) Interlocked.Increment(ref left);
+                if (ShotModel.FliesIn(s.Origin, s.Launch, s.Spin, w.Pitch, t)) Interlocked.Increment(ref on);
+            });
+            Assert.True(shots > n * 0.95, $"{scenario}: only {shots} of {n} rounds had a shot");
+            foot = left * 2 > shots ? Foot.Left : Foot.Right;
+            return 100.0 * on / shots;
+        }
+        double strong = Share(1, out var strongFoot), weak = Share(-1, out var weakFoot);
+        _out.WriteLine($"{scenario}: finesse on target at the +Z post {strong:F1}% ({strongFoot} foot), at the -Z post {weak:F1}% ({weakFoot} foot)");
+        Assert.Equal(Foot.Right, strongFoot);
+        Assert.Equal(Foot.Left, weakFoot);
+        Assert.InRange(strong - weak, 0.0, 10.0);
     }
 
     // ---- reported, not asserted ----

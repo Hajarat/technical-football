@@ -577,8 +577,9 @@ public class ShotFootTests
         Assert.Equal(8f, T.Shot.MaxTargetZ);
         var ball = new Vector3(P.GoalLineX - 12f, 0.11f, 0f);
         Assert.Equal(8f, ShotModel.RawTargetZ(new Vector2(1f, 1f), 0f, ball, P, T), 4);
-        Assert.Equal(6f, ShotModel.RawTargetZ(new Vector2(1f, 0.5f), 0f, ball, P, T), 4);   // beyond the assist range: left alone
-        Assert.Equal(6f, ShotModel.AssistTargetZ(6f, P, T), 4);
+        Assert.Equal(6f, ShotModel.RawTargetZ(new Vector2(1f, 0.5f), 0f, ball, P, T), 4);
+        // (26.6 degrees off the centre line, about 10 wide of the post: beyond Low's reach it is left alone, and always at Off)
+        Assert.Equal(6f, ShotModel.AimTargetZ(new Vector2(1f, 0.5f), 0f, ball, AimAssistLevel.Off, P, T), 4);
     }
 
     // ---- in the world ----

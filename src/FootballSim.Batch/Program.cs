@@ -22,6 +22,11 @@ using FootballSim.Core;
 //                                               at contact, and speed steps in possession
 //   ... --probe shot [--seeds 20] [--ratings 1,50,99]  scripted shots pressed in possession: press to strike, ball distance,
 //                                               touches after the press, strike foot and speed steps
+//   ... --probe shots --scenario <id> [--n 1000] [--type finesse] [--side 1]
+//                                               the scoring diagnostic: scripted rounds read at the strike (the foot rule, the launch
+//                                               solve's turn, where the shot crossed against where it was aimed, why wide shots were wide)
+//   ... --probe aim [--aims <file>]              the recorded aims per assistance level: captured, eased, free, inside the posts
+//   ... --probe aim --record <sessions dir>     writes the recorded aims again from session folders (see AimProbe)
 //   ... --probe feel [--seeds 20] [--ratings 1,50,99] [--replays <dir|file>]
 //                                               speed surges, acceleration, speed steps, touch cadence and heading response of dribbling
 //   ... --probe feel --rtrace <replay> [--from T --to T] [--steps-only 1]
@@ -129,11 +134,12 @@ static class Cli
             if (probe == "move-identity") return MoveIdentityProbe.Run(opts, dataDir, tuning);
             if (probe == "sessions") return SessionProbe.Run(opts, root ?? Directory.GetCurrentDirectory(), dataDir, tuning);
             if (probe == "shots") return ShotDiag.Run(opts, dataDir, tuning);
+            if (probe == "aim") return AimProbe.Run(opts, root ?? Directory.GetCurrentDirectory(), dataDir, tuning);
             if (probe == "shot") return ShotProbe.Run(opts, dataDir, tuning);
             if (probe == "defender") return DefenderProbe.Run(opts, dataDir, tuning);
             if (probe == "team") return MateProbe.RunTeam(opts, dataDir, tuning);
             if (probe == "human") return HumanProbe.Run(opts, dataDir, tuning);
-            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, move-identity, sessions, shots, shot, defender, team, human)"); return 2; }
+            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, move-identity, sessions, shots, shot, aim, defender, team, human)"); return 2; }
             return DribbleProbe.Run(opts, dataDir, tuning);
         }
 

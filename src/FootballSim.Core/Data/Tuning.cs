@@ -821,6 +821,36 @@ public sealed class ReceiveTuning
     public float QueuedCooldown { get; set; } = 0.1f;
 }
 
+/// <summary>How much help a person's aim gets when the stick points wide of the goal (see <see cref="ShotModel.AimTargetZ"/>).</summary>
+public enum AimAssistLevel { Off, Low, Medium, High }
+
+/// <summary>One assistance level's angles, measured from the ball: how far wide of a post a stick may point and still be pulled.</summary>
+public sealed class AimAssistBand
+{
+    public AimAssistBand() { }
+    public AimAssistBand(float captureDeg, float releaseDeg) { CaptureDeg = captureDeg; ReleaseDeg = releaseDeg; }
+    /// <summary>A stick up to this far wide of the nearer post is aimed at the safe point, degrees.</summary>
+    public float CaptureDeg { get; set; }
+    /// <summary>The pull fades out by this far wide of the post, degrees; from here on the stick is the aim.</summary>
+    public float ReleaseDeg { get; set; }
+}
+
+/// <summary>The aim pull: the safe point and the angles of each assistance level.</summary>
+public sealed class AimAssistTuning
+{
+    /// <summary>A captured aim goes to the point this far inside the nearer post, metres.</summary>
+    public float InsetM { get; set; } = 1.0f;
+    public AimAssistBand Low { get; set; } = new(8f, 20f);
+    public AimAssistBand Medium { get; set; } = new(15f, 35f);
+    public AimAssistBand High { get; set; } = new(30f, 60f);
+
+    /// <summary>The angles of a level; null for Off.</summary>
+    public AimAssistBand? For(AimAssistLevel level) => level switch
+    {
+        AimAssistLevel.Low => Low, AimAssistLevel.Medium => Medium, AimAssistLevel.High => High, _ => null,
+    };
+}
+
 /// <summary>Shot model constants.</summary>
 public sealed class ShotTuning
 {
@@ -944,10 +974,13 @@ public sealed class ShotTuning
 
     /// <summary>The aimed point on the goal line is clamped to this far either side of centre (wider than the frame: a wild aim misses).</summary>
     public float MaxTargetZ { get; set; } = 8f;
-    /// <summary>Aim assist applies when the raw target is outside the frame by less than this.</summary>
-    public float AssistRange { get; set; } = 1.5f;
-    /// <summary>The assist pulls toward a point this far inside the nearer post.</summary>
-    public float AssistInset { get; set; } = 0.6f;
+    /// <summary>The aim pull by assistance level (see <see cref="ShotModel.AimTargetZ"/>).</summary>
+    public AimAssistTuning AimAssist { get; set; } = new();
+    /// <summary>
+    /// A finesse or low finesse aimed within this of the goal centre, metres, is struck with the strong foot's instep; wider
+    /// than that it takes the foot that bends it in (see <see cref="ShotModel.ChooseCurlIn"/>).
+    /// </summary>
+    public float CurlInCentreM { get; set; } = 0.5f;
     /// <summary>A strike needs the ball within foot reach plus this.</summary>
     public float StrikeReachMargin { get; set; } = 0.2f;
     public float StrikeMaxHeight { get; set; } = 0.6f;
@@ -2069,7 +2102,6 @@ public sealed class Tuning
     public int TickRate { get; set; } = 120;
     /// <summary>Multiplies every shot spread.</summary>
     public float ErrorScale { get; set; } = 1.0f;
-    public float AimAssist { get; set; } = 0.3f;
     public BallTuning Ball { get; set; } = new();
     public FrameTuning Frame { get; set; } = new();
     public ArenaTuning Arena { get; set; } = new();

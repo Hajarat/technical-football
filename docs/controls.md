@@ -51,6 +51,7 @@ The table uses Xbox names.
 | Y / Triangle while paused | Open the player editor (see [Player editor](#player-editor)) |
 | Keyboard `B` | Swap face buttons (A with B, X with Y) for the active pad. On by default for Nintendo / Switch / Pro Controller pads; the choice is saved per pad name |
 | Keyboard `V` | Controller vibration on or off (a toast says which). On by default; the choice is saved for every pad in `user://controls.cfg` |
+| Keyboard `N` | Aim assist: steps Off, Low, Medium, High (a toast says which; the controls panel shows it in its row). Medium by default; saved in `user://controls.cfg`. It sets how far a shot aimed wide of the goal is pulled onto the frame (see [shooting.md](shooting.md)); an aim inside the frame is never touched. Stepped before a round begins it applies to that round, during play from the next one. A replay plays at the level it was recorded at, and `-- --aim-assist off\|low\|medium\|high` sets it for a tool run |
 
 Each skill move is a short list of right-stick steps (the drag-back's is the left stick), and every move is followed at
 once, each side move to either side (the attacker draws them from authored clips, see [animation.md](animation.md)). The
@@ -119,6 +120,7 @@ Works alongside a gamepad (the larger stick value wins) and when none is detecte
 | P or Esc | Pause |
 | B | Swap the pad's face buttons (see above) |
 | V | Controller vibration on or off (see above) |
+| N | Aim assist: Off, Low, Medium, High (see above) |
 | H | Show or hide the controls panel |
 | T | Open the player editor while play is stopped: paused, in Setup or at the report |
 

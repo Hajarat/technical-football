@@ -197,6 +197,11 @@ public sealed partial class World
     public int PlayerCount => Teams[0].Count + Teams[1].Count;
     /// <summary>True while the round is being simulated (Live, Strike, Flight or Outcome).</summary>
     public bool IsSimulating => State is RoundState.Live or RoundState.Strike or RoundState.Flight or RoundState.Outcome;
+    /// <summary>
+    /// The aim assistance level of the round: how far a shot's aim is pulled onto the frame when the stick points wide of it
+    /// (see <see cref="ShotModel.AimTargetZ"/>). Set when the round is set up; Off unless set, as in every batch run and probe.
+    /// </summary>
+    public AimAssistLevel AimAssist { get; set; }
     /// <summary>When set, every simulated tick's intents are recorded for a replay.</summary>
     public ReplayRecorder? Recorder { get => _recorder; set => _recorder = value; }
 
@@ -210,7 +215,7 @@ public sealed partial class World
         var ctx = new ShotContext
         {
             Shooter = Attacker, Keeper = Keeper, BallPosition = Ball.Position, Stick = AimStick(_lastStick), Charge = _charge,
-            Type = ShotModel.TypeFor(_latchFinesse, _latchChip, _latchDriven), Foot = _strikeFoot,
+            Type = ShotModel.TypeFor(_latchFinesse, _latchChip, _latchDriven), Foot = _strikeFoot, AimAssist = AimAssist,
         };
         ctx.Surface = SurfaceNow(ctx.Type);
         return ShotModel.Preview(ctx, Pitch, Tuning);
@@ -973,7 +978,7 @@ public sealed partial class World
     /// <summary>The intended yaw of a shot of <paramref name="type"/> released now with the aim stick <paramref name="stick"/>.</summary>
     float AimYawFor(PlayerState p, Vector2 stick, ShotType type)
     {
-        var ctx = new ShotContext { Shooter = p, BallPosition = Ball.Position, Stick = stick, Type = type };
+        var ctx = new ShotContext { Shooter = p, BallPosition = Ball.Position, Stick = stick, Type = type, AimAssist = AimAssist };
         return ShotModel.IntendedYaw(ctx, Pitch, Tuning, out _);
     }
 
@@ -1009,7 +1014,8 @@ public sealed partial class World
             right = TouchPlanner.StrikeTickFor(p, Ball, Foot.Right, earliestTick, notBefore, Tick, SimTime, Tuning, Pitch);
             left = TouchPlanner.StrikeTickFor(p, Ball, Foot.Left, earliestTick, notBefore, Tick, SimTime, Tuning, Pitch);
         }
-        if (!keepGeometry) _strikeGeometry = ShotModel.ChooseByGeometry(p.Sheet, p.Position, p.Facing, Ball.Position, _aimYaw, type, Pitch, Tuning);
+        // (a pass keeps the geometry rules; a finesse at goal takes the foot that curls it in)
+        if (!keepGeometry) _strikeGeometry = ShotModel.ChooseByGeometry(p.Sheet, p.Position, p.Facing, Ball.Position, _aimYaw, type, Pitch, Tuning, curlIn: _passKind == PassKind.None);
         var choice = ShotModel.WithContact(_strikeGeometry, type, right, left, allowSwap: !keepGeometry, Tuning);
         _strikeFoot = choice.Foot;
         _strikeSurface = choice.Surface;
@@ -1252,7 +1258,10 @@ public sealed partial class World
     /// <summary>
     /// Shoot pressed again after its release, any time before the strike: the shot becomes a low shot (power to driven,
     /// finesse to low finesse; a chip stays a chip, as there is no low chip yet). The charge stays the first press's, so a
-    /// low shot can have any power. Shoulder buttons held on the second press count as if held through the first.
+    /// low shot can have any power. Shoulder buttons held on the second press count as if held through the first. A press that
+    /// takes the shot into or out of the finesse family (finesse held on it after a power shot, chip after a finesse) changes
+    /// the foot rule that applies (see <see cref="ShotModel.ChooseCurlIn"/>): the foot and surface are chosen again for the
+    /// new type and the aim locked at the release, unless the strike is already committed.
     /// </summary>
     void PressShootAgain(PlayerState p, in TickIntent it)
     {
@@ -1260,11 +1269,25 @@ public sealed partial class World
         bool finesse = t is ShotType.Finesse or ShotType.LowFinesse || it.Finesse;
         bool chip = t == ShotType.Chip || it.Chip;
         _pending.Type = ShotModel.TypeFor(finesse, chip, driven: true);
-        _pending.Surface = SurfaceNow(_pending.Type);
-        _strikeSurface = _pending.Surface;
+        bool family = _pending.Type is ShotType.Finesse or ShotType.LowFinesse;
+        if (family != (t is ShotType.Finesse or ShotType.LowFinesse) && p.StrikeContactTick < 0)
+        {
+            Foot before = _strikeFoot;
+            _strikeSurface = ShotModel.SurfaceFor(_pending.Type);
+            ChooseStrike(p, _pending.Type, EarliestStrikeTick(Tick));
+            if (_strikeFoot != before) p.ClearForecast();
+            _pending.Foot = _strikeFoot;
+            _pending.Surface = _strikeSurface;
+        }
+        else
+        {
+            _pending.Surface = SurfaceNow(_pending.Type);
+            _strikeSurface = _pending.Surface;
+        }
         if (p.ShotAction is { } shot)
         {
             shot.Kind = ShotModel.KindFor(_pending.Type);
+            shot.Foot = _pending.Foot;
             shot.Surface = _pending.Surface;
         }
     }
@@ -1429,6 +1452,7 @@ public sealed partial class World
             Type = _pending.Type,
             Foot = _pending.Foot,
             Surface = _pending.Surface,
+            AimAssist = AimAssist,
         };
         var result = ShotModel.Compute(ctx, Pitch, Tuning, _rng, Tick);
         var a = Attacker;

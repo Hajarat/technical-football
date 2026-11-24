@@ -173,6 +173,7 @@ public partial class InputReader : Node
         BindFaceButtons();
         BindFixedButtons();
         LoadVibration();
+        LoadAimAssist();
     }
 
     // ---- face-button swap (A<->B, X<->Y) for pads that report them crossed, e.g. Switch-mode Xbox-layout pads ----
@@ -266,6 +267,33 @@ public partial class InputReader : Node
         VibrationChanged?.Invoke(Vibration);
     }
 
+    // ---- aim assistance (Medium by default, saved) ----
+
+    /// <summary>The aim assistance level the person chose; a round takes it when it is set up (see World.AimAssist).</summary>
+    public FootballSim.Core.AimAssistLevel AimAssist { get; private set; } = FootballSim.Core.AimAssistLevel.Medium;
+    /// <summary>Raised when the person steps the level: (level).</summary>
+    public event System.Action<FootballSim.Core.AimAssistLevel>? AimAssistChanged;
+
+    void LoadAimAssist()
+    {
+        var cfg = new ConfigFile();
+        if (cfg.Load(ConfigPath) == Error.Ok && cfg.HasSectionKey("shooting", "aim_assist")
+            && System.Enum.TryParse((string)cfg.GetValue("shooting", "aim_assist"), ignoreCase: true, out FootballSim.Core.AimAssistLevel level)
+            && System.Enum.IsDefined(level))
+            AimAssist = level;
+    }
+
+    /// <summary>Steps the level (Off, Low, Medium, High, then Off again) and remembers it.</summary>
+    public void CycleAimAssist()
+    {
+        AimAssist = (FootballSim.Core.AimAssistLevel)(((int)AimAssist + 1) % 4);
+        var cfg = new ConfigFile();
+        cfg.Load(ConfigPath);
+        cfg.SetValue("shooting", "aim_assist", AimAssist.ToString().ToLowerInvariant());
+        cfg.Save(ConfigPath);
+        AimAssistChanged?.Invoke(AimAssist);
+    }
+
     /// <summary>Call exactly once per _PhysicsProcess.</summary>
     public PadSnapshot Poll()
     {
@@ -273,6 +301,7 @@ public partial class InputReader : Node
         // (the key's edge is read every poll, so a B typed into a note does not toggle the swap when the panel closes)
         if (KeyboardEnabled && Pressed(Bindings.SwapFace) && !TextEntry) ToggleSwap();
         if (KeyboardEnabled && Pressed(Bindings.Vibration) && !TextEntry) ToggleVibration();
+        if (KeyboardEnabled && Pressed(Bindings.AimAssist) && !TextEntry) CycleAimAssist();
         var pad = PollPad();
         if (!KeyboardEnabled) return HoldKnockOn(pad);
         return HoldKnockOn(Merge(pad, PollKeyboard()));
