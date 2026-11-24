@@ -268,26 +268,26 @@ gives the same table, since the rounds' seeds are the run's seed plus 0 to 1,999
 
 | Plan | Attacker | First attack: goal / miss / held | Band (goals) |
 | --- | --- | --- | --- |
-| shoot_set | even | 61.4 / 22.4 / 12.5% | - |
-| round | even | 10.7 / 38.1 / 47.9% | at most 58.4% (ok) |
-| round_close | even | 15.7 / 1.8 / 82.3% | at most 58.4% (ok) |
-| feint_round | even | 39.1 / 18.7 / 40.6% | 25 to 40% (ok) |
-| shoot_set | fast | 77.5 / 10.3 / 8.6% | - |
-| round | fast | 11.9 / 18.3 / 65.6% | at most 74.6% (ok) |
-| round_close | fast | 20.6 / 3.0 / 76.0% | at most 74.6% (ok) |
-| feint_round | fast | 26.4 / 21.1 / 49.2% | 25 to 40% (ok) |
+| shoot_set | even | 61.5 / 23.2 / 13.9% | - |
+| round | even | 9.1 / 43.5 / 47.5% | at most 58.5% (ok) |
+| round_close | even | 15.8 / 1.8 / 82.3% | at most 58.5% (ok) |
+| feint_round | even | 38.0 / 21.0 / 41.0% | 25 to 40% (ok) |
+| shoot_set | fast | 77.9 / 10.8 / 10.3% | - |
+| round | fast | 13.5 / 20.1 / 66.5% | at most 74.9% (ok) |
+| round_close | fast | 20.4 / 3.5 / 76.0% | at most 74.9% (ok) |
+| feint_round | fast | 24.3 / 25.4 / 50.2% | 25 to 40% (MISS) |
 
 | All four plans | Even: measured (band) | Fast: measured (band) |
 | --- | --- | --- |
-| keeper depth p90, carrier on the ball more than 8 m from him | 4.2 m (at most 6.5 m, ok) | 4.3 m (at most 6.5 m, ok) |
-| median taken round to back on the line | 0.61 s: back in 23 of 34 rounds (at most 1.5 s, ok) | 0.77 s: back in 4 of 8 rounds (ok) |
+| keeper depth p90, carrier on the ball more than 8 m from him | 4.2 m (at most 6.5 m, ok) | 4.2 m (at most 6.5 m, ok) |
+| median taken round to back on the line | 0.58 s: back in 27 of 34 rounds (at most 1.5 s, ok) | 0.55 s: back in 6 of 8 rounds (at most 1.5 s, ok) |
 
 He sets about 6 to 7 m from the carrier, about 4 to 5 m off his line, and mirrors him, so going round him rarely works: in
 traced `round` rounds (even, seeds 1 to 40) he pounced on a sprint touch in about a third, and in most of the rest the carrier
 was run wide and shot from a tight angle. The shot from 11 to 13 m scores far more often than against the legacy keeper, who
 met the shooter about 3 m out. A step-over inside 4 m that draws his pounce leaves him on the ground and the goal open. The fast
-attacker's `feint_round` and his rounds taken round sit near their bands' edges (26.4%; 4 of 8 back).
+attacker's `feint_round` is just under its band (24.3%).
 
 The legacy keeper (`--brain legacy`, seed 1) charged a carrier he could reach and was then taken round with the goal open:
-`shoot_set` 13.6 / 20.8% (even / fast), `round` 95.5 / 89.2%, `round_close` 39.7 / 9.6%, `feint_round` 97.0 / 92.8%; his
-depth p90 7.3 / 8.1 m, and he was back on the line after being taken round in 13 of 3,803 and 105 of 3,866 rounds.
+`shoot_set` 13.8 / 21.8% (even / fast), `round` 95.1 / 88.0%, `round_close` 39.8 / 9.6%, `feint_round` 97.2 / 92.7%; his
+depth p90 7.3 / 8.1 m, and he was back on the line after being taken round in 18 of 3,803 and 117 of 3,866 rounds.

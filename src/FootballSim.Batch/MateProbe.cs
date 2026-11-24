@@ -197,7 +197,7 @@ static class MateProbe
     /// </summary>
     public static readonly Dictionary<string, (float Lo, float Hi)> GoalBands = new()
     {
-        ["solo"] = (2f, 12f), ["square"] = (18f, 28f), ["through"] = (0f, 9f),
+        ["solo"] = (1f, 11f), ["square"] = (23f, 33f), ["through"] = (0f, 6f),
     };
     public static readonly Dictionary<string, (float Lo, float Hi)> LegacyGoalBands = new()
     {

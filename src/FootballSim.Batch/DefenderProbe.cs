@@ -21,14 +21,14 @@ static class DefenderProbe
     /// </summary>
     public static readonly Dictionary<string, (float Lo, float Hi)> DispossessedBands = new()
     {
-        ["straight"] = (85f, 95f), ["cut"] = (19f, 29f), ["skill"] = (10f, 20f),
+        ["straight"] = (85f, 95f), ["cut"] = (17f, 27f), ["skill"] = (10f, 20f),
     };
     public static readonly Dictionary<string, (float Lo, float Hi)> LegacyDispossessedBands = new()
     {
         ["straight"] = (65f, 85f), ["cut"] = (30f, 45f), ["skill"] = (20f, 35f),
     };
     /// <summary>Shots blocked, percent of all the styles' shots together (the legacy bot's beside it), and fouls, percent of rounds (every style).</summary>
-    public static readonly (float Lo, float Hi) BlockedBand = (31f, 41f);
+    public static readonly (float Lo, float Hi) BlockedBand = (29f, 39f);
     public static readonly (float Lo, float Hi) LegacyBlockedBand = (10f, 25f);
     public const float FoulMax = 5f;
 
