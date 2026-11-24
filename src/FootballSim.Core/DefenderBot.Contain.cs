@@ -3,9 +3,10 @@ using System.Numerics;
 namespace FootballSim.Core;
 
 // The containing bot (tuning defender.brain = contain). Each tick, on his feet:
-//   Drop     the carrier is outside his gap: he goes to his spot on the ball's line to the goal centre at the jockey pace,
-//            never further out than engage_line_m, running flat out only to a spot well behind him; with the carrier near
-//            and himself stepped off his line, he contains instead;
+//   Drop     the carrier is outside his gap (reached sooner by a carrier coming on fast, not dead straight): he goes to
+//            his spot on the ball's line to the goal centre at the jockey pace, never further out than engage_line_m,
+//            running flat out only to a spot well behind him; with the carrier near and himself stepped off his line, he
+//            contains instead;
 //   Contain  the carrier is inside his gap: he backs off at the carrier's pace along the line, facing him, correcting toward
 //            his spot by gap_gain;
 //   RunWith  the speed that asks for is beyond his jockey: he turns and runs on the carrier's goal-side shoulder;
@@ -22,6 +23,8 @@ public sealed partial class DefenderBot
     bool _winPressed;           // a tackle button was pressed in this Win spell
     float _fastFor;             // seconds the speed containing asks for has been beyond the run-with threshold
     float _slowFor;             // seconds the carrier has been under press_speed
+    float _carrierSpeed;        // the carrier's speed last tick, m/s ...
+    float _carrierAccel;        // ... and his change of speed, smoothed over BrakeSmoothS, m/s per second
     Vector2 _winPoint;          // where the loose ball will be met ...
     float _winTime;             // ... this many seconds from now
     Ball? _scratch;             // the ball rolled on for the loose-touch race
@@ -42,6 +45,10 @@ public sealed partial class DefenderBot
     const float ArriveShortM = 0.6f, ArriveMinSpeed = 0.5f;
     /// <summary>Within this of last_line_m (and further from goal than it is less) he is on his last line, metres.</summary>
     const float LastLineTolM = 0.3f;
+    /// <summary>The carrier's change of speed is smoothed over about this long, seconds.</summary>
+    const float BrakeSmoothS = 0.08f;
+    /// <summary>Giving ground early needs the carrier moving at least this fast across the line, m/s.</summary>
+    const float GiveGroundAcrossMin = 0.5f;
     /// <summary>The shade grows from nothing with the ball on the long centre line to shade_m this far off it, metres.</summary>
     const float ShadeFullM = 1f;
     /// <summary>The loose-touch race and the cut-off search step the ball and the path this finely, seconds and metres.</summary>
@@ -142,8 +149,15 @@ public sealed partial class DefenderBot
         float slowJ = Movement.JockeyTopSpeed(d.Sheet, 0f, t), fastJ = Movement.JockeyTopSpeed(d.Sheet, 1f, t);
         float gap = GapFor(d.Sheet, speedC, t);
         Gap = gap;
+        // (giving ground early: a carrier coming on toward goal faster than his jockey pace, not braking and not running dead
+        // straight down the line, is inside the gap give_ground_s of that excess speed sooner, so he is already backing off when
+        // the cut comes; one running straight at him meets him planted, where his tackle is surest)
+        _carrierAccel = hasBall ? _carrierAccel + (dt / BrakeSmoothS) * ((speedC - _carrierSpeed) / dt - _carrierAccel) : 0f;
+        _carrierSpeed = speedC;
+        bool offLineRun = MathF.Abs(Vector2.Dot(vc, new Vector2(-u.Y, u.X))) >= GiveGroundAcrossMin;
+        float early = hasBall && offLineRun && _carrierAccel >= -k.GiveGroundBrake ? MathF.Max(0f, Vector2.Dot(vc, u) - slowJ) * k.GiveGroundS : 0f;
         // (inside the gap: the carrier no more than the gap further from the goal centre than he is)
-        bool inside = dOpp - dSelf <= gap + (Mode is DefenderMode.Contain or DefenderMode.RunWith ? ContainExitM : 0f);
+        bool inside = dOpp - dSelf <= gap + early + (Mode is DefenderMode.Contain or DefenderMode.RunWith ? ContainExitM : 0f);
         _slowFor = hasBall && speedC < k.PressSpeed ? _slowFor + dt : 0f;
         bool beaten = hasBall && dSelf > dOpp + k.OvershootM;
         float margin = k.WinMarginS.Evaluate(d.Sheet.Awareness);

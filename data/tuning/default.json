@@ -915,6 +915,8 @@
     "press_after_s": 0.27,
     "press_far_after_s": 1.5,
     "drop_offline_m": 1,
+    "give_ground_s": 1.5,
+    "give_ground_brake": 2,
     "recover_min_goal_m": 4.6,
     "slide_behind_deg": 65,
     "hold_distance_m": [[8, 2.5], [20, 5]],

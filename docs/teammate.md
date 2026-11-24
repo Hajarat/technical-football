@@ -97,13 +97,13 @@ pass the script plays on as the receiver. `--probe team [--n 2000] [--speed 1]` 
 
 | Style | Goal | Held | Dispossessed | Band (goal) |
 | --- | --- | --- | --- | --- |
-| solo | 6.1% | 7.0% | 71.5% | 1–11% |
-| square | 24.4% | 10.1% | 61.0% | 23–33% |
-| through | 1.1% | 79.0% | 19.6% | 0–6% |
+| solo | 6.1% | 7.0% | 71.4% | 1–11% |
+| square | 24.6% | 10.0% | 60.5% | 23–33% |
+| through | 0.9% | 78.8% | 19.6% | 0–6% |
 
 These are regression rows set about five points either side of the containing defender's rates (seed 1), not a measure of
 difficulty; with `--brain legacy` the team probe holds the older bands (solo 3–10%, square 13–24%, through 15–28%). Square
-has to beat solo by at least 10 points (measured 18.35). With `--speed 1` it also times 10,000 rounds beside
+has to beat solo by at least 10 points (measured 18.45). With `--speed 1` it also times 10,000 rounds beside
 defender_duel; measured with the legacy bot: played alone (the same script) two_v_one takes 1.00 times as long, and a second
 of play costs 1.2 to 1.7 times as much in the three styles (the bound is 2). The passing styles' rounds last about 9 s of
 play against 6, so their 10,000 rounds take 2.1 to 2.3 times as long.
@@ -125,7 +125,7 @@ attacker; the fast attacker's row has none. Measured (seed 1), with the containi
 
 | Attacker | Defender | First attack: goal / miss / held / dispossessed | Past the defender | Band (goals) |
 | --- | --- | --- | --- | --- |
-| even | contain | 20.0 / 22.0 / 8.8 / 46.0% | 45.8% | 40 to 55% (MISS) |
+| even | contain | 20.0 / 21.9 / 8.8 / 46.0% | 45.8% | 40 to 55% (MISS) |
 | fast | contain | 18.2 / 19.6 / 6.7 / 50.2% | 33.5% | - |
 | even | legacy | 39.4 / 20.9 / 8.3 / 31.3% | 93.6% | 40 to 55% (MISS) |
 | fast | legacy | 46.2 / 20.2 / 7.2 / 26.1% | 92.8% | - |
