@@ -39,10 +39,10 @@ public class ShotActionTests
         Assert.Null(p.PreviousAction);
         for (int i = 0; i < 9; i++) Step(w, new TickIntent { ShootHeld = true });
         Assert.Same(shot, p.Action);
-        Assert.Equal(press + 54, shot.ContactTick);          // the earliest contact while still held
+        Assert.Equal(press + 44, shot.ContactTick);          // the earliest contact while still held (striker_a's finishing-78 wind-up, 0.36 s)
         Step(w, new TickIntent { MoveX = 1 });
         Assert.True(shot.Released);
-        Assert.Equal(press + 54, shot.ContactTick);
+        Assert.Equal(press + 44, shot.ContactTick);
         int contact = shot.ContactTick;
         while (w.Tick < contact - 1) { Step(w, default); Assert.Equal(ActionPhase.Windup, shot.Phase); Assert.Same(shot, p.Action); }
         Step(w, default);
@@ -289,9 +289,10 @@ public class ShotActionTests
     public void ShootPressedAgainBeforeTheStrikeIsALowShot(bool finesse, bool chip, ShotType type)
     {
         Assert.Equal(type, DoubleTap(8, 6, 6, finesse, chip).Type);
-        // A first press held past the old 0.25 s, the second press late in the wind-up (contact at 54 ticks after the press).
+        // A first press held past the old 0.25 s, the second press late in the wind-up (contact at 44 ticks after the press:
+        // striker_a's finishing-78 wind-up).
         Assert.Equal(type, DoubleTap(40, 4, 6, finesse, chip).Type);
-        Assert.Equal(type, DoubleTap(8, 44, 2, finesse, chip).Type);
+        Assert.Equal(type, DoubleTap(8, 32, 2, finesse, chip).Type);
     }
 
     [Theory]

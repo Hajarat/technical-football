@@ -878,8 +878,11 @@ public sealed class ShotTuning
     public float ChargeSpeedSlope { get; set; } = 0.7f;
     /// <summary>Seconds of holding shoot that fill the charge from 0 to 1.</summary>
     public float ChargeSeconds { get; set; } = 0.3f;
-    /// <summary>The strike's contact comes no sooner than this after the press, seconds (the wind-up).</summary>
-    public float WindupSeconds { get; set; } = 0.45f;
+    /// <summary>
+    /// The strike's contact comes no sooner than this after the press, seconds (the wind-up), by the shooter's finishing rating
+    /// (1-99): a better finisher strikes sooner. Read through <see cref="ShotModel.WindupSeconds"/>.
+    /// </summary>
+    public Curve WindupByFinishingS { get; set; } = new((1f, 0.55f), (50f, 0.45f), (99f, 0.30f));
     /// <summary>... and no sooner than this after the release, seconds.</summary>
     public float ReleaseLeadSeconds { get; set; } = 0.12f;
     /// <summary>A stick at rest at the release aims along its last pushed direction if that push was this recent, seconds.</summary>

@@ -621,7 +621,7 @@ public class ShotFootTests
         var b = Shoot(back, out int tb, out float side);
         var f = Shoot(facing, out int tf, out _);
         Assert.True(f.BodyAngleDeg < 30f && b.BodyAngleDeg > 150f, $"body angles {f.BodyAngleDeg} and {b.BodyAngleDeg}");
-        Assert.Equal(54, tf);                                                         // the 0.45 s wind-up
+        Assert.Equal(44, tf);                                                         // striker_a's wind-up (finishing 78: 0.36 s)
         Assert.True(tb - tf >= 24, $"struck {tb - tf} ticks later");                  // at least 0.2 s more
         Assert.True(b.Speed <= 0.7f * f.Speed, $"speed {b.Speed} against {f.Speed}");
         Assert.True(b.SigmaH >= 3f * f.SigmaH, $"sigma {b.SigmaH} against {f.SigmaH}");

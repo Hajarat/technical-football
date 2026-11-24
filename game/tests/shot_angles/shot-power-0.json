@@ -4,7 +4,7 @@
   "attacker_id": "striker_a",
   "keeper_id": "the_wall",
   "scenario_id": "edge_of_box",
-  "tuning_hash": "454fbb8f2b02df08",
+  "tuning_hash": "1f18080c40ca6b79",
   "sheets_hash": "fbe77b53fb01638a",
   "players_per_tick": 2,
   "intents": [
@@ -2910,7 +2910,7 @@
     },
     {
       "mx": 0.99994314,
-      "mz": -0.010659966,
+      "mz": -0.010660065,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -2929,8 +2929,8 @@
       "knock": false
     },
     {
-      "mx": 0.99994326,
-      "mz": -0.010654549,
+      "mx": 0.9999432,
+      "mz": -0.010654748,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -2949,8 +2949,8 @@
       "knock": false
     },
     {
-      "mx": 0.99994326,
-      "mz": -0.010649113,
+      "mx": 0.9999433,
+      "mz": -0.010649413,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -2970,7 +2970,7 @@
     },
     {
       "mx": 0.9999434,
-      "mz": -0.010643658,
+      "mz": -0.010644058,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -2990,7 +2990,7 @@
     },
     {
       "mx": 0.99994344,
-      "mz": -0.010638183,
+      "mz": -0.010638683,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3010,7 +3010,7 @@
     },
     {
       "mx": 0.9999435,
-      "mz": -0.010632689,
+      "mz": -0.01063329,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3030,7 +3030,7 @@
     },
     {
       "mx": 0.99994355,
-      "mz": -0.010627172,
+      "mz": -0.010627874,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3050,7 +3050,7 @@
     },
     {
       "mx": 0.99994355,
-      "mz": -0.010621644,
+      "mz": -0.010622446,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3070,7 +3070,7 @@
     },
     {
       "mx": 0.9999436,
-      "mz": -0.010616104,
+      "mz": -0.0106170075,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3090,7 +3090,7 @@
     },
     {
       "mx": 0.9999437,
-      "mz": -0.010610552,
+      "mz": -0.0106115565,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3110,7 +3110,7 @@
     },
     {
       "mx": 0.99994373,
-      "mz": -0.010604987,
+      "mz": -0.010606092,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3130,7 +3130,7 @@
     },
     {
       "mx": 0.9999438,
-      "mz": -0.010599411,
+      "mz": -0.010600617,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3150,7 +3150,7 @@
     },
     {
       "mx": 0.99994385,
-      "mz": -0.010593822,
+      "mz": -0.01059513,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3170,7 +3170,27 @@
     },
     {
       "mx": 0.9999439,
-      "mz": -0.010588221,
+      "mz": -0.01058963,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.999944,
+      "mz": -0.010584119,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3190,27 +3210,7 @@
     },
     {
       "mx": 0.99994403,
-      "mz": -0.010582609,
-      "sprint": 0,
-      "close": false,
-      "shoot": true,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0.99994403,
-      "mz": -0.010576983,
+      "mz": -0.010578594,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3230,7 +3230,7 @@
     },
     {
       "mx": 0.99994415,
-      "mz": -0.010571347,
+      "mz": -0.010573059,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3250,7 +3250,7 @@
     },
     {
       "mx": 0.99994415,
-      "mz": -0.010565696,
+      "mz": -0.010567511,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3270,7 +3270,27 @@
     },
     {
       "mx": 0.9999442,
-      "mz": -0.010560036,
+      "mz": -0.010561952,
+      "sprint": 0,
+      "close": false,
+      "shoot": true,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0,
+      "mz": 0,
+      "sprint": 0,
+      "close": false,
+      "shoot": false,
+      "finesse": false,
+      "chip": false,
+      "knock": false
+    },
+    {
+      "mx": 0.99994427,
+      "mz": -0.010556381,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3290,7 +3310,7 @@
     },
     {
       "mx": 0.9999443,
-      "mz": -0.010554364,
+      "mz": -0.010550798,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3310,7 +3330,7 @@
     },
     {
       "mx": 0.9999444,
-      "mz": -0.010548679,
+      "mz": -0.0105452025,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3330,7 +3350,7 @@
     },
     {
       "mx": 0.99994445,
-      "mz": -0.010542983,
+      "mz": -0.010539595,
       "sprint": 0,
       "close": false,
       "shoot": true,
@@ -3349,228 +3369,8 @@
       "knock": false
     },
     {
-      "mx": 0.99994445,
-      "mz": -0.010537274,
-      "sprint": 0,
-      "close": false,
-      "shoot": true,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0.99994457,
-      "mz": -0.010531554,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
-      "sprint": 0,
-      "close": false,
-      "shoot": false,
-      "finesse": false,
-      "chip": false,
-      "knock": false
-    },
-    {
-      "mx": 0,
-      "mz": 0,
+      "mx": 0.9999445,
+      "mz": -0.010533975,
       "sprint": 0,
       "close": false,
       "shoot": false,
@@ -6369,5 +6169,5 @@
       "knock": false
     }
   ],
-  "tick_count": 318
+  "tick_count": 308
 }

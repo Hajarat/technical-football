@@ -357,7 +357,7 @@
     "charge_base_speed": 0.3,
     "charge_speed_slope": 0.7,
     "charge_seconds": 0.3,
-    "windup_seconds": 0.45,
+    "windup_by_finishing_s": [[1, 0.55], [50, 0.45], [99, 0.3]],
     "release_lead_seconds": 0.12,
     "aim_lock_seconds": 0.5,
     "recovery_seconds": 0.25,

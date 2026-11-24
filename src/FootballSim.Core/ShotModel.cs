@@ -191,6 +191,12 @@ public static class ShotModel
     /// <summary>The body angle, degrees (0 to 180): how far the intended direction is from where the shooter faces.</summary>
     public static float BodyAngleDeg(float facing, float yaw) => MathF.Abs(Movement.WrapAngle(yaw - facing)) * 180f / MathF.PI;
 
+    /// <summary>
+    /// The base wind-up, seconds: the strike's contact comes no sooner than this after the press, by the shooter's finishing
+    /// rating (see <see cref="ShotTuning.WindupByFinishingS"/>); the body angle adds to it (<see cref="ExtraWindupSeconds"/>).
+    /// </summary>
+    public static float WindupSeconds(PlayerSheet s, Tuning t) => MathF.Max(0f, t.Shot.WindupByFinishingS.Evaluate(s.Finishing));
+
     /// <summary>The wind-up added for a body angle, seconds (see <see cref="ShotTuning.AngleExtraWindupS"/>).</summary>
     public static float ExtraWindupSeconds(float facing, float yaw, Tuning t) =>
         MathF.Max(0f, t.Shot.AngleExtraWindupS.Evaluate(BodyAngleDeg(facing, yaw)));

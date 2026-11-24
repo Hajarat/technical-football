@@ -326,7 +326,7 @@ static class HumanProbe
         // breakaway, shoot_set: jogs in and shoots low at the far corner from the distance drawn for the round.
         TickIntent ShootSet(World w, in View v, ref TickIntent it)
         {
-            float atStrike = v.BallGoal - MathF.Max(0f, Vector2.Dot(G(w.Attacker.Velocity), v.ToGoal)) * w.Tuning.Shot.WindupSeconds;
+            float atStrike = v.BallGoal - MathF.Max(0f, Vector2.Dot(G(w.Attacker.Velocity), v.ToGoal)) * ShotModel.WindupSeconds(w.Attacker.Sheet, w.Tuning);
             if (v.Mine && atStrike <= _range) return Press(w, v, ref it, FarSide(v));
             return Stick(ref it, v.ToGoal, 0f);
         }

@@ -18,7 +18,9 @@ toward -Z when he shoots toward +X) and one struck with the outside bends the ot
 surface alone.
 
 - Charge fills 0 to 1 in 0.3 s while shoot is held and is frozen at the release (or at 1). The strike comes no sooner than
-  0.45 s after the press (the wind-up) and 0.12 s after the release (the earliest strike tick), and it takes the place of the
+  the wind-up after the press and 0.12 s after the release (the earliest strike tick). The wind-up runs by the shooter's
+  finishing (`windup_by_finishing_s`: 0.55 s at 1, 0.45 s at 50, 0.30 s at 99, linear between; 0.36 s for striker_a's 78),
+  longer by the body angle's extra (below). The strike takes the place of the
   attacker's next touch: from the press no dribble touch is committed (one already committed is played), and the strike is
   the touch controller's first eligible contact from the earliest strike tick on (the first tick of a swing's contact window
   that meets the ball) on a swing of the foot chosen for the shot. It waits for that foot: up to a step longer than the next
@@ -191,4 +193,5 @@ surface alone.
 - Scripted finesse shots at either post are on target within 10 points of each other, the weak-foot post the lower one
   (measured 2026-11-24, 1,000 rounds a post: 95 and 88% from the penalty spot, 80 and 73% from the edge of the box; before
   the curl-in foot and the launch solve, 99 and 1%).
-- Every number is in the `shot` section of `data/tuning/default.json`.
+- Every number is in the `shot` section of `data/tuning/default.json`, the wind-up's curve over finishing
+  (`windup_by_finishing_s`) included.

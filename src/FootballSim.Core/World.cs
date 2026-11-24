@@ -965,14 +965,15 @@ public sealed partial class World
 
     /// <summary>
     /// The earliest tick the shot under way may be struck on; while shoot is held, as if it were let go on
-    /// <paramref name="releaseTick"/> with the aim as it is now: the wind-up after the press, longer by what the body angle adds
+    /// <paramref name="releaseTick"/> with the aim as it is now: the wind-up after the press (by the shooter's finishing, see
+    /// <see cref="ShotModel.WindupSeconds"/>), longer by what the body angle adds
     /// (see <see cref="ShotModel.ExtraWindupSeconds"/>), and the lead after the release.
     /// </summary>
     int EarliestStrikeTick(int releaseTick) => _pending.Active
         ? _pending.ContactTick
         // (a pass: its execution time after the press, by the charge so far and the body angle to it)
         : _passKind != PassKind.None ? _shotStartTick + Ticks(PassModel.ExecutionSeconds(Attacker, _passCharge, _aimYaw, Tuning))
-        : Math.Max(_shotStartTick + Ticks(Tuning.Shot.WindupSeconds + ShotModel.ExtraWindupSeconds(Attacker.Facing, _aimYaw, Tuning)),
+        : Math.Max(_shotStartTick + Ticks(ShotModel.WindupSeconds(Attacker.Sheet, Tuning) + ShotModel.ExtraWindupSeconds(Attacker.Facing, _aimYaw, Tuning)),
             releaseTick + Ticks(Tuning.Shot.ReleaseLeadSeconds));
 
     /// <summary>The intended yaw of a shot of <paramref name="type"/> released now with the aim stick <paramref name="stick"/>.</summary>

@@ -328,7 +328,7 @@ public static class DataLoader
                 ("skill.sprint_blend", t.Skill.SprintBlend), ("skill.drag_back_run_blend", t.Skill.DragBackRunBlend),
                 ("skill.sided_exit_burst", t.Skill.SidedExitBurst), ("skill.straight_exit_burst", t.Skill.StraightExitBurst),
                 ("shot.ideal_charge", t.Shot.IdealCharge), ("shot.angle_accuracy", t.Shot.AngleAccuracy), ("shot.angle_power", t.Shot.AnglePower),
-                ("shot.angle_extra_windup_s", t.Shot.AngleExtraWindupS), ("shot.goal_mouth_accuracy", t.Shot.GoalMouthAccuracy),
+                ("shot.windup_by_finishing_s", t.Shot.WindupByFinishingS), ("shot.angle_extra_windup_s", t.Shot.AngleExtraWindupS), ("shot.goal_mouth_accuracy", t.Shot.GoalMouthAccuracy),
                 ("shot.weak_foot_accuracy", t.Shot.WeakFootAccuracy), ("shot.weak_foot_power", t.Shot.WeakFootPower), ("shot.weak_foot_curl", t.Shot.WeakFootCurl),
                 ("shot.run_speed_power", t.Shot.RunSpeedPower),
                 ("keeper.arc_depth", t.Keeper?.ArcDepth), ("keeper.arc_depth_bearing", t.Keeper?.ArcDepthBearing), ("keeper.near_post_bias", t.Keeper?.NearPostBias),

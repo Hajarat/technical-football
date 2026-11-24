@@ -249,6 +249,8 @@ public class CalibrationTests
     /// With the keeper who stays within his home depth and is set at the strike (2026-11-24) the seven measured penalty 75.2,
     /// edge of the box 9.6, tight angle 2.0, breakaway 30.9, halfway run 17.6, angled run 18.2 and keeper rush 38.8; breakaway
     /// and angled run left their bands and were reset to five points either side of the measured values; the others held.
+    /// With the wind-up by finishing (2026-11-24: striker_a's 78 winds up 0.36 s instead of 0.45 s) they measured penalty 75.1,
+    /// edge of the box 9.8, tight angle 2.1, breakaway 29.2, halfway run 17.4, angled run 22.2 and keeper rush 36.3; all held.
     /// The real bands per shot type are set once the keeper is rebuilt.
     /// </summary>
     [Theory]

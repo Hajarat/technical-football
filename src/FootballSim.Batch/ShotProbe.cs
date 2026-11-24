@@ -4,10 +4,11 @@ using FootballSim.Core;
 
 /// <summary>
 /// The shot probe: scripted shots pressed in possession on a long empty pitch (no keeper involved), per situation and
-/// dribbling 1/50/99: standing, a straight jog and sprint, a jog at 45 degrees to the aim (the stick swung onto the aim three
-/// ticks after the press), the press right after a sprint push with the ball about 1 m ahead, and the press 0.1 s into a 90
-/// degree turn of the stick. Shoot is held 0.2 s. Per row: the time from the press to the strike, the ball's distance from the
-/// feet at the press and at the strike, the runs in which a dribble touch was committed after the press or played after it,
+/// dribbling 1/50/99 (or, with `--axis finishing`, finishing 1/50/99, which sets the wind-up; `--ratings` picks the
+/// values): standing, a straight jog and sprint, a jog at 45 degrees to the aim (the stick swung onto the aim three ticks after
+/// the press), the press right after a sprint push with the ball about 1 m ahead, and the press 0.1 s into a 90 degree turn of
+/// the stick. Shoot is held 0.2 s (`--hold` seconds). Per row: the time from the press to the strike, the ball's distance
+/// from the feet at the press and at the strike, the runs in which a dribble touch was committed after the press or played after it,
 /// the strike made (of all runs), the striking foot against the swinging foot at the strike (`foot_ok`: the swinging foot, in
 /// its contact window, or the player standing), the strike against the strike estimate published at the press
 /// (`vs_eta`, ticks, mean / max of |x|), and the speed steps from the press to 0.5 s after the strike (`shot`, see
@@ -46,14 +47,21 @@ static class ShotProbe
     }
 
     static bool List;
+    /// <summary>The rating the probe varies: "dribbling" (close and sprint dribbling) or "finishing".</summary>
+    static string Axis = "dribbling";
+    /// <summary>How long shoot is held from the press, seconds.</summary>
+    static float HoldSeconds = 0.2f;
 
     public static int Run(Dictionary<string, string> opts, string dataDir, Tuning tuning)
     {
         List = opts.ContainsKey("list");
+        Axis = opts.TryGetValue("axis", out var ax) ? ax : "dribbling";
+        HoldSeconds = opts.TryGetValue("hold", out var hs) ? float.Parse(hs, CultureInfo.InvariantCulture) : 0.2f;
+        if (Axis is not ("dribbling" or "finishing")) { Console.Error.WriteLine($"--axis must be dribbling or finishing, not {Axis}"); return 2; }
         int seeds = opts.TryGetValue("seeds", out var ns) ? int.Parse(ns, CultureInfo.InvariantCulture) : 20;
         int[] ratings = opts.TryGetValue("ratings", out var rs) ? rs.Split(',').Select(int.Parse).ToArray() : new[] { 1, 50, 99 };
         var keeper = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", "the_wall.json")).Value!;
-        Console.WriteLine($"shot probe: striker_a by dribbling, seeds={seeds}, shoot held 0.2 s; time = press to strike s (mean/max), d_press / d_strike = ball from the feet m (mean/max), committed / played = runs with a dribble touch committed / played after the press, at_foot = strikes pressed with the ball at the feet (struck at the earliest strike tick), foot_ok = the other strikes on the swinging foot in its window (or standing) / those strikes, vs_eta = strike tick - (press + StrikeEta at the press) (mean, max |x|, runs within one tick), vs_touch = strike tick - the later of the earliest strike tick and the first dribble touch of the same run without the press (mean, max |x|, runs within one tick), shot = speed steps (|d speed|/dt > 15 m/s^2) from the press to 0.5 s after the strike / ticks; chosen_foot = the other strikes on the foot chosen for the shot at the release (it never changes after), est_earlier = ticks the published estimate moved more than a tick earlier, commit_moved = ticks it moved after the strike's commit");
+        Console.WriteLine($"shot probe: striker_a by {Axis}, seeds={seeds}, shoot held {F(HoldSeconds)} s; time = press to strike s (mean/max), d_press / d_strike = ball from the feet m (mean/max), committed / played = runs with a dribble touch committed / played after the press, at_foot = strikes pressed with the ball at the feet (struck at the earliest strike tick), foot_ok = the other strikes on the swinging foot in its window (or standing) / those strikes, vs_eta = strike tick - (press + StrikeEta at the press) (mean, max |x|, runs within one tick), vs_touch = strike tick - the later of the earliest strike tick and the first dribble touch of the same run without the press (mean, max |x|, runs within one tick), shot = speed steps (|d speed|/dt > 15 m/s^2) from the press to 0.5 s after the strike / ticks; chosen_foot = the other strikes on the foot chosen for the shot at the release (it never changes after), est_earlier = ticks the published estimate moved more than a tick earlier, commit_moved = ticks it moved after the strike's commit");
         Console.WriteLine($"{"case",-22} {"rating",6} {"runs",5} {"struck",7} {"time",11} {"d_press",11} {"d_strike",11} {"committed",9} {"played",6} {"at_foot",7} {"foot_ok",7} {"vs_eta",13} {"vs_touch",13} {"shot",9}");
         if (opts.TryGetValue("trace", out var tr))
         {
@@ -116,7 +124,8 @@ static class ShotProbe
     static World Setup(Case c, int rating, ulong seed, int index, Tuning t, string dataDir, PlayerSheet keeper, out SpeedSteps steps)
     {
         var sheet = DataLoader.LoadPlayer(Path.Combine(dataDir, "players", "striker_a.json")).Value!;
-        sheet.CloseDribbling = sheet.SprintDribbling = rating;
+        if (Axis == "finishing") sheet.Finishing = rating;
+        else sheet.CloseDribbling = sheet.SprintDribbling = rating;
         var sc = new Scenario
         {
             Id = "probe",
@@ -177,7 +186,7 @@ static class ShotProbe
         Foot chosen = Foot.Right;   // the foot chosen for the shot, as published at the release
         int prevEst = int.MinValue, commitAt = -1;
         var before = p.TouchAction;
-        int hold = (int)MathF.Round(0.2f * t.TickRate);
+        int hold = Math.Max(1, (int)MathF.Round(HoldSeconds * t.TickRate));
         int press = -1, strike = -1, earliest = 0;
         float eta = float.NaN, dStrike = float.NaN;
         Foot strikeFoot = Foot.Right;
@@ -192,7 +201,7 @@ static class ShotProbe
             Step(it);
             if (i == 0) { press = w.Tick; eta = p.StrikeEta; }
             if (i == hold) chosen = p.StrikeFoot;
-            if (i == hold) earliest = Math.Max((int)MathF.Round(t.Shot.WindupSeconds * t.TickRate), hold + (int)MathF.Round(t.Shot.ReleaseLeadSeconds * t.TickRate));
+            if (i == hold) earliest = Math.Max((int)MathF.Round(ShotModel.WindupSeconds(p.Sheet, t) * t.TickRate), hold + (int)MathF.Round(t.Shot.ReleaseLeadSeconds * t.TickRate));
             if (!float.IsNaN(p.StrikeEta))
             {
                 int e = w.Tick + (int)MathF.Round(p.StrikeEta * t.TickRate);

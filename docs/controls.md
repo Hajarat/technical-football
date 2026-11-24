@@ -89,7 +89,7 @@ timings are in the `skill` section of `data/tuning/default.json`:
   reach (see [dribbling.md](dribbling.md)).
 - A skill key (keyboard) registers its move directly, sprinting or not, under the same holding and taking-up rules.
 - Low shot: hold B for the power wanted, release, and press B again any time after the release and before the strike (the
-  strike comes no sooner than 0.45 s after the first press and 0.12 s after the release; see [shooting.md](shooting.md)). The charge is the first press's,
+  strike comes no sooner than the wind-up after the first press, 0.55 s at finishing 1 to 0.30 s at 99, and 0.12 s after the release; see [shooting.md](shooting.md)). The charge is the first press's,
   so a low shot can have full power; bumpers held on either press count. There is no minimum gap between the release and
   the second press.
 

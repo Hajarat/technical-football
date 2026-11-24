@@ -113,7 +113,7 @@ public class ShotNextContactTests
             }
             if (strike >= 0 && w.Tick >= strike + 60) break;
         }
-        int earliest = press + (int)MathF.Round(w.Tuning.Shot.WindupSeconds * w.Tuning.TickRate);
+        int earliest = press + (int)MathF.Round(ShotModel.WindupSeconds(p.Sheet, w.Tuning) * w.Tuning.TickRate);
         return new Run(strike >= 0, atFoot, committed, footOk, maxDspd, press, strike, eta, earliest, struckWith == chosen, earlier, moved, footChanges);
     }
 
@@ -189,7 +189,7 @@ public class ShotNextContactTests
         Assert.True(float.IsNaN(p.StrikeEta));
         Step(w, Dir(0f, shoot: true));
         Assert.True(float.IsFinite(p.StrikeEta), "no strike estimate on the press tick");
-        Assert.True(p.StrikeEta >= w.Tuning.Shot.WindupSeconds - 1e-3f);
+        Assert.True(p.StrikeEta >= ShotModel.WindupSeconds(p.Sheet, w.Tuning) - 1e-3f);
         var shot = p.Action!;
         Assert.True(shot.IsShot);
         Assert.Equal(shot.ContactTick, w.Tick + (int)MathF.Round(p.StrikeEta * w.Tuning.TickRate));

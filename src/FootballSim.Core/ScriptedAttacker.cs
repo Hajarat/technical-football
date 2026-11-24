@@ -375,7 +375,7 @@ public sealed class ScriptedAttacker
         bool strikable = ShotModel.CanStrike(a, w.Ball, w.Tuning);
         bool running = w.Scenario.ShootDistance > 0f;
         float charge = float.IsNaN(_pressCharge) ? (Charge ?? 0f) : _pressCharge;
-        float toContact = MathF.Max(k.WindupSeconds, charge * k.ChargeSeconds + k.ReleaseLeadSeconds);
+        float toContact = MathF.Max(ShotModel.WindupSeconds(a.Sheet, w.Tuning), charge * k.ChargeSeconds + k.ReleaseLeadSeconds);
         bool close = strikable
             || w.BallController == a && a.NextTouchEta <= toContact - PressMargin
             || w.BallController == a && running && toGoal <= w.Scenario.ShootDistance - LateDistance;

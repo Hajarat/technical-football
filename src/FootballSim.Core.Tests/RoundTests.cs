@@ -94,10 +94,10 @@ public class RoundTests
     [Fact]
     public void ContactComesNoSoonerThanTheWindupAfterThePress()
     {
-        // A short press: the wind-up (0.45 s = 54 ticks after the press) decides.
+        // A short press: the wind-up (striker_a's finishing 78: 0.36 s = 44 ticks after the press) decides.
         var (press, release, strike) = StrikeTiming(10);
         Assert.Equal(press + 10, release);
-        Assert.Equal(press + 54, strike);
+        Assert.Equal(press + 44, strike);
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class RoundTests
         // A long press: the lead after the release (0.12 s = 14 ticks) decides.
         var (press, release, strike) = StrikeTiming(80);
         Assert.Equal(release + 14, strike);
-        Assert.True(strike > press + 54);
+        Assert.True(strike > press + 44);
         // A release just before the wind-up ends still gets the full lead.
         var (p2, r2, s2) = StrikeTiming(50);
         Assert.Equal(p2 + 50, r2);

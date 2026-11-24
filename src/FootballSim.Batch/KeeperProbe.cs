@@ -161,7 +161,7 @@ static class KeeperProbe
                 if (coming) _sawCharge = true;
                 if (_sawCharge) sprint = 0f;
                 float depth = w.Pitch.GoalLineX - kp.X;
-                float atStrike = ballGoal - MathF.Max(0f, Vector2.Dot(G(w.Attacker.Velocity), toGoal)) * w.Tuning.Shot.WindupSeconds;
+                float atStrike = ballGoal - MathF.Max(0f, Vector2.Dot(G(w.Attacker.Velocity), toGoal)) * ShotModel.WindupSeconds(w.Attacker.Sheet, w.Tuning);
                 if (mine && (atStrike <= 12f || _sawCharge && atStrike >= 14f && atStrike <= _chipAt && (depth >= 5f || kb <= 9f))) return Press(w, ref it, 0f);
             }
 
