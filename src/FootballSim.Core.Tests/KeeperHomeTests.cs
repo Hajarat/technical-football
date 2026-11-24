@@ -144,15 +144,15 @@ public class KeeperHomeTests
         Assert.True(worst <= 0.75f, $"{worst:F2} m off the line from the ball to the goal centre");
     }
 
-    /// <summary>Set on a carrier, then the ball <paramref name="offFoot"/> m ahead of his foot and 2 m from the keeper, his next touch that far off.</summary>
-    static KeeperBrain PounceRig(float offFoot, float next, bool covers = false)
+    /// <summary>Set on a carrier, then the ball <paramref name="offFoot"/> m ahead of his foot and <paramref name="from"/> m from the keeper, his next touch that far off.</summary>
+    static KeeperBrain PounceRig(float offFoot, float next, bool covers = false, float from = 1.6f)
     {
         var (brain, keeper, ball) = Rig(At(8f, 0f, 0.11f), At(2.5f));
         var rng = new SimRng(5);
         var vel = new Vector3(1.5f, 0f, 0f);
         for (int i = 0; i < 6; i++) brain.Update(Dt, ball, rng, OnBall(ball.Position, vel, covers: covers));
         Assert.True(brain.IsSet);
-        ball.Position = keeper.Position - new Vector3(2f, 0f, 0f) + new Vector3(0f, 0.11f, 0f);
+        ball.Position = keeper.Position - new Vector3(from, 0f, 0f) + new Vector3(0f, 0.11f, 0f);
         ball.Velocity = Vector3.Zero;
         brain.Update(Dt, ball, rng, OnBall(ball.Position, vel, next: next, touchTick: 2, behind: offFoot, covers: covers));
         return brain;
@@ -161,13 +161,100 @@ public class KeeperHomeTests
     [Fact]
     public void APounceStartsOnABallOffTheFootInsideHisReachAndNotOnOneAtTheFoot()
     {
-        Assert.True(2f > T.Keeper.SmotherReach && 2f <= T.Keeper.HullRadius + Core.Keeper.PounceReach(Wall, T));
+        // (1.6 m off: beyond a smother from where he stands, inside a pounce)
+        Assert.True(1.6f > T.Keeper.SmotherReach);
         var pushed = PounceRig(1.2f, 0.8f);
         Assert.True(pushed.Report.Pounced);
         Assert.Equal(KeeperMode.Pounce, pushed.Thought.Mode);
         var atFoot = PounceRig(0.3f, 0.05f);
         Assert.False(atFoot.Report.Pounced);
         Assert.True(atFoot.IsSet);
+    }
+
+    [Fact]
+    public void HeDoesNotPounceOnABallHisHandsGetToLaterThanPounceMaxS()
+    {
+        // 2.2 m off, at rest: his hands would take longer than pounce_max_s; 1.6 m off they would not
+        var hands = new Vector3(0f, Wall.HeightM * T.Keeper.HomeHeightFraction, 0f);
+        Assert.True(KeeperBrain.PounceHandsS(hands, new Vector3(2.2f, T.Ball.Radius, 0f), T) > T.Keeper.PounceMaxS);
+        Assert.True(KeeperBrain.PounceHandsS(hands, new Vector3(1.6f, T.Ball.Radius, 0f), T) < T.Keeper.PounceMaxS);
+        var far = PounceRig(1.2f, 0.8f, from: 2.2f);
+        Assert.False(far.Report.Pounced);
+        Assert.NotEqual(KeeperMode.Pounce, far.Thought.Mode);
+        Assert.True(PounceRig(1.2f, 0.8f, from: 1.6f).Report.Pounced);
+    }
+
+    /// <summary>
+    /// Set on a carrier, then the ball rolls across in front of him at <paramref name="speed"/> m/s, passing <paramref name="pass"/> m
+    /// from him, the attacker's next touch far off: true when he pounces (whatever his misjudgement, drawn from <paramref name="seed"/>).
+    /// </summary>
+    static bool PouncesOnACrossingBall(float speed, float pass, ulong seed)
+    {
+        var (brain, keeper, ball) = Rig(At(8f, 0f, 0.11f), At(2.5f));
+        var rng = new SimRng(seed);
+        var vel = new Vector3(1.5f, 0f, 0f);
+        for (int i = 0; i < 6; i++) brain.Update(Dt, ball, rng, OnBall(ball.Position, vel));
+        Assert.True(brain.IsSet);
+        ball.Position = keeper.Position + new Vector3(-pass, 0.11f, -1.6f);
+        ball.Velocity = new Vector3(0f, 0f, speed);
+        for (int i = 0; i < 6; i++)
+        {
+            brain.Update(Dt, ball, rng, OnBall(ball.Position, ball.Velocity, next: 1.0f, touchTick: 2 + i, behind: 2f));
+            if (brain.Report.Pounced) return true;
+            ball.Position += ball.Velocity * Dt;
+        }
+        return false;
+    }
+
+    [Fact]
+    public void HeDoesNotPounceOnABallHisHandsCannotReachFirst()
+    {
+        // a ball across his front at 12 m/s, 1 m from him, is past before his hands get there: no pounce, whatever he misjudges
+        for (ulong seed = 1; seed <= 40; seed++) Assert.False(PouncesOnACrossingBall(12f, 1f, seed), $"seed {seed}");
+        // the same ball at 3 m/s he reaches first
+        Assert.True(PouncesOnACrossingBall(3f, 1f, 1));
+    }
+
+    [Fact]
+    public void MirroringWhereTheRunTakesTheBallHeGivesGroundAndIsNotTakenRoundByACarrierRunningPastHim()
+    {
+        // a carrier 5.9 m in front of him sprints past his side toward the goal line beside the post (7.4 m/s): mirroring the ball
+        // where his run takes it he gives ground with him and stays goal-side; mirroring the ball where it is, the ball gets level with him
+        var still = new Tuning();
+        still.Keeper.MirrorLookaheadS = 0f;
+        var (leadMargin, leadTop) = RunPast(T);
+        var (stillMargin, _) = RunPast(still);
+        Assert.True(leadMargin > -T.Keeper.RoundedMarginM, $"the ball {-leadMargin:F2} m nearer his line than he is");
+        Assert.True(leadMargin >= stillMargin + 0.5f, $"margin {leadMargin:F2} m, {stillMargin:F2} m without the lead");
+        // (no faster than his set stance allows: mirror_speed across, his backpedal toward goal)
+        float m = Core.Keeper.MirrorSpeed(Wall, T), b = MathF.Max(Core.Keeper.BackpedalSpeed(Wall, T), m);
+        Assert.True(leadTop <= MathF.Sqrt(m * m + b * b) + 0.01f, $"top speed {leadTop:F2} m/s");
+    }
+
+    /// <summary>
+    /// Set on a carrier 5.9 m in front of him, a little wide, who then sprints past his side toward a point 3 m off the line and 4 m
+    /// out, the ball at his foot: the least his depth exceeds the ball's (negative: the ball nearer his line) and his top speed.
+    /// </summary>
+    static (float Margin, float Top) RunPast(Tuning t)
+    {
+        var (brain, keeper, ball) = Rig(At(10.6f, -1.9f, 0.11f), At(4.8f, -0.9f), t);
+        var rng = new SimRng(3);
+        var inVel = new Vector3(7f, 0f, 0f);
+        for (int i = 0; i < 12; i++) brain.Update(Dt, ball, rng, OnBall(ball.Position, inVel));
+        Assert.True(brain.IsSet);
+        var to = At(3f, -4f, 0.11f);
+        float margin = float.PositiveInfinity, top = 0f;
+        for (int i = 0; i < (int)(1.2f / Dt) && P.GoalLineX - ball.Position.X > 3.1f; i++)
+        {
+            var run = Vector3.Normalize(new Vector3(to.X - ball.Position.X, 0f, to.Z - ball.Position.Z)) * 7.4f;
+            ball.Position += run * Dt;
+            ball.Velocity = run;
+            brain.Update(Dt, ball, rng, OnBall(ball.Position, run, next: 0.05f, touchTick: 1 + i / 30));
+            if (brain.Thought.Mode is not (KeeperMode.Set or KeeperMode.Mirror)) break;
+            top = MathF.Max(top, keeper.Speed);
+            margin = MathF.Min(margin, (P.GoalLineX - ball.Position.X) - Depth(keeper));
+        }
+        return (margin, top);
     }
 
     [Fact]

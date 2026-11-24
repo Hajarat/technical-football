@@ -601,10 +601,8 @@
       "at99": 5.5
     },
     "mirror_lead_m": 1.75,
-    "pounce_reach_m": {
-      "at1": 2,
-      "at99": 2.8
-    },
+    "mirror_lookahead_s": 0.3,
+    "pounce_max_s": 0.3,
     "pounce_margin_s": {
       "at1": 0.12,
       "at99": 0.02

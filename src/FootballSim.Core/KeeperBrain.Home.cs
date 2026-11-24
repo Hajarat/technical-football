@@ -101,7 +101,7 @@ public sealed partial class KeeperBrain
     /// <c>backpedal_speed</c> toward his line. Shown as Set (Spread within <c>pre_spread_range</c>) while still, Shuffle or
     /// Backpedal while moving (from above <c>still_speed</c> until under <see cref="SetStillAgain"/>).
     /// </summary>
-    KeeperMode StepSet(float dt, Vector2 ball, Vector2 feet, float toBall)
+    KeeperMode StepSet(float dt, Vector2 ball, Vector2 feet, float toBall, Vector2 carrierVel)
     {
         var k = _t.Keeper;
         var vel = new Vector2(_k.Velocity.X, _k.Velocity.Z);
@@ -115,7 +115,11 @@ public sealed partial class KeeperBrain
             return KeeperMode.Set;
         }
         _settled = true;
-        var spot = MirrorSpot(ball, feet, _pitch, _t, MathF.Max(HomeCap(Keeper.MouthDistance(ball, _pitch)), ArcDepthFor(ball)));
+        // (he mirrors where the carrier is taking the ball, mirror_lookahead_s ahead, not where it is: a carrier running across him
+        // does not leave him trailing; the look is kept in front of the goal line)
+        var look = ball + carrierVel * k.MirrorLookaheadS;
+        look.X = MathF.Min(look.X, _pitch.GoalLineX);
+        var spot = MirrorSpot(look, feet, _pitch, _t, MathF.Max(HomeCap(Keeper.MouthDistance(look, _pitch)), ArcDepthFor(look)));
         var d = spot - feet;
         float dist = d.Length();
         float accel = Keeper.MoveAccel(_k.Sheet, _t);
@@ -172,10 +176,12 @@ public sealed partial class KeeperBrain
 
     /// <summary>
     /// The pounce, while set: a smother at the first point on the ball's predicted path, low (below <c>slide_max_height</c>) and
-    /// in his penalty area, within <c>pounce_reach_m</c> (diving) of his hull, that his hands get to (at the smother's speed, from
-    /// his feet) no later than the ball and at least <c>pounce_margin_s</c> (reflexes) before the attacker's next touch, as he
-    /// judges it with his rush misjudgement (drawn per attacker touch, as for the rush race). The forecast is the one published
-    /// this tick: a move that changes the attacker's next touch after he goes is a feint that beats him.
+    /// in his penalty area, that his hands get to (<see cref="PounceHandsS"/>: from where he holds them, at the smother's speed)
+    /// within <c>pounce_max_s</c>, no later than the ball, and at least <c>pounce_margin_s</c> (reflexes) before the attacker's
+    /// next touch. Only that last race is judged with his rush misjudgement (drawn per attacker touch, as for the rush race): he
+    /// knows how quick his own hands are, so a draw that flatters him cannot send him at a ball that has gone before he gets
+    /// there. The forecast is the one published this tick: a move that changes the attacker's next touch after he goes is a
+    /// feint that beats him.
     /// </summary>
     bool TryPounce(Ball ball, in KeeperSituation s, SimRng rng, out Vector3 point)
     {
@@ -188,8 +194,7 @@ public sealed partial class KeeperBrain
             _misjudgeTick = s.AttackerTouchTick;
             _misjudge = rng.Normal(0f, Keeper.RushMisjudgeSd(_k.Sheet, _t));
         }
-        var feet = new Vector2(_k.Position.X, _k.Position.Z);
-        float reach = k.HullRadius + Keeper.PounceReach(_k.Sheet, _t);
+        var hands = HomeFor(_k.Position);
         float margin = Keeper.PounceMargin(_k.Sheet, _t);
         float horizon = MathF.Min(k.RushLookahead, tAtt);
         const float step = 1f / 60f;
@@ -202,21 +207,26 @@ public sealed partial class KeeperBrain
             bool rest = b.Velocity == Vector3.Zero && b.OnGround;
             if (p.Y <= k.SlideMaxHeight && p.X <= _pitch.GoalLineX - 0.3f && HandsAllowedAt(p))
             {
-                float d = Vector2.Distance(new Vector2(p.X, p.Z), feet);
-                if (d <= reach)
+                var at = new Vector3(p.X, _t.Ball.Radius, p.Z);
+                float handsS = PounceHandsS(hands, at, _t);
+                if (handsS <= k.PounceMaxS && (rest || handsS <= tb) && handsS - _misjudge + margin <= tAtt)
                 {
-                    float perceived = MathF.Max(0f, d - k.HullRadius) / k.SmotherSpeed - _misjudge;
-                    if ((rest || perceived <= tb) && perceived + margin <= tAtt)
-                    {
-                        point = new Vector3(p.X, _t.Ball.Radius, p.Z);
-                        return true;
-                    }
+                    point = at;
+                    return true;
                 }
             }
             if (rest) break;
         }
         return false;
     }
+
+    /// <summary>
+    /// The seconds his hands take to get to a ball at <paramref name="at"/> in a pounce: from where he holds them
+    /// (<paramref name="hands"/>) at <c>smother_speed</c>, to within <c>smother_radius</c> plus the ball's radius of its centre (where
+    /// the smother meets it).
+    /// </summary>
+    internal static float PounceHandsS(Vector3 hands, Vector3 at, Tuning t) =>
+        MathF.Max(0f, Vector3.Distance(hands, at) - t.Keeper.SmotherRadius - t.Ball.Radius) / t.Keeper.SmotherSpeed;
 
     /// <summary>Starts a pounce: today's smother at the point, counted in the round's report.</summary>
     void StartPounce(Vector3 point)

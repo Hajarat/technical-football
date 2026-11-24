@@ -17,7 +17,7 @@ static class HumanProbe
 {
     static readonly CultureInfo Ic = CultureInfo.InvariantCulture;
 
-    enum Plan { WideSprint, StopGo, CutInside, SkillWide, ShootSet, Round, RoundClose, FeintRound, PassRound }
+    enum Plan { WideSprint, StopGo, CutInside, SkillWide, ShootSet, Round, RoundClose, FeintRound, AcrossFace, LateTurn, JogVeer, WidePost, JogBurst, PassRound }
 
     static readonly (string Name, Plan Plan, string Scenario)[] Plans =
     {
@@ -25,6 +25,8 @@ static class HumanProbe
         ("cut_inside", Plan.CutInside, "defender_duel"), ("skill_wide", Plan.SkillWide, "defender_duel"),
         ("shoot_set", Plan.ShootSet, "breakaway"), ("round", Plan.Round, "breakaway"),
         ("round_close", Plan.RoundClose, "breakaway"), ("feint_round", Plan.FeintRound, "breakaway"),
+        ("across_face", Plan.AcrossFace, "breakaway"), ("late_turn", Plan.LateTurn, "breakaway"), ("jog_veer", Plan.JogVeer, "breakaway"),
+        ("wide_post", Plan.WidePost, "breakaway"), ("jog_burst", Plan.JogBurst, "breakaway"),
         ("pass_round", Plan.PassRound, "two_v_one"),
     };
 
@@ -49,9 +51,10 @@ static class HumanProbe
         [Plan.CutInside] = (new(25f, 45f), new(null, 60f)),
         [Plan.SkillWide] = (new(35f, 55f), new(45f, 65f)),
     };
-    /// <summary>First-attack goals, % of rounds: feint_round (both attackers) and pass_round (even only).</summary>
-    static readonly Band FeintRoundGoals = new(25f, 40f);
+    /// <summary>First-attack goals, % of rounds: pass_round (even only). feint_round has no band (shoot_set neither).</summary>
     static readonly Band PassRoundGoalsEven = new(40f, 55f);
+    /// <summary>The ways round the keeper with no skill move (across_face, late_turn, jog_veer, wide_post, jog_burst): first-attack goals, %.</summary>
+    static readonly Band RoundWayGoalsEven = new(null, 20f), RoundWayGoalsFast = new(null, 30f);
     /// <summary>round and round_close: first-attack goals at most shoot_set's measured rate minus this, points.</summary>
     const float RoundBelowShootSet = 3f;
     /// <summary>defender_duel, all four plans: goals of the best plan, %.</summary>
@@ -130,6 +133,7 @@ static class HumanProbe
             {
                 Plan.WideSprint => (6f, 35f), Plan.StopGo => (5f, 30f), Plan.CutInside => (3f, 50f), Plan.SkillWide => (3.5f, 45f),
                 Plan.Round or Plan.RoundClose => (7f, 45f), Plan.FeintRound => (4f, 60f),
+                Plan.LateTurn => (3f, 65f), Plan.JogVeer => (5f, 35f), Plan.JogBurst => (4f, 35f), Plan.WidePost => (14f, 0f),
                 Plan.PassRound => (PassGap(w) + 1f, 0f), _ => (0f, 0f),
             };
             _trigger = trig * _rng.Uniform(0.9f, 1.1f);
@@ -185,6 +189,7 @@ static class HumanProbe
                 Plan.WideSprint or Plan.StopGo or Plan.CutInside or Plan.SkillWide => Duel(w, v, ref it),
                 Plan.ShootSet => ShootSet(w, v, ref it),
                 Plan.PassRound => PassRound(w, v, ref it),
+                Plan.AcrossFace or Plan.LateTurn or Plan.JogVeer or Plan.WidePost or Plan.JogBurst => GoRound(w, v, ref it),
                 _ => Breakaway(w, v, ref it),
             };
         }
@@ -310,6 +315,65 @@ static class HumanProbe
             if (v.Mine && (Clear(v.Ball, v.Keeper, w) && v.BallGoal <= TapInRange || v.BallGoal <= 6f || InPhase(w) > 2.5f))
                 return Press(w, v, ref it, v.Keeper.Y > v.Ball.Y ? -1 : 1, tapIn: true);
             return Stick(ref it, v.ToGoal, closeRound ? 0f : 1f, closeRound);
+        }
+
+        // breakaway, the ways round him with no skill move. Phases: 0 the approach, 2 going round him, 3 the finish; 4 and 5 the
+        // runs to a point (wide_post: beside the post; across_face: out wide, then across his face to the far post).
+        TickIntent GoRound(World w, in View v, ref TickIntent it)
+        {
+            var u = Norm(v.Goal - v.Ball);
+            bool close = _plan == Plan.LateTurn;
+            Vector2 Point(float offLine, float across) => new(w.Pitch.GoalLineX - offLine, across);
+            if (_plan == Plan.AcrossFace)
+            {
+                // sprints out to 15 m off the line and 4.5 m wide, then across his face to 1.5 m off the line, 3 m out on the
+                // far side, and walks it in: on at goal, a tap-in only from inside 3 m of the goal centre (or 4 s on)
+                if (_phase == 0) { _side = _rng.NextFloat() < 0.5f ? -1 : 1; Enter(w, 4); }
+                if (_phase == 4)
+                {
+                    var p = Point(15f, 4.5f * _side);
+                    if (Vector2.Distance(v.Ball, p) < 1.2f) Enter(w, 5);
+                    else return Stick(ref it, Norm(p - v.Feet), 1f);
+                }
+                if (_phase == 5)
+                {
+                    var p = Point(1.5f, -3f * _side);
+                    if (Vector2.Distance(v.Ball, p) < 1.2f || v.Ball.X > p.X) Enter(w, 3);
+                    else return Stick(ref it, Norm(p - v.Feet), 1f);
+                }
+                if (v.Mine && (v.BallGoal <= 3f || InPhase(w) > 4f)) return Press(w, v, ref it, v.Keeper.Y > v.Ball.Y ? -1 : 1, tapIn: true);
+                return Stick(ref it, v.ToGoal, 1f);
+            }
+            if (_phase == 0)
+            {
+                // at goal: wide_post sprints, late_turn under close control, jog_veer and jog_burst jog
+                if (!(v.Mine && v.KeeperBall <= _trigger)) return Stick(ref it, v.ToGoal, _plan == Plan.WidePost ? 1f : 0f, close);
+                _side = PickSide(v, v.OpenSide(v.Keeper));
+                _dir = Rot(u, _side * _angle);
+                Enter(w, _plan == Plan.WidePost ? 4 : 2);
+            }
+            if (_phase == 4)
+            {
+                // wide_post: to 3 m off the line, 4 m out on the side away from his lean, sprinting
+                var p = Point(3f, 4f * _side);
+                if (Vector2.Distance(v.Ball, p) < 1f || v.Ball.X > p.X || InPhase(w) > 6f) Enter(w, 3);
+                else return Stick(ref it, Norm(p - v.Feet), 1f);
+            }
+            if (_phase == 2)
+            {
+                // away from his lean at the plan's angle (jog_burst with sprint held) until past him, 2.5 s, or 8.5 m out wide
+                bool roundedHim = Keeper.MouthDistance(v.Ball, w.Pitch) < Keeper.MouthDistance(v.Keeper, w.Pitch) + 0.5f;
+                if (roundedHim || InPhase(w) > 2.5f || MathF.Abs(v.Feet.Y) > 8.5f) Enter(w, 3);
+                else return Stick(ref it, _dir, _plan == Plan.JogBurst ? 1f : 0f, close);
+            }
+            int open = v.Keeper.Y > v.Ball.Y ? -1 : 1;
+            float pace = _plan is Plan.WidePost or Plan.JogBurst ? 1f : 0f;
+            // wide_post shoots at the open corner once clear inside 10 m; the others tap in as round does
+            if (_plan == Plan.WidePost && v.Mine && (Clear(v.Ball, v.Keeper, w) && v.BallGoal <= 10f || v.BallGoal <= 5f || InPhase(w) > 2.5f))
+                return Press(w, v, ref it, open);
+            if (_plan != Plan.WidePost && v.Mine && (Clear(v.Ball, v.Keeper, w) && v.BallGoal <= TapInRange || v.BallGoal <= 6f || InPhase(w) > 2.5f))
+                return Press(w, v, ref it, open, tapIn: true);
+            return Stick(ref it, v.ToGoal, pace, close);
         }
 
         /// <summary>A tap-in is struck inside this distance of the goal centre once the keeper is off the line to the open post, metres.</summary>
@@ -559,7 +623,8 @@ static class HumanProbe
                     float goalPct = 100f * goals / Math.Max(1, n);
                     if (PastBands.TryGetValue(plan, out var pb))
                         ok &= Mark(marks, scGroup.Key, name, attName, "past", 100f * list.Count(r => r.Past) / Math.Max(1, n), attName == "even" ? pb.Even : pb.Fast, "%");
-                    if (plan == Plan.FeintRound) ok &= Mark(marks, scGroup.Key, name, attName, "first-attack goals", goalPct, FeintRoundGoals, "%");
+                    if (plan is Plan.AcrossFace or Plan.LateTurn or Plan.JogVeer or Plan.WidePost or Plan.JogBurst)
+                        ok &= Mark(marks, scGroup.Key, name, attName, "first-attack goals", goalPct, attName == "even" ? RoundWayGoalsEven : RoundWayGoalsFast, "%");
                     if (plan == Plan.PassRound && attName == "even") ok &= Mark(marks, scGroup.Key, name, attName, "first-attack goals", goalPct, PassRoundGoalsEven, "%");
                     if (plan is Plan.Round or Plan.RoundClose)
                     {
@@ -587,15 +652,25 @@ static class HumanProbe
                 }
                 if (scGroup.Key == "breakaway")
                 {
-                    var all = rows.Where(r => results.ContainsKey((r.Plan, attName))).SelectMany(r => results[(r.Plan, attName)]).ToList();
-                    string over = rows.Count == 4 ? "all" : string.Join("+", rows.Select(r => r.Name));
+                    // The depth and recovery bands are over the four plans they were set for (shoot_set, round, round_close,
+                    // feint_round; over the plans run when none of those is); the ways round him get the recovery line without a band.
+                    var four = rows.Where(r => r.Plan is Plan.ShootSet or Plan.Round or Plan.RoundClose or Plan.FeintRound).ToList();
+                    var banded = four.Count > 0 ? four : rows;
+                    var all = banded.Where(r => results.ContainsKey((r.Plan, attName))).SelectMany(r => results[(r.Plan, attName)]).ToList();
+                    string over = banded.Count == 4 ? "all four" : string.Join("+", banded.Select(r => r.Name));
                     var depths = all.SelectMany(r => r.Depths).OrderBy(x => x).ToArray();
-                    // (a keeper taken round who is not back by the first attack's end counts as slower than any who is)
-                    var rounded = all.Where(r => r.Rounded).Select(r => float.IsFinite(r.RecoverS) ? r.RecoverS : float.PositiveInfinity).OrderBy(x => x).ToArray();
-                    int back = rounded.Count(float.IsFinite);
+                    var (rounded, back) = Recovery(all);
                     ok &= Mark(marks, scGroup.Key, over, attName, $"keeper depth p90, carrier on the ball more than {DepthSampleBeyondM.ToString("F0", Ic)} m from him", depths.Length == 0 ? float.NaN : DefenceReport.Quantile(depths, 0.9), KeeperDepthP90, " m");
                     ok &= Mark(marks, scGroup.Key, over, attName, $"median rounded to back on the ball-to-goal line (back in {back} of {rounded.Length} rounds he was taken round)",
                         rounded.Length == 0 ? float.NaN : rounded[(rounded.Length - 1) / 2], RecoverMedian, " s");
+                    var ways = rows.Where(r => r.Plan is Plan.AcrossFace or Plan.LateTurn or Plan.JogVeer or Plan.WidePost or Plan.JogBurst && four.Count > 0).ToList();
+                    if (ways.Count > 0)
+                    {
+                        var (wr, wb) = Recovery(ways.Where(r => results.ContainsKey((r.Plan, attName))).SelectMany(r => results[(r.Plan, attName)]).ToList());
+                        float med = wr.Length == 0 ? float.NaN : wr[(wr.Length - 1) / 2];
+                        marks.Add($"   --   {scGroup.Key} {string.Join("+", ways.Select(r => r.Name))} {attName}: median rounded to back on the ball-to-goal line (back in {wb} of {wr.Length} rounds he was taken round) " +
+                                  $"{(float.IsFinite(med) ? med.ToString("F2", Ic) + " s" : float.IsPositiveInfinity(med) ? "not back" : "-")} (no band)");
+                    }
                 }
             }
         }
@@ -604,6 +679,13 @@ static class HumanProbe
         foreach (var m in marks) Console.WriteLine(m);
         Console.WriteLine(ok ? "bands: all inside" : comparison ? "bands: some MISS (a comparison run: exit 0)" : "bands: some MISS");
         return ok || comparison ? 0 : 3;
+    }
+
+    /// <summary>The rounds he was taken round, by seconds to back on the line (one not back by the first attack's end counts as slower than any who is), and how many were back.</summary>
+    static (float[] Rounded, int Back) Recovery(List<Rec> recs)
+    {
+        var rounded = recs.Where(r => r.Rounded).Select(r => float.IsFinite(r.RecoverS) ? r.RecoverS : float.PositiveInfinity).OrderBy(x => x).ToArray();
+        return (rounded, rounded.Count(float.IsFinite));
     }
 
     static bool Mark(List<string> marks, string scenario, string plan, string attacker, string what, float value, Band band, string unit)

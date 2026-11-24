@@ -1218,12 +1218,17 @@ public sealed class KeeperTuning
     /// </summary>
     public float MirrorLeadM { get; set; } = 1.75f;
     /// <summary>
-    /// Set, he pounces (a smother) on a low ball in his penalty area that comes within this distance of his hull (<see cref="HullRadius"/>),
-    /// metres, by diving (range 1.2-2.0 at 1, 2.0-2.8 at 99)...
+    /// Set, he mirrors the ball where the carrier's run takes it this far ahead (the ball plus the carrier's velocity times this),
+    /// seconds (range 0.1-0.5).
     /// </summary>
-    public RatingRange PounceReachM { get; set; } = new(2.0f, 2.8f);
+    public float MirrorLookaheadS { get; set; } = 0.3f;
     /// <summary>
-    /// ...when his hands get to it at least this much sooner than the attacker's next touch (judged with
+    /// Set, he pounces (a smother) on a low ball in his penalty area only where his hands get to it (from where he holds them, at
+    /// <see cref="SmotherSpeed"/>, to within <see cref="SmotherRadius"/> of it) within this long, seconds (range 0.2-0.4)...
+    /// </summary>
+    public float PounceMaxS { get; set; } = 0.3f;
+    /// <summary>
+    /// ...no later than the ball, and at least this much sooner than the attacker's next touch (that race judged with
     /// <see cref="RushMisjudge"/>), seconds, by reflexes (range 0.06-0.24 at 1, 0.01-0.04 at 99).
     /// </summary>
     public RatingRange PounceMarginS { get; set; } = new(0.12f, 0.02f);
