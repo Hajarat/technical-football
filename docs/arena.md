@@ -34,6 +34,16 @@ inside it once the ball is strikable or its next touch comes early enough in the
 ball, carried on at his speed to the contact, will be that close at the strike. Within 4 m of the keeper it stops sprinting
 and within 6 m takes close control. Against a defender it plays one of the styles in [defending.md](defending.md#the-probe); with a team-mate one of solo, square and through ([teammate.md](teammate.md#scripted-styles-and-bands)).
 
+## The first attack
+
+The arena keeps the ball in play, so a round goes on after a missed shot until a goal, the keeper holding the ball, the
+defender controlling it, a foul, an offside or the clock. The round report's `first_attack` block (`World.Measure.cs`) says
+how the attacking side's first go ended, which every human-probe band reads: `goal`, `ended_tick` (from Begin) and
+`ended_by`, one of `goal`, `miss` (a struck shot met the boards with no keeper, frame or defender touch since its strike),
+`held`, `dispossessed`, `foul`, `offside` and `time` (the clock, or a round ended for a value that became not-a-number). A
+parry, the frame or a block keeps the first attack on, so a rebound goal is a first-attack goal; after a clean miss a later
+goal is the round's but not the first attack's. It changes nothing in the round. A report saved before it existed has none.
+
 ## How the arena is drawn
 
 All of it is view only: `game/Pitch.cs` draws the shapes the simulation's `Pitch` already has and changes none of them.

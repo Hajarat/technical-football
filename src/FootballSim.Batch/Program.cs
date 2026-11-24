@@ -49,6 +49,14 @@ using FootballSim.Core;
 //   ... --trace-defender <seed> [--style straight|cut|skill] [--every 12]
 //                                               prints the defender's state through one scripted round
 //   ... --write-defender-replays <dir>          searches scripted rounds for each defender action and writes one replay each
+//   ... --probe human [--n 2000] [--seed 1] [--plans a,b] [--attacker even|fast] [--scenario id] [--brain contain|legacy]
+//                                               plans played like a person (TickIntent per tick) for an even and a fast attacker,
+//                                               first attacks only, with its bands (exit 3 on a miss unless --brain legacy)
+//   ... --defence-report <session dir|replay> [--any-tuning 1]
+//                                               recorded rounds from their saved reports and replays: goals per round and per first
+//                                               attack, past the defender, the keeper at each goal's strike
+//   ... --brain legacy|contain                 with any run: legacy sets every brain key of the tuning (defender.brain, keeper.brain) to
+//                                               legacy, the older bots; contain (or no flag) plays the shipped tuning
 //   ... --lock-probe [--seeds 1000] [--only behind,still_shot,first_time,flick,gesture,race,slide]
 //                                               scripted loose-ball rounds, one case per lock-on rule, with their targets
 //   ... --lock-probe --trace <case> [--seed 1]  prints one round of a case: the claim, the legs and the events
@@ -101,7 +109,13 @@ static class Cli
             tuning = again.Value!;
         }
 
+        // --brain legacy: every brain key of the tuning set to legacy (the older bots); contain or none: the shipped tuning.
+        if (HumanProbe.CheckBrain(opts) is int badBrain) return badBrain;
+        tuning = HumanProbe.ApplyBrain(opts, tuning);
+
         if (opts.TryGetValue("replay", out var replayPath)) return RunReplay(replayPath, dataDir, tuning);
+        if (opts.TryGetValue("defence-report", out var defencePath)) return DefenceReport.Run(defencePath, dataDir, tuning,
+            opts.TryGetValue("any-tuning", out var anyT) && anyT is "1" or "true");
         if (opts.TryGetValue("shot-audit", out var auditPath))
             return ShotAuditCli.Run(auditPath, opts.TryGetValue("capture", out var capId) ? capId : null, dataDir, tuning);
         if (opts.ContainsKey("skill-probe")) return SkillProbe.Run(opts, dataDir, tuning);
@@ -124,7 +138,8 @@ static class Cli
             if (probe == "shot") return ShotProbe.Run(opts, dataDir, tuning);
             if (probe == "defender") return DefenderProbe.Run(opts, dataDir, tuning);
             if (probe == "team") return MateProbe.RunTeam(opts, dataDir, tuning);
-            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, move-identity, sessions, shots, shot, aim, defender, team)"); return 2; }
+            if (probe == "human") return HumanProbe.Run(opts, dataDir, tuning);
+            if (probe != "dribble") { Console.Error.WriteLine($"Unknown probe '{probe}' (known: dribble, feel, move-identity, sessions, shots, shot, aim, defender, team, human)"); return 2; }
             return DribbleProbe.Run(opts, dataDir, tuning);
         }
 

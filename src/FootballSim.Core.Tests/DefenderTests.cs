@@ -10,6 +10,8 @@ namespace FootballSim.Core.Tests;
 public class DefenderTests
 {
     static readonly Tuning T = new();
+    /// <summary>The legacy hold-and-press bot, for the tests of its own rules.</summary>
+    static readonly Tuning LegacyT = new() { Defender = new DefenderTuning { Brain = "legacy" } };
     static readonly Scenario Duel = TestData.Scenario("defender_duel");
     static readonly PlayerSheet Striker = TestData.Player("striker_a");
     static readonly PlayerSheet Wall = TestData.Player("the_wall");
@@ -142,14 +144,14 @@ public class DefenderTests
     public void TheSideOffsetIsDrawnOncePerHoldSpellInsideItsRange()
     {
         // The defender is kept behind the attacker (not goal-side), so he holds throughout.
-        var w = Live(seed: 7);
+        var w = Live(seed: 7, tuning: LegacyT);
         var pitch = w.Pitch;
         var offsets = new List<float>();
         for (int i = 0; i < 240; i++)
         {
             w.Defender!.Position = new Vector3(1.5f, 0f, 2f);
             Step(w, new TickIntent { MoveX = 1f, Sprint = 0f });
-            Assert.Equal(DefenderMode.Hold, w.DefenderBot!.Mode);
+            Assert.Equal(DefenderMode.Drop, w.DefenderBot!.Mode);
             var b = new Vector2(w.Ball.Position.X, w.Ball.Position.Z);
             var dir = Vector2.Normalize(new Vector2(pitch.GoalLineX, 0f) - b);
             var rel = w.DefenderBot.HoldSpot - b;
@@ -174,34 +176,34 @@ public class DefenderTests
     [Fact]
     public void HePressesOnlyWhenGoalSideByTheMargin()
     {
-        var w = Live();
+        var w = Live(tuning: LegacyT);
         GiveAttackerTheBall(w);
         var goal = new Vector3(w.Pitch.GoalLineX, 0f, 0f);
         float dOpp = Vector3.Distance(w.Attacker.Position, goal);
         // Level with the attacker (inside the margin): he holds.
         w.Defender!.Position = goal + Vector3.Normalize(new Vector3(-1f, 0f, 0.4f)) * (dOpp - T.Defender.GoalSideMarginM + 0.2f);
         Step(w);
-        Assert.Equal(DefenderMode.Hold, w.DefenderBot!.Mode);
+        Assert.Equal(DefenderMode.Drop, w.DefenderBot!.Mode);
         // Goal-side by more than the margin: he presses (his first hold counts as served).
         w.Defender.Position = goal + Vector3.Normalize(new Vector3(-1f, 0f, 0.4f)) * (dOpp - T.Defender.GoalSideMarginM - 0.5f);
         Step(w);
-        Assert.Equal(DefenderMode.Press, w.DefenderBot.Mode);
+        Assert.Equal(DefenderMode.Win, w.DefenderBot.Mode);
     }
 
     [Fact]
     public void BeatenByTheOvershootHeDropsBackAndThenHoldsForHisAwarenessTime()
     {
-        var w = Live();
+        var w = Live(tuning: LegacyT);
         GiveAttackerTheBall(w);
         Step(w, default, 3);
-        Assert.Equal(DefenderMode.Press, w.DefenderBot!.Mode);
+        Assert.Equal(DefenderMode.Win, w.DefenderBot!.Mode);
         var goal = new Vector3(w.Pitch.GoalLineX, 0f, 0f);
         float dOpp = Vector3.Distance(w.Attacker.Position, goal);
         // Further from the goal than the attacker by more than the overshoot, well to the side (out of every tackle's reach).
         var beaten = goal + Vector3.Normalize(new Vector3(-1f, 0f, 0.35f)) * (dOpp + T.Defender.OvershootM + 0.3f);
         w.Defender!.Position = beaten;
         Step(w);
-        Assert.Equal(DefenderMode.Hold, w.DefenderBot.Mode);
+        Assert.Equal(DefenderMode.Drop, w.DefenderBot.Mode);
         // Goal-side again at once: he still holds, until his awareness time has run.
         float wait = T.Defender.ToActiveAfterS.Evaluate(CentreBack.Awareness);
         var goalSide = goal + Vector3.Normalize(new Vector3(-1f, 0f, 0.6f)) * (dOpp - 3f);
@@ -210,7 +212,7 @@ public class DefenderTests
         {
             w.Defender.Position = goalSide;
             Step(w);
-            if (w.DefenderBot.Mode == DefenderMode.Press) break;
+            if (w.DefenderBot.Mode == DefenderMode.Win) break;
             held++;
         }
         Assert.InRange(held * Dt, wait - 0.05f, wait + 0.05f);
@@ -232,7 +234,7 @@ public class DefenderTests
         // A defender too slow to reach the attacker, kept goal-side and far off: only the clock ends his press.
         var slow = CentreBack.Clone();
         slow.SetRating("awareness", 1);
-        var w = Live(defender: slow);
+        var w = Live(defender: slow, tuning: LegacyT);
         GiveAttackerTheBall(w);
         var far = new Vector3(w.Pitch.GoalLineX - 3f, 0f, 6f);
         int pressed = 0;
@@ -240,7 +242,7 @@ public class DefenderTests
         {
             w.Defender!.Position = far;
             Step(w);
-            if (w.DefenderBot!.Mode == DefenderMode.Press) pressed++;
+            if (w.DefenderBot!.Mode == DefenderMode.Win) pressed++;
             else if (pressed > 0) break;
         }
         Assert.InRange(pressed * Dt, 3f - 0.05f, 3f + 0.05f);
@@ -849,7 +851,7 @@ public class DefenderTests
         // The same breakaway run at the keeper, the defender kept either on the keeper's line to the ball or far out wide.
         bool Charged(bool covering)
         {
-            var w = Live(seed: 11);
+            var w = Live(seed: 11, tuning: new Tuning { Keeper = { Brain = "legacy" } });
             w.DefenderBotEnabled = false;
             var buf = new TickIntent[w.PlayerCount];
             for (int i = 0; i < 1500 && w.Outcome == Outcome.None; i++)
@@ -1076,7 +1078,7 @@ public class DefenderTests
             int won = 0;
             Parallel.For(0, n, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
             {
-                var r = RoundRunner.RunToReport(T, Duel, Striker, Wall, 1 + (ulong)i, out _, new ScriptedAttacker { Style = style }, CentreBack);
+                var r = RoundRunner.RunToReport(LegacyT, Duel, Striker, Wall, 1 + (ulong)i, out _, new ScriptedAttacker { Style = style }, CentreBack);
                 if (r.Outcome == Outcome.Dispossessed && r.Shots.Count == 0) Interlocked.Increment(ref won);
             });
             return 100f * won / n;

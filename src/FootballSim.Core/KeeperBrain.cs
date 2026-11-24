@@ -44,12 +44,14 @@ internal readonly struct KeeperSituation
 /// <summary>
 /// What decided the standing keeper's movement on a tick (a diagnostic for probes and traces; it changes no behaviour). Slide and
 /// Poke: going for a ball outside his penalty area with his feet; HoldArea: a close race for a ball outside the area, he comes
-/// to the edge of the area and no further.
+/// to the edge of the area and no further. The home keeper's: Set (braking into his stance, or still in it, on the carrier), Mirror
+/// (side-stepping or giving ground onto the carrier's line to goal), Pounce (starting a smother on a ball off the carrier's foot)
+/// and Recover (taken round, running back to his line).
 /// </summary>
-public enum KeeperMode { None, Hold, Arc, CloseDown, Charge, Jockey, Spread, Plant, Rush, Anticipate, Smother, Play, Slide, Poke, HoldArea }
+public enum KeeperMode { None, Hold, Arc, CloseDown, Charge, Jockey, Spread, Plant, Rush, Anticipate, Smother, Play, Slide, Poke, HoldArea, Set, Mirror, Pounce, Recover }
 
-/// <summary>Which bound set his closing-down depth on a tick.</summary>
-public enum KeeperLimit { None, Arc, Want, ChipCap, Gap, HoldCap, Kept, Spread }
+/// <summary>Which bound set his closing-down depth on a tick (HomeCap: the home keeper's home depth).</summary>
+public enum KeeperLimit { None, Arc, Want, ChipCap, Gap, HoldCap, Kept, Spread, HomeCap }
 
 /// <summary>
 /// Why the standing keeper did what he did on the latest tick (for probes and traces): the mode, the bound that set his depth,
@@ -61,7 +63,10 @@ public readonly record struct KeeperThought(KeeperMode Mode, KeeperLimit Limit, 
     float RaceShort, string RaceBlock, float CloseT = float.NaN, float Tolerance = float.NaN);
 
 /// <summary>
-/// The keeper's decision code (Phase D). Standing, he holds a spot on an arc off his line on the angle to the ball, biased to the
+/// The keeper's decision code (Phase D). The home keeper (keeper.brain "home", KeeperBrain.Home.cs) closes down no further than
+/// his home depth, charges no attacker on the ball, sets before the carrier is close, mirrors him, pounces on a ball pushed off
+/// his foot and runs back once taken round; the charge described below is the legacy keeper's (keeper.brain "legacy"). The rest
+/// is both keepers'. Standing, he holds a spot on an arc off his line on the angle to the ball, biased to the
 /// near post and deeper or shallower by his positioning; each new spot carries a positioning error. Once an attacker comes in
 /// with the ball he closes down along the cover line, further out as the ball comes closer, but never beyond the depth he
 /// judges he can recover from a chip, unless he charges: with the attacker coming on inside the charge range he runs at him once he
@@ -164,6 +169,8 @@ public sealed partial class KeeperBrain
         Enter(Phase.Stand);
         _hasSpot = false;
         _fromBackpedal = false;
+        _set = false;
+        _settled = false;
         SetAction(KeeperAction.Set);
         _hands = HomeFor(_k.Position);
         _k.HandPosition = _hands;
@@ -230,7 +237,9 @@ public sealed partial class KeeperBrain
                 break;
         }
         _k.HandPosition = _hands;
-        if (_phase != Phase.Stand) Thought = new KeeperThought(KeeperMode.Play, KeeperLimit.None, _engaged, float.NaN, float.NaN, float.NaN, float.PositiveInfinity, "");
+        // (the tick a pounce starts keeps its own thought, Pounce)
+        if (_phase != Phase.Stand && !(_pounce && _phaseTime == 0f))
+            Thought = new KeeperThought(KeeperMode.Play, KeeperLimit.None, _engaged, float.NaN, float.NaN, float.NaN, float.PositiveInfinity, "");
     }
 
     // ---- movement ----
@@ -299,6 +308,7 @@ public sealed partial class KeeperBrain
         _fromBackpedal = false;
         _contact = false;
         _handsOff = false;
+        _pounce = false;
         if (!_struck) { _roundSmother = true; Report.Smothered = true; }
         _feet0 = _k.Position;
         _home = HomeFor(_k.Position);

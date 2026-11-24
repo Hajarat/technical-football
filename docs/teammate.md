@@ -62,15 +62,16 @@ is measured until the carrier loses the ball. `--mate-probe --trace run --seed n
 
 | Measure | Measured (1,000 seeds) | Target |
 | --- | --- | --- |
-| Onside, of ticks | 90.0% | ≥ 90% |
-| A ground-pass lane open, of the ticks the carrier is within 12 m of the defender | 90.7% | ≥ 70% |
-| 4 to 12 m from the carrier, of ticks | 86.9% | ≥ 85% |
-| Direction reversals per second | 0.34 | < 1 |
-| A run in behind, of rounds longer than 6 s | 98.1% | ≥ 60% |
+| Onside, of ticks | 80.8% | ≥ 75% |
+| A ground-pass lane open, of the ticks the carrier is within 12 m of the defender | 95.6% | ≥ 70% |
+| 4 to 12 m from the carrier, of ticks | 92.9% | ≥ 85% |
+| Direction reversals per second | 0.71 | < 1 |
+| A run in behind, of rounds longer than 6 s | 95.5% | ≥ 60% |
 
-The onside share sits on its target. The defender presses the carrier from the start, so these rounds last 2.9 s on average
-and one run that is not rewarded with a pass costs about a second beyond the line; nearly all his offside ticks are the way
-back from a run.
+The onside target is 75% (reset by the user on 2026-11-24, from 90%): the carrier never passes, so each run costs about a
+second beyond the line, and against the containing defender rounds last long enough for a run every 4 s or so (3.6 s on
+average, 0.86 runs a round; 0.17 against the legacy bot, where onside measures 92.0%). Nearly all his offside ticks (19.0% of
+ticks) are the way back from a run.
 
 ## Against two: the defender and the keeper
 
@@ -79,10 +80,10 @@ The defender's bot is the one in [defending.md](defending.md), with three change
 - **Reaction delay.** After any strike by the attackers he makes no claim run until the ball has travelled his distance to
   it at the strike times `lock_on.reaction_ratio` (0.35 at awareness 1, 0.05 at 99), or `lock_on.reaction_max_seconds`
   (0.5 s) have passed. The pass's lane test allows him the same delay.
-- **Anchor.** With the ball loose he holds, anchored on where the ball was struck while he has not reacted, then on the
-  attackers' meeting point with it. He goes for the ball himself only when his own meeting with it is no later than theirs
+- **Anchor.** With the ball loose he plays on (drops or contains) as if the ball were where it was struck while he has not
+  reacted, then at the attackers' meeting point with it. He goes for the ball himself only when his own meeting with it is no later than theirs
   (he cuts the pass out), or they have none.
-- **The carrier** he presses is the controlled attacker, so it is the receiver from the strike on.
+- **The carrier** he contains and goes for is the controlled attacker, so it is the receiver from the strike on.
 
 The keeper reads the same carrier, and while a pass is on its way he sets himself for where it will be met instead of where
 the ball is ([keeper.md](keeper.md#with-a-team-mate)). The time both need to get across is what a square pass buys.
@@ -96,14 +97,35 @@ pass the script plays on as the receiver. `--probe team [--n 2000] [--speed 1]` 
 
 | Style | Goal | Held | Dispossessed | Band (goal) |
 | --- | --- | --- | --- | --- |
-| solo | 6.3% | 7.5% | 86.0% | 3–10% |
-| square | 18.3% | 44.0% | 36.1% | 13–24% |
-| through | 21.4% | 28.9% | 45.2% | 15–28% |
+| solo | 5.8% | 8.2% | 70.5% | 1–11% |
+| square | 27.9% | 10.6% | 58.5% | 23–33% |
+| through | 1.4% | 78.5% | 19.7% | 0–6% |
 
-Square has to beat solo by at least 10 points (measured 12.0). With `--speed 1` it also times 10,000 rounds beside
-defender_duel: played alone (the same script) two_v_one takes 1.00 times as long, and a second of play costs 1.2 to 1.7 times
-as much in the three styles (the bound is 2). The passing styles' rounds last about 9 s of play against 6, so their 10,000
-rounds take 2.1 to 2.3 times as long.
+These are regression rows set about five points either side of the containing defender's rates (seed 1), not a measure of
+difficulty; with `--brain legacy` the team probe holds the older bands (solo 3–10%, square 13–24%, through 15–28%). Square
+has to beat solo by at least 10 points (measured 22.10). With `--speed 1` it also times 10,000 rounds beside
+defender_duel; measured with the legacy bot: played alone (the same script) two_v_one takes 1.00 times as long, and a second
+of play costs 1.2 to 1.7 times as much in the three styles (the bound is 2). The passing styles' rounds last about 9 s of
+play against 6, so their 10,000 rounds take 2.1 to 2.3 times as long.
 
 `--scenario two_v_one --trace-team <seed> --style square` prints one scripted round with its passes, control changes and
 offside calls.
+
+## The human probe
+
+`--probe human` ([tools.md](tools.md), [defending.md](defending.md#the-human-probe) for how its plans play and finish) plays
+two_v_one with `pass_round`, 2,000 rounds per attacker, first attacks only: the carrier jogs at goal and draws the defender;
+he presses pass (a 6-tick tap, the stick on the team-mate) so that the pass leaves as the defender comes inside the gap + 1 m
+(a gap by the defender's jockeying, a constant in `HumanProbe.cs`: 4.0 m at 1 to 2.5 m at 99, 2.9 m for
+`centre_back`), allowing for the defender's closing speed through the pass's wind-up, and only with the team-mate onside by
+0.5 m. The receiver shoots first time (shoot pressed while the pass comes) inside 16 m of the goal centre, else after his
+first touch, low at the far corner. The band, a constant in `HumanProbe.cs`: first-attack goals 40 to 55% for the even
+attacker; the fast attacker's row has none. Measured (seed 1), with the containing defender and, for comparison, with
+`--brain legacy`:
+
+| Attacker | Defender | First attack: goal / miss / held / dispossessed | Past the defender | Band (goals) |
+| --- | --- | --- | --- | --- |
+| even | contain | 17.9 / 22.1 / 8.7 / 47.4% | 44.0% | 40 to 55% (MISS) |
+| fast | contain | 18.0 / 18.8 / 7.9 / 50.3% | 32.8% | - |
+| even | legacy | 39.4 / 20.9 / 8.3 / 31.3% | 93.6% | 40 to 55% (MISS) |
+| fast | legacy | 46.2 / 20.2 / 7.2 / 26.1% | 92.8% | - |

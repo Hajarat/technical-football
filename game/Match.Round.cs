@@ -343,7 +343,9 @@ public partial class Match
             if (_intents.Length != World.PlayerCount) _intents = new TickIntent[World.PlayerCount];
             else Array.Clear(_intents);
             var intents = _intents;
-            intents[0] = _replay != null ? _replay.IntentAt(World.Tick) : FromPad(pad);
+            // (a replay feeds every recorded player; with the defender's intents recorded his bot is off while they last)
+            if (_replay != null) _replay.Replay.Feed(World, World.Tick, intents);
+            else intents[0] = FromPad(pad);
             _closeControl = intents[0].CloseControl;
             _stick = intents[0].Move;
             _intent = intents[0];

@@ -77,10 +77,16 @@ public sealed partial class World
         /// <summary>The earliest contact: the wind-up after the press (longer by the body angle at the release) and the lead after the release.</summary>
         public int ContactTick;
         /// <summary>
-        /// Past this tick with the ball still out of reach, a shot without possession is dropped (a shot in possession never is:
+        /// Past this tick with the ball still out of reach, a shot without possession is dropped (a shot in possession is not:
         /// set when possession is lost).
         /// </summary>
         public int DeadlineTick;
+        /// <summary>
+        /// In possession past the earliest contact, the tick (plus one; 0: none) from which the controller has had no contact
+        /// planned for the strike with him and the ball nearly still: a wind-up that cannot be struck, dropped StuckSeconds
+        /// after it.
+        /// </summary>
+        public int UnplannedFrom;
         /// <summary>The kind of pass this is, or None for a shot at goal.</summary>
         public PassKind Pass;
     }
@@ -243,6 +249,7 @@ public sealed partial class World
         _flightPress = false;
         _controlled = 0; _jumpTick = int.MinValue / 2; _jumpStick = default;
         ResetPass(); _passes = 0; _received = 0; _offsides = 0; _controlChanges = 0;
+        ResetMeasures();
         _claims[0] = default; _claims[1] = default;
         Forecast.Clear();
 
@@ -413,6 +420,7 @@ public sealed partial class World
         {
             int flat = Teams[0].Count + Defender.Index;
             def = DefenderBotEnabled && State != RoundState.Outcome ? _bot!.Next(this) : IntentFor(intents, 1, Defender.Index);
+            if (!DefenderBotEnabled && DefenderBotShadow && State != RoundState.Outcome) _bot!.Next(this);
             if (_recorder != null)
             {
                 Span<TickIntent> all = stackalloc TickIntent[PlayerCount];
@@ -426,6 +434,7 @@ public sealed partial class World
         SimTime += _dt;
         StepSimulation(atk, def);
         PublishContract();
+        ObserveMeasures();
     }
 
     /// <summary>
@@ -628,7 +637,8 @@ public sealed partial class World
             // crosses the goal line.
             if (_lastShot != null && float.IsNaN(_lastShot.Landed.X) && res.BoardPoint.X >= Pitch.GoalLineX - Ball.Radius - 1e-3f)
                 _lastShot.Landed = new Vector2(res.BoardPoint.Z, res.BoardPoint.Y);
-            // Off the boards the shot is over and the ball is in play again.
+            // Off the boards the shot is over and the ball is in play again; untouched, it was a clean miss.
+            if (State == RoundState.Flight && !res.SphereHit && !res.ObstacleHit) NoteMiss();
             if (State == RoundState.Flight) State = RoundState.Live;
         }
         // A shot that dies before it reaches anything (it comes to rest) is over too, so the clock runs again.
@@ -1077,9 +1087,11 @@ public sealed partial class World
     /// <summary>
     /// The released shot, every tick until it is struck. Without possession (pressed without the ball, or the keeper took it
     /// away): struck from the earliest tick as soon as the ball is strikable, dropped after round.shoot_buffer. In possession it
-    /// is never dropped: with the ball held at the feet it is struck at the earliest tick if strikable then (otherwise it goes
-    /// on as below); else it is struck at the controller's committed contact if the ball is strikable there and the chosen
-    /// foot is the swinging foot in its contact window, and a contact missed is let go for that foot's next one.
+    /// is not dropped while a contact is planned for it: with the ball held at the feet it is struck at the earliest tick if
+    /// strikable then (otherwise it goes on as below); else it is struck at the controller's committed contact if the ball is
+    /// strikable there and the chosen foot is the swinging foot in its contact window, and a contact missed is let go for that
+    /// foot's next one; with no contact planned and he and the ball nearly still (under 0.5 m/s) for 2 s past the earliest
+    /// contact, it is dropped.
     /// </summary>
     void TryStrike()
     {
@@ -1118,12 +1130,36 @@ public sealed partial class World
             _strikeUntimed = true;
             return;
         }
-        if (a.StrikeContactTick < 0 || Tick < a.StrikeContactTick) return;
+        if (a.StrikeContactTick < 0)
+        {
+            // No contact planned for the strike and he and the ball both nearly still (the ball pinned against a board, or out of
+            // his reach): left so for StuckSeconds, nothing will bring a contact, so the wind-up is dropped like one that lost the
+            // ball and the round goes on (the clock stands still while a shot is under way).
+            bool stuck = Tick >= _pending.ContactTick && a.Speed < StuckSpeed && Ball.Velocity.Length() < StuckSpeed;
+            if (!stuck) _pending.UnplannedFrom = 0;
+            else if (_pending.UnplannedFrom == 0) _pending.UnplannedFrom = Tick + 1;
+            else if (Tick + 1 - _pending.UnplannedFrom >= Ticks(StuckSeconds)) { DropShot(); return; }
+            // The published estimate runs away when no swing within reach of the ball can be found (each search starts after
+            // the last one's answer): more than RunawaySeconds ahead, the strike will not come either. (Struck wind-ups have run at
+            // most 2.8 s ahead.) This also bounds the search, which grows with how far ahead it starts.
+            if (_strikeEstMax - Tick > Ticks(RunawaySeconds)) DropShot();
+            return;
+        }
+        _pending.UnplannedFrom = 0;
+        if (Tick < a.StrikeContactTick) return;
         Foot foot = a.StrikeContactFoot;
         a.StrikeContactTick = -1;
         if (!ShotModel.CanStrike(a, Ball, Tuning) || !TouchPlanner.FootInWindow(a, foot)) return;
         ExecuteStrike();
     }
+
+    /// <summary>
+    /// A wind-up in possession with no contact planned for it, the shooter and the ball both slower than StuckSpeed (m/s) for
+    /// StuckSeconds, cannot be struck: it is dropped. (Wind-ups that are struck in the end have been still so for 1.5 s at most.)
+    /// </summary>
+    const float StuckSpeed = 0.5f, StuckSeconds = 2f;
+    /// <summary>A wind-up in possession whose published strike estimate is more than this ahead of now is dropped, seconds.</summary>
+    const float RunawaySeconds = 5f;
 
     /// <summary>
     /// The left stick that aims a shot released now: the stick itself, or, at rest, its last pushed direction if that push was
@@ -1446,6 +1482,7 @@ public sealed partial class World
         Attacker.LastTouchFoot = result.Foot;
         Attacker.StrikeFoot = result.Foot;
         _shots.Add(result);
+        NoteStrike();
         StartReaction();
         { bool none = false; OffsideAtStrike(Attacker, null, ref none); } // (a shot's rebound cannot be tapped in by a player who was beyond the line)
         _lastShot = result;
@@ -1470,6 +1507,7 @@ public sealed partial class World
 
     void EndRound(Outcome outcome)
     {
+        NoteOutcome(outcome);
         Outcome = outcome;
         State = RoundState.Outcome;
         _outcomeLeft = Tuning.Round.OutcomeSeconds;
@@ -1531,8 +1569,9 @@ public sealed partial class World
             Ticks = _endTick,
             Clock = _endClock,
             Shots = _shots.ToArray(),
-            Keeper = _brain.Report,
+            Keeper = FinishKeeperMeasures(_brain.Report),
             Defender = FinishDefenderReport(),
+            FirstAttack = FinishFirstAttack(),
             Team = HasMates ? new TeamReport { Passes = _passes, Received = _received, Offside = Outcome == Outcome.Offside, ControlChanges = _controlChanges } : null,
         };
         State = RoundState.Report;

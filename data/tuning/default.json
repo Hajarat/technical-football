@@ -458,6 +458,7 @@
     "outside_speed": 0.92
   },
   "keeper": {
+    "brain": "home",
     "reaction": {
       "at1": 0.34,
       "at99": 0.145
@@ -583,7 +584,33 @@
     },
     "backpedal_catch_factor": 0.4,
     "pre_spread_range": 3.5,
-    "engage_range": 8.5,
+    "engage_range": 4.5,
+    "legacy_engage_range": 8.5,
+    "home_depth_m": [
+      [8, 6],
+      [12, 5],
+      [16, 3.6],
+      [20, 2.6],
+      [25, 1.7],
+      [30, 1.2]
+    ],
+    "set_gap_m": 6,
+    "set_speed": 0.5,
+    "mirror_speed": {
+      "at1": 3.5,
+      "at99": 5.5
+    },
+    "mirror_lead_m": 1.75,
+    "pounce_reach_m": {
+      "at1": 2,
+      "at99": 2.8
+    },
+    "pounce_margin_s": {
+      "at1": 0.12,
+      "at99": 0.02
+    },
+    "rounded_margin_m": 0.5,
+    "recover_depth_m": 1,
     "charge_range": 20,
     "charge_time": {
       "at1": 0.35,
@@ -869,6 +896,27 @@
     "step_over_no_burst_toward_deg": 45
   },
   "defender": {
+    "brain": "contain",
+    "engage_line_m": 16.4,
+    "last_line_m": 6.1,
+    "contain_gap_m": {
+      "at1": 4.65,
+      "at99": 2.25
+    },
+    "gap_pace_s": 0.2,
+    "gap_max_m": 5.8,
+    "gap_gain": 1.6,
+    "shade_m": 0.7,
+    "drop_sprint_distance_m": 5.7,
+    "run_with_factor": 0.86,
+    "run_with_after_s": 0.24,
+    "run_with_inside_m": 0.6,
+    "win_margin_s": [[1, 0.18], [50, 0.09], [99, 0.036]],
+    "win_horizon_s": 0.49,
+    "press_speed": 2.4,
+    "press_after_s": 0.27,
+    "recover_min_goal_m": 4.6,
+    "slide_behind_deg": 65,
     "hold_distance_m": [[8, 2.5], [20, 5]],
     "hold_offset_min_m": [[1, 3], [50, 1.5], [99, 0.5]],
     "hold_offset_max_m": [[1, 4], [50, 2], [99, 1]],
@@ -894,6 +942,10 @@
       "at99": 0.35
     },
     "barge_preference": {
+      "at1": 0.1,
+      "at99": 0.6
+    },
+    "legacy_barge_preference": {
       "at1": 0,
       "at99": 0.3
     },

@@ -219,4 +219,36 @@ public class QueuedShotTests
         var fresh = ShotInFlight();
         Assert.Equal(RoundState.Flight, fresh.State);
     }
+
+    [Fact]
+    public void AWindUpInPossessionThatCanNeverBeStruckIsDroppedAndTheRoundGoesOn()
+    {
+        foreach (ulong seed in new ulong[] { 789, 920 })
+            StuckRound(seed);
+    }
+
+    static void StuckRound(ulong seed)
+    {
+        // A scripted through-ball round (shipped tuning, seed 789) where the carrier releases a shot with the ball rolling along
+        // the side board out of his reach: no contact is ever planned for the strike, and he and the ball come to rest apart. The
+        // wind-up is dropped 2 s after that, the clock runs again and the round reaches its report. (Seed 920 is the other way
+        // it happened: the ball at rest at his feet against the goal-line board, no contact ever planned.)
+        var tuning = DataLoader.LoadTuning(Path.Combine(DataDir, "tuning", "default.json")).Value!;
+        tuning.Sheets = Sheets;
+        var sc = Scenario("two_v_one");
+        var w = new World(tuning, sc, Player("striker_a"), Player("the_wall"), seed, Player("centre_back"), Player("team_mate"));
+        var script = new ScriptedAttacker { Team = ScriptedAttacker.TeamStyle.Through };
+        w.Begin();
+        var buf = new TickIntent[w.PlayerCount];
+        int strikeTicks = 0, longest = 0;
+        for (int i = 0; i < 20000 && w.State != RoundState.Report; i++)
+        {
+            buf[0] = script.Next(w);
+            w.Step(buf);
+            strikeTicks = w.State == RoundState.Strike ? strikeTicks + 1 : 0;
+            longest = Math.Max(longest, strikeTicks);
+        }
+        Assert.Equal(RoundState.Report, w.State);
+        Assert.True(longest * tuning.Dt < 5f, $"a wind-up lasted {longest * tuning.Dt:F2} s");
+    }
 }

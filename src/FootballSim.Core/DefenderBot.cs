@@ -2,26 +2,37 @@ using System.Numerics;
 
 namespace FootballSim.Core;
 
-/// <summary>What the defender bot is at: holding his spot, pressing the attacker, or going for a loose ball.</summary>
-public enum DefenderMode { Hold, Press, Collect }
+/// <summary>
+/// What the defender bot is at: waiting on his line (Drop), giving ground in front of the carrier (Contain), running with him
+/// (RunWith), going for the ball (Win), beaten and cutting him off (Recover), or going for a loose ball (Collect). The legacy bot
+/// uses Drop for holding his spot and Win for pressing.
+/// </summary>
+public enum DefenderMode { Drop, Contain, RunWith, Win, Recover, Collect }
 
 /// <summary>
 /// The defender's bot. Each tick it reads the world and writes a <see cref="TickIntent"/>: a stick, sprint, jockey, and the
 /// tackle, slide and barge buttons. It never moves the defender itself, so a human defender goes through the same action code.
 /// <para>
-/// Hold: he stands off the ball on its line to the goal centre (closer the nearer the goal), a side offset drawn once per spell,
-/// sprinting there from far off and jockeying when near. Once he has held for his awareness time and is goal-side of the
-/// attacker by the margin, he presses: he runs at where the attacker will be shortly (the attacker's feet if that point is
-/// behind him), bending in from the side close up and steering off after a bump. With the ball between them and the attacker
-/// within the tackle distance he presses the tackle button, a lunge or, by a roll made once per press, a slide; running
-/// alongside he may barge. After his active time, or once the attacker is past him, he drops back to hold. A loose ball he
-/// goes for, at his own meeting point with it.
+/// Two bots, chosen by tuning defender.brain. The containing bot (DefenderBot.Contain.cs) waits on his engage line, gives
+/// ground in front of the carrier at a gap, runs with a carrier too fast to jockey, goes for the ball on a loose touch, a slow
+/// carrier or his last line, and when beaten runs to cut the carrier off.
 /// </para>
-/// The numbers are in tuning.defender. His draws come from his own generator, so nothing else's draws move.
+/// <para>
+/// The legacy bot (this file). Hold: he stands off the ball on its line to the goal centre (closer the nearer the goal), a side
+/// offset drawn once per spell, sprinting there from far off and jockeying when near (mode Drop). Once he has held for his
+/// awareness time and is goal-side of the attacker by the margin, he presses (mode Win): he runs at where the attacker will be
+/// shortly (the attacker's feet if that point is behind him), bending in from the side close up and steering off after a bump.
+/// With the ball between them and the attacker within the tackle distance he presses the tackle button, a lunge or, by a roll
+/// made once per press, a slide; running alongside he may barge. After his active time, or once the attacker is past him, he
+/// drops back to hold.
+/// </para>
+/// Either bot goes for a loose ball at his own meeting point with it. The numbers are in tuning.defender. His draws come from
+/// his own generator, so nothing else's draws move.
 /// </summary>
-public sealed class DefenderBot
+public sealed partial class DefenderBot
 {
     readonly SimRng _rng;
+    readonly bool _legacy;
     float _holdFor, _activeFor;
     float _offset;
     bool _offsetDrawn;
@@ -32,14 +43,17 @@ public sealed class DefenderBot
 
     /// <summary>What he is at this tick.</summary>
     public DefenderMode Mode { get; private set; }
-    /// <summary>Seconds spent pressing this round.</summary>
+    /// <summary>Seconds spent going for the ball this round (the legacy bot: pressing).</summary>
     public float TimeActive { get; private set; }
     /// <summary>The spot he holds (world X, Z), as last worked out.</summary>
     public Vector2 HoldSpot { get; private set; }
+    /// <summary>True when this is the legacy hold-and-press bot (tuning defender.brain = legacy).</summary>
+    public bool Legacy => _legacy;
 
-    internal DefenderBot(ulong seed)
+    internal DefenderBot(ulong seed, bool legacy = false)
     {
         _rng = new SimRng(seed);
+        _legacy = legacy;
         // A round starts in the middle of play: his first hold counts as served, so his first press waits only for the
         // goal-side margin. Every later hold runs its awareness time.
         _holdFor = float.PositiveInfinity;
@@ -67,7 +81,10 @@ public sealed class DefenderBot
     }
 
     /// <summary>The defender's intent for this tick.</summary>
-    internal TickIntent Next(World w)
+    internal TickIntent Next(World w) => _legacy ? NextLegacy(w) : NextContain(w);
+
+    /// <summary>The legacy bot's intent for this tick: hold, press, collect.</summary>
+    TickIntent NextLegacy(World w)
     {
         var d = w.Defender!;
         var a = w.Attacker;
@@ -95,12 +112,12 @@ public sealed class DefenderBot
         }
         if (Mode == DefenderMode.Collect) EnterHold();
 
-        if (Mode == DefenderMode.Hold)
+        if (Mode == DefenderMode.Drop)
         {
             _holdFor += dt;
             if (hasBall && dOpp >= dSelf + k.GoalSideMarginM && _holdFor >= k.ToActiveAfterS.Evaluate(awareness) && Defending.Free(d, now))
             {
-                Mode = DefenderMode.Press;
+                Mode = DefenderMode.Win;
                 _activeFor = 0f;
                 _slideRolled = false;
             }
@@ -111,14 +128,14 @@ public sealed class DefenderBot
             TimeActive += dt;
             if (!hasBall || _activeFor >= k.ActiveMaxS.Evaluate(awareness) || dSelf > dOpp + k.OvershootM) EnterHold();
         }
-        var intent = Mode == DefenderMode.Press ? Press(w, d, a, dp, ap, bp) : Hold(w, d, dp, bp);
-        intent.Barge = BargeButton(w, d);
+        var intent = Mode == DefenderMode.Win ? Press(w, d, a, dp, ap, bp) : Hold(w, d, dp, bp);
+        intent.Barge = BargeButton(w, d, k.LegacyBargePreference);
         return intent;
     }
 
     void EnterHold()
     {
-        Mode = DefenderMode.Hold;
+        Mode = DefenderMode.Drop;
         _holdFor = 0f;
         _offsetDrawn = false;
         _buttonLeft = 0f;
@@ -225,9 +242,10 @@ public sealed class DefenderBot
 
     /// <summary>
     /// The barge, in any mode but collecting: every barge_roll_s, with an opponent running alongside (see
-    /// <see cref="Defending.BargeTarget"/>), a roll against barge_preference presses the button for tackle_hold_s.
+    /// <see cref="Defending.BargeTarget"/>), a roll against <paramref name="preference"/> (by strength) presses the button for
+    /// tackle_hold_s.
     /// </summary>
-    bool BargeButton(World w, PlayerState d)
+    bool BargeButton(World w, PlayerState d, RatingRange preference)
     {
         var t = w.Tuning;
         var k = t.Defender;
@@ -237,7 +255,7 @@ public sealed class DefenderBot
         if (_bargeRollIn > 0f) return false;
         _bargeRollIn = k.BargeRollS;
         if (_buttonLeft > 0f || !Defending.Free(d, now) || now < d.Def.BargeCooldownUntil || Defending.BargeTarget(d, w.Teams[0], t) == null
-            || _rng.NextFloat() >= k.BargePreference.ForRating(d.Sheet.Strength)) return false;
+            || _rng.NextFloat() >= preference.ForRating(d.Sheet.Strength)) return false;
         _bargeLeft = k.TackleHoldS;
         return true;
     }

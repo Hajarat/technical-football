@@ -1022,6 +1022,13 @@ public sealed class ShotTuning
 /// <summary>Keeper model constants.</summary>
 public sealed class KeeperTuning
 {
+    /// <summary>
+    /// Which keeper plays: "home" (he stays inside his home depth, sets before the carrier is close, mirrors him and pounces on a
+    /// ball pushed off his foot: <see cref="HomeDepthM"/> to <see cref="RecoverDepthM"/>) or "legacy" (the keeper before it:
+    /// closing down to <see cref="CloseDownDepth"/> and <see cref="HoldGroundMaxOut"/>, charging and jockeying from
+    /// <see cref="LegacyEngageRange"/>). Allowed: home | legacy.
+    /// </summary>
+    public string Brain { get; set; } = "home";
     public RatingRange Reaction { get; set; } = new(0.34f, 0.145f);
     public float ReactionNoise { get; set; } = 0.02f;
     /// <summary>Reaction noise is clamped to this many standard deviations, so the reaction time has hard bounds.</summary>
@@ -1129,7 +1136,7 @@ public sealed class KeeperTuning
     public RatingRange RushMarginRating { get; set; } = new(3.5f, 2.5f);
     /// <summary>Each movement decision moves toward a point at most this far away, metres (3.5, from reference data).</summary>
     public float MoveTargetCap { get; set; } = 3.5f;
-    /// <summary>Closing down never takes him (or holds him) further than this from the goal mouth, metres.</summary>
+    /// <summary>Closing down never takes the legacy keeper (or holds him) further than this from the goal mouth, metres.</summary>
     public float HoldGroundMaxOut { get; set; } = 8.5f;
     /// <summary>Seconds of slack in a rush race inside which he starts toward the ball before he is sure (anticipation), by rushing_out.</summary>
     public RatingRange RushAnticipation { get; set; } = new(0.0f, 0.25f);
@@ -1138,11 +1145,12 @@ public sealed class KeeperTuning
 
     // ---- closing down ----
     /// <summary>
-    /// Closing down: how far out from the goal mouth he comes, metres, by the ball's distance from the mouth, once an attacker
-    /// comes in with the ball (scaled by <see cref="CloseDownPositioning"/>; never shallower than his arc).
+    /// Closing down (the legacy keeper): how far out from the goal mouth he comes, metres, by the ball's distance from the mouth,
+    /// once an attacker comes in with the ball (scaled by <see cref="CloseDownPositioning"/>; never shallower than his arc). The
+    /// home keeper reads <see cref="HomeDepthM"/> instead.
     /// </summary>
     public Curve CloseDownDepth { get; set; } = new((8f, 5.0f), (12f, 4.6f), (16f, 3.6f), (20f, 2.6f), (25f, 1.7f), (30f, 1.2f));
-    /// <summary>Multiplier on <see cref="CloseDownDepth"/> beyond the arc by positioning: a poorly positioned keeper comes out less.</summary>
+    /// <summary>Multiplier on <see cref="CloseDownDepth"/> (or <see cref="HomeDepthM"/>) beyond the arc by positioning: a poorly positioned keeper comes out less.</summary>
     public RatingRange CloseDownPositioning { get; set; } = new(0.6f, 1.0f);
     /// <summary>He starts closing down once the ball is within this distance of the goal mouth...</summary>
     public float CloseDownRange { get; set; } = 30f;
@@ -1177,10 +1185,55 @@ public sealed class KeeperTuning
     /// <summary>Within this distance of an attacker on the ball that he cannot beat to it, he stops and spreads (makes himself big), metres.</summary>
     public float PreSpreadRange { get; set; } = 3.5f;
     /// <summary>
-    /// Closing down an attacker on the ball who is within this distance of him and in front, he always charges him (to
-    /// <see cref="JockeyDistance"/>) instead of keeping <see cref="CloseDownGap"/>, metres.
+    /// The home keeper's charge: only with an attacker on the ball in front of him within this distance, and then to
+    /// <see cref="SetGapM"/> from the ball rather than <see cref="JockeyDistance"/>, metres (range 3.5-6).
     /// </summary>
-    public float EngageRange { get; set; } = 8.5f;
+    public float EngageRange { get; set; } = 4.5f;
+    /// <summary>
+    /// The legacy keeper: closing down an attacker on the ball who is within this distance of him and in front, he always charges
+    /// him (to <see cref="JockeyDistance"/>) instead of keeping <see cref="CloseDownGap"/>, metres.
+    /// </summary>
+    public float LegacyEngageRange { get; set; } = 8.5f;
+
+    // ---- staying home (brain home) ----
+    /// <summary>
+    /// The most the home keeper stands off his line, metres, by the ball's distance from the goal mouth: the limit on closing
+    /// down (scaled by <see cref="CloseDownPositioning"/> beyond the arc as what he wants; never below his arc). A rush race he
+    /// wins may take him further. Range: the first two points 4-7, the rest fixed.
+    /// </summary>
+    public Curve HomeDepthM { get; set; } = new((8f, 6.0f), (12f, 5.0f), (16f, 3.6f), (20f, 2.6f), (25f, 1.7f), (30f, 1.2f));
+    /// <summary>
+    /// With the attacker on the ball in front of him and closing, he sets (brakes at <see cref="PlantDecel"/> to under
+    /// <see cref="SetSpeed"/> and holds his stance) once the ball is within this distance plus the gap that closes while he brakes,
+    /// metres (range 4-7)...
+    /// </summary>
+    public float SetGapM { get; set; } = 6.0f;
+    /// <summary>...so that he is under this speed before the ball is that close, m/s (range 0.5-1.5).</summary>
+    public float SetSpeed { get; set; } = 0.5f;
+    /// <summary>Set, he side-steps onto the ball's line to goal at up to this pace, m/s, by positioning (range 3.0-4.0 at 1, 5.0-6.0 at 99).</summary>
+    public RatingRange MirrorSpeed { get; set; } = new(3.5f, 5.5f);
+    /// <summary>
+    /// Set, he gives ground (at up to <see cref="BackpedalSpeed"/>) so as to stay this much nearer the goal centre than the ball,
+    /// once the ball comes that close to level with him, metres (range 0.5-2).
+    /// </summary>
+    public float MirrorLeadM { get; set; } = 1.75f;
+    /// <summary>
+    /// Set, he pounces (a smother) on a low ball in his penalty area that comes within this distance of his hull (<see cref="HullRadius"/>),
+    /// metres, by diving (range 1.2-2.0 at 1, 2.0-2.8 at 99)...
+    /// </summary>
+    public RatingRange PounceReachM { get; set; } = new(2.0f, 2.8f);
+    /// <summary>
+    /// ...when his hands get to it at least this much sooner than the attacker's next touch (judged with
+    /// <see cref="RushMisjudge"/>), seconds, by reflexes (range 0.06-0.24 at 1, 0.01-0.04 at 99).
+    /// </summary>
+    public RatingRange PounceMarginS { get; set; } = new(0.12f, 0.02f);
+    /// <summary>
+    /// With the ball nearer his goal line than he is by more than this (taken round) and no save under way, he runs back at
+    /// <see cref="RushSpeed"/>, metres (range 0.3-1)...
+    /// </summary>
+    public float RoundedMarginM { get; set; } = 0.5f;
+    /// <summary>...to the point this far off his line on the line from the ball to the goal centre, metres (range 0.6-2).</summary>
+    public float RecoverDepthM { get; set; } = 1.0f;
 
     // ---- charging and jockeying ----
     /// <summary>
@@ -1792,31 +1845,84 @@ public sealed class RoundTuning
 }
 
 /// <summary>
-/// The defender bot: where he holds, when he presses and for how long, and when he presses the tackle buttons. Values marked
-/// (ref) are read from reference data; the others are ours. Curves "by awareness" take the rating 1..99 as x.
+/// The defender bot: which bot plays him, where he waits, how he gives ground, when he goes for the ball, and when he presses
+/// the tackle buttons. Values marked (ref) are read from reference data; the others are ours. Curves "by awareness" take the
+/// rating 1..99 as x. The ranges in brackets are how far a probe may move a value.
 /// </summary>
 public sealed class DefenderTuning
 {
-    /// <summary>How far off the ball he holds, on its line to the goal centre, against the ball's distance from the goal centre, metres (ref 2.5 to 5; the distances are ours).</summary>
+    /// <summary>
+    /// Which bot plays him: "contain" (he drops, contains, runs with the carrier and goes for the ball on a trigger) or
+    /// "legacy" (the older hold-and-press bot, which also reads the keys marked legacy only). Anything else loads as "contain".
+    /// </summary>
+    public string Brain { get; set; } = "contain";
+
+    // ---- the containing bot ----
+
+    /// <summary>The furthest from the goal centre he steps out while the carrier is outside his gap, metres [12 to 18].</summary>
+    public float EngageLineM { get; set; } = 16.4f;
+    /// <summary>He gives no more ground than this from the goal centre, metres; on it he goes for the ball [6 to 10].</summary>
+    public float LastLineM { get; set; } = 6.1f;
+    /// <summary>The gap he keeps goal-side of the carrier, metres, by jockeying [each end within 0.75 of 4.0 and 2.5] ...</summary>
+    public RatingRange ContainGapM { get; set; } = new(4.65f, 2.25f);
+    /// <summary>... plus this much per m/s the carrier runs faster than his sprint-jockey pace, seconds [0.2 to 0.6] ...</summary>
+    public float GapPaceS { get; set; } = 0.2f;
+    /// <summary>... and never more than this, metres [5 to 7].</summary>
+    public float GapMaxM { get; set; } = 5.8f;
+    /// <summary>Containing, he corrects his distance from his spot at this many m/s per metre, per second [1 to 4].</summary>
+    public float GapGain { get; set; } = 1.6f;
+    /// <summary>His spot is this far square to the ball-to-goal line, toward the arena's long centre line, metres [0.3 to 0.9].</summary>
+    public float ShadeM { get; set; } = 0.7f;
+    /// <summary>Dropping, he runs flat out to his spot only when it is further than this and nearer the goal than he is, metres [4 to 8].</summary>
+    public float DropSprintDistanceM { get; set; } = 5.7f;
+    /// <summary>
+    /// Containing, once the speed he wants is above this share of his sprint-jockey pace [0.85 to 1.0] for run_with_after_s
+    /// [0.1 to 0.3], he turns and runs with the carrier.
+    /// </summary>
+    public float RunWithFactor { get; set; } = 0.86f;
+    public float RunWithAfterS { get; set; } = 0.24f;
+    /// <summary>Running with the carrier, he aims this far goal-side of him on the ball-to-goal line, metres [0.5 to 1.2].</summary>
+    public float RunWithInsideM { get; set; } = 0.6f;
+    /// <summary>
+    /// The loose touch: he goes for a ball the carrier has pushed ahead when his foot gets to it at least this long before the
+    /// carrier's next touch, seconds, by awareness [each value times 0.5 to 1.5] ...
+    /// </summary>
+    public Curve WinMarginS { get; set; } = new((1f, 0.18f), (50f, 0.09f), (99f, 0.036f));
+    /// <summary>... looking this far ahead along the ball's path, seconds [0.4 to 0.8].</summary>
+    public float WinHorizonS { get; set; } = 0.49f;
+    /// <summary>The slow carrier: under this speed, m/s [1.5 to 3], for press_after_s, seconds [0.2 to 0.6], he goes for the ball.</summary>
+    public float PressSpeed { get; set; } = 2.4f;
+    public float PressAfterS { get; set; } = 0.27f;
+    /// <summary>Beaten, the point he runs to cut the carrier off is never nearer the goal centre than this, metres [2 to 5].</summary>
+    public float RecoverMinGoalM { get; set; } = 4.6f;
+    /// <summary>
+    /// He does not slide with his bearing to the ball within this of the carrier's heading and the carrier's body nearer him
+    /// than the ball (from behind), degrees [35 to 70].
+    /// </summary>
+    public float SlideBehindDeg { get; set; } = 65f;
+
+    // ---- read by both bots, except those marked (legacy only) ----
+
+    /// <summary>(legacy only) How far off the ball he holds, on its line to the goal centre, against the ball's distance from the goal centre, metres (ref 2.5 to 5; the distances are ours).</summary>
     public Curve HoldDistanceM { get; set; } = new((8f, 2.5f), (20f, 5f));
-    /// <summary>The side offset of the hold spot, metres: drawn once per hold spell, uniform between these two, with a random sign; by awareness (ref at 1 and 50).</summary>
+    /// <summary>(legacy only) The side offset of the hold spot, metres: drawn once per hold spell, uniform between these two, with a random sign; by awareness (ref at 1 and 50).</summary>
     public Curve HoldOffsetMinM { get; set; } = new((1f, 3f), (50f, 1.5f), (99f, 0.5f));
     public Curve HoldOffsetMaxM { get; set; } = new((1f, 4f), (50f, 2f), (99f, 1f));
-    /// <summary>Holding, he sprints to his spot from further than this, metres; nearer he jockeys (ref).</summary>
+    /// <summary>(legacy only) Holding, he sprints to his spot from further than this, metres; nearer he jockeys (ref).</summary>
     public float PassiveSprintDistanceM { get; set; } = 6f;
-    /// <summary>He may press only while at least this much nearer his goal's centre than the attacker, metres.</summary>
+    /// <summary>(legacy only) He may press only while at least this much nearer his goal's centre than the attacker, metres.</summary>
     public float GoalSideMarginM { get; set; } = 0.5f;
-    /// <summary>Seconds he holds before he may press, by awareness (ref).</summary>
+    /// <summary>(legacy only) Seconds he holds before he may press, by awareness (ref).</summary>
     public Curve ToActiveAfterS { get; set; } = new((1f, 6f), (50f, 2f), (99f, 1f));
-    /// <summary>The longest a press lasts, seconds, by awareness (ref at 50 and 99).</summary>
+    /// <summary>(legacy only) The longest a press lasts, seconds, by awareness (ref at 50 and 99).</summary>
     public Curve ActiveMaxS { get; set; } = new((1f, 3f), (50f, 5f), (99f, 8f));
     /// <summary>Beaten: the attacker is this much nearer the goal centre than he is, metres (ref).</summary>
     public float OvershootM { get; set; } = 0.4f;
-    /// <summary>Pressing, he runs at where the attacker will be this many seconds on (ref).</summary>
+    /// <summary>(legacy only) Pressing, he runs at where the attacker will be this many seconds on (ref).</summary>
     public float ExtrapolateS { get; set; } = 0.5f;
-    /// <summary>Pressing, he sprints while further than this from that point, metres; nearer he runs.</summary>
+    /// <summary>(legacy only) Pressing, he sprints while further than this from that point, metres; nearer he runs.</summary>
     public float PressSprintDistanceM { get; set; } = 4f;
-    /// <summary>Pressing, with the attacker within this he jockeys in, metres, with this much of the sprint input (0 the jockey pace, 1 the sprint-jockey pace).</summary>
+    /// <summary>(legacy only) Pressing, with the attacker within this he jockeys in, metres, with this much of the sprint input (0 the jockey pace, 1 the sprint-jockey pace).</summary>
     public float PressJockeyDistanceM { get; set; } = 3f;
     public float PressJockeySprint { get; set; } = 0.75f;
     /// <summary>He lunges or slides only with the attacker within this, metres (ref).</summary>
@@ -1835,8 +1941,10 @@ public sealed class DefenderTuning
     public float TackleHoldS { get; set; } = 0.1f;
     /// <summary>The chance, drawn once per press, that his tackle in it is a slide; by slide_tackle.</summary>
     public RatingRange SlidePreference { get; set; } = new(0f, 0.35f);
-    /// <summary>The chance he barges an attacker running alongside, drawn every barge_roll_s; by strength.</summary>
-    public RatingRange BargePreference { get; set; } = new(0f, 0.3f);
+    /// <summary>The chance he barges an attacker running alongside, drawn every barge_roll_s; by strength (the containing bot).</summary>
+    public RatingRange BargePreference { get; set; } = new(0.1f, 0.6f);
+    /// <summary>(legacy only) The same chance for the legacy bot.</summary>
+    public RatingRange LegacyBargePreference { get; set; } = new(0f, 0.3f);
     public float BargeRollS { get; set; } = 0.25f;
     /// <summary>The keeper neither charges nor rushes while the defender is within this half-angle of his line to the ball, degrees.</summary>
     public float KeeperYieldConeDeg { get; set; } = 25f;

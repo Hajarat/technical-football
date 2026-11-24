@@ -16,14 +16,20 @@ static class DefenderProbe
     /// <summary>
     /// The bands per style: the share of rounds in which the defender wins the ball from the dribble, that is, the round ends
     /// DISPOSSESSED with no shot struck, in percent. (The scripted attacker stands still after its shot, so the rounds that end
-    /// DISPOSSESSED after one say little about the duel; they are printed beside it.)
+    /// DISPOSSESSED after one say little about the duel; they are printed beside it.) They are regression rows set about five
+    /// points either side of the measured rates, not difficulty targets; the legacy bot (defender.brain = legacy) keeps its own.
     /// </summary>
     public static readonly Dictionary<string, (float Lo, float Hi)> DispossessedBands = new()
     {
+        ["straight"] = (85f, 95f), ["cut"] = (17f, 27f), ["skill"] = (10f, 20f),
+    };
+    public static readonly Dictionary<string, (float Lo, float Hi)> LegacyDispossessedBands = new()
+    {
         ["straight"] = (65f, 85f), ["cut"] = (30f, 45f), ["skill"] = (20f, 35f),
     };
-    /// <summary>Shots blocked, percent of all the styles' shots together, and fouls, percent of rounds (every style).</summary>
-    public static readonly (float Lo, float Hi) BlockedBand = (10f, 25f);
+    /// <summary>Shots blocked, percent of all the styles' shots together (the legacy bot's beside it), and fouls, percent of rounds (every style).</summary>
+    public static readonly (float Lo, float Hi) BlockedBand = (29f, 39f);
+    public static readonly (float Lo, float Hi) LegacyBlockedBand = (10f, 25f);
     public const float FoulMax = 5f;
 
     public sealed class Tally
@@ -100,6 +106,7 @@ static class DefenderProbe
         int n = opts.TryGetValue("n", out var ns) ? int.Parse(ns, Ic) : 2000;
         ulong seed = opts.TryGetValue("seed", out var ss) ? ulong.Parse(ss, Ic) : 1UL;
         var styles = (opts.TryGetValue("styles", out var st) ? st : "straight,cut,skill,shoot").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        bool legacy = tuning.Defender.Brain == "legacy";
         string field = "";
         var values = new List<int?> { null };
         if (opts.TryGetValue("sweep", out var sweep))
@@ -126,11 +133,12 @@ static class DefenderProbe
                                   $"{t.WonBy[(int)TackleKind.Auto]}/{t.WonBy[(int)TackleKind.Lunge]}/{t.WonBy[(int)TackleKind.Slide]}/{t.WonBy[(int)TackleKind.None]} | " +
                                   $"{(t.Active / Math.Max(1, t.N)).ToString("F2", Ic),7}  {(t.Clock / Math.Max(1, t.N)).ToString("F2", Ic),6}  | {F(100f * t.KeeperCharged / Math.Max(1, t.N))}%/{F(100f * t.KeeperRushed / Math.Max(1, t.N))}%");
                 if (v != null) continue;
-                if (DispossessedBands.TryGetValue(style, out var band))
+                if ((legacy ? LegacyDispossessedBands : DispossessedBands).TryGetValue(style, out var band))
                     ok &= Check($"{style}: ball won from the dribble (DISPOSSESSED, no shot)", 100f * t.CleanWins / Math.Max(1, t.N), band.Lo, band.Hi);
                 ok &= Check($"{style}: fouls", t.FoulPct, 0f, FoulMax);
             }
-            if (v == null && styles.Length == 4) ok &= Check("all styles: shots blocked", 100f * blocks / Math.Max(1, shots), BlockedBand.Lo, BlockedBand.Hi);
+            var blockedBand = legacy ? LegacyBlockedBand : BlockedBand;
+            if (v == null && styles.Length == 4) ok &= Check("all styles: shots blocked", 100f * blocks / Math.Max(1, shots), blockedBand.Lo, blockedBand.Hi);
         }
         Console.WriteLine(ok ? "bands: all inside" : "bands: OUTSIDE (see above)");
         return ok ? 0 : 3;
