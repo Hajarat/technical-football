@@ -280,7 +280,7 @@ public class DefenderContainTests
     }
 
     [Fact]
-    public void ACarrierStandingStillAtTwentyMetresGetsNoCreepPastTheEngageLineThenTheSlowTriggerSendsHim()
+    public void ACarrierStandingStillAtTwentyMetresGetsNoCreepPastTheEngageLineThenTheSlowTriggerSendsHimAfterTheFarWait()
     {
         var w = Live();
         GiveAttackerTheBall(w);
@@ -297,7 +297,8 @@ public class DefenderContainTests
             if (w.DefenderBot!.WinsSlow > 0) { sentAt = i; break; }
             Assert.True(Vector2.Distance(G(d.Position), Goal) <= engage + 0.3f, "crept past the engage line before the slow trigger");
         }
-        Assert.InRange(sentAt * T.Dt, 0f, 1.5f);
+        // (20 m out is beyond his engage line and his gap: the far wait, press_far_after_s, not press_after_s)
+        Assert.InRange(sentAt * T.Dt, T.Defender.PressFarAfterS - 0.1f, T.Defender.PressFarAfterS + 0.1f);
         Assert.Equal(DefenderMode.Win, w.DefenderBot!.Mode);
         // Sent, he goes out to the carrier.
         float before = Vector2.Distance(G(d.Position), G(a.Position));
@@ -508,6 +509,83 @@ public class DefenderContainTests
                     Assert.True(w.Keeper.KeeperAction is not (KeeperAction.Rush or KeeperAction.Charge), $"seed {seed}: the keeper went for a ball the defender covers ({w.Keeper.KeeperAction})");
             }
         }
+    }
+
+
+    // ---- the play-test's three ways past him ----
+
+    [Fact]
+    public void ASlowCarrierNearHisEngageLineDrawsHimAfterPressAfterSecondsAndOneFarOutOnlyAfterTheFarWait()
+    {
+        var k = T.Defender;
+        float gap = DefenderBot.GapFor(CentreBack, 0f, T);
+        foreach (bool far in new[] { false, true })
+        {
+            var w = Live();
+            GiveAttackerTheBall(w);
+            var d = w.Defender!;
+            float fromGoal = far ? k.EngageLineM + gap + 4f : k.EngageLineM + gap - 0.5f;
+            Place(w, DuelPitch.GoalLineX - fromGoal, 0f);
+            d.Position = new Vector3(DuelPitch.GoalLineX - (k.EngageLineM - 1f), 0f, 0f);
+            int sentAt = -1;
+            for (int i = 0; i < 600 && sentAt < 0; i++)
+            {
+                Step(w);
+                if (w.DefenderBot!.WinsSlow > 0) sentAt = i + 1;
+            }
+            float expect = far ? k.PressFarAfterS : k.PressAfterS;
+            Assert.InRange(sentAt * T.Dt, expect - 0.05f, expect + 0.1f);
+        }
+    }
+
+    [Fact]
+    public void ClosingOnAStillCarrierHeArrivesUnderControlAndLungesOnlyAtABallInsideHisReach()
+    {
+        var w = Idle(out var d);
+        float decel = T.Defending.JockeyDecel;
+        bool closed = false;
+        for (int i = 0; i < 360 && w.BallController == w.Attacker; i++)
+        {
+            Step(w);
+            if (w.DefenderBot!.Mode != DefenderMode.Win) continue;
+            float dist = Vector2.Distance(G(d.Position), G(w.Ball.Position));
+            // no faster than he can stop from short of the ball (half a metre a second of slack: his brakes lag the cap a little)
+            float cap = MathF.Max(0.5f, MathF.Sqrt(2f * decel * MathF.Max(0f, dist - 0.6f)));
+            if (dist < 3f) Assert.True(d.Speed <= cap + 0.5f, $"closing at {d.Speed:F2} m/s {dist:F2} m from the ball");
+            if (w.Events.Any(e => e.Kind == EventKind.TackleStart))
+                Assert.True(dist <= Defending.LungeReach(d, w.Ball.Position, T) + 0.2f, $"lunged at a ball {dist:F2} m away");
+            closed |= dist < 1.5f;
+        }
+        Assert.True(closed, "he never closed on the still carrier");
+    }
+
+    [Fact]
+    public void SteppedOffHisLineWithTheCarrierNearHeContainsAndDropsAgainOnlyOnceBackWithinHalfOfIt()
+    {
+        var w = Live(tuning: NoWin);
+        GiveAttackerTheBall(w);
+        var a = w.Attacker;
+        var d = w.Defender!;
+        var k = T.Defender;
+        float gap = DefenderBot.GapFor(CentreBack, 0f, T);
+        // The carrier walks at goal, outside the gap but within twice it; the defender stands on his engage line.
+        Place(w, DuelPitch.GoalLineX - (k.EngageLineM + 1.6f * gap), 0f);
+        Vector3 At(float off) => new(DuelPitch.GoalLineX - k.EngageLineM, 0f, off);
+        var walk = new TickIntent { MoveX = 0.3f, CloseControl = true };
+        d.Position = At(0f); d.Velocity = Vector3.Zero;
+        Step(w, walk);
+        Assert.Equal(DefenderMode.Drop, w.DefenderBot!.Mode);
+        d.Position = At(k.DropOfflineM + 0.4f); d.Velocity = Vector3.Zero;
+        Step(w, walk);
+        Assert.Equal(DefenderMode.Contain, w.DefenderBot.Mode);
+        // Between half the threshold and the threshold he stays containing (no flicker) ...
+        d.Position = At(0.75f * k.DropOfflineM); d.Velocity = Vector3.Zero;
+        Step(w, walk);
+        Assert.Equal(DefenderMode.Contain, w.DefenderBot.Mode);
+        // ... and drops again once back within half of it.
+        d.Position = At(0.2f * k.DropOfflineM); d.Velocity = Vector3.Zero;
+        Step(w, walk);
+        Assert.Equal(DefenderMode.Drop, w.DefenderBot.Mode);
     }
 
     // ---- replays ----

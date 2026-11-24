@@ -4,11 +4,13 @@ namespace FootballSim.Core;
 
 // The containing bot (tuning defender.brain = contain). Each tick, on his feet:
 //   Drop     the carrier is outside his gap: he goes to his spot on the ball's line to the goal centre at the jockey pace,
-//            never further out than engage_line_m, running flat out only to a spot well behind him;
+//            never further out than engage_line_m, running flat out only to a spot well behind him; with the carrier near
+//            and himself stepped off his line, he contains instead;
 //   Contain  the carrier is inside his gap: he backs off at the carrier's pace along the line, facing him, correcting toward
 //            his spot by gap_gain;
 //   RunWith  the speed that asks for is beyond his jockey: he turns and runs on the carrier's goal-side shoulder;
-//   Win      a loose touch he gets to first, a slow carrier, or his last line: he goes for the ball and presses a button;
+//   Win      a loose touch he gets to first, a slow carrier (far out, only after press_far_after_s), or his last line: he
+//            goes for the ball, arriving under control, and presses a button;
 //   Recover  beaten: he runs to the point on the carrier's way to goal that he reaches first;
 //   Collect  a loose ball he goes for, as the legacy bot does.
 // Stumbling, stunned or on the ground he presses no button and keeps his mode until he is free again.
@@ -36,6 +38,8 @@ public sealed partial class DefenderBot
 
     /// <summary>Once containing, he drops again only with the carrier this much beyond the gap, metres (so he does not flicker).</summary>
     const float ContainExitM = 0.5f;
+    /// <summary>Closing on a slow carrier he can stop this far short of the ball, metres, and never crawls slower than this, m/s.</summary>
+    const float ArriveShortM = 0.6f, ArriveMinSpeed = 0.5f;
     /// <summary>Within this of last_line_m (and further from goal than it is less) he is on his last line, metres.</summary>
     const float LastLineTolM = 0.3f;
     /// <summary>The shade grows from nothing with the ball on the long centre line to shade_m this far off it, metres.</summary>
@@ -144,6 +148,11 @@ public sealed partial class DefenderBot
         bool beaten = hasBall && dSelf > dOpp + k.OvershootM;
         float margin = k.WinMarginS.Evaluate(d.Sheet.Awareness);
         var spotIn = SpotFor(bp, dOpp, gap, false, w.Pitch, t);
+        // (stepping across: with the carrier within twice his gap, more than drop_offline_m off his shaded line he contains; he
+        // drops again only once back within half of it)
+        float offLine = MathF.Abs(Vector2.Dot(dp - spotIn, new Vector2(-u.Y, u.X)));
+        bool near = hasBall && dOpp - dSelf <= 2f * gap;
+        bool across = near && offLine > k.DropOfflineM, stillAcross = near && offLine > 0.5f * k.DropOfflineM;
         // (Contain's velocity: the carrier's along the line, plus the gain toward his spot; Run with is left on its speed toward goal)
         var want = u * Vector2.Dot(vc, u) + (spotIn - dp) * k.GapGain;
 
@@ -165,7 +174,8 @@ public sealed partial class DefenderBot
             if (Mode != DefenderMode.Win && hasBall)
             {
                 if (LooseRace(w, d, a, margin, out _winPoint)) EnterWin(WinTrigger.Loose);
-                else if (!beaten && _slowFor >= k.PressAfterS) EnterWin(WinTrigger.Slow);
+                // (a slow carrier further out than his engage line and his gap draws him only once he has been slow for press_far_after_s)
+                else if (!beaten && _slowFor >= k.PressAfterS && (dOpp <= k.EngageLineM + gap || _slowFor >= k.PressFarAfterS)) EnterWin(WinTrigger.Slow);
                 else if (!beaten && inside && dSelf <= k.LastLineM + LastLineTolM && bd - gap <= k.LastLineM) EnterWin(WinTrigger.LastLine);
             }
             if (Mode != DefenderMode.Win)
@@ -173,8 +183,8 @@ public sealed partial class DefenderBot
                 if (beaten) Mode = DefenderMode.Recover;
                 else if (Mode == DefenderMode.Recover) Mode = inside ? DefenderMode.Contain : DefenderMode.Drop;
                 else if (Mode == DefenderMode.RunWith && Vector2.Dot(vc, u) < slowJ) Mode = inside ? DefenderMode.Contain : DefenderMode.Drop;
-                else if (Mode == DefenderMode.Drop && inside) Mode = DefenderMode.Contain;
-                else if (Mode == DefenderMode.Contain && !inside) Mode = DefenderMode.Drop;
+                else if (Mode == DefenderMode.Drop && (inside || across)) Mode = DefenderMode.Contain;
+                else if (Mode == DefenderMode.Contain && !inside && !stillAcross) Mode = DefenderMode.Drop;
             }
         }
 
@@ -426,7 +436,12 @@ public sealed partial class DefenderBot
             }
             dir = SteerOffBump(w, d, dir);
             it = new TickIntent { MoveX = dir.X, MoveZ = dir.Y, Sprint = 1f, Jockey = true };
-            if (canPress && da <= k.TackleMaxDistanceM && BallBetween(ap, bp, dp, t))
+            // He arrives under control: no faster than he can stop from at jockey_decel ArriveShortM short of the ball.
+            float slowJ = Movement.JockeyTopSpeed(d.Sheet, 0f, t);
+            float vcap = MathF.Max(ArriveMinSpeed, MathF.Sqrt(2f * t.Defending.JockeyDecel * MathF.Max(0f, dist - ArriveShortM)));
+            if (vcap < slowJ) { it.Sprint = 0f; float m = vcap / slowJ; it.MoveX = dir.X * m; it.MoveZ = dir.Y * m; }
+            // (and the ball inside his lunge's reach: he does not lunge at a ball still at the carrier's feet out of it)
+            if (canPress && da <= k.TackleMaxDistanceM && BallBetween(ap, bp, dp, t) && dist <= Defending.LungeReach(d, w.Ball.Position, t))
             {
                 if (!_slideRolled)
                 {

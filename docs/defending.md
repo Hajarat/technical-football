@@ -40,7 +40,9 @@ line" runs from the ball (or, against a team with the ball loose, the anchor) to
 - **Drop** (the carrier outside the gap). He goes to his spot jockeying, facing the carrier, easing in no faster than he can
   brake from at `jockey_decel`; the sprint-jockey pace only toward a spot nearer goal than he is, and a run (no jockey) only
   to such a spot further than `drop_sprint_distance_m` away. So he never sprints up the pitch, and while the carrier is far
-  off he waits on his engage line.
+  off he waits on his engage line. With the carrier within twice his gap and himself more than `drop_offline_m` off his
+  shaded line (the carrier cutting across him), he contains instead of dropping; he drops again only once the carrier is
+  outside the gap and he is back within half of `drop_offline_m`.
 - **Contain** (inside the gap). The velocity he asks for is the carrier's velocity along the line plus `gap_gain` times the
   distance from him to his spot, jockeying at whatever share of the sprint-jockey pace that needs.
 - **Run with.** Once that velocity has been above `run_with_factor` of his sprint-jockey pace for `run_with_after_s`, with
@@ -56,12 +58,15 @@ line" runs from the ball (or, against a team with the ball loose, the anchor) to
     is inside his slide (slide reach plus the slide's foot), and he is not behind the carrier (his bearing to the ball within
     `slide_behind_deg` of the carrier's heading with the carrier's body nearer him than the ball). The spell holds while the
     race still holds with no margin.
-  - *slow*: the carrier under `press_speed` for `press_after_s`. He closes on the ball at the sprint-jockey pace, bending in
-    from the ball's side close up, and with the attacker within `tackle_max_distance_m` and the ball between them presses
-    tackle, or slide by a roll against `slide_preference` made once per spell (never from behind). It ends when the carrier
-    speeds up past `press_speed`.
-  - *last line*: on his last line (within 0.3 m of `last_line_m`) with the carrier inside the gap: he closes and tackles the
-    same way, giving no more ground.
+  - *slow*: the carrier under `press_speed` for `press_after_s`, or, with the carrier further from the goal centre than
+    `engage_line_m` plus the gap, for `press_far_after_s` (so a carrier who sets off slowly from far out does not draw him up
+    the pitch, while one who stands on the ball still does). He closes on the ball at the sprint-jockey pace, bending in from
+    the ball's side close up, but no faster than he can stop from at `jockey_decel` 0.6 m short of the ball, so he arrives
+    under control; with the attacker within `tackle_max_distance_m`, the ball between them and inside his lunge's reach, he
+    presses tackle, or slide by a roll against `slide_preference` made once per spell (never from behind). It ends when the
+    carrier speeds up past `press_speed`.
+  - *last line*: on his last line (within 0.3 m of `last_line_m`) with the carrier inside the gap: he closes (under control)
+    and tackles the same way, giving no more ground.
   A spell ends once a pressed button's action is over, the ball has gone, or its trigger no longer holds. No button is pressed
   while the carrier's pass will be struck within `stand.exec_max_s`.
 - **Recover** (beaten: further from goal than the carrier by `overshoot_m`). He runs, easing in, at the nearest point to the
@@ -192,9 +197,9 @@ difficulty (that is the human probe's); the legacy bot is held to its own (strai
 | | band | measured (seed 1, 2,000 rounds each) |
 | --- | --- | --- |
 | straight: ball won from the dribble | 85 to 95% | 90.4% |
-| cut: ball won from the dribble | 17 to 27% | 24.8% |
+| cut: ball won from the dribble | 17 to 27% | 25.6% |
 | skill: ball won from the dribble | 10 to 20% | 15.1% |
-| shots blocked, all four styles' shots together | 29 to 39% | 34.8% |
+| shots blocked, all four styles' shots together | 29 to 39% | 35.0% |
 | fouls, each style | under 5% of rounds | 1.0 to 3.5% |
 
 The blocked share comes mostly from `shoot` (about 71% of its shots are blocked; the other styles shoot after they
@@ -225,6 +230,16 @@ offset off the ball-to-goal line, or with him on it the side with more room (a c
 - `skill_wide`: jogs at goal; with him within 3.5 m plays a step-over (sold away from the exit) or an elastico (toward it),
   by the round's coin, with the right-stick traces of the skill probe and sprint let go, then sprints out at 45 degrees on the
   wider side until level or past (or 1 s), then finishes.
+- `jog_cut`: 0.6 s at a third of the stick, then jogs at goal; with him 4 m in front along the line bursts at 45 degrees with
+  sprint for 0.4 s to the side away from his offset (a coin when he is on the line), then sprints on at 15 degrees that side
+  until past, then finishes.
+- `stand_burst`: stands on the ball until he is 2.5 m in front along the line, then bursts at 60 to 77 degrees (by round)
+  with sprint for 0.4 s to the side away from his offset, then on at 15 degrees until past, and finishes.
+- `sprint_cut`: sprints at goal from the start; with him 5 m in front along the line bursts at 60 degrees for 0.25 s, then on
+  at 15 degrees until past, and finishes.
+
+The last three are the ways past him a play-tester found (a slow start then a jog and a cut; standing until he arrives and
+bursting away; a sprint and a sharp cut); they are held to their past bands only, not pooled in "all four".
 
 "Past" is the report's `beaten_s` up to the first attack's end (see [How a round ends](#how-a-round-ends): a shot in flight is not
 the attackers' ball, so an unblocked shot struck from in front of him is not past him). The bands are the targets set for the
@@ -233,21 +248,32 @@ containing bot (seed 1, 2,000 rounds per row; seed 2 gives the same to within 0.
 
 | Plan | Attacker | First attack: goal / miss / held / dispossessed / foul | Past | Band (past) |
 | --- | --- | --- | --- | --- |
-| wide_sprint | even | 26.1 / 14.6 / 16.9 / 41.0 / 1.3% | 23.6% | at most 30% (ok) |
-| stop_go | even | 27.5 / 19.8 / 7.0 / 42.5 / 3.3% | 36.6% | at most 35% (MISS) |
-| cut_inside | even | 18.2 / 20.2 / 7.5 / 50.9 / 3.0% | 48.0% | 25 to 45% (MISS) |
-| skill_wide | even | 11.1 / 9.8 / 4.2 / 71.2 / 3.6% | 28.5% | 35 to 55% (MISS) |
-| wide_sprint | fast | 39.2 / 12.3 / 14.1 / 33.2 / 1.1% | 44.9% | 40 to 60% (ok) |
-| stop_go | fast | 37.9 / 23.9 / 5.5 / 30.9 / 1.8% | 36.1% | at most 60% (ok) |
-| cut_inside | fast | 29.4 / 27.1 / 6.6 / 35.7 / 1.1% | 60.5% | at most 60% (MISS) |
-| skill_wide | fast | 21.1 / 9.3 / 3.0 / 64.2 / 2.1% | 36.2% | 45 to 65% (MISS) |
+| wide_sprint | even | 25.4 / 15.3 / 17.2 / 40.6 / 1.3% | 23.0% | at most 30% (ok) |
+| stop_go | even | 27.4 / 19.9 / 7.2 / 42.5 / 3.0% | 37.0% | at most 35% (MISS) |
+| cut_inside | even | 18.4 / 20.3 / 7.2 / 50.8 / 3.0% | 47.7% | 25 to 45% (MISS) |
+| skill_wide | even | 10.9 / 9.9 / 4.5 / 71.0 / 3.5% | 29.0% | 35 to 55% (MISS) |
+| jog_cut | even | 28.6 / 17.6 / 13.2 / 35.0 / 5.0% | 66.0% | at most 25% (MISS) |
+| stand_burst | even | 13.5 / 9.3 / 2.8 / 73.5 / 0.8% | 30.5% | at most 25% (MISS) |
+| sprint_cut | even | 27.6 / 13.4 / 12.2 / 39.8 / 6.7% | 66.7% | at most 25% (MISS) |
+| wide_sprint | fast | 39.2 / 12.1 / 14.6 / 33.3 / 0.9% | 45.1% | 40 to 60% (ok) |
+| stop_go | fast | 38.1 / 23.9 / 5.7 / 30.7 / 1.5% | 36.0% | at most 60% (ok) |
+| cut_inside | fast | 24.9 / 20.6 / 6.2 / 46.9 / 1.1% | 45.1% | at most 60% (ok) |
+| skill_wide | fast | 21.2 / 9.1 / 2.8 / 64.3 / 2.2% | 36.2% | 45 to 65% (MISS) |
+| jog_cut | fast | 39.6 / 11.9 / 11.9 / 30.6 / 5.7% | 83.5% | at most 45% (MISS) |
+| stand_burst | fast | 17.4 / 4.6 / 2.4 / 75.3 / 0.1% | 27.4% | at most 45% (ok) |
+| sprint_cut | fast | 42.9 / 9.9 / 8.5 / 28.3 / 10.2% | 88.3% | at most 45% (MISS) |
 
 | All four plans | Even: measured (band) | Fast: measured (band) |
 | --- | --- | --- |
-| first-attack goals of the best plan | 27.5%, stop_go (12 to 22%, MISS) | 39.2%, wide_sprint (25 to 38%, MISS) |
-| median time to get past, rounds that got past | 2.60 s (3.0 s or more, MISS) | 2.30 s (2.5 s or more, MISS) |
-| tackles (lunges and slides) tried per round | 0.75 (0.5 or more, ok) | 0.69 (0.5 or more, ok) |
-| fouls | 2.8% (under 6%, ok) | 1.5% (under 6%, ok) |
+| first-attack goals of the best plan | 27.4%, stop_go (12 to 22%, MISS) | 39.2%, wide_sprint (25 to 38%, MISS) |
+| median time to get past, rounds that got past | 2.61 s (3.0 s or more, MISS) | 2.31 s (2.5 s or more, MISS) |
+| tackles (lunges and slides) tried per round | 0.75 (0.5 or more, ok) | 0.67 (0.5 or more, ok) |
+| fouls | 2.7% (under 6%, ok) | 1.5% (under 6%, ok) |
+
+The burst plans still get past a defender who waits on his engage line: the carrier reaches him at 6 to 7 m/s and turns
+sideways while he is still flat-footed. Making him give ground earlier (with the carrier a fraction of a second further off)
+holds those bursts but leaves the 12 m shot free in front of him and stops pace beating him on the outside, which the other
+rows do not allow.
 
 With `--brain legacy` (the same seeds) the legacy bot measures: past 77.8 / 25.6 / 71.0 / 52.7% (even) and 78.7 / 27.1 / 65.3 /
 57.8% (fast) for the four plans in this order, goals of the best plan 32.0% and 43.5%, median time past 2.03 s and 2.06 s,

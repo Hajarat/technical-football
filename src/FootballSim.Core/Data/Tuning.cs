@@ -1893,6 +1893,13 @@ public sealed class DefenderTuning
     /// <summary>The slow carrier: under this speed, m/s [1.5 to 3], for press_after_s, seconds [0.2 to 0.6], he goes for the ball.</summary>
     public float PressSpeed { get; set; } = 2.4f;
     public float PressAfterS { get; set; } = 0.27f;
+    /// <summary>
+    /// A slow carrier further from the goal centre than engage_line_m plus his gap draws him only once he has been slow this long,
+    /// seconds [1 to 3].
+    /// </summary>
+    public float PressFarAfterS { get; set; } = 1.5f;
+    /// <summary>With the carrier within twice his gap, he contains once more than this off his shaded line, metres [0.5 to 2].</summary>
+    public float DropOfflineM { get; set; } = 1f;
     /// <summary>Beaten, the point he runs to cut the carrier off is never nearer the goal centre than this, metres [2 to 5].</summary>
     public float RecoverMinGoalM { get; set; } = 4.6f;
     /// <summary>

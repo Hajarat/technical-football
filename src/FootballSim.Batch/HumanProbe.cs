@@ -17,12 +17,13 @@ static class HumanProbe
 {
     static readonly CultureInfo Ic = CultureInfo.InvariantCulture;
 
-    enum Plan { WideSprint, StopGo, CutInside, SkillWide, ShootSet, Round, RoundClose, FeintRound, PassRound }
+    enum Plan { WideSprint, StopGo, CutInside, SkillWide, ShootSet, Round, RoundClose, FeintRound, PassRound, JogCut, StandBurst, SprintCut }
 
     static readonly (string Name, Plan Plan, string Scenario)[] Plans =
     {
         ("wide_sprint", Plan.WideSprint, "defender_duel"), ("stop_go", Plan.StopGo, "defender_duel"),
         ("cut_inside", Plan.CutInside, "defender_duel"), ("skill_wide", Plan.SkillWide, "defender_duel"),
+        ("jog_cut", Plan.JogCut, "defender_duel"), ("stand_burst", Plan.StandBurst, "defender_duel"), ("sprint_cut", Plan.SprintCut, "defender_duel"),
         ("shoot_set", Plan.ShootSet, "breakaway"), ("round", Plan.Round, "breakaway"),
         ("round_close", Plan.RoundClose, "breakaway"), ("feint_round", Plan.FeintRound, "breakaway"),
         ("pass_round", Plan.PassRound, "two_v_one"),
@@ -41,6 +42,9 @@ static class HumanProbe
         static string F(float x) => x.ToString(x == MathF.Round(x) ? "F0" : "F1", Ic);
     }
 
+    /// <summary>Past the defender, % of rounds, for the play-test's three plans: (even, fast).</summary>
+    static readonly (Band Even, Band Fast) JogCutPast = (new(null, 25f), new(null, 45f)), StandBurstPast = (new(null, 25f), new(null, 45f)),
+        SprintCutPast = (new(null, 25f), new(null, 45f));
     /// <summary>Past the defender, % of rounds, per defender_duel plan: (even, fast).</summary>
     static readonly Dictionary<Plan, (Band Even, Band Fast)> PastBands = new()
     {
@@ -48,7 +52,13 @@ static class HumanProbe
         [Plan.StopGo] = (new(null, 35f), new(null, 60f)),
         [Plan.CutInside] = (new(25f, 45f), new(null, 60f)),
         [Plan.SkillWide] = (new(35f, 55f), new(45f, 65f)),
+        // (the play-test's three ways past him, set by the user on 2026-11-24)
+        [Plan.JogCut] = JogCutPast,
+        [Plan.StandBurst] = StandBurstPast,
+        [Plan.SprintCut] = SprintCutPast,
     };
+    /// <summary>The defender_duel plans "all four" pools (the play-test's three are held to their past bands only).</summary>
+    static bool AllFour(Plan p) => p is Plan.WideSprint or Plan.StopGo or Plan.CutInside or Plan.SkillWide;
     /// <summary>First-attack goals, % of rounds: feint_round (both attackers) and pass_round (even only).</summary>
     static readonly Band FeintRoundGoals = new(25f, 40f);
     static readonly Band PassRoundGoalsEven = new(40f, 55f);
@@ -129,11 +139,12 @@ static class HumanProbe
             (float trig, float ang) = plan switch
             {
                 Plan.WideSprint => (6f, 35f), Plan.StopGo => (5f, 30f), Plan.CutInside => (3f, 50f), Plan.SkillWide => (3.5f, 45f),
+                Plan.JogCut => (4f, 45f), Plan.StandBurst => (2.5f, 68.5f), Plan.SprintCut => (5f, 60f),
                 Plan.Round or Plan.RoundClose => (7f, 45f), Plan.FeintRound => (4f, 60f),
                 Plan.PassRound => (PassGap(w) + 1f, 0f), _ => (0f, 0f),
             };
             _trigger = trig * _rng.Uniform(0.9f, 1.1f);
-            _angle = ang + _rng.Uniform(-5f, 5f);
+            _angle = plan == Plan.StandBurst ? _rng.Uniform(60f, 77f) : ang + _rng.Uniform(-5f, 5f);
             _wait = plan == Plan.StopGo ? 0.4f * _rng.Uniform(0.8f, 1.2f) : 0f;
             _range = plan == Plan.ShootSet ? _rng.Uniform(11f, 13f) : ShootRange * _rng.Uniform(0.92f, 1.08f);
             _aimJitter = _rng.Uniform(-0.3f, 0.3f);
@@ -183,6 +194,7 @@ static class HumanProbe
             return _plan switch
             {
                 Plan.WideSprint or Plan.StopGo or Plan.CutInside or Plan.SkillWide => Duel(w, v, ref it),
+                Plan.JogCut or Plan.StandBurst or Plan.SprintCut => Burst(w, v, ref it),
                 Plan.ShootSet => ShootSet(w, v, ref it),
                 Plan.PassRound => PassRound(w, v, ref it),
                 _ => Breakaway(w, v, ref it),
@@ -249,6 +261,44 @@ static class HumanProbe
                     return Finish(w, v, ref it);
             }
         }
+
+        // The play-test's three ways past him: an approach, a sprint burst to the side away from his offset once he is a trigger
+        // distance in front along the line, then on at 15 degrees that side until past, and finish.
+        //   jog_cut: 0.6 s at a third of the stick, then a jog; at 4 m a 45-degree burst for 0.4 s.
+        //   stand_burst: stands on the ball until he is 2.5 m in front, then bursts at 60 to 77 degrees for 0.4 s.
+        //   sprint_cut: sprints from the start; at 5 m a 60-degree burst for 0.25 s.
+        TickIntent Burst(World w, in View v, ref TickIntent it)
+        {
+            var d = v.Defender!.Value;
+            var u = Norm(v.Goal - v.Ball);
+            bool past = PastDefender(v);
+            if (_phase == 0)
+            {
+                float along = Vector2.Dot(d - v.Ball, u);
+                if (!(v.Mine && along > 0f && along <= _trigger))
+                {
+                    if (_plan == Plan.StandBurst && v.Mine) return it;
+                    if (_plan == Plan.JogCut && w.SimTime < JogCutSlowS) return Stick(ref it, v.ToGoal, 0f, size: JogCutSlowStick);
+                    return Stick(ref it, v.ToGoal, _plan == Plan.SprintCut ? 1f : 0f);
+                }
+                float across = Vector2.Dot(d - v.Ball, new Vector2(-u.Y, u.X));
+                _side = MathF.Abs(across) > 0.2f ? (across > 0f ? -1 : 1) : (_rng.NextFloat() < 0.5f ? -1 : 1);
+                _dir = Rot(u, _side * _angle);
+                Enter(w, 1);
+            }
+            if (_phase == 1)
+            {
+                if (InPhase(w) < (_plan == Plan.SprintCut ? 0.25f : 0.4f)) return Stick(ref it, _dir, 1f);
+                Enter(w, 2);
+            }
+            if (past || v.BallGoal <= _range) return Finish(w, v, ref it);
+            return Stick(ref it, Rot(u, _side * BurstOnDeg), 1f);
+        }
+
+        /// <summary>jog_cut's slow start: this long at this much of the stick, seconds and share.</summary>
+        const float JogCutSlowS = 0.6f, JogCutSlowStick = 0.3f;
+        /// <summary>After the burst the play-test's plans carry on at this angle off the line to goal, degrees.</summary>
+        const float BurstOnDeg = 15f;
 
         /// <summary>The ticks of a skill gesture (the skill probe's traces: a step-over forward then to its side, an elastico back then to its side).</summary>
         const int Gesture = 30;
@@ -573,9 +623,9 @@ static class HumanProbe
                     }
                 }
                 // the summary rows of the scenario, for this attacker
-                if (scGroup.Key == "defender_duel")
+                if (scGroup.Key == "defender_duel" && rows.Any(r => AllFour(r.Plan) && results.ContainsKey((r.Plan, attName))))
                 {
-                    var duel = rows.Where(r => results.ContainsKey((r.Plan, attName))).Select(r => (r.Name, Recs: results[(r.Plan, attName)])).ToList();
+                    var duel = rows.Where(r => AllFour(r.Plan) && results.ContainsKey((r.Plan, attName))).Select(r => (r.Name, Recs: results[(r.Plan, attName)])).ToList();
                     var best = duel.OrderByDescending(r => r.Recs.Count(x => x.Goal)).ThenBy(r => r.Name, StringComparer.Ordinal).First();
                     var all = duel.SelectMany(r => r.Recs).ToList();
                     var pastT = all.Where(r => r.Past).Select(r => r.PastS).OrderBy(x => x).ToArray();

@@ -62,15 +62,15 @@ is measured until the carrier loses the ball. `--mate-probe --trace run --seed n
 
 | Measure | Measured (1,000 seeds) | Target |
 | --- | --- | --- |
-| Onside, of ticks | 80.7% | ≥ 75% |
-| A ground-pass lane open, of the ticks the carrier is within 12 m of the defender | 95.6% | ≥ 70% |
-| 4 to 12 m from the carrier, of ticks | 93.0% | ≥ 85% |
-| Direction reversals per second | 0.71 | < 1 |
-| A run in behind, of rounds longer than 6 s | 95.4% | ≥ 60% |
+| Onside, of ticks | 80.9% | ≥ 75% |
+| A ground-pass lane open, of the ticks the carrier is within 12 m of the defender | 96.6% | ≥ 70% |
+| 4 to 12 m from the carrier, of ticks | 93.1% | ≥ 85% |
+| Direction reversals per second | 0.96 | < 1 |
+| A run in behind, of rounds longer than 6 s | 94.7% | ≥ 60% |
 
 The onside target is 75% (reset by the user on 2026-11-24, from 90%): the carrier never passes, so each run costs about a
-second beyond the line, and against the containing defender rounds last long enough for a run every 4 s or so (3.6 s on
-average, 0.86 runs a round; 0.17 against the legacy bot, where onside measures 92.0%). Nearly all his offside ticks (19.1% of
+second beyond the line, and against the containing defender rounds last long enough for a run every 4 to 5 s (4.1 s on
+average, 0.91 runs a round; 0.17 against the legacy bot, where onside measures 92.0%). Nearly all his offside ticks (18.9% of
 ticks) are the way back from a run.
 
 ## Against two: the defender and the keeper
@@ -97,13 +97,13 @@ pass the script plays on as the receiver. `--probe team [--n 2000] [--speed 1]` 
 
 | Style | Goal | Held | Dispossessed | Band (goal) |
 | --- | --- | --- | --- | --- |
-| solo | 5.5% | 8.1% | 71.0% | 1–11% |
-| square | 26.8% | 11.8% | 58.4% | 23–33% |
-| through | 1.4% | 78.3% | 19.8% | 0–6% |
+| solo | 5.4% | 7.9% | 71.2% | 1–11% |
+| square | 25.1% | 11.3% | 58.7% | 23–33% |
+| through | 1.1% | 79.0% | 19.6% | 0–6% |
 
 These are regression rows set about five points either side of the containing defender's rates (seed 1), not a measure of
 difficulty; with `--brain legacy` the team probe holds the older bands (solo 3–10%, square 13–24%, through 15–28%). Square
-has to beat solo by at least 10 points (measured 21.30). With `--speed 1` it also times 10,000 rounds beside
+has to beat solo by at least 10 points (measured 19.75). With `--speed 1` it also times 10,000 rounds beside
 defender_duel; measured with the legacy bot: played alone (the same script) two_v_one takes 1.00 times as long, and a second
 of play costs 1.2 to 1.7 times as much in the three styles (the bound is 2). The passing styles' rounds last about 9 s of
 play against 6, so their 10,000 rounds take 2.1 to 2.3 times as long.
@@ -125,7 +125,7 @@ attacker; the fast attacker's row has none. Measured (seed 1), with the containi
 
 | Attacker | Defender | First attack: goal / miss / held / dispossessed | Past the defender | Band (goals) |
 | --- | --- | --- | --- | --- |
-| even | contain | 19.0 / 21.1 / 10.4 / 46.8% | 46.5% | 40 to 55% (MISS) |
-| fast | contain | 17.9 / 19.1 / 7.4 / 50.2% | 33.2% | - |
+| even | contain | 19.5 / 21.2 / 10.3 / 45.7% | 45.8% | 40 to 55% (MISS) |
+| fast | contain | 17.9 / 19.6 / 7.5 / 49.9% | 33.5% | - |
 | even | legacy | 39.4 / 20.9 / 8.3 / 31.3% | 93.6% | 40 to 55% (MISS) |
 | fast | legacy | 46.2 / 20.2 / 7.2 / 26.1% | 92.8% | - |

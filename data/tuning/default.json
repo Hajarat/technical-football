@@ -915,6 +915,8 @@
     "win_horizon_s": 0.49,
     "press_speed": 2.4,
     "press_after_s": 0.27,
+    "press_far_after_s": 1.5,
+    "drop_offline_m": 1,
     "recover_min_goal_m": 4.6,
     "slide_behind_deg": 65,
     "hold_distance_m": [[8, 2.5], [20, 5]],
