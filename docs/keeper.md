@@ -40,10 +40,13 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
   (`KeeperMode.Set`; shown as `Spread` within `pre_spread_range` of the ball, else `Set`), so a change of direction does not
   catch him running. He stays set while the attacker keeps the ball within `set_gap_m` + 2 m of him and has not taken it past
   him (below).
-- **Mirror.** Set and under `set_speed`, each tick his spot is on the line from the ball to the goal centre at his own distance
-  from the goal centre, less however much the ball's distance from it has fallen below his own plus `mirror_lead_m`: he holds
-  his distance until the ball comes that close to level with him, then gives ground to stay `mirror_lead_m` nearer the goal
-  centre than the ball. The spot is never deeper off his line than his home depth (or his arc) for the ball, never nearer the
+- **Mirror.** Set and under `set_speed`, he mirrors the ball where the carrier's run takes it: the ball plus the carrier's
+  velocity times `mirror_lookahead_s` (kept in front of the goal line). Each tick his spot is on the line from that point to the
+  goal centre at his own distance from the goal centre, less however much the point's distance from it has fallen below his own
+  plus `mirror_lead_m`: he holds his distance until the point comes that close to level with him, then gives ground to stay
+  `mirror_lead_m` nearer the goal centre than it. So a carrier running past his side toward the goal line, or across his face,
+  has him giving ground and stepping across with the run rather than trailing it, and the ball does not get level with him. The
+  spot is never deeper off his line than his home depth (or his arc) for that point, never nearer the
   goal centre than `arc_min_from_line`, never behind the line `arc_min_from_line` in front of his goal line; a ball on the goal
   centre gives the line straight out. He moves there (`move_accel`, slowing to arrive) at up to `mirror_speed` (positioning)
   across the line from the goal centre to him and `backpedal_speed` toward goal (`KeeperMode.Mirror` while moving, shown as
@@ -51,10 +54,12 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
   his stance).
 - **Pounce.** Set (braking into it or mirroring), with the ball low in his penalty area, he pounces at the first point on the
   ball's predicted path (from the forecast published that tick, up to the attacker's next touch or `rush_lookahead`) that is
-  below `slide_max_height`, in his area, within `pounce_reach_m` (diving) of his hull (`hull_radius` from his centre), and
-  that his hands reach (at `smother_speed` over the distance beyond his hull) no later than the ball and at least
-  `pounce_margin_s` (reflexes) before the attacker's next touch, as he judges it with `rush_misjudge` (drawn per attacker touch,
-  as for the rush race). The pounce is a smother from then on: it holds, blocks or misses, and leaves him `Grounded`, then
+  below `slide_max_height` and in his area, where his hands get to it (from where he holds them, at `smother_speed`, to within
+  `smother_radius` plus the ball's radius of it) within `pounce_max_s`, no later than the ball, and at least `pounce_margin_s`
+  (reflexes) before the attacker's next touch. Only that last race is judged with `rush_misjudge` (drawn per attacker touch, as
+  for the rush race): he knows how quick his own hands are, so a draw that flatters him does not send him at a ball that is gone
+  before his hands get there, and he does not dive from 3 to 5 m at a dribbler, who can play the ball again before he arrives.
+  The pounce is a smother from then on: it holds, blocks or misses, and leaves him `Grounded`, then
   getting up. A skill move that changes the attacker's next touch after he goes is a feint that beats him. A ball at the
   attacker's foot (his next touch due now) is never pounced on.
 - **Run back.** Taken round (the ball nearer his goal line than he is by more than `rounded_margin_m`) and standing (no save
@@ -254,7 +259,7 @@ close-control approach he jockeys and pounces on, a step-over that beats him, a 
 ## The human probe
 
 `--probe human` ([tools.md](tools.md), [defending.md](defending.md#the-human-probe) for how its plans play and finish)
-runs four breakaway plans, 2,000 rounds each for the even (`striker_a`) and the fast attacker (`pace_star`), first attacks
+runs nine breakaway plans, 2,000 rounds each for the even (`striker_a`) and the fast attacker (`pace_star`), first attacks
 only:
 
 - `shoot_set`: jogs at goal and shoots low (driven) at the far corner once the ball, carried on through the wind-up, will be
@@ -267,34 +272,69 @@ only:
 - `feint_round`: sprints at goal, close control inside 8 m of him; within 4 m plays a step-over sold toward the side he leans
   to (the skill probe's trace) and goes out the other way at 60 degrees, then taps in as above.
 
+Five more are the ways round him a person takes with no skill move (each trigger distance jittered by 10% and each angle by
+5 degrees per round):
+
+- `across_face`: sprints out to 15 m off the goal line and 4.5 m wide (a side drawn per round), then diagonally across his face
+  to 1.5 m off the line and 3 m out on the far side, and walks it in: on at goal, a tap-in only from inside 3 m of the goal
+  centre (or 4 s on).
+- `late_turn`: close control straight at him; with him within 3 m, the stick 65 degrees away from his lean, until past him (or
+  2.5 s, or 8.5 m out wide); taps in as `round` does, under close control.
+- `jog_veer`: jogs straight at him; within 5 m veers 35 degrees away from his lean, still jogging; taps in as `round` does.
+- `wide_post`: sprints at goal; with him within 14 m, sprints to 3 m off the goal line and 4 m out on the side away from his
+  lean, then at goal, and shoots low at the open corner once he is off the line to the open post inside 10 m (or inside 5 m,
+  or 2.5 s on).
+- `jog_burst`: jogs straight at him; within 4 m veers 35 degrees away from his lean with sprint held; taps in as `round` does,
+  sprinting.
+
 Bands, constants in `HumanProbe.cs`: `round` and `round_close` at most `shoot_set`'s measured first-attack goals minus 3
-points (same attacker); `feint_round` 25 to 40%; over all four plans the p90 of his depth off his line on the ticks the
-carrier has the ball more than 8 m from him, at most 6.5 m, and the median time from taken round to back on the line, at most
-1.5 s (a keeper taken round who is not back before the first attack ends counts as slower than any who is; the probe plays on
-0.5 s after the first attack ends, then stops). `shoot_set` has no band. Measured with the shipped tuning (seed 1; `--seed 2`
-gives the same table to within 0.1 point, since the rounds' seeds are the run's seed plus 0 to 1,999):
+points (same attacker); the five ways round him at most 20% (even) and 30% (fast); over the first four
+plans the p90 of his depth off his line on the ticks the carrier has the ball more than 8 m from him, at most 6.5 m, and the
+median time from taken round to back on the line, at most 1.5 s (a keeper taken round who is not back before the first attack
+ends counts as slower than any who is; the probe plays on 0.5 s after the first attack ends, then stops). The five ways round
+him get that recovery line too, without a band. `shoot_set` has no band, and neither has `feint_round`: the user dropped its
+band (25 to 40%) on 2026-11-24, until skill moves get their own design. Measured with the shipped tuning (seed 1):
 
 | Plan | Attacker | First attack: goal / miss / held | Band (goals) |
 | --- | --- | --- | --- |
-| shoot_set | even | 62.5 / 21.8 / 14.6% | - |
-| round | even | 8.6 / 43.5 / 47.9% | at most 59.5% (ok) |
-| round_close | even | 15.8 / 1.8 / 82.5% | at most 59.5% (ok) |
-| feint_round | even | 37.1 / 21.1 / 41.7% | 25 to 40% (ok) |
-| shoot_set | fast | 77.6 / 11.1 / 10.4% | - |
-| round | fast | 13.3 / 19.9 / 66.8% | at most 74.6% (ok) |
-| round_close | fast | 20.3 / 3.5 / 76.2% | at most 74.6% (ok) |
-| feint_round | fast | 24.9 / 25.1 / 50.1% | 25 to 40% (MISS) |
+| shoot_set | even | 63.2 / 23.7 / 11.9% | - |
+| round | even | 1.9 / 11.2 / 86.8% | at most 60.2% (ok) |
+| round_close | even | 2.2 / 0.3 / 97.5% | at most 60.2% (ok) |
+| feint_round | even | 11.8 / 2.5 / 85.6% | - |
+| across_face | even | 10.4 / 0.3 / 89.2% | at most 20% (ok) |
+| late_turn | even | 0.4 / 0.0 / 99.6% | at most 20% (ok) |
+| jog_veer | even | 8.2 / 5.5 / 86.3% | at most 20% (ok) |
+| wide_post | even | 3.1 / 3.1 / 93.8% | at most 20% (ok) |
+| jog_burst | even | 6.2 / 27.3 / 66.5% | at most 20% (ok) |
+| shoot_set | fast | 79.1 / 11.4 / 8.5% | - |
+| round | fast | 0.5 / 1.3 / 98.2% | at most 76.1% (ok) |
+| round_close | fast | 0.0 / 0.0 / 100.0% | at most 76.1% (ok) |
+| feint_round | fast | 0.1 / 0.0 / 99.8% | - |
+| across_face | fast | 11.2 / 0.1 / 88.8% | at most 30% (ok) |
+| late_turn | fast | 7.0 / 1.1 / 92.0% | at most 30% (ok) |
+| jog_veer | fast | 8.4 / 11.7 / 79.9% | at most 30% (ok) |
+| wide_post | fast | 25.8 / 18.8 / 55.5% | at most 30% (ok) |
+| jog_burst | fast | 4.3 / 57.1 / 38.5% | at most 30% (ok) |
 
-| All four plans | Even: measured (band) | Fast: measured (band) |
+| | Even: measured (band) | Fast: measured (band) |
 | --- | --- | --- |
-| keeper depth p90, carrier on the ball more than 8 m from him | 4.2 m (at most 6.5 m, ok) | 4.2 m (at most 6.5 m, ok) |
-| median taken round to back on the line | 0.58 s: back in 27 of 34 rounds (at most 1.5 s, ok) | 0.55 s: back in 6 of 8 rounds (at most 1.5 s, ok) |
+| keeper depth p90 (first four plans), carrier on the ball more than 8 m from him | 4.2 m (at most 6.5 m, ok) | 4.2 m (at most 6.5 m, ok) |
+| median taken round to back on the line (first four plans) | 0.40 s: back in 2 of 4 rounds (at most 1.5 s, ok) | 0.47 s: back in 1 of 1 rounds (at most 1.5 s, ok) |
+| the same, the five ways round him (no band) | 1.82 s: back in 61 of 120 rounds | 0.35 s: back in 266 of 311 rounds |
 
-He sets about 6 to 7 m from the carrier, about 4 to 5 m off his line, and mirrors him, so going round him rarely works: in
-traced `round` rounds (even, seeds 1 to 40) he pounced on a sprint touch in about a third, and in most of the rest the carrier
-was run wide and shot from a tight angle. The shot from 11 to 13 m scores far more often than against the legacy keeper, who
-met the shooter about 3 m out. A step-over inside 4 m that draws his pounce leaves him on the ground and the goal open. The fast
-attacker's `feint_round` is just under its band (24.9%).
+He sets about 6 to 7 m from the carrier, about 4 to 5 m off his line, and mirrors the ball where the run takes it, giving
+ground with a carrier who goes past his side or across his face, so going round him rarely works; he pounces only on a ball
+his hands get to within `pounce_max_s`. The shot from 11 to 13 m scores far more often than against the legacy keeper, who met
+the shooter about 3 m out. `feint_round` scores far less than before (11.8 / 0.1%): the step-over inside 4 m used to draw his pounce from further out and
+leave the goal open; now he stays on his feet and smothers the ball as the carrier comes out of it.
+`wide_post` is the way round him that still works best for the fast attacker (25.8%): sprinting past his side to beside the
+post, the carrier is often met by the pounce late or shoots from a tight angle.
+
+Before these three rules (the keeper of 2026-11-24, the same nine plans, seed 1), first-attack goals were: `shoot_set` 62.5 /
+77.6% (even / fast), `round` 8.6 / 13.3%, `round_close` 15.8 / 20.3%, `feint_round` 37.1 / 24.9%, `across_face` 46.3 / 75.3%,
+`late_turn` 86.4 / 81.0%, `jog_veer` 64.1 / 77.7%, `wide_post` 31.9 / 43.4%, `jog_burst` 63.2 / 71.8%: he pounced from 3 to 5 m
+at a dribbler who turned as he went, went at short pounces whenever a misjudgement flattered him, and trailed a carrier
+running past him.
 
 The legacy keeper (`--brain legacy`, seed 1) charged a carrier he could reach and was then taken round with the goal open:
 `shoot_set` 13.8 / 21.8% (even / fast), `round` 95.1 / 88.0%, `round_close` 39.8 / 9.6%, `feint_round` 97.2 / 92.7%; his

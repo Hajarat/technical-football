@@ -128,7 +128,7 @@ public sealed partial class KeeperBrain
         // The home keeper sets on a carrier closing on him, then mirrors him.
         if (HomeBrain && !holdLine && !s.BallDead && !s.ShotInFlight && SetOn(s, ball2, feet, toBall, inFront))
         {
-            Think(StepSet(dt, ball2, feet, toBall));
+            Think(StepSet(dt, ball2, feet, toBall, new Vector2(s.AttackerVelocity.X, s.AttackerVelocity.Z)));
             return;
         }
 

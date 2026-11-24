@@ -242,8 +242,6 @@ public static partial class Keeper
 
     /// <summary>The home keeper's side-step pace while mirroring the carrier, m/s (positioning).</summary>
     public static float MirrorSpeed(PlayerSheet s, Tuning t) => t.Keeper.MirrorSpeed.ForRating(s.Positioning);
-    /// <summary>How far beyond his hull he pounces on a ball, metres (diving).</summary>
-    public static float PounceReach(PlayerSheet s, Tuning t) => t.Keeper.PounceReachM.ForRating(s.Diving);
     /// <summary>How much sooner than the attacker's next touch his hands must get to a ball he pounces on, seconds (reflexes).</summary>
     public static float PounceMargin(PlayerSheet s, Tuning t) => t.Keeper.PounceMarginS.ForRating(s.Reflexes);
 
