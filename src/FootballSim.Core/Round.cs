@@ -65,6 +65,20 @@ public sealed class KeeperReport
     public int DepthReversals { get; set; }
     public int DepthReversalsFirst2S { get; set; }
 
+    // Measured over the whole round (filled at its end; reports saved before these existed read them as their defaults).
+    /// <summary>True if he pounced on a ball pushed off the attacker's foot this round, and won it (no pounce exists yet: false).</summary>
+    public bool Pounced { get; set; }
+    public bool PounceWon { get; set; }
+    /// <summary>The furthest he stood off his goal line at any tick of play this round, metres.</summary>
+    public float DepthMaxM { get; set; }
+    /// <summary>
+    /// Seconds from his first being taken round (<see cref="Rounded"/>) until he was back on the line from the ball to the goal
+    /// centre (goal-side of the ball, within 0.75 m of it); null when he was not taken round or not back before the outcome.
+    /// </summary>
+    public float? RecoverS { get; set; }
+    /// <summary>At each shot's strike, his distance from the segment from the ball to the goal centre, metres.</summary>
+    public float[] OffLineAtStrikeM { get; set; } = Array.Empty<float>();
+
     /// <summary>The attacker's distances from the goal centre at which <see cref="DepthAtBandM"/> is sampled, metres.</summary>
     public static readonly float[] DepthBands = { 20f, 15f, 10f, 6f };
 
@@ -105,6 +119,40 @@ public sealed class DefenderReport
     public bool Collected { get; set; }
     /// <summary>How the ball he collected was won (None when it came loose another way, or was not collected).</summary>
     public TackleKind WonBy { get; set; }
+    /// <summary>
+    /// Seconds from the round's start to the first time the ball was past him (at least 0.5 m nearer the goal centre than he
+    /// is, with the attacking side still on the ball 0.5 s later), or null; and how: within 1.5 s of a pass, or by a dribble.
+    /// </summary>
+    public float? BeatenS { get; set; }
+    public BeatenBy BeatenBy { get; set; }
+    /// <summary>Seconds his bot spent containing and running with the carrier (no such states yet: 0).</summary>
+    public float TimeContain { get; set; }
+    public float TimeRunWith { get; set; }
+    /// <summary>Times his bot went to win the ball on a loose touch, a slow carrier or his last line (no such triggers yet: 0).</summary>
+    public int WinsLoose { get; set; }
+    public int WinsSlow { get; set; }
+    public int WinsLastLine { get; set; }
+}
+
+/// <summary>How the ball first got past the defender: not at all, within 1.5 s of a pass, or by a dribble.</summary>
+public enum BeatenBy { None, Dribble, Pass }
+
+/// <summary>
+/// How the attacking side's first attack ended: a goal; a miss (a shot met the boards with no keeper, frame or defender touch);
+/// the keeper holding the ball; the defender controlling it; a foul; an offside; or the clock.
+/// </summary>
+public enum FirstAttackEnd { Goal, Miss, Held, Dispossessed, Foul, Offside, Time }
+
+/// <summary>
+/// The round's first attack: it runs from the start until a goal, a clean miss or the round's end. A parry, the frame or a block
+/// keeps it on, so a rebound goal is a first-attack goal; after a clean miss a later goal is the round's but not the first attack's.
+/// </summary>
+public sealed class FirstAttackReport
+{
+    public bool Goal { get; set; }
+    /// <summary>The tick (from Begin) on which it ended.</summary>
+    public int EndedTick { get; set; }
+    public FirstAttackEnd EndedBy { get; set; }
 }
 
 /// <summary>The record of one round, available when the state reaches Report.</summary>
@@ -138,6 +186,13 @@ public sealed class RoundReport
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public TeamReport? Team { get; init; }
 
+    /// <summary>The first attack (see <see cref="FirstAttackReport"/>); null only in a report saved before it existed.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public FirstAttackReport? FirstAttack { get; init; }
+
     /// <summary>The report as JSON, used to compare two runs exactly.</summary>
     public string ToJson() => JsonSerializer.Serialize(this, DataLoader.Options);
+
+    /// <summary>Reads a saved report (a session log's <c>round_end</c>, for one); fields it lacks keep their defaults.</summary>
+    public static RoundReport? FromJson(string json) => JsonSerializer.Deserialize<RoundReport>(json, DataLoader.Options);
 }

@@ -158,6 +158,15 @@ his line changed direction before the shot (above 0.3 m/s held 0.1 s; mean, p95 
 and the chips tried, scored and tipped over. `--counters off` makes the scripted attacker ignore the keeper; `--close-down off`
 runs the shallow keeper (`close_down_range` 0: he holds his arc and never charges). A first shot touched by the keeper that carries on into the net counts as scored.
 
+The round report's `keeper` block is the last strike's numbers (with the round's flags before the first strike: rushed,
+charged, smothered, slid, won the ball, rounded, the band depths and the reversals) and, measured over the whole round
+(`World.Measure.cs`): `depth_max_m`, the furthest he stood off his goal line on any tick of play; `recover_s`, the seconds
+from his first being taken round (`rounded`) until he was back on the line from the ball to the goal centre (goal-side of the
+ball and within 0.75 m of it, `World.BackOnLine`), null when he was not taken round or not back before the outcome;
+`off_line_at_strike_m`, his distance from the segment from the ball to the goal centre at each shot's strike, one per shot;
+and `pounced` and `pounce_won`, false: he has no pounce yet. Reports saved before these fields read them as 0, null, empty
+and false.
+
 The scripted attacker (batch and tests) reacts to the keeper as a player would see him: jogging touches once he is within 9 m
 of the ball and close control within 6 m, taking round a keeper rushing or charging out at it within 5 m (holding the shot until past
 him), and, with a chance that grows with composure, chipping a keeper standing further off his line than his chip-safe depth
@@ -176,3 +185,45 @@ the share of his decisions by mode, depth limit and rush race (`World.KeeperThou
 prints the first N seeds every 0.25 s. `--probe-replays <dir|file>` prints that timeline for play-test replays
 (`sessions/<folder>/round-*.json`), and `--write-probe-replays <dir>` writes showcase replays (a sprint he charges and wins, a
 close-control approach he jockeys and pounces on, a step-over that beats him, a chip over him) for screenshots.
+
+## The human probe
+
+`--probe human` ([tools.md](tools.md), [defending.md](defending.md#the-human-probe) for how its plans play and finish)
+runs four breakaway plans, 2,000 rounds each for the even (`striker_a`) and the fast attacker (`pace_star`), first attacks
+only:
+
+- `shoot_set`: jogs at goal and shoots low (driven) at the far corner once the ball, carried on through the wind-up, will be
+  11 to 13 m from the goal centre (drawn per round).
+- `round`: sprints at goal; with the keeper within 7 m veers 45 degrees away from the side he leans to (the wider side when he
+  is central) and sprints on until the ball is nearer the goal mouth than he is by 0.5 m (or 1.5 s, or 8.5 m out wide), then
+  carries on at goal and taps in: a low shot at the middle of the open half of the goal (1.8 m from its centre) once he is more
+  than 1.5 m off the line to the open post inside 9 m, or inside 6 m, or 2.5 s after going round.
+- `round_close`: the same, under close control from 8 m out from him (no sprint).
+- `feint_round`: sprints at goal, close control inside 8 m of him; within 4 m plays a step-over sold toward the side he leans
+  to (the skill probe's trace) and goes out the other way at 60 degrees, then taps in as above.
+
+Bands, constants in `HumanProbe.cs`: `round` and `round_close` at most `shoot_set`'s measured first-attack goals minus 3
+points (same attacker); `feint_round` 25 to 40%; over all four plans the p90 of his depth off his line on the ticks the
+carrier has the ball more than 8 m from him, at most 6.5 m, and the median time from taken round to back on the line, at most
+1.5 s (a keeper taken round who is not back before the first attack ends counts as slower than any who is; the probe plays on
+0.5 s after the first attack ends, then stops). `shoot_set` has no band. Measured with `--brain legacy` (seed 1): today's
+keeper against bands he is not expected to meet.
+
+| Plan | Attacker | First attack: goal / miss / held | Band (goals) |
+| --- | --- | --- | --- |
+| shoot_set | even | 13.6 / 8.8 / 76.3% | - |
+| round | even | 95.5 / 4.3 / 0.1% | at most 10.6% (MISS) |
+| round_close | even | 39.7 / 0.1 / 60.2% | at most 10.6% (MISS) |
+| feint_round | even | 97.0 / 0.1 / 2.9% | 25 to 40% (MISS) |
+| shoot_set | fast | 20.8 / 3.5 / 74.3% | - |
+| round | fast | 89.2 / 9.7 / 0.5% | at most 17.8% (MISS) |
+| round_close | fast | 9.6 / 0.1 / 90.3% | at most 17.8% (ok) |
+| feint_round | fast | 92.8 / 5.7 / 0.6% | 25 to 40% (MISS) |
+
+| All four plans | Even: measured (band) | Fast: measured (band) |
+| --- | --- | --- |
+| keeper depth p90, carrier on the ball more than 8 m from him | 7.3 m (at most 6.5 m, MISS) | 8.1 m (at most 6.5 m, MISS) |
+| median taken round to back on the line | not back: back in 13 of 3,803 rounds (at most 1.5 s, MISS) | not back: back in 105 of 3,866 rounds (MISS) |
+
+Today's keeper charges a carrier he can reach and is then taken round with the goal open: hence the near-certain goals of
+`round` and `feint_round`; most `shoot_set` rounds end with him holding the ball, a shot saved or a smother as he comes out.

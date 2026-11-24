@@ -107,3 +107,20 @@ rounds take 2.1 to 2.3 times as long.
 
 `--scenario two_v_one --trace-team <seed> --style square` prints one scripted round with its passes, control changes and
 offside calls.
+
+## The human probe
+
+`--probe human` ([tools.md](tools.md), [defending.md](defending.md#the-human-probe) for how its plans play and finish) plays
+two_v_one with `pass_round`, 2,000 rounds per attacker, first attacks only: the carrier jogs at goal and draws the defender;
+he presses pass (a 6-tick tap, the stick on the team-mate) so that the pass leaves as the defender comes inside the gap + 1 m
+(a gap by the defender's jockeying, a constant in `HumanProbe.cs`: 4.0 m at 1 to 2.5 m at 99, 2.9 m for
+`centre_back`), allowing for the defender's closing speed through the pass's wind-up, and only with the team-mate onside by
+0.5 m. The receiver shoots first time (shoot pressed while the pass comes) inside 16 m of the goal centre, else after his
+first touch, low at the far corner. The band, a constant in `HumanProbe.cs`: first-attack goals 40 to 55% for the even
+attacker; the fast attacker's row has none. Measured with `--brain legacy` (seed 1): today's defender measured against a band he is not
+expected to meet:
+
+| Attacker | First attack: goal / miss / held / dispossessed | Past the defender | Band (goals) |
+| --- | --- | --- | --- |
+| even | 38.6 / 21.1 / 8.3 / 31.9% | 93.8% | 40 to 55% (MISS) |
+| fast | 45.6 / 21.3 / 7.2 / 25.6% | 93.3% | - |

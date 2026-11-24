@@ -475,6 +475,7 @@ public sealed partial class World
     DefenderReport? FinishDefenderReport()
     {
         if (_defReport != null && _bot != null) _defReport.TimeActive = _bot.TimeActive;
+        FinishDefenderMeasures(_defReport);
         return _defReport;
     }
 }

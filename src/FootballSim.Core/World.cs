@@ -238,6 +238,7 @@ public sealed partial class World
         _flightPress = false;
         _controlled = 0; _jumpTick = int.MinValue / 2; _jumpStick = default;
         ResetPass(); _passes = 0; _received = 0; _offsides = 0; _controlChanges = 0;
+        ResetMeasures();
         _claims[0] = default; _claims[1] = default;
         Forecast.Clear();
 
@@ -421,6 +422,7 @@ public sealed partial class World
         SimTime += _dt;
         StepSimulation(atk, def);
         PublishContract();
+        ObserveMeasures();
     }
 
     /// <summary>
@@ -623,7 +625,8 @@ public sealed partial class World
             // crosses the goal line.
             if (_lastShot != null && float.IsNaN(_lastShot.Landed.X) && res.BoardPoint.X >= Pitch.GoalLineX - Ball.Radius - 1e-3f)
                 _lastShot.Landed = new Vector2(res.BoardPoint.Z, res.BoardPoint.Y);
-            // Off the boards the shot is over and the ball is in play again.
+            // Off the boards the shot is over and the ball is in play again; untouched, it was a clean miss.
+            if (State == RoundState.Flight && !res.SphereHit && !res.ObstacleHit) NoteMiss();
             if (State == RoundState.Flight) State = RoundState.Live;
         }
         // A shot that dies before it reaches anything (it comes to rest) is over too, so the clock runs again.
@@ -1422,6 +1425,7 @@ public sealed partial class World
         Attacker.LastTouchFoot = result.Foot;
         Attacker.StrikeFoot = result.Foot;
         _shots.Add(result);
+        NoteStrike();
         StartReaction();
         { bool none = false; OffsideAtStrike(Attacker, null, ref none); } // (a shot's rebound cannot be tapped in by a player who was beyond the line)
         _lastShot = result;
@@ -1446,6 +1450,7 @@ public sealed partial class World
 
     void EndRound(Outcome outcome)
     {
+        NoteOutcome(outcome);
         Outcome = outcome;
         State = RoundState.Outcome;
         _outcomeLeft = Tuning.Round.OutcomeSeconds;
@@ -1507,8 +1512,9 @@ public sealed partial class World
             Ticks = _endTick,
             Clock = _endClock,
             Shots = _shots.ToArray(),
-            Keeper = _brain.Report,
+            Keeper = FinishKeeperMeasures(_brain.Report),
             Defender = FinishDefenderReport(),
+            FirstAttack = FinishFirstAttack(),
             Team = HasMates ? new TeamReport { Passes = _passes, Received = _received, Offside = Outcome == Outcome.Offside, ControlChanges = _controlChanges } : null,
         };
         State = RoundState.Report;

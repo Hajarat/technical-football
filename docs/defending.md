@@ -110,7 +110,13 @@ round ends as **DISPOSSESSED** once a loose ball has been within `control_distan
 and no faster than `control_speed` against his own velocity, for `control_s`. It ends as **FOUL** on a foul. `Outcome` has
 both, after the existing values. The round's report carries a `defender` block (auto tackles won, lunges and slides tried
 and won, blocks, barges, fouls, seconds pressing, whether he collected the ball and how it was won); a round without a
-defender has none.
+defender has none. It also says when the ball first got past him: `beaten_s`, seconds from the round's start to the first
+tick the ball was at least 0.5 m nearer the goal centre than he was with the attacking side still on the ball 0.5 s later
+(they control it or played it last, and no tackle, block or save came in that time; a goal inside it counts), or null; and
+`beaten_by`, `pass` when that tick came within 1.5 s of a pass, `dribble` otherwise, `none` when never (`World.IsPast`,
+`World.PastTick`, in `World.Measure.cs`). `time_contain`, `time_run_with`, `wins_loose`, `wins_slow` and `wins_last_line`
+are in the block and stay 0: today's bot has no such states or triggers. Reports saved before these fields read them as null,
+`none` and 0.
 
 ## The keeper yields
 
@@ -148,3 +154,49 @@ are past him). `--sweep awareness=1,50,99` (any defending rating) repeats the ta
 `--trace-defender <seed> [--style cut] [--every 12]` prints one round: the bot's mode, the action, both players, the ball,
 who has it and the events. `--write-defender-replays <dir>` searches scripted rounds for one showing each action and ending
 and writes a replay of each. `--set defender.overshoot_m=0.6,...` overrides plain tuning numbers for an experiment.
+
+## The human probe
+
+`--probe human` ([tools.md](tools.md)) plays the duel like a person: one intent per tick from what a player sees, through
+the same intents as a pad, never the scripted attacker. Each plan runs 2,000 rounds for the even attacker (`striker_a`) and
+the fast one (`data/players/pace_star.json`, the play-test Custom player's sheet), and counts the first attack only. Every
+plan finishes as a person would: a low driven shot at the far corner (the ideal power for the distance plus a person's error)
+once within 12 m of the goal centre (11 to 13 m by round), or from inside the penalty area (16.5 m) once past the defender;
+a loose ball he runs at. A little jitter from the probe's own generator, seeded from the round's seed, moves each trigger
+distance (±10%), angle (±5 degrees), wait (±20%) and the aim (±0.3 m). "The wider side" is the side away from the defender's
+offset off the ball-to-goal line, or with him on it the side with more room (a coin when central).
+
+- `wide_sprint`: sprints at goal; with him within 6 m veers 35 degrees to the wider side and sprints on until level with him
+  or past (or 2 s, or 8.5 m out wide), then goes for goal and shoots.
+- `stop_go`: sprints at goal; with him within 5 m slows to a walk under close control (the stick at 0.35) for 0.4 s, then
+  sprints at 30 degrees to the side he is not shading until level or past, then finishes.
+- `cut_inside`: sprints 30 degrees wide of goal from the start (the side with more room); with him within 3 m cuts back across
+  him at 50 degrees to the other side until level or past (or 1.2 s), then finishes.
+- `skill_wide`: jogs at goal; with him within 3.5 m plays a step-over (sold away from the exit) or an elastico (toward it),
+  by the round's coin, with the right-stick traces of the skill probe and sprint let go, then sprints out at 45 degrees on the
+  wider side until level or past (or 1 s), then finishes.
+
+"Past" is the report's `beaten_s` up to the first attack's end. The bands are the targets set for the defender on 2026-11-24, constants in
+`HumanProbe.cs`; "all four" pools the four plans of one attacker. Measured with `--brain legacy` (seed 1, 2,000 rounds per
+row): this is today's bot measured against bands it does not meet.
+
+| Plan | Attacker | First attack: goal / miss / held / dispossessed | Past | Band (past) |
+| --- | --- | --- | --- | --- |
+| wide_sprint | even | 32.7 / 19.4 / 6.9 / 40.8% | 77.8% | at most 30% (MISS) |
+| stop_go | even | 10.0 / 7.2 / 3.2 / 79.5% | 25.7% | at most 35% (ok) |
+| cut_inside | even | 28.7 / 19.1 / 8.4 / 43.5% | 71.0% | 25 to 45% (MISS) |
+| skill_wide | even | 19.9 / 14.4 / 4.7 / 60.9% | 52.6% | 35 to 55% (ok) |
+| wide_sprint | fast | 42.9 / 11.8 / 6.3 / 38.8% | 78.7% | 40 to 60% (MISS) |
+| stop_go | fast | 16.1 / 4.8 / 1.9 / 77.1% | 27.1% | at most 60% (ok) |
+| cut_inside | fast | 33.0 / 14.2 / 6.1 / 46.2% | 65.3% | at most 60% (MISS) |
+| skill_wide | fast | 28.9 / 11.8 / 4.0 / 55.0% | 57.8% | 45 to 65% (ok) |
+
+| All four plans | Even: measured (band) | Fast: measured (band) |
+| --- | --- | --- |
+| first-attack goals of the best plan | 32.7%, wide_sprint (12 to 22%, MISS) | 42.9%, wide_sprint (25 to 38%, MISS) |
+| median time to get past, rounds that got past | 2.03 s (3.0 s or more, MISS) | 2.06 s (2.5 s or more, MISS) |
+| tackles (lunges and slides) tried per round | 0.60 (0.5 or more, ok) | 0.58 (0.5 or more, ok) |
+| fouls | 0.0% (under 6%, ok) | 0.0% (under 6%, ok) |
+
+A "past" also counts a round where his auto tackle pokes the ball back up the pitch, he chases it beyond the ball and the
+attacker gets there first: the ball is then goal-side of him.
