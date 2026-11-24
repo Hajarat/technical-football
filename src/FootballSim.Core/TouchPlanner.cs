@@ -1737,12 +1737,14 @@ public static class TouchPlanner
                 // Pushed so the player, chasing without the dribble cap, meets the ball on the swing nearest the catch time.
                 float catchTime = TouchModel.KnockOnCatchTime(p.Sheet, t);
                 int catchTicks = Math.Max(1, (int)MathF.Round(catchTime / t.Dt));
-                float aim = stickActive ? MathF.Atan2(intent.Move.Y, intent.Move.X) : p.Facing;
+                // A heavy touch armed by the right stick goes where that stick pointed; else along the left stick.
+                bool flicked = p.GHeavyTick >= 0;
+                float aim = flicked ? MathF.Atan2(p.GHeavyDir.Y, p.GHeavyDir.X) : stickActive ? MathF.Atan2(intent.Move.Y, intent.Move.X) : p.Facing;
                 var aimDir = new Vector2(MathF.Cos(aim), MathF.Sin(aim));
                 p.KnockOnFrom = now;
                 p.KnockOnUntil = now + catchTicks * t.Dt + k.KnockOnChaseGrace;
                 p.KnockOnDirection = aimDir;
-                var user = stickActive ? intent : new TickIntent { MoveX = aimDir.X, MoveZ = aimDir.Y, Sprint = 1f };
+                var user = stickActive && !flicked ? intent : new TickIntent { MoveX = aimDir.X, MoveZ = aimDir.Y, Sprint = 1f };
                 errDeg = Rated(rng, 0f, sigmaD);
                 hasMeet = FindMeet(p, user, 0, catchTicks, now, t, pitch, out meet);
                 Vector3 target = hasMeet ? meet.Cp : p.Position + new Vector3(aimDir.X, 0f, aimDir.Y) * 10f;

@@ -81,6 +81,8 @@ public struct PadSnapshot
 public partial class InputReader : Node
 {
     const float DeadZone = 0.15f;
+    /// <summary>The right stick's dead zone: the core's gesture thresholds (half deflection, 0.85 for a heavy touch) count from past it.</summary>
+    const float RightDeadZone = 0.25f;
     /// <summary>Mouse travel, in pixels, before mouse motion counts as the person using keyboard and mouse.</summary>
     const float MouseMotionThreshold = 8f;
     /// <summary>Stick or trigger deflection that counts as the person using the pad (above its own dead zone).</summary>
@@ -367,11 +369,11 @@ public partial class InputReader : Node
         var v = new Vector2(x, y);
         float len = v.Length();
         v = len < DeadZone ? Vector2.Zero : v / len * Mathf.Min(1f, (len - DeadZone) / (1f - DeadZone));
-        // The right stick goes to the core raw (same axes and radial dead zone as the left); the core reads the gestures.
+        // The right stick goes to the core on the same axes with its own radial dead zone; the core reads the gestures.
         var r = new Vector2(Input.GetActionRawStrength(RRightName) - Input.GetActionRawStrength(RLeftName),
             Input.GetActionRawStrength(RDownName) - Input.GetActionRawStrength(RUpName));
         float rlen = r.Length();
-        r = rlen < DeadZone ? Vector2.Zero : r / rlen * Mathf.Min(1f, (rlen - DeadZone) / (1f - DeadZone));
+        r = rlen < RightDeadZone ? Vector2.Zero : r / rlen * Mathf.Min(1f, (rlen - RightDeadZone) / (1f - RightDeadZone));
         return new PadSnapshot
         {
             MoveX = v.X,

@@ -24,15 +24,15 @@ The table uses Xbox names.
 | Left bumper + B | Chip |
 | B (hold for power, release), then B again before the strike | Low (driven) shot; right bumper + B, B is a low curved shot; left bumper + B, B is played as a chip |
 | B, then A / Cross before the strike | Fake shot: left stick at rest a fake stop, pushed a fake cut that way; the shot winds up as a real one and the fake's contact comes when the strike would have (at least 0.10 s after A; A in the last 0.05 s before the strike is too late) |
-| Right stick: forward, then straight on to a side | Step-over to that side |
-| Right stick: a side flicked from rest and released | Body feint to that side |
-| Right stick: a side held 0.1 s | Ball roll to that side |
-| Right stick: forward flick while sprinting | Knock-on: a heavy touch ahead to sprint onto |
+| Right stick: forward, then round to a side without passing the centre | Step-over to that side |
+| Right stick: a side flicked and let go | Body feint to that side |
+| Right stick: a side held 0.17 s | Ball roll to that side (held on, another) |
+| Right stick flicked while sprinting (right trigger held) | Knock-on: his next touch is a heavy one where the stick pointed, to sprint onto. No skill move registers while the trigger is held |
 | Left stick, without the ball | Lock-on: with a loose ball he can reach first he goes for it by himself. Stick at rest: the earliest point. Stick held toward a later point on the ball's path (within 40 degrees): he meets it there (see [dribbling.md](dribbling.md)) |
 | Right bumper + left stick away from a loose ball | Let it run: he does not go for it |
 | B, a skill gesture or a knock-on on the way to a loose ball | Played at his first contact: a first-time shot (a flick when there is no time for the wind-up), the move after his first touch, a knock-on as his first touch |
-| Left stick back with left and right bumpers held | Drag-back |
-| Right stick: back, then straight on to a side | Elastico toward that side |
+| Left stick back (within 45 degrees of straight back from his facing) with left and right bumpers held | Drag-back |
+| Right stick: back, then round to a side without passing the centre | Elastico toward that side |
 | Right stick: forward flick, rest, back | Heel-to-heel: the ball flicked on straight ahead |
 | Right stick: forward flick, rest, a side | Spin (a roulette) toward that side |
 | Right stick: back flick, rest, a side | McGeady spin: the ball dragged behind, a turn away, out square to that side |
@@ -52,21 +52,41 @@ The table uses Xbox names.
 | Keyboard `B` | Swap face buttons (A with B, X with Y) for the active pad. On by default for Nintendo / Switch / Pro Controller pads; the choice is saved per pad name |
 | Keyboard `V` | Controller vibration on or off (a toast says which). On by default; the choice is saved for every pad in `user://controls.cfg` |
 
-Skill-move directions are taken against the running direction (the facing when standing), and every side move works to
-either side (the attacker draws them from authored clips, see [animation.md](animation.md)). The right stick counts from half deflection; the timings are in the `skill` section of
-`data/tuning/default.json`:
+Each skill move is a short list of right-stick steps (the drag-back's is the left stick), and every move is followed at
+once, each side move to either side (the attacker draws them from authored clips, see [animation.md](animation.md)). The
+timings are in the `skill` section of `data/tuning/default.json`:
 
-- Step-over: the side within 0.25 s of forward, within 30 degrees of square, without passing the stick through rest
-  (forward, rest, side is a spin).
-- Body feint: from rest, a side held at least a tick and back at rest within 0.1 s. Ball roll: a side held 0.1 s.
-- Knock-on: forward past 0.85 deflection while sprinting; it fires 0.15 s after the flick unless the stick goes to a side or
-  back first, and a flick released to rest waits until a spin or heel-to-heel can no longer follow (0.125 s after the release).
-- Heel-to-heel and spin: from rest a forward flick of at most 0.125 s, rest, then back (heel-to-heel) or a side (spin), within
-  0.125 s of the release (`combo_step_window`). Elastico: back, then a side as for the step-over. McGeady spin: from rest a back
-  flick of at most 0.125 s, rest, then the side he comes out to, within 0.125 s of the release (back straight on to the side,
-  without rest, is the elastico; the back flick that ended a heel-to-heel does not start one).
-- Drag-back: the left stick `drag_back_stick_deg` (120) or more from forward with both bumpers held, on the tick the three come
-  together; it replaces the touch controller's own turn at the feet if that began within `drag_back_over_feet_turn` (0.1 s).
+- **The stick.** The right stick has a dead zone of 0.25 and counts as pushed from half of what is left (`min_actuation`
+  0.5, about 0.62 of the full throw); below that it is at rest. A direction is met within 45 degrees of it
+  (`angle_tolerance_deg`), the side of a step-over or an elastico within 30 (`step_over_side_tolerance_deg`).
+- **Directions** are taken against his facing, fixed when the gesture's first direction completes, so turning during the
+  gesture does not bend it.
+- **Steps.** A flick counts once the stick has stayed on its direction `flick_hold` (0.017 s). Each later step begins within
+  `combo_step_window` (0.17 s) of the one before; the side of a step-over or an elastico and the last flick of either spin
+  get `roll_step_window` (0.33 s). The first flick may come any time after the stick has rested.
+  - Step-over: forward, then round to a side without the stick coming to rest (forward, rest, side is a spin).
+  - Elastico: back, then round to a side the same way (back, rest, side is a McGeady spin).
+  - Body feint: a side flick and back to rest within 0.17 s. Ball roll: a side held `roll_min_hold` (0.17 s); held on, it
+    registers again as soon as the last one's hold has run out.
+  - Heel-to-heel: a forward flick, rest, a back flick. Spin: a forward flick, rest, a side flick. McGeady spin: a back
+    flick, rest, a flick to the side he comes out to.
+  - Drag-back: the left stick `drag_back_stick_deg` (135) or more from his facing with both bumpers held; it replaces the
+    touch controller's own turn at the feet if that began within `drag_back_over_feet_turn` (0.1 s).
+- **Sprint.** No gesture registers while the right trigger is held: let go of it, make the move, press it again. With it
+  held, a right-stick flick past `knock_on_actuation` (0.85) arms a heavy touch instead: his next touch is a knock-on along
+  the stick (where it pointed last, once it is let go). It is dropped when the trigger is let go of or
+  `heavy_touch_max_delay` (2 s) passes without a touch.
+- **Holding and dropping.** A registered gesture is held `gesture_cooldown` (0.17 s), and no other gesture registers in that
+  time: one completed then is dropped, not kept for later. When two complete on the same tick the first of drag-back, ball
+  roll, step-over, heel-to-heel, spin, elastico, body feint, McGeady spin wins.
+- **Taking it up.** A step-over or a ball roll can be taken up on any tick it is held; the other moves only on the tick they
+  register, and a gesture that cannot be taken up then is gone. It is taken up when he has the ball (or his team's claim on
+  a loose one), no skill move is under way, the ball at his feet is below `max_ball_height`, the step-over, body feint and
+  drag-back are past the last move's cooldown, and the ball is slower than `sole_max_ball_speed` (15 m/s; ball roll,
+  drag-back) or `two_contact_max_ball_speed` (10 m/s; elastico, heel-to-heel, both spins). There is no rule about the
+  touch he is in: a move can be asked for between any two touches, and once taken up it starts as soon as the ball is in
+  reach (see [dribbling.md](dribbling.md)).
+- A skill key (keyboard) registers its move directly, sprinting or not, under the same holding and taking-up rules.
 - Low shot: hold B for the power wanted, release, and press B again any time after the release and before the strike (the
   strike comes no sooner than 0.45 s after the first press and 0.12 s after the release; see [shooting.md](shooting.md)). The charge is the first press's,
   so a low shot can have full power; bumpers held on either press count. There is no minimum gap between the release and
@@ -88,7 +108,7 @@ Works alongside a gamepad (the larger stick value wins) and when none is detecte
 | F / R | Ground pass / through ball, with a team-mate |
 | Back against the run + E + Left Shift | Drag-back, as the pad's left stick back with both bumpers |
 | Space, G | Shoot and cancel again, for keyboard-only play |
-| X | Knock-on |
+| X | Knock-on (a heavy touch along the run) |
 | 1 / 2 / 3 / 4 | Step-over / body feint / ball roll / drag-back, side from A/D, right by default |
 | Enter | Start the round; at the report, next round |
 | Backspace | At the report, retry with the same seed |

@@ -91,15 +91,26 @@ public partial class SkillMoveTests
 
     static TickIntent Right(TickIntent it, Vector2 r) { it.RightX = r.X; it.RightZ = r.Y; return it; }
 
+    /// <summary>
+    /// One tick of a stick gesture that registers on trace tick <paramref name="at"/>: the right stick, with sprint let go of
+    /// until then (no gesture registers with sprint held).
+    /// </summary>
+    static TickIntent Gest(TickIntent it, int i, int at, Vector2 r)
+    {
+        if (i <= at) it.Sprint = 0f;
+        return Right(it, r);
+    }
+
     // Traces for a player running along +X: forward is +X, his right is +Z.
-    static TickIntent StepOver(int i, TickIntent it, int side) => Right(it, i < 6 ? new Vector2(1f, 0f) : i < 12 ? new Vector2(0f, side) : Vector2.Zero);
-    static TickIntent Feint(int i, TickIntent it, int side) => Right(it, i < 5 ? new Vector2(0f, side) : Vector2.Zero);
-    static TickIntent Roll(int i, TickIntent it, int side) => Right(it, i < 16 ? new Vector2(0f, side) : Vector2.Zero);
+    static TickIntent StepOver(int i, TickIntent it, int side) => Gest(it, i, 6, i < 6 ? new Vector2(1f, 0f) : i < 12 ? new Vector2(0f, side) : Vector2.Zero);
+    static TickIntent Feint(int i, TickIntent it, int side) => Gest(it, i, 5, i < 5 ? new Vector2(0f, side) : Vector2.Zero);
+    static TickIntent Roll(int i, TickIntent it, int side) => Gest(it, i, 20, i < 22 ? new Vector2(0f, side) : Vector2.Zero);
     /// <summary>The drag-back: the left stick back with both shoulder buttons held (the right stick back alone does nothing).</summary>
     static TickIntent Drag(int i, TickIntent it)
     {
         if (i >= 8) return it;
         it.MoveX = -1f; it.MoveZ = 0f; it.Finesse = true; it.Chip = true;
+        if (i == 0) it.Sprint = 0f;
         return it;
     }
 
@@ -131,11 +142,11 @@ public partial class SkillMoveTests
 
     // The two-contact moves: elastico (back, then straight on to the side), spin (forward flick, rest, the side) and heel-to-heel
     // (forward flick, rest, back).
-    static TickIntent Elastico(int i, TickIntent it, int side) => Right(it, i < 6 ? new Vector2(-1f, 0f) : i < 12 ? new Vector2(0f, side) : Vector2.Zero);
-    static TickIntent Spin(int i, TickIntent it, int side) => Right(it, i < 5 ? new Vector2(1f, 0f) : i < 9 ? Vector2.Zero : i < 13 ? new Vector2(0f, side) : Vector2.Zero);
+    static TickIntent Elastico(int i, TickIntent it, int side) => Gest(it, i, 6, i < 6 ? new Vector2(-1f, 0f) : i < 12 ? new Vector2(0f, side) : Vector2.Zero);
+    static TickIntent Spin(int i, TickIntent it, int side) => Gest(it, i, 11, i < 5 ? new Vector2(1f, 0f) : i < 9 ? Vector2.Zero : i < 13 ? new Vector2(0f, side) : Vector2.Zero);
     /// <summary>The McGeady spin: a back flick, rest, then the side he comes out to.</summary>
-    static TickIntent McGeady(int i, TickIntent it, int side) => Right(it, i < 5 ? new Vector2(-1f, 0f) : i < 9 ? Vector2.Zero : i < 13 ? new Vector2(0f, side) : Vector2.Zero);
-    static TickIntent HeelToHeel(int i, TickIntent it) => Right(it, i < 5 ? new Vector2(1f, 0f) : i < 9 ? Vector2.Zero : i < 14 ? new Vector2(-1f, 0f) : Vector2.Zero);
+    static TickIntent McGeady(int i, TickIntent it, int side) => Gest(it, i, 11, i < 5 ? new Vector2(-1f, 0f) : i < 9 ? Vector2.Zero : i < 13 ? new Vector2(0f, side) : Vector2.Zero);
+    static TickIntent HeelToHeel(int i, TickIntent it) => Gest(it, i, 11, i < 5 ? new Vector2(1f, 0f) : i < 9 ? Vector2.Zero : i < 14 ? new Vector2(-1f, 0f) : Vector2.Zero);
 
     [Theory]
     [MemberData(nameof(Moves))]
@@ -645,8 +656,9 @@ public partial class SkillMoveTests
         var p = w.Attacker;
         var effective = new List<(int Tick, float Eff, int Chain)>();
         var buf = new TickIntent[w.PlayerCount];
-        // Body feints right at 2.0 s, 2.6 s and 3.2 s (chained), then one at 6.5 s after the 2 s window has lapsed.
-        var at = new[] { 240, 312, 384, 780 };
+        // Body feints right at 2.0 s, 2.7 s and 3.4 s (chained; each after the last one's cooldown, or it would be dropped),
+        // then one at 6.5 s after the 2 s window has lapsed.
+        var at = new[] { 240, 324, 408, 780 };
         for (int tick = 1; tick <= 900; tick++)
         {
             var it = Run(Entry.Standing, tick);
@@ -765,7 +777,7 @@ public partial class SkillMoveTests
             {
                 int i = tick - 241;
                 var it = Run(Entry.Jog, tick);
-                if (i is >= 0 and < 16) it = Roll(i, it, 1);
+                if (i is >= 0 and < 22) it = Roll(i, it, 1);
                 if (end > 0 && tick >= end - 1) it = new TickIntent { MoveX = Dir(exitDeg).X, MoveZ = Dir(exitDeg).Y, Sprint = 1f };
                 buf[0] = it;
                 w.Step(buf);
@@ -1333,7 +1345,8 @@ public partial class SkillMoveTests
             ballBefore = w.Ball.Position;
             if (g0 < 0 && tick > 240 && p.InPossession && p.TouchAction is { Pending: true } pt && pt.ContactTick - w.Tick >= 6) g0 = tick;
             var it = Run(e, tick);
-            if (g0 >= 0 && tick - g0 < 20) it = trace(tick - g0, it);
+            // (the ball roll by its key: its stick hold would outlast the committed touch)
+            if (g0 >= 0 && tick - g0 < 20) { if (move != "ball_roll") it = trace(tick - g0, it); else if (tick == g0) { it.SkillKey = SkillKey.BallRoll; it.MoveZ = side * 0.5f; } }
             buf[0] = it;
             w.Step(buf);
             var pending = w.Attacker.PendingSkill;
@@ -1629,7 +1642,7 @@ public partial class SkillMoveTests
     [InlineData("elastico", Entry.Sprint, -1)]
     [InlineData("elastico", Entry.Standing, 1)]
     [InlineData("spin", Entry.Jog, 1)]
-    [InlineData("spin", Entry.Sprint, -1)]
+    [InlineData("spin", Entry.Sprint, 1)]
     [InlineData("drag_back", Entry.Jog, 0)]
     public void TheExitTouchIsForecastAsItIsMade(string move, Entry e, int side)
     {
@@ -1733,7 +1746,8 @@ public partial class SkillMoveTests
     [InlineData("rs_back")]
     public void TheRightStickBackAloneChangesNothing(string trace)
     {
-        foreach (var e in new[] { Entry.Standing, Entry.Jog, Entry.Sprint })
+        // (with sprint held a right-stick flick arms a heavy touch, whichever way it points)
+        foreach (var e in new[] { Entry.Standing, Entry.Jog })
         {
             // The same run with and without the trace: no move, no knock-on, the same player and ball on every tick.
             var a = Field(2);
@@ -1757,9 +1771,10 @@ public partial class SkillMoveTests
     }
 
     [Fact]
-    public void ASprintingForwardFlickIsAKnockOnUnlessAHeelToHeelFollows()
+    public void ASprintingRightStickFlickIsAKnockOnWhereItPoints()
     {
-        bool Knocked(Func<int, Vector2> stick)
+        float knockDeg = float.NaN;
+        bool Knocked(Func<int, Vector2> stick, Entry e = Entry.Sprint)
         {
             var w = Field(1);
             var p = w.Attacker;
@@ -1767,18 +1782,25 @@ public partial class SkillMoveTests
             bool knocked = false;
             for (int tick = 1; tick <= 480; tick++)
             {
-                var it = Run(Entry.Sprint, tick);
+                var it = Run(e, tick);
                 int i = tick - 241;
                 if (i >= 0) { var r = stick(i); it.RightX = r.X; it.RightZ = r.Y; }
                 buf[0] = it;
                 w.Step(buf);
-                knocked |= p.Action is { Kind: ActionKind.KnockOn } || p.PreviousAction is { Kind: ActionKind.KnockOn };
+                bool now = !knocked && p.LastTouchKind == ActionKind.KnockOn && w.Events.Any(x => x.Kind == EventKind.Touch);
+                if (now) { knocked = true; knockDeg = MathF.Atan2(w.Ball.Velocity.Z, w.Ball.Velocity.X) * 180f / MathF.PI; }
             }
             return knocked;
         }
+        // Forward, or 40 degrees to his right: the next touch is the heavy one, along the flick (within its touch error).
         Assert.True(Knocked(i => i < 6 ? new Vector2(1f, 0f) : Vector2.Zero));
-        Assert.False(Knocked(i => HeelToHeel(i, default).Right));
-        Assert.False(Knocked(i => Spin(i, default, 1).Right));
+        Assert.InRange(knockDeg, -12f, 12f);
+        float c = MathF.Cos(40f * MathF.PI / 180f), s = MathF.Sin(40f * MathF.PI / 180f);
+        Assert.True(Knocked(i => i < 6 ? new Vector2(c, s) : Vector2.Zero));
+        Assert.InRange(knockDeg, 28f, 52f);
+        // With sprint held the flicks of a heel-to-heel or a spin are a heavy touch too; without sprint a flick is none.
+        Assert.True(Knocked(i => HeelToHeel(i, default).Right));
+        Assert.False(Knocked(i => i < 6 ? new Vector2(1f, 0f) : Vector2.Zero, Entry.Jog));
     }
 
     [Fact]
@@ -1906,10 +1928,11 @@ public partial class SkillMoveTests
         Assert.Equal(p.LastGesture, c.LastGesture);
         Assert.Equal(p.LastGestureTick, c.LastGestureTick);
         Assert.Equal(p.SkillEffective, c.SkillEffective);
-        Assert.Equal(p.GZone, c.GZone);
-        Assert.Equal(p.GFwdLastTick, c.GFwdLastTick);
-        Assert.Equal(p.GBackStart, c.GBackStart);
-        Assert.Equal(p.GBackFromNeutral, c.GBackFromNeutral);
+        Assert.Equal(p.GProg, c.GProg);
+        Assert.NotSame(p.GProg, c.GProg);
+        Assert.Equal(p.GDetKind, c.GDetKind);
+        Assert.Equal(p.GDetTick, c.GDetTick);
+        Assert.Equal(p.GHeavyTick, c.GHeavyTick);
         Assert.Equal(p.SkillChainUntil, c.SkillChainUntil);
     }
 }
