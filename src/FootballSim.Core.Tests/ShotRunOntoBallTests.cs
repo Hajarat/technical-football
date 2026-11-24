@@ -69,6 +69,7 @@ public class ShotRunOntoBallTests
         return float.NaN;
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void AShotPressedInADribbleAtAnAngleToTheAimIsStruck()
     {

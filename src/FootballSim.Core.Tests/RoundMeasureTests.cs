@@ -185,6 +185,7 @@ public class RoundMeasureTests
         return -1;
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void AShotStruckFromInFrontOfHimThatGoesInIsNotPast()
     {
@@ -198,6 +199,7 @@ public class RoundMeasureTests
         Assert.Equal(-1, SeenPastTick(o));
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void ADribblePastHimFollowedByAShotInsideHalfASecondIsPast()
     {

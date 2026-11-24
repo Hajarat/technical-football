@@ -99,6 +99,7 @@ public class PossessionTests
 
     // 2. A touch is committed: a 90 degree stick change (not more than the replan angle) is played by the next planned
     // touch, at most three jog steps (about 0.95 s) away.
+    [Trait("Category", "Slow")]
     [Fact]
     public void JogThenTurnNinetyDegreesFollowsWithinOneTouch()
     {
@@ -169,6 +170,7 @@ public class PossessionTests
     }
 
     // 5.
+    [Trait("Category", "Slow")]
     [Fact]
     public void SprintKeepsPossessionAndLowDribblingKnocksItFurther()
     {
@@ -181,6 +183,7 @@ public class PossessionTests
 
     // 6. Steps per touch at a sprint is a whole number of steps by dribbling (6 at 1 down to 4 at 99: 5 at 40 and 60, 4 at
     // 80), so the distance falls in steps and must never rise.
+    [Trait("Category", "Slow")]
     [Fact]
     public void MaxBallDistanceDoesNotRiseWithDribbling()
     {
@@ -216,6 +219,7 @@ public class PossessionTests
     }
 
     // 7.
+    [Trait("Category", "Slow")]
     [Fact]
     public void LosingAndRegainingRaisesTheEventsAndFirstTouchMatters()
     {
@@ -398,6 +402,7 @@ public class PossessionTests
         Assert.Same(w.Attacker, w.BallController);
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void AStrikeEndsPossessionAndAHeldBallIsTheKeepers()
     {

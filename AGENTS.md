@@ -13,10 +13,10 @@ Run the cheapest check that answers the question, and climb only when it calls f
 | Step | When | What |
 |---|---|---|
 | 0 | Every edit | Build the projects you changed |
-| 1 | While iterating | Tests for that area (`dotnet test ... --filter`) and the one probe the theory is about, at a small `--n`; try tuning ideas with `--set` before editing code |
+| 1 | While iterating | Tests for that area (`dotnet test src/FootballSim.Core.Tests --filter <name>`; the default run already skips the tests marked `Category=Slow`, and a `--filter` adds to that exclusion, so name a slow test with `--settings src/FootballSim.Core.Tests/all.runsettings --filter <name>`) and the one probe the theory is about, at a small `--n`; try tuning ideas with `--set` before editing code |
 | 2 | Before reporting | That probe at its full `--n`, and the replays of the behaviour you touched, `--headless` |
 | 3 | Only for a visible change | Screenshots through `run-bg.sh`: one strip per move, not sheets plus videos |
-| 4 | Only when the user asks | The full suites: `dotnet test FootballSim.slnx`, `game/tests/smoke.sh`, the skill-replay table, the shot check, the skill probe. At merge, push and suggest them; do not start them unasked |
+| 4 | Only when the user asks | The full suites: `dotnet test src/FootballSim.Core.Tests --settings src/FootballSim.Core.Tests/all.runsettings` (slow tests included, about 8 minutes; plain `dotnet test FootballSim.slnx` is the fast set), `game/tests/smoke.sh`, the skill-replay table, the shot check, the skill probe. At merge, push and suggest them; do not start them unasked |
 | 5 | The Mac | Play-testing |
 
 - An agent runs only the checks for what it touched; regressions elsewhere are caught at step 4.

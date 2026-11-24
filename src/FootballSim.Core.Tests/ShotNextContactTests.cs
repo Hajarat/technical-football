@@ -117,6 +117,7 @@ public class ShotNextContactTests
         return new Run(strike >= 0, atFoot, committed, footOk, maxDspd, press, strike, eta, earliest, struckWith == chosen, earlier, moved, footChanges);
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void EveryShotPressedInPossessionIsStruckAsTheNextContactWithoutASpeedStep()
     {

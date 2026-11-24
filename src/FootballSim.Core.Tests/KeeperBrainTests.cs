@@ -105,6 +105,7 @@ public class KeeperBrainTests
         Assert.True(Out(wide) > Out(central) + 0.8f, $"central {Out(central)} wide {Out(wide)}");
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void HisPositionAtTheStrikeDoesNotDependOnWhereHeStarted()
     {

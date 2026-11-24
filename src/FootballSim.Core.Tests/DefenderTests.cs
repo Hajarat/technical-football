@@ -1051,6 +1051,7 @@ public class DefenderTests
         }
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void OverManyRoundsNothingBecomesNotANumberAndEveryRoundEnds()
     {
@@ -1069,6 +1070,7 @@ public class DefenderTests
 
     // ---- the duel's measured bands (the defender probe runs the same rounds, 2,000 per style) ----
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void TheDefenderWinsTheBallMostFromAStraightRunLessFromACutLeastFromASkillMove()
     {

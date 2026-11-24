@@ -109,6 +109,7 @@ public class TeamOpponentsTests
             defender: Player(sc.DefaultDefender), mate: Player(sc.DefaultMate));
     }
 
+    [Trait("Category", "Slow")]
     [Fact]
     public void TheScriptedStylesPassOrDoNot()
     {

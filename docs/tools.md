@@ -8,7 +8,8 @@ Run from the repo root.
 | --- | --- |
 | Play (needs a gamepad); builds the C# first, since `godot-mono --path game` alone runs the last compiled build, which a pull does not update | `./play.sh` |
 | Build the game project | `dotnet build game/FootballSim.Game.csproj` |
-| Tests | `dotnet test FootballSim.slnx` |
+| Tests, the fast set (skips the statistical tests marked `[Trait("Category", "Slow")]`, via `fast.runsettings`; both test projects run at most 4 test threads, from `xunit.runner.json`) | `dotnet test FootballSim.slnx` |
+| Tests, everything including the slow ones (about 8 minutes; the anim project ignores the settings file), or only the slow ones | `dotnet test src/FootballSim.Core.Tests --settings src/FootballSim.Core.Tests/all.runsettings` (add `--filter Category=Slow` for only the slow ones) |
 | Batch run, 10 000 scripted rounds | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario penalty --n 10000 --seed 1` |
 | Save a scripted round as a replay | `dotnet run -c Release --project src/FootballSim.Batch -- --scenario breakaway --seed 6 --save-replay game/tests/smoke_replay.json` |
 | Re-run a replay in the batch tool; a partial replay (a capture taken mid-round, an unfinished round) plays its recorded ticks, then prints `partial: N ticks, no report` and the shots so far | `dotnet run -c Release --project src/FootballSim.Batch -- --replay game/tests/smoke_replay.json` |
