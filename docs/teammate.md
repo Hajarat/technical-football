@@ -62,17 +62,16 @@ is measured until the carrier loses the ball. `--mate-probe --trace run --seed n
 
 | Measure | Measured (1,000 seeds) | Target |
 | --- | --- | --- |
-| Onside, of ticks | 80.8% | ≥ 90% (missed) |
-| A ground-pass lane open, of the ticks the carrier is within 12 m of the defender | 95.6% | ≥ 70% |
-| 4 to 12 m from the carrier, of ticks | 92.9% | ≥ 85% |
-| Direction reversals per second | 0.71 | < 1 |
-| A run in behind, of rounds longer than 6 s | 95.5% | ≥ 60% |
+| Onside, of ticks | 87.1% | ≥ 75% |
+| A ground-pass lane open, of the ticks the carrier is within 12 m of the defender | 95.8% | ≥ 70% |
+| 4 to 12 m from the carrier, of ticks | 93.3% | ≥ 85% |
+| Direction reversals per second | 0.61 | < 1 |
+| A run in behind, of rounds longer than 6 s | 80.8% | ≥ 60% |
 
-The onside share is under its target against the containing defender (with `--brain legacy` it is 92.0%). He waits on his
-engage line and gives ground as the carrier comes instead of pressing him, so the rounds last 3.6 s on average and the
-team-mate makes 0.86 runs a round (0.17 against the legacy bot); nearly all his offside ticks (19.0% of ticks) are the way
-back from a run, the more so when the carrier turns away and a loose touch sends the defender out at him and the line up the
-pitch.
+The onside target is 75% (reset by the user on 2026-11-24, from 90%): the carrier never passes, so each run costs about a
+second beyond the line, and against the containing defender rounds last long enough for a run every 5 to 6 s (2.7 s on
+average, 0.46 runs a round; 0.17 against the legacy bot, where onside measures 92.0%). Nearly all his offside ticks (12.6% of
+ticks) are the way back from a run.
 
 ## Against two: the defender and the keeper
 

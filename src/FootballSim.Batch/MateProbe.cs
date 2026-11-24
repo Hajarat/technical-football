@@ -124,7 +124,7 @@ static class MateProbe
         Console.WriteLine($"   offside ticks by what he was doing: support {F(100.0 * offBy[0] / Math.Max(1, ticks), 1)}%, armed {F(100.0 * offBy[1] / Math.Max(1, ticks), 1)}%, go {F(100.0 * offBy[2] / Math.Max(1, ticks), 1)}%, back {F(100.0 * offBy[3] / Math.Max(1, ticks), 1)}%");
         Console.WriteLine($"   came back onside {backFrom.Sum()} times: caught by the line in support {backFrom[0]}, armed {backFrom[1]}; after a run {backFrom[2]}");
         Console.WriteLine($"   nearer the carrier than 4 m in {F(100.0 * tooNear / Math.Max(1, ticks), 1)}% of ticks, further than 12 m in {F(100.0 * (ticks - spaced - tooNear) / Math.Max(1, ticks), 1)}%");
-        bool ok = Line("onside, of ticks", 100.0 * onside / Math.Max(1, ticks), 90, 100);
+        bool ok = Line("onside, of ticks", 100.0 * onside / Math.Max(1, ticks), 75, 100);
         ok &= Line("a ground-pass lane open, of the ticks the carrier is within 12 m of the defender", 100.0 * laneOpen / Math.Max(1, nearTicks), 70, 100);
         ok &= Line("4 to 12 m from the carrier, of ticks", 100.0 * spaced / Math.Max(1, ticks), 85, 100);
         ok &= Line("direction reversals per second", reversals / Math.Max(1e-9, seconds), 0, 1, "");

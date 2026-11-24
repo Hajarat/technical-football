@@ -1856,7 +1856,7 @@ public sealed class DefenderTuning
     /// </summary>
     public Curve WinMarginS { get; set; } = new((1f, 0.18f), (50f, 0.09f), (99f, 0.036f));
     /// <summary>... looking this far ahead along the ball's path, seconds [0.4 to 0.8].</summary>
-    public float WinHorizonS { get; set; } = 0.49f;
+    public float WinHorizonS { get; set; } = 0.8f;
     /// <summary>The slow carrier: under this speed, m/s [1.5 to 3], for press_after_s, seconds [0.2 to 0.6], he goes for the ball.</summary>
     public float PressSpeed { get; set; } = 2.4f;
     public float PressAfterS { get; set; } = 0.27f;

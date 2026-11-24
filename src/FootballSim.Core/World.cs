@@ -1132,7 +1132,11 @@ public sealed partial class World
             bool stuck = Tick >= _pending.ContactTick && a.Speed < StuckSpeed && Ball.Velocity.Length() < StuckSpeed;
             if (!stuck) _pending.UnplannedFrom = 0;
             else if (_pending.UnplannedFrom == 0) _pending.UnplannedFrom = Tick + 1;
-            else if (Tick + 1 - _pending.UnplannedFrom >= Ticks(StuckSeconds)) DropShot();
+            else if (Tick + 1 - _pending.UnplannedFrom >= Ticks(StuckSeconds)) { DropShot(); return; }
+            // The published estimate runs away when no swing within reach of the ball can be found (each search starts after
+            // the last one's answer): more than RunawaySeconds ahead, the strike will not come either. (Struck wind-ups have run at
+            // most 2.8 s ahead.) This also bounds the search, which grows with how far ahead it starts.
+            if (_strikeEstMax - Tick > Ticks(RunawaySeconds)) DropShot();
             return;
         }
         _pending.UnplannedFrom = 0;
@@ -1148,6 +1152,8 @@ public sealed partial class World
     /// StuckSeconds, cannot be struck: it is dropped. (Wind-ups that are struck in the end have been still so for 1.5 s at most.)
     /// </summary>
     const float StuckSpeed = 0.5f, StuckSeconds = 2f;
+    /// <summary>A wind-up in possession whose published strike estimate is more than this ahead of now is dropped, seconds.</summary>
+    const float RunawaySeconds = 5f;
 
     /// <summary>
     /// The left stick that aims a shot released now: the stick itself, or, at rest, its last pushed direction if that push was
