@@ -152,10 +152,14 @@ run as the clips (what a sheet holds and how the simulation loads it: [dribbling
   card must give; `snap_deg`, the shoulder line against the hip line, 20 degrees or more unless the card says otherwise; `drive_m`,
   the travel of the hand on the non-playing side relative to the chest, 0.25 m or more unless the card says otherwise). The
   elastico's two files and the drag-back's three have cards.
+- Every clip's bones turn no faster than 1,500 deg/s from one frame to the next; a skill-move file (one with a `[sheet]`) may
+  set its own `max_bone_deg_s`, at most 2,500. The elastico's and drag-back's files set 2,500 for their exaggerated foot work,
+  read from the game camera (their clips peak at 1,530 to 2,010 deg/s).
 - `plant_accel` is used by `elastico*.toml` (23: the plant for the snap, which the card's 2 m/s toward the exit by the release
-  needs; its root reaches 22), `drag_back_run.toml` (32; 31) and `drag_back_sprint.toml` (47; 45): the card's stop by 0.45 of the move, and the ball ending
-  0.20 to 0.30 m behind his hip line after a pull of 0.90 or 1.10 m, need a harder stop than a plant's 20 m/s^2 (the legacy
-  drag-back stopped him at 29 to 47 m/s^2).
+  needs; its root reaches 22), `drag_back_run.toml` (30; 29.5) and `drag_back_sprint.toml` (30; 29.5): the drag-back's stop,
+  with the ball ending 0.20 to 0.30 m behind his hip line, needs a harder stop than a plant's 20 m/s^2. No file's
+  `plant_accel` is above 30. From a sprint that stop takes a step: the left foot plants, lets go as his hips pass over it, skips
+  forward and plants again, his run gone by 0.59 of the move, and the sole pulls the ball 0.76 m (0.87 from a jog).
 - A move the simulation plays from its sheet (`BallAction.Sheet`, see [dribbling.md](dribbling.md#the-follower)) is drawn on the
   sheet's root: the clips of the two entries the simulation blends (`stand`, `run`, `sprint`) at the simulation's own share, not
   the chooser's (`SKILL_SHEET` in the log), each clip's pose taken relative to its own `root` in clips.json (position and yaw)

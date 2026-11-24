@@ -32,7 +32,7 @@ static class MoveIdentityProbe
             new Band("out_m", 0.45f, 0.55f),
             new Band("out_s", 0f, 0.125f),
             new Band("contact2_s", 0.21f, 0.23f),
-            new Band("whip_mps", 8f, Inf),
+            new Band("whip_mps", 3f, Inf),
             new Band("hips_m", 0.15f, 0.20f),
             new Band("exit_side_mps", 2f, Inf),
             new Band("keep", 0.80f, Inf, new[] { "jog", "sprint" }),
@@ -40,12 +40,12 @@ static class MoveIdentityProbe
         },
         ["drag_back"] = new[]
         {
-            new Band("pull_m", 0.82f, 0.98f, null, new() { ["standing"] = (0.62f, 0.78f), ["sprint"] = (1.02f, 1.18f) }),
+            new Band("pull_m", 0.82f, 0.98f, null, new() { ["standing"] = (0.62f, 0.78f), ["sprint"] = (0.68f, 0.84f) }),
             new Band("pull_s", 0.35f, 0.37f),
             new Band("end_behind_m", 0.20f, 0.30f),
             new Band("end_side_m", 0.10f, 0.18f),
             new Band("end_ball_mps", 0f, 0.35f),
-            new Band("stop_share", 0f, 0.45f, new[] { "jog", "sprint" }),
+            new Band("stop_share", 0f, 0.50f, new[] { "jog", "sprint" }, new() { ["sprint"] = (0f, 0.62f) }),
             new Band("hop_m", 0.20f, 0.30f),
             new Band("open_deg", 80f, 100f),
         },

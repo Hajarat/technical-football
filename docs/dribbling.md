@@ -237,19 +237,21 @@ The two moves played from sheets, as the identity probe measures them at a jog (
 - **Elastico** (`elastico.toml`, `elastico_run.toml`; 0.10 s reach in the sheet, the second contact 0.217 s after the first, the
   release 0.267 s after it). The outside of the foot away from the exit side takes the ball 0.52 m away from the exit side against
   him within 0.10 s (a `body` leg, so the ball travels with him) while his hips go 0.17 m with it; the foot stays on it. The
-  second contact, the same foot's inside, is the exit (a `launch`): 40 to 75 degrees off the run toward the exit side as the stick
-  chooses, 55 with the stick at rest, pushed as a sprint touch. He plants for it and drives to the exit side, leaving at 2.2 m/s
+  second contact, the same foot's inside, is the exit (a `launch`): 45 to 80 degrees off the run toward the exit side as the stick
+  chooses, 60 with the stick at rest, pushed as a jog touch, so the ball stays within his reach and his next touch comes 0.4 to
+  0.5 s after the second contact. He plants for it and drives to the exit side, leaving at 2.2 m/s
   that way with his facing turned onto his way out, and keeps 0.92 of his pace. The plant turns his hips back at up to 22 m/s^2.
-  Within 0.06 s of the second contact the ball's sideways speed against him is 4 to 5 m/s: a sprint touch (at most 12 m/s, and
-  never faster than he can catch) does not reach the 8 m/s the card asks for, and that band fails in the probe.
+  Within 0.06 s of the second contact the ball's sideways speed against him is 3.4 m/s from standing, 4.7 at a jog and 5.1 at a
+  sprint (the card asks for 3 or more).
 - **Drag-back** (`drag_back.toml`, `drag_back_run.toml`, `drag_back_sprint.toml`; 0.12 s reach in the sheet, the release 0.367 s
   after the contact). The sole pulls the ball straight back along his run on the pitch (a `pitch` leg): 0.70 m from standing,
-  0.90 m from a jog, 1.10 m from a sprint, to rest 0.23 to 0.29 m behind his hip line and 0.11 to 0.13 m to the playing foot's
-  side. His run is gone by 0.45 of the move from a jog and 0.40 from a sprint (he brakes at up to 31 and 45 m/s^2), he hops back
-  0.23 to 0.28 m and opens 90 degrees toward the playing foot's side, so he ends side-on to the ball. The exit is a touch toward
+  0.86 m from a jog, 0.76 m from a sprint, to rest 0.22 to 0.26 m behind his hip line and 0.11 to 0.13 m to the playing foot's
+  side. His run is gone by 0.47 of the move from a jog and 0.57 from a sprint (he brakes at up to 30 m/s^2; from a sprint over
+  a step, the left foot planting twice), he hops back 0.22 to 0.25 m and opens 90 degrees toward the playing foot's side, so he
+  ends side-on to the ball. The exit is a touch toward
   the stick anywhere from 60 to 180 degrees off the old run on the open side, pushed as a jog touch; with the stick at rest the
-  ball stays at rest. Its speed steps in the skill probe are 11 to 23 a run (the hard stop; the standing elastico's plant gives
-  12 to 15).
+  ball stays at rest. Its speed steps in the skill probe are 11 to 33 a run (the hard stop, longest from a sprint; the standing
+  elastico's plant gives 12 to 15).
 
 ### The moves
 
