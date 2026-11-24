@@ -131,6 +131,27 @@ def test_checks_refuse_a_bone_turning_too_fast(rig):
     assert any("deg/s" in p for p in c.problems)
 
 
+def test_the_bone_speed_limit_is_1500_unless_a_skill_move_file_raises_it_to_at_most_2500(rig, monkeypatch):
+    p = []
+    assert A.turn_limit({}, p) == 1500 and not p
+    assert A.turn_limit({"sheet": {}, "max_bone_deg_s": 2500}, p) == 2500 and not p
+    assert A.turn_limit({"max_bone_deg_s": 2500}, p) == 1500 and "skill-move files" in p[-1]   # a shot file, say
+    assert A.turn_limit({"sheet": {}, "max_bone_deg_s": 3000}, p) == 1500 and "outside 0 to 2500" in p[-1]
+    # and the check uses it: a head turning about 1,800 deg/s is refused at the default ...
+    m = still(rig)
+    m["key"].append({"t": 0.5, "head": {"yaw": 120}})
+    c = A.solve(m, {"spans": [0.1]}, rig)
+    assert 1500 < c.stats["max_bone_deg_per_s"] < 2500
+    assert any("limit 1500" in q for q in c.problems)
+    # ... and passes a file whose limit is 2500 (the sheet itself is not what this test is about)
+    m["max_bone_deg_s"] = 2500
+    m["sheet"] = {}
+    monkeypatch.setattr(A, "sheet_of", lambda clip: None)
+    monkeypatch.setattr(A, "check_sheet", lambda clip, rig: None)
+    c = A.solve(m, {"spans": [0.1]}, rig)
+    assert not any("deg/s" in q for q in c.problems)
+
+
 def test_checks_refuse_a_sole_off_the_ball(rig):
     m = still(rig, ball={"pos": [-0.1, 0.11, 0.35]}, foot_r={"pos": [-0.1, 0.24, 0.35]})  # 2 cm above the ball
     m["ball"] = {"radius": 0.11, "on": ["start", "end"]}

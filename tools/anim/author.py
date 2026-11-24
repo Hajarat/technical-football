@@ -54,7 +54,8 @@ The mirror (the other side) is made from the move file itself: left and right ch
 Checks (after quantisation, as the game will see it); a clip that fails is not written and the run exits non-zero:
 * no bone joint under the ground, and no foot point (ankle, toe joint, toe tip) more than 1 cm into it;
 * no leg asked to reach past its length;
-* no bone turning faster than 1,500 deg/s between two frames;
+* no bone turning faster than 1,500 deg/s between two frames; a skill-move file (one with a [sheet] table) may raise its own
+  limit with max_bone_deg_s, up to 2,500 deg/s (for exaggerated foot work read from the game camera);
 * while the ball span says the sole is on the ball, the playing foot's sole point within 1 cm of the ball's surface;
 * no boot vertex (every third, carried by the foot or toe bone) more than 1 cm inside the ball at any frame;
 * at each [ball] touch event, that foot's boot within 1.5 cm of the ball's surface;
@@ -84,6 +85,7 @@ OUT = REPO / "game/assets/anim/attacker/skills"
 SHEETS = REPO / "data/moves/sheets.json"
 FPS = 60
 MAX_TURN_DEG_S = 1500.0
+SKILL_MAX_TURN_DEG_S = 2500.0    # the most a skill-move file's own max_bone_deg_s may ask for
 MAX_SOLE_OFF = 0.01
 MAX_FOOT_UNDER = 0.01
 MAX_BOOT_IN = 0.01
@@ -642,6 +644,21 @@ def sole_points(rig: Rig, gr: np.ndarray, gt: np.ndarray, s: int) -> np.ndarray:
     return gt[:, ft] + np.einsum("nij,j->ni", gr[:, ft], off)
 
 
+def turn_limit(m: dict, problems: list) -> float:
+    """The fastest a bone of this move's clips may turn, deg/s: 1,500, or a skill-move file's own max_bone_deg_s (a file with a
+    [sheet] table), at most SKILL_MAX_TURN_DEG_S. A value it may not have is reported and the default kept."""
+    if "max_bone_deg_s" not in m:
+        return MAX_TURN_DEG_S
+    v = float(m["max_bone_deg_s"])
+    if "sheet" not in m:
+        problems.append("max_bone_deg_s is for skill-move files (with a [sheet] table) only")
+        return MAX_TURN_DEG_S
+    if not (0 < v <= SKILL_MAX_TURN_DEG_S):
+        problems.append(f"max_bone_deg_s {v:.0f} is outside 0 to {SKILL_MAX_TURN_DEG_S:.0f}")
+        return MAX_TURN_DEG_S
+    return v
+
+
 def check(c: Clip, rig: Rig, stretch: list) -> None:
     gr, gt = fk_points(rig, c.local_q, c.hips)
     n = len(c.hips)
@@ -681,8 +698,9 @@ def check(c: Clip, rig: Rig, stretch: list) -> None:
         ang = np.degrees(2 * np.arccos(np.clip(d, 0, 1))) * FPS
         if len(ang) and ang.max() > turn:
             turn = float(ang.max()); turn_at = f"{BONES[b]}@{int(ang.argmax()) + 1}"
-    if turn > MAX_TURN_DEG_S:
-        p.append(f"bone turning {turn:.0f} deg/s ({turn_at})")
+    limit = turn_limit(c.move, p)
+    if turn > limit:
+        p.append(f"bone turning {turn:.0f} deg/s ({turn_at}; limit {limit:.0f})")
     sole_err = 0.0
     bl = c.move.get("ball", {})
     for a_ev, b_ev, foot in on_spans(c.move):

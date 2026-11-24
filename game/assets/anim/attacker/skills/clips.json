@@ -9257,11 +9257,11 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1498,
+    "max_bone_deg_per_s": 1780,
     "max_turn_at": "RightLeg@2",
-    "sole_off_ball_max_m": 0.0027,
+    "sole_off_ball_max_m": 0.0044,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0075,
+    "boot_in_ball_max_m": 0.0088,
     "boot_in_ball_at": "R boot@8",
     "touch_gap_m": {},
     "root_accel_max": 7.9
@@ -9971,11 +9971,11 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1498,
+    "max_bone_deg_per_s": 1780,
     "max_turn_at": "LeftLeg@2",
-    "sole_off_ball_max_m": 0.0027,
+    "sole_off_ball_max_m": 0.0044,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0075,
+    "boot_in_ball_max_m": 0.0088,
     "boot_in_ball_at": "L boot@8",
     "touch_gap_m": {},
     "root_accel_max": 7.9
@@ -10685,12 +10685,12 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1307,
+    "max_bone_deg_per_s": 1555,
     "max_turn_at": "RightLeg@36",
-    "sole_off_ball_max_m": 0.0027,
+    "sole_off_ball_max_m": 0.0044,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0079,
-    "boot_in_ball_at": "R boot@7",
+    "boot_in_ball_max_m": 0.0088,
+    "boot_in_ball_at": "R boot@8",
     "touch_gap_m": {},
     "root_accel_max": 29.5
    },
@@ -11399,12 +11399,12 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1307,
+    "max_bone_deg_per_s": 1555,
     "max_turn_at": "LeftLeg@36",
-    "sole_off_ball_max_m": 0.0028,
+    "sole_off_ball_max_m": 0.0044,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0079,
-    "boot_in_ball_at": "L boot@7",
+    "boot_in_ball_max_m": 0.0088,
+    "boot_in_ball_at": "L boot@8",
     "touch_gap_m": {},
     "root_accel_max": 29.5
    },
@@ -11677,11 +11677,11 @@
     "left": [
      [
       2,
-      7
+      6
      ],
      [
-      10,
-      17
+      11,
+      14
      ],
      [
       23,
@@ -12117,12 +12117,12 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1488,
+    "max_bone_deg_per_s": 1886,
     "max_turn_at": "RightLeg@6",
-    "sole_off_ball_max_m": 0.0027,
+    "sole_off_ball_max_m": 0.0044,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.008,
-    "boot_in_ball_at": "R boot@7",
+    "boot_in_ball_max_m": 0.0088,
+    "boot_in_ball_at": "R boot@8",
     "touch_gap_m": {},
     "root_accel_max": 29.5
    },
@@ -12352,11 +12352,11 @@
     "left": [
      [
       0.033325554259043176,
-      0.11670945157526254
+      0.10004667444574096
      ],
      [
-      0.15002916585650397,
-      0.283375461792728
+      0.1666887030915808,
+      0.2499863892669648
      ],
      [
       0.3667431460237216,
@@ -12405,11 +12405,11 @@
     "right": [
      [
       2,
-      7
+      6
      ],
      [
-      10,
-      17
+      11,
+      14
      ],
      [
       23,
@@ -12839,12 +12839,12 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1488,
+    "max_bone_deg_per_s": 1886,
     "max_turn_at": "LeftLeg@6",
-    "sole_off_ball_max_m": 0.0027,
+    "sole_off_ball_max_m": 0.0044,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0079,
-    "boot_in_ball_at": "L boot@7",
+    "boot_in_ball_max_m": 0.0088,
+    "boot_in_ball_at": "L boot@8",
     "touch_gap_m": {},
     "root_accel_max": 29.5
    },
@@ -13074,11 +13074,11 @@
     "right": [
      [
       0.033325554259043176,
-      0.11670945157526254
+      0.10004667444574096
      ],
      [
-      0.15002916585650397,
-      0.283375461792728
+      0.1666887030915808,
+      0.2499863892669648
      ],
      [
       0.3667431460237216,
@@ -13499,15 +13499,15 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1373,
-    "max_turn_at": "RightFoot@14",
+    "max_bone_deg_per_s": 2011,
+    "max_turn_at": "RightUpLeg@23",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.004,
-    "boot_in_ball_at": "R boot@13",
+    "boot_in_ball_max_m": 0.0,
+    "boot_in_ball_at": "",
     "touch_gap_m": {
-     "contact": 0.0045,
-     "contact2": 0.0102
+     "contact": 0.0022,
+     "contact2": 0.0106
     },
     "root_accel_max": 22.2
    },
@@ -14124,15 +14124,15 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1374,
-    "max_turn_at": "Hips@21",
+    "max_bone_deg_per_s": 2010,
+    "max_turn_at": "LeftUpLeg@23",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.004,
-    "boot_in_ball_at": "L boot@13",
+    "boot_in_ball_max_m": 0.0,
+    "boot_in_ball_at": "",
     "touch_gap_m": {
-     "contact": 0.0045,
-     "contact2": 0.0103
+     "contact": 0.0022,
+     "contact2": 0.0106
     },
     "root_accel_max": 22.2
    },
@@ -14761,15 +14761,15 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "LeftToeBase",
-    "max_bone_deg_per_s": 1394,
-    "max_turn_at": "RightFoot@14",
+    "max_bone_deg_per_s": 1729,
+    "max_turn_at": "RightUpLeg@23",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.004,
-    "boot_in_ball_at": "R boot@13",
+    "boot_in_ball_max_m": 0.0,
+    "boot_in_ball_at": "",
     "touch_gap_m": {
-     "contact": 0.0045,
-     "contact2": 0.0103
+     "contact": 0.0022,
+     "contact2": 0.0106
     },
     "root_accel_max": 21.8
    },
@@ -15410,15 +15410,15 @@
    "checks": {
     "lowest_joint_m": 0.047,
     "lowest_joint": "RightToeBase",
-    "max_bone_deg_per_s": 1394,
-    "max_turn_at": "LeftFoot@14",
+    "max_bone_deg_per_s": 1729,
+    "max_turn_at": "LeftUpLeg@23",
     "sole_off_ball_max_m": 0.0,
     "lowest_foot_m": 0.0,
-    "boot_in_ball_max_m": 0.0041,
-    "boot_in_ball_at": "L boot@13",
+    "boot_in_ball_max_m": 0.0,
+    "boot_in_ball_at": "",
     "touch_gap_m": {
-     "contact": 0.0045,
-     "contact2": 0.0103
+     "contact": 0.0022,
+     "contact2": 0.0106
     },
     "root_accel_max": 21.8
    },

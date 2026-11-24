@@ -15,6 +15,7 @@ side = "none"
 foot = "right"
 entry = "stand"
 entry_speed = 0.0
+max_bone_deg_s = 2500              # exaggerated foot work, read from the game camera (the default is 1,500)
 notes = "drag-back from standing: the right sole pulls the ball 0.70 m back to rest behind his hip line while he hops back and opens a quarter turn toward the playing foot, ending side-on to it"
 
 [events]
@@ -98,7 +99,7 @@ root = { yaw = 0 }
 [[key]]
 t = 0.1
 label = "reach: the right knee up, the foot rising over the ball (0.070 s)"
-foot_r = { pos = [-0.02, 0.23, -0.17], frame = "ball", yaw = -6, pitch = 16, knee = [-0.3, 0.4, 1] }
+foot_r = { pos = [-0.02, 0.36, -0.18], frame = "ball", yaw = -6, pitch = 26, knee = [-0.3, 0.75, 1] }
 
 [[key]]
 t = 0.1429
@@ -112,7 +113,7 @@ label = "contact: the right sole on top of the ball, toes up (0.120 s)"
 pelvis = { yaw = -4, pitch = 10, roll = -2 }
 chest = { yaw = 6, pitch = 4, roll = 0 }
 head = { yaw = -6, pitch = 34 }
-foot_r = { pos = [0, 0.108, 0.02], frame = "ball", yaw = -6, pitch = 20, knee = [-0.25, 0.45, 1], ease = 0.3 }
+foot_r = { pos = [0, 0.108, 0.02], frame = "ball", yaw = -6, pitch = 21, knee = [-0.25, 0.6, 1], ease = 0.3 }
 hand_l = { swing = 40, abduct = 25, bend = 35, trail = 90 }
 hand_r = { swing = 35, abduct = 22, bend = 40 }
 ball = { pos = [-0.09, 0.11, 0.24], ease = 0 }
@@ -126,7 +127,7 @@ root = { yaw = -0.36 }
 [[key]]
 t = 0.2357
 label = "on the root (0.165 s)"
-foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -10, pitch = 17, knee = [-0.5, 0.35, 1] }
+foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -10, pitch = 24, knee = [-0.65, 0.55, 1] }
 ball = { pos = [-0.0909, 0.11, 0.2099], ease = 0 }
 
 [[key]]
@@ -144,7 +145,7 @@ root = { yaw = -11.36 }
 [[key]]
 t = 0.3
 label = "on the root (0.210 s)"
-foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -16, pitch = 17, knee = [-0.5, 0.35, 1] }
+foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -16, pitch = 24, knee = [-0.65, 0.55, 1] }
 ball = { pos = [-0.0931, 0.11, 0.1306], ease = 0 }
 
 [[key]]
@@ -161,7 +162,7 @@ root = { yaw = -21.14 }
 [[key]]
 t = 0.3643
 label = "on the root (0.255 s)"
-foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -24, pitch = 17, knee = [-0.5, 0.35, 1] }
+foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -24, pitch = 24, knee = [-0.65, 0.55, 1] }
 ball = { pos = [-0.0963, 0.11, 0.0185], ease = 0 }
 
 [[key]]
@@ -176,8 +177,8 @@ label = "mid-pull: rocking back, the hips opening toward the playing foot, the s
 pelvis = { pos = [0.0049, 0.8092, -0.1499], yaw = -45, pitch = -4, roll = 0 }
 chest = { yaw = 24, pitch = -10, roll = 2 }
 head = { yaw = 10, pitch = 42 }
-foot_l = { pos = [0.1349, 0.15, -0.0499], yaw = -15, pitch = 0, toe = 0, knee = [0.25, 0.35, 1] }
-foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -34, pitch = 17, knee = [-0.5, 0.35, 1] }
+foot_l = { pos = [0.1349, 0.26, -0.0499], yaw = -15, pitch = 0, toe = 0, knee = [0.3, 0.7, 1] }
+foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -34, pitch = 24, knee = [-0.65, 0.55, 1] }
 hand_l = { swing = 62, abduct = 18, bend = 25 }
 hand_r = { swing = 20, abduct = 40, bend = 30 }
 ball = { pos = [-0.1, 0.11, -0.11], ease = 0 }
@@ -192,7 +193,7 @@ root = { yaw = -57.36 }
 [[key]]
 t = 0.4929
 label = "on the root (0.345 s)"
-foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -46, pitch = 17, knee = [-0.5, 0.35, 1] }
+foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -46, pitch = 24, knee = [-0.65, 0.55, 1] }
 ball = { pos = [-0.1037, 0.11, -0.2385], ease = 0 }
 
 [[key]]
@@ -209,7 +210,7 @@ foot_l = { pos = [0.0987, 0.002, -0.0505], yaw = -55, pitch = 0, toe = 0, knee =
 [[key]]
 t = 0.5571
 label = "on the root (0.390 s)"
-foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -58, pitch = 17, knee = [-0.5, 0.35, 1] }
+foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -58, pitch = 24, knee = [-0.65, 0.55, 1] }
 ball = { pos = [-0.1069, 0.11, -0.3506], ease = 0 }
 
 [[key]]
@@ -227,7 +228,7 @@ root = { yaw = -85.86 }
 [[key]]
 t = 0.6214
 label = "on the root (0.435 s)"
-foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -68, pitch = 17, knee = [-0.5, 0.35, 1] }
+foot_r = { pos = [0, 0.11, 0], frame = "ball", yaw = -68, pitch = 24, knee = [-0.65, 0.55, 1] }
 ball = { pos = [-0.1091, 0.11, -0.4299], ease = 0 }
 
 [[key]]
@@ -257,7 +258,7 @@ root = { yaw = -90 }
 [[key]]
 t = 0.7571
 label = "the right foot lifts off the ball (0.530 s)"
-foot_r = { pos = [0.08, 0.27, 0.04], frame = "ball", yaw = -80, pitch = 8, knee = [-0.6, 0.4, 0.6] }
+foot_r = { pos = [0.1, 0.4, 0.08], frame = "ball", yaw = -80, pitch = 8, knee = [-0.7, 0.7, 0.6] }
 
 [[key]]
 t = 0.7619
