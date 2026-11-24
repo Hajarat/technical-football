@@ -99,6 +99,12 @@ public sealed class Replay
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? SheetsHash { get; set; }
     /// <summary>
+    /// The aim assistance level the round was played at (see <see cref="World.AimAssist"/>). Left out of the file at Off, and a
+    /// replay without it (every one recorded before the levels existed, and every batch round) runs at Off.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public AimAssistLevel AimAssist { get; set; }
+    /// <summary>
     /// The attacker's full sheet in the data/players format, written only when the attacker was the player editor's Custom player
     /// (who has no file). When present it is used instead of looking up <see cref="AttackerId"/>; older replays have none.
     /// </summary>
@@ -197,7 +203,7 @@ public sealed class Replay
     public World Play(Tuning tuning, Scenario scenario, PlayerSheet attacker, PlayerSheet keeper, Action<World, TickIntent>? afterStep = null,
         PlayerSheet? defender = null, PlayerSheet? mate = null)
     {
-        var world = new World(tuning, scenario, attacker, keeper, Seed, defender, mate);
+        var world = new World(tuning, scenario, attacker, keeper, Seed, defender, mate) { AimAssist = AimAssist };
         world.Begin();
         int n = world.PlayerCount;
         var buf = new TickIntent[n];
@@ -235,6 +241,7 @@ public sealed class Replay
         Version = Version, Seed = Seed, AttackerId = AttackerId, KeeperId = KeeperId, ScenarioId = ScenarioId, TuningHash = TuningHash,
         AttackerSheet = AttackerSheet, Partial = Partial, Capture = Capture?.Copy(), PlayersPerTick = PlayersPerTick,
         DefenderId = DefenderId, DefendingHash = DefendingHash, MateId = MateId, TeamHash = TeamHash, SheetsHash = SheetsHash,
+        AimAssist = AimAssist,
         Intents = new List<IntentRecord>(Intents),
     };
 }
@@ -256,7 +263,10 @@ public sealed class ReplayCapture
     public ReplayCapture Copy() => (ReplayCapture)MemberwiseClone();
 }
 
-/// <summary>Collects the intents of each simulated tick. Attach to <see cref="World.Recorder"/> before <see cref="World.Begin"/>.</summary>
+/// <summary>
+/// Collects the intents of each simulated tick. Attach to <see cref="World.Recorder"/> before <see cref="World.Begin"/>, with
+/// the world's aim assistance level already set (the header takes it when the recording starts).
+/// </summary>
 public sealed class ReplayRecorder
 {
     readonly Replay _replay;
@@ -279,6 +289,7 @@ public sealed class ReplayRecorder
             TeamHash = world.HasMates ? DataLoader.TeamHash(world.Tuning) : null,
             DefendingHash = world.Defender != null ? DataLoader.DefendingHash(world.Tuning) : null,
             SheetsHash = world.Tuning.Sheets?.Sha,
+            AimAssist = world.AimAssist,
         };
     }
 

@@ -28,6 +28,8 @@ public sealed class ToolArgs
     public int BurstStart, BurstCount, BurstStep = 1;
     public string? DataDir;
     public string? ReplayPath;
+    /// <summary>--aim-assist off|low|medium|high: the aim assistance level of rounds played here, instead of the saved setting (a replay keeps its own).</summary>
+    public FootballSim.Core.AimAssistLevel? AimAssist;
     /// <summary>--keeper-gallery &lt;dir&gt;: play every keeper state from a script (no simulation) and write screenshots there.</summary>
     public string? GalleryDir;
     /// <summary>--clip-gallery &lt;dir&gt;: play every keeper clip (res://assets/anim/keeper) and write a contact sheet per clip there.</summary>
@@ -113,6 +115,11 @@ public sealed class ToolArgs
                 case "--side-cam": a.CloseCam = true; a.CloseAttacker = true; a.SideCam = true; break;
                 case "--data": a.DataDir = Next(); break;
                 case "--replay": a.ReplayPath = Next(); break;
+                case "--aim-assist":
+                    string level = Next() ?? "";
+                    if (Enum.TryParse(level, ignoreCase: true, out FootballSim.Core.AimAssistLevel aim) && Enum.IsDefined(aim) && !int.TryParse(level, out _)) a.AimAssist = aim;
+                    else GD.PushWarning($"--aim-assist expects off, low, medium or high, got '{level}'");
+                    break;
                 case "--keeper-gallery": a.GalleryDir = Next(); break;
                 case "--clip-gallery": a.ClipGalleryDir = Next(); break;
                 case "--clip-folder": a.ClipFolder = Next() ?? a.ClipFolder; break;

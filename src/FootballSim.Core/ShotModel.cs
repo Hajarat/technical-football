@@ -12,8 +12,11 @@ public readonly record struct ShotPreview(Vector3 Origin, float IntendedYaw, flo
 /// <summary>The foot and the part of it a shot is struck with (see <see cref="ShotModel.ChooseStrike"/>).</summary>
 public readonly record struct StrikeChoice(Foot Foot, FootSurface Surface);
 
-/// <summary>Which case of the foot rule decided a strike (see <see cref="ShotModel.ChooseByGeometry"/>), in the order they are tried.</summary>
-public enum StrikeRule { Behind, Wide, Ahead, Across, Outside, FarPost, Weak }
+/// <summary>
+/// Which case of the foot rule decided a strike, in the order they are tried (see <see cref="ShotModel.ChooseByGeometry"/>).
+/// CurlIn and CurlInOutside are the finesse family's own rule (see <see cref="ShotModel.ChooseCurlIn"/>).
+/// </summary>
+public enum StrikeRule { Behind, Wide, Ahead, Across, Outside, FarPost, Weak, CurlIn, CurlInOutside }
 
 /// <summary>What the geometry gave for a strike and the rule that gave it (see <see cref="ShotModel.ChooseByGeometry"/>).</summary>
 public readonly record struct StrikeDecision(StrikeChoice Choice, StrikeRule Rule);
@@ -44,6 +47,8 @@ public struct ShotContext
     public float FirstTimeError;
     /// <summary>A flick: struck at the first contact before the wind-up was done (shot.flick_power, shot.flick_error).</summary>
     public bool Flick;
+    /// <summary>The aim assistance level of the round (see <see cref="ShotModel.AimTargetZ"/>); Off unless set.</summary>
+    public AimAssistLevel AimAssist;
 }
 
 /// <summary>A shot as struck, with every factor that shaped it. Recorded in the round report.</summary>
@@ -87,7 +92,16 @@ public sealed class ShotResult
     public Vector3 Launch { get; init; }
     /// <summary>Intended yaw toward the aimed point, radians (0 = +X).</summary>
     public float IntendedYaw { get; init; }
-    /// <summary>The sideways error actually drawn, degrees (launch yaw minus intended yaw).</summary>
+    /// <summary>
+    /// The turn the launch solve gave, degrees: how far the launch was turned off the intended yaw, against the bend, so that
+    /// the flight ends on the aimed point (see <see cref="ShotModel.LaunchTurn"/>). Zero when the solve was skipped.
+    /// </summary>
+    public float AdjustDeg { get; init; }
+    /// <summary>The direction the aim stick gave (the facing, with the stick at rest), before the aim pull, radians (0 = +X).</summary>
+    public float StickYaw { get; init; }
+    /// <summary>Where the ball was struck from.</summary>
+    public Vector3 Origin { get; init; }
+    /// <summary>The sideways error actually drawn, degrees (launch yaw minus the solved launch yaw: the intended yaw turned by <see cref="AdjustDeg"/>).</summary>
     public float YawErrorDeg { get; init; }
     /// <summary>The vertical error, degrees: the charge miss plus the random part drawn.</summary>
     public float PitchErrorDeg { get; init; }
@@ -226,8 +240,8 @@ public static class ShotModel
     /// default): no timing, as for a ball at the feet.
     /// </summary>
     public static StrikeChoice ChooseStrike(PlayerSheet sheet, Vector3 position, float facing, Vector3 ball, float yaw, ShotType type,
-        Pitch pitch, Tuning t, int rightTick = 0, int leftTick = 0) =>
-        WithContact(ChooseByGeometry(sheet, position, facing, ball, yaw, type, pitch, t), type, rightTick, leftTick, allowSwap: true, t);
+        Pitch pitch, Tuning t, int rightTick = 0, int leftTick = 0, bool curlIn = false) =>
+        WithContact(ChooseByGeometry(sheet, position, facing, ball, yaw, type, pitch, t, curlIn), type, rightTick, leftTick, allowSwap: true, t);
 
     // An angle on a limit counts as inside it (at the cap: still the outside; at foot_by_side_deg: not yet wide; at
     // dead_ahead_deg: still dead ahead). Angles reach here through radians, so "on" is within this of the limit, degrees.
@@ -246,10 +260,13 @@ public static class ShotModel
     /// (<see cref="FarPostApplies"/>): the strong foot, the type's own surface.</item>
     /// <item>Outside: within the cap otherwise: the outside of the strong foot.</item>
     /// </list>
+    /// With <paramref name="curlIn"/> (a shot at goal, not a pass) a finesse or low finesse is decided by the curl-in rule
+    /// instead (<see cref="ChooseCurlIn"/>); the other types are not changed by it.
     /// </summary>
     public static StrikeDecision ChooseByGeometry(PlayerSheet sheet, Vector3 position, float facing, Vector3 ball, float yaw, ShotType type,
-        Pitch pitch, Tuning t)
+        Pitch pitch, Tuning t, bool curlIn = false)
     {
+        if (curlIn && type is ShotType.Finesse or ShotType.LowFinesse) return ChooseCurlIn(sheet, facing, ball, yaw, type, pitch, t);
         var k = t.Shot;
         Foot strong = sheet.PreferredFoot, weak = strong == Foot.Right ? Foot.Left : Foot.Right;
         FootSurface normal = SurfaceFor(type);
@@ -265,6 +282,35 @@ public static class ShotModel
         return By(strong, FootSurface.Outside, StrikeRule.Outside);
     }
 
+    /// <summary>
+    /// The curl-in rule, for a finesse or low finesse struck at goal: the foot and surface that bend the ball toward the goal
+    /// centre from where it is aimed (the Z on the goal line the intended direction <paramref name="yaw"/> meets, after the aim
+    /// pull). The first case that holds decides:
+    /// <list type="number">
+    /// <item>CurlIn: aimed within curl_in_centre_m of the goal centre: the strong foot's instep.</item>
+    /// <item>CurlIn: the foot whose instep bends it in (the right foot for an aim at the +Z half, the left for the -Z half) is
+    /// his strong foot: that foot's instep.</item>
+    /// <item>CurlInOutside: it is his weak foot, he has the outside_foot trait, and the aim is toward his strong side of his
+    /// facing by no more than his outside cap (<see cref="OutsideCapDeg"/>): the outside of the strong foot, which bends the
+    /// same way.</item>
+    /// <item>CurlIn: otherwise the weak foot's instep.</item>
+    /// </list>
+    /// </summary>
+    public static StrikeDecision ChooseCurlIn(PlayerSheet sheet, float facing, Vector3 ball, float yaw, ShotType type, Pitch pitch, Tuning t)
+    {
+        Foot strong = sheet.PreferredFoot, weak = strong == Foot.Right ? Foot.Left : Foot.Right;
+        StrikeDecision By(Foot foot, FootSurface surface, StrikeRule rule) => new(new StrikeChoice(foot, surface), rule);
+        float aimZ = AimZ(ball, yaw, pitch, t);
+        if (MathF.Abs(aimZ) <= t.Shot.CurlInCentreM) return By(strong, FootSurface.Inside, StrikeRule.CurlIn);
+        // A right foot's instep bends the ball toward -Z, so it bends an aim at the +Z half in.
+        Foot instep = aimZ > 0f ? Foot.Right : Foot.Left;
+        if (instep == strong) return By(strong, FootSurface.Inside, StrikeRule.CurlIn);
+        float signed = Movement.WrapAngle(yaw - facing) * 180f / MathF.PI, own = strong == Foot.Right ? signed : -signed;
+        if (sheet.Has(PlayerTrait.OutsideFoot) && own >= -OnTheLimitDeg && own <= OutsideCapDeg(sheet, type, t) + OnTheLimitDeg)
+            return By(strong, FootSurface.Outside, StrikeRule.CurlInOutside);
+        return By(weak, FootSurface.Inside, StrikeRule.CurlIn);
+    }
+
     /// <summary>The dead-ahead swap's lead in whole ticks (dead_ahead_swap_s; 0.1 s is exactly 12 ticks at 120 a second).</summary>
     public static int SwapLeadTicks(Tuning t) => (int)MathF.Round(t.Shot.DeadAheadSwapS * t.TickRate);
 
@@ -275,14 +321,17 @@ public static class ShotModel
     /// held, and the release), a shot the Ahead rule decided, where either foot is natural, goes to the weak foot when both
     /// feet have a contact and the weak foot's comes at least dead_ahead_swap_s sooner (<see cref="SwapLeadTicks"/>); whatever
     /// the weak foot is rated, its quality curves apply as on any weak-foot strike. Stride timing never changes the foot
-    /// otherwise.
+    /// otherwise. A strike the curl-in rule decided is handed over with the opposite surface (the other foot's outside for an
+    /// instep, its instep for an outside), so the ball still bends in; it never takes the swap.
     /// </summary>
     public static StrikeChoice WithContact(StrikeDecision decision, ShotType type, int rightTick, int leftTick, bool allowSwap, Tuning t)
     {
         var choice = decision.Choice;
         if (rightTick == 0 && leftTick == 0) return choice;
         int mine = choice.Foot == Foot.Right ? rightTick : leftTick, other = choice.Foot == Foot.Right ? leftTick : rightTick;
-        var handed = new StrikeChoice(choice.Foot == Foot.Right ? Foot.Left : Foot.Right, SurfaceFor(type));
+        bool curlIn = decision.Rule is StrikeRule.CurlIn or StrikeRule.CurlInOutside;
+        var handed = new StrikeChoice(choice.Foot == Foot.Right ? Foot.Left : Foot.Right,
+            !curlIn ? SurfaceFor(type) : choice.Surface == FootSurface.Outside ? FootSurface.Inside : FootSurface.Outside);
         if (mine < 0 && other >= 0) return handed;
         // Decided by Ahead the chosen foot is the strong one, so the other is the weak one.
         if (allowSwap && decision.Rule == StrikeRule.Ahead && mine >= 0 && other >= 0 && mine - other >= SwapLeadTicks(t)) return handed;
@@ -319,16 +368,68 @@ public static class ShotModel
     }
 
     /// <summary>
-    /// Aim assist: when the raw target is outside the frame by less than 1.5 m, pull it <c>aim_assist</c> of the way toward
-    /// a point 0.6 m inside the nearer post.
+    /// The aimed point on the goal line (Z) after the aim pull. The stick (the facing, with the stick at rest) is a ray from the
+    /// ball. A ray that meets the goal line between the posts is never touched, at any level; neither is any ray at Off, or from
+    /// a ball on or behind the goal line: those give <see cref="RawTargetZ"/>. Otherwise the pull is measured as an angle from
+    /// the ball: phi is how far the ray points wide of the nearer post's bearing. Up to the level's capture_deg the aim is the
+    /// safe point, inset_m inside that post; from there the aim's bearing turns outward in a line, reaching the ray itself at
+    /// release_deg; beyond that the ray is the aim. The result is clamped like any aim (max_target_z).
     /// </summary>
-    public static float AssistTargetZ(float rawZ, Pitch pitch, Tuning t)
+    public static float AimTargetZ(Vector2 stick, float facing, Vector3 ball, AimAssistLevel level, Pitch pitch, Tuning t)
     {
-        float outside = MathF.Abs(rawZ) - pitch.GoalHalfWidth;
-        if (outside <= 0f || outside >= t.Shot.AssistRange) return rawZ;
-        float inside = MathF.Sign(rawZ) * (pitch.GoalHalfWidth - t.Shot.AssistInset);
-        return rawZ + t.AimAssist * (inside - rawZ);
+        float raw = RawTargetZ(stick, facing, ball, pitch, t);
+        float dx = pitch.GoalLineX - ball.X;
+        if (t.Shot.AimAssist.For(level) is not { } band || dx <= 0f) return raw;
+        const float deg = MathF.PI / 180f;
+        float half = pitch.GoalHalfWidth, dir = StickYawOrFacing(stick, facing, t);
+        float fromLeft = Movement.WrapAngle(dir - MathF.Atan2(-half - ball.Z, dx)), fromRight = Movement.WrapAngle(dir - MathF.Atan2(half - ball.Z, dx));
+        // (the posts open less than half a turn from in front of the line, so this is exactly "between the two bearings")
+        if (fromLeft >= 0f && fromRight <= 0f) return raw;
+        float side = MathF.Abs(fromLeft) <= MathF.Abs(fromRight) ? -1f : 1f;
+        float phi = MathF.Min(MathF.Abs(fromLeft), MathF.Abs(fromRight)) / deg;
+        float capture = MathF.Max(0f, band.CaptureDeg), release = MathF.Max(capture, band.ReleaseDeg);
+        if (phi >= release) return raw;
+        float safeZ = side * (half - t.Shot.AimAssist.InsetM);
+        if (phi <= capture) return Math.Clamp(safeZ, -t.Shot.MaxTargetZ, t.Shot.MaxTargetZ);
+        float safeYaw = MathF.Atan2(safeZ - ball.Z, dx), d = MathF.Abs(MathF.Atan2(side * half - ball.Z, dx) - safeYaw) / deg;
+        return AimZ(ball, safeYaw + side * (release + d) * (phi - capture) / (release - capture) * deg, pitch, t);
     }
+
+    /// <summary>
+    /// The launch solve's test flight: a copy of the ball is flown from <paramref name="ball"/> with <paramref name="velocity"/>
+    /// and <paramref name="spin"/> (the shot as it would be struck straight along <paramref name="yaw0"/>, the bearing to the
+    /// aimed point) through the real ball physics at the simulation tick, over the ground alone: no boards, frame, keeper or
+    /// players. It stops where its ground distance from the start reaches <paramref name="distance"/> (the aimed point's), found
+    /// inside the step, or after 3 s. Returns the turn to add to the launch yaw, radians: minus the bearing of that point from
+    /// yaw0, so the launch is turned against the drift. Drag, bounce and a spin that turns with the launch are the same in every
+    /// direction, so the turned flight is the test flight turned, and it ends on the aimed point. Zero when the flight never
+    /// gets that far.
+    /// </summary>
+    public static float LaunchTurn(Vector3 ball, float yaw0, float distance, Vector3 velocity, Vector3 spin, Tuning t)
+    {
+        if (!(distance > 1e-3f)) return 0f;
+        var b = new Ball(t.Ball) { Position = ball, Velocity = velocity, Spin = spin };
+        int steps = (int)MathF.Ceiling(LaunchSolveSeconds * t.TickRate);
+        Vector3 prev = ball;
+        float d0 = 0f;
+        for (int i = 0; i < steps; i++)
+        {
+            b.Step(t.Dt, null, null);
+            float d1 = new Vector2(b.Position.X - ball.X, b.Position.Z - ball.Z).Length();
+            if (d1 >= distance)
+            {
+                var at = Vector3.Lerp(prev, b.Position, d1 - d0 > 1e-6f ? (distance - d0) / (d1 - d0) : 1f);
+                float a = Movement.WrapAngle(MathF.Atan2(at.Z - ball.Z, at.X - ball.X) - yaw0);
+                return float.IsFinite(a) ? -a : 0f;
+            }
+            if (!float.IsFinite(d1)) return 0f;
+            prev = b.Position; d0 = d1;
+        }
+        return 0f;
+    }
+
+    /// <summary>The longest test flight of the launch solve, seconds.</summary>
+    public const float LaunchSolveSeconds = 3f;
 
     /// <summary>Skill rating (0..1) for a shot from the given distance: finishing inside 18 m, long_shots beyond 25 m, linear between.</summary>
     public static float SkillR01(PlayerSheet s, float distance, Tuning t)
@@ -444,11 +545,14 @@ public static class ShotModel
     /// <summary>The strike a context asks for: its own foot and surface when decided, else chosen here without timing.</summary>
     static StrikeChoice StrikeFor(in ShotContext c, float yaw, Pitch pitch, Tuning t) => c.Foot is Foot f
         ? new StrikeChoice(f, c.Surface ?? SurfaceFor(c.Type))
-        : ChooseStrike(c.Shooter.Sheet, c.Shooter.Position, c.Shooter.Facing, c.BallPosition, yaw, c.Type, pitch, t);
+        : ChooseStrike(c.Shooter.Sheet, c.Shooter.Position, c.Shooter.Facing, c.BallPosition, yaw, c.Type, pitch, t, curlIn: true);
 
     /// <summary>
-    /// Computes a strike: target, foot, multipliers, error draw, launch velocity and spin. All randomness comes from
-    /// <paramref name="rng"/>, in a fixed order (yaw, pitch, speed, then spin).
+    /// Computes a strike: target, foot, multipliers, error draw, the launch solve, launch velocity and spin. All randomness comes
+    /// from <paramref name="rng"/>, in a fixed order (yaw, pitch, speed, then spin), and is drawn before the launch is solved:
+    /// the test flight (<see cref="LaunchTurn"/>) is flown with the drawn speed and spin straight at the aimed point, the launch
+    /// is turned against its drift, and only then are the drawn yaw and pitch errors added. So a shot with no error crosses the
+    /// goal line where it was aimed, whatever its bend. The solve is skipped for a ball on or behind the goal line.
     /// </summary>
     public static ShotResult Compute(in ShotContext c, Pitch pitch, Tuning t, SimRng rng, int tick = 0)
     {
@@ -494,44 +598,42 @@ public static class ShotModel
         float pitchErr = missDeg + rng.Normal(0f, sigmaV);
         float speed = MathF.Max(0.1f, vIntended * speedMiss * rng.Normal(1f, k.SpeedNoise));
 
+        // The spin's size (the last draw). Side spin (about the axis that bends the ball sideways) grows with the launch speed
+        // and the curve rating.
         const float deg = MathF.PI / 180f;
-        float yaw = yaw0 + yawErr * deg;
-        float pitchRad = (elev + pitchErr) * deg;
-        var dir = new Vector3(MathF.Cos(pitchRad) * MathF.Cos(yaw), MathF.Sin(pitchRad), MathF.Cos(pitchRad) * MathF.Sin(yaw));
-        Vector3 launch = dir * speed;
-
-        // Side spin (about the axis that bends the ball sideways) grows with the launch speed and the curve rating.
-        Vector3 spin;
         const float rev = 2f * MathF.PI;
         float speedScale = speed / MathF.Max(0.1f, k.SpinReferenceSpeed);
-        var rightOfShot = new Vector3(-MathF.Sin(yaw), 0f, MathF.Cos(yaw));
-        switch (c.Type)
+        bool finesse = c.Type is ShotType.Finesse or ShotType.LowFinesse;
+        float spinRev = finesse ? k.FinesseSpinRev.ForRating(p.Sheet.Curve) * speedScale * curl
+            : chip ? rng.Uniform(k.ChipBackspinMinRev, k.ChipBackspinMaxRev)
+            // Power: a light curl to either side; driven: barely any. Signed amount, so the side is part of the draw.
+            : rng.Uniform(-1f, 1f) * (c.Type == ShotType.Driven ? k.DrivenSpinRev : k.PowerSpinRev).ForRating(p.Sheet.Curve) * speedScale * curl;
+
+        static Vector3 Direction(float yawRad, float pitchRad) =>
+            new(MathF.Cos(pitchRad) * MathF.Cos(yawRad), MathF.Sin(pitchRad), MathF.Cos(pitchRad) * MathF.Sin(yawRad));
+        // The spin for a launch direction: it turns with the launch.
+        Vector3 SpinFor(Vector3 d, float yawRad)
         {
-            case ShotType.Finesse:
-            case ShotType.LowFinesse:
-            {
-                // Bends away from the striking foot's side: a right foot bends left (its outside bends the other way).
-                // Force = spin x velocity, so spin = v x bend.
-                Vector3 bend = (foot == Foot.Right) != (strike.Surface == FootSurface.Outside) ? -rightOfShot : rightOfShot;
-                spin = Vector3.Normalize(Vector3.Cross(dir, bend)) * (k.FinesseSpinRev.ForRating(p.Sheet.Curve) * speedScale * curl * rev);
-                break;
-            }
-            case ShotType.Chip:
-            {
-                // Backspin lifts the ball: spin = v x up.
-                Vector3 axis = Vector3.Normalize(Vector3.Cross(dir, Vector3.UnitY));
-                spin = axis * (rng.Uniform(k.ChipBackspinMinRev, k.ChipBackspinMaxRev) * rev);
-                break;
-            }
-            default:
-            {
-                // Power: a light curl to either side; driven: barely any. Signed amount, so the side is part of the draw.
-                var range = c.Type == ShotType.Driven ? k.DrivenSpinRev : k.PowerSpinRev;
-                float amount = rng.Uniform(-1f, 1f) * range.ForRating(p.Sheet.Curve) * speedScale * curl;
-                spin = Vector3.Normalize(Vector3.Cross(dir, rightOfShot)) * (amount * rev);
-                break;
-            }
+            var rightOfShot = new Vector3(-MathF.Sin(yawRad), 0f, MathF.Cos(yawRad));
+            // A finesse bends away from the striking foot's side: a right foot bends left (its outside bends the other way).
+            // Force = spin x velocity, so spin = v x bend. A chip's backspin lifts the ball: spin = v x up.
+            Vector3 about = finesse ? ((foot == Foot.Right) != (strike.Surface == FootSurface.Outside) ? -rightOfShot : rightOfShot)
+                : chip ? Vector3.UnitY : rightOfShot;
+            return Vector3.Normalize(Vector3.Cross(d, about)) * (spinRev * rev);
         }
+
+        // The launch solve: the shot as drawn, flown straight at the aimed point, shows its drift; the launch is turned against it.
+        float turn = 0f;
+        if (dx > 0f)
+        {
+            var straight = Direction(yaw0, (elev + missDeg) * deg);
+            turn = LaunchTurn(ball, yaw0, new Vector2(dx, targetZ - ball.Z).Length(), straight * speed, SpinFor(straight, yaw0), t);
+        }
+
+        float yaw = yaw0 + turn + yawErr * deg;
+        var dir = Direction(yaw, (elev + pitchErr) * deg);
+        Vector3 launch = dir * speed;
+        Vector3 spin = SpinFor(dir, yaw);
 
         // Aimed point on the goal plane, ignoring drag and spin.
         float dh = MathF.Abs(dx) < 1e-3f ? 0f : dx / MathF.Cos(yaw0);
@@ -558,6 +660,9 @@ public static class ShotModel
             Distance = distance,
             Launch = launch,
             IntendedYaw = yaw0,
+            AdjustDeg = turn / deg,
+            StickYaw = StickYawOrFacing(c.Stick, p.Facing, t),
+            Origin = ball,
             YawErrorDeg = yawErr,
             PitchErrorDeg = pitchErr,
             ElevationDeg = elev,
@@ -568,15 +673,15 @@ public static class ShotModel
     }
 
     /// <summary>
-    /// The intended yaw (radians, 0 = +X) and the aimed Z on the goal line, before any error is drawn. A ball on or behind the
-    /// goal line is aimed where the stick points (where the shooter faces with the stick at rest).
+    /// The intended yaw (radians, 0 = +X) and the aimed Z on the goal line (after the aim pull, see <see cref="AimTargetZ"/>),
+    /// before the launch solve and any error. A ball on or behind the goal line is aimed where the stick points (where the
+    /// shooter faces with the stick at rest).
     /// </summary>
     public static float IntendedYaw(in ShotContext c, Pitch pitch, Tuning t, out float targetZ)
     {
         var p = c.Shooter;
         Vector3 ball = c.BallPosition;
-        float rawZ = RawTargetZ(c.Stick, p.Facing, ball, pitch, t);
-        targetZ = AssistTargetZ(rawZ, pitch, t);
+        targetZ = AimTargetZ(c.Stick, p.Facing, ball, c.AimAssist, pitch, t);
         float dx = pitch.GoalLineX - ball.X, dz = targetZ - ball.Z;
         float yaw0 = MathF.Abs(dx) < 1e-3f && MathF.Abs(dz) < 1e-3f ? p.Facing : MathF.Atan2(dz, dx);
         if (dx <= 0f) yaw0 = StickYawOrFacing(c.Stick, p.Facing, t);

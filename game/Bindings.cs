@@ -128,6 +128,8 @@ public static class Bindings
     public static readonly KeyBind SwapFace = new("B", Key.B);
     /// <summary>Turns controller vibration on or off (saved).</summary>
     public static readonly KeyBind Vibration = new("V", Key.V);
+    /// <summary>Steps the aim assistance level: Off, Low, Medium, High (saved).</summary>
+    public static readonly KeyBind AimAssist = new("N", Key.N);
     public static readonly KeyBind Controls = new("H", Key.H);
     /// <summary>Opens the player editor while play is stopped (paused, in Setup or at the report).</summary>
     public static readonly KeyBind EditorOpen = new("T", Key.T);
@@ -184,7 +186,8 @@ public static class Bindings
     /// The panel content for a pad kind. Gesture wording follows GestureReader and docs/controls.md: skill-move directions are taken
     /// against the running direction, "→ or ←" means either side, and the timings live in the `skill` tuning section.
     /// </summary>
-    public static List<Group> Groups(PadKind k)
+    /// <param name="aim">The aim assistance level in use, shown in its row.</param>
+    public static List<Group> Groups(PadKind k, FootballSim.Core.AimAssistLevel aim = FootballSim.Core.AimAssistLevel.Medium)
     {
         string B(PadBind p) => p.Label(k);
         string shoot = B(Pad.Shoot), rb = B(Pad.Finesse), lb = B(Pad.Chip), cancel = B(Pad.Confirm);
@@ -237,6 +240,7 @@ public static class Bindings
                 new("Debug overlay", Overlay.Label, B(Pad.Overlay)),
                 new("Swap face buttons", SwapFace.Label, $"keyboard {SwapFace.Label}"),
                 new("Controller vibration on / off", Vibration.Label, $"keyboard {Vibration.Label}"),
+                new($"Aim assist: {aim}", $"{AimAssist.Label} (Off / Low / Medium / High)", $"keyboard {AimAssist.Label} (Off / Low / Medium / High)"),
                 new("This panel", Controls.Label, $"{B(Pad.Pause)} (shown while paused)"),
             }),
             new("Player editor", new()

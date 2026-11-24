@@ -10,7 +10,11 @@ using FootballSim.Core;
 /// contact check handed it to the other foot, the body angle, the launch speed, the time from the press to the strike and his
 /// turn fatigue just before the strike) and how the round
 /// ended, then prints means and shares (on target = the shots that, flying free of the keeper, go in), the reasons wide shots went
-/// wide, why rounds had no shot, and the share of all sprint pushes that were cut short near the keeper.
+/// wide, why rounds had no shot, and the share of all sprint pushes that were cut short near the keeper. It also prints the
+/// launch solve's turn (adjust: how far the launch was turned against the shot's bend) and the drift (where the shot crossed
+/// the goal line, flying free of the keeper and the frame, minus where it was aimed: the drawn error alone, since the solve
+/// cancels the bend), and with <c>--list 1</c> those two for every shot. <c>--type finesse</c> (power, driven, finesse,
+/// low_finesse, chip) and <c>--side 1</c> or <c>-1</c> (the +Z or -Z post) set the scripted attacker's shot.
 /// </summary>
 static class ShotDiag
 {
@@ -28,6 +32,11 @@ static class ShotDiag
         var factors = new Dictionary<string, List<float>>();
         var launch = new List<float>(); var pressToStrike = new List<float>(); var bodyAngle = new List<float>();
         var feet = new Dictionary<string, int>();
+        var adjust = new List<float>(); var drift = new List<float>(); var absDrift = new List<float>();
+        ShotType type = opts.TryGetValue("type", out var tn) ? Enum.Parse<ShotType>(tn.Replace("_", ""), ignoreCase: true) : ShotType.Power;
+        int side = opts.TryGetValue("side", out var sd) ? int.Parse(sd, CultureInfo.InvariantCulture) : 0;
+        bool list = opts.ContainsKey("list");
+        ScriptedAttacker Script() => new() { Type = type, Side = side };
         var rules = new Dictionary<StrikeRule, int>();
         int onTarget = 0, farPost = 0, swapped = 0, noContact = 0;
         var ends = new Dictionary<string, int>();
@@ -37,7 +46,7 @@ static class ShotDiag
         for (int r = 0; r < n; r++)
         {
             var w = new World(tuning, sc, att, kee, seed0 + (ulong)r);
-            var script = new ScriptedAttacker();
+            var script = Script();
             w.Begin();
             var buf = new TickIntent[w.PlayerCount];
             int cap = (int)((tuning.Round.MaxSeconds + 10f) * tuning.TickRate);
@@ -81,6 +90,11 @@ static class ShotDiag
             launch.Add(s.Speed); bodyAngle.Add(s.BodyAngleDeg);
             // On target: the ball as struck, flying free of the keeper, goes in.
             if (ShotModel.FliesIn(w.Ball.Position, w.Ball.Velocity, w.Ball.Spin, w.Pitch, tuning)) onTarget++;
+            adjust.Add(s.AdjustDeg);
+            float crossed = CrossedZ(s, w.Pitch, tuning);
+            if (!float.IsNaN(crossed)) { drift.Add(crossed - s.Aimed.X); absDrift.Add(MathF.Abs(crossed - s.Aimed.X)); }
+            if (list) Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"  seed {seed0 + (ulong)r}: {s.Type} {s.Foot}/{s.Surface} rule {w.StrikeGeometry.Rule} from {s.Distance:F1} m aimed z {s.Aimed.X:F2} adjust {s.AdjustDeg:F2} deg yaw error {s.YawErrorDeg:F2} deg crossed z {crossed:F2} drift {crossed - s.Aimed.X:F2} m"));
             if (pressTick >= 0) pressToStrike.Add((s.Tick - pressTick) * tuning.Dt);
             string how = (s.Foot == att.PreferredFoot ? "strong " : "weak ") + s.Surface.ToString().ToLowerInvariant();
             feet[how] = feet.GetValueOrDefault(how) + 1;
@@ -90,7 +104,7 @@ static class ShotDiag
             rules[decision.Rule] = rules.GetValueOrDefault(decision.Rule) + 1;
             if (decision.Rule == StrikeRule.FarPost) farPost++;
             if (s.Foot != decision.Choice.Foot) { if (decision.Rule == StrikeRule.Ahead) swapped++; else noContact++; }
-            var res = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed0 + (ulong)r);
+            var res = RoundRunner.RunFirstShot(tuning, sc, att, kee, seed0 + (ulong)r, Script());
             ends[res.End.ToString()] = ends.GetValueOrDefault(res.End.ToString()) + 1;
             if (res.End == ShotEnd.Wide)
             {
@@ -101,13 +115,14 @@ static class ShotDiag
         }
         string F(List<float> l) => l.Count == 0 ? "-" : $"{l.Average():F2} (p10 {Q(l, 0.1):F2}, p90 {Q(l, 0.9):F2})";
         float Q(List<float> l, double q) { var c = l.OrderBy(x => x).ToList(); return c[Math.Min(c.Count - 1, (int)(q * c.Count))]; }
-        Console.WriteLine($"shot diagnostic: scenario {id}, {n} rounds from seed {seed0}, {dist.Count} with a shot");
+        Console.WriteLine($"shot diagnostic: scenario {id}, {n} rounds from seed {seed0}, {dist.Count} with a shot ({type}{(side == 0 ? "" : side > 0 ? ", the +Z post" : ", the -Z post")})");
         Console.WriteLine($"  ends: {string.Join(", ", ends.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} {100.0 * kv.Value / n:F1}%"))}");
         Console.WriteLine($"  on target: {(dist.Count == 0 ? "-" : $"{100.0 * onTarget / dist.Count:F1}% of the shots")}   launch speed m/s: {F(launch)}   press to strike s: {F(pressToStrike)}");
         Console.WriteLine($"  body angle deg: {F(bodyAngle)}   struck with: {string.Join(", ", feet.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} {100.0 * kv.Value / Math.Max(1, dist.Count):F1}%"))}");
         Console.WriteLine($"  far_post: {(dist.Count == 0 ? "-" : $"yes {100.0 * farPost / dist.Count:F1}%, no {100.0 * (dist.Count - farPost) / dist.Count:F1}%")}   run_speed factor: {(factors.TryGetValue("speed x run_speed", out var rs) ? F(rs) : "-")}");
         Console.WriteLine($"  rule: {(dist.Count == 0 ? "-" : string.Join(", ", Enum.GetValues<StrikeRule>().Select(r => $"{r.ToString().ToLowerInvariant()} {100.0 * rules.GetValueOrDefault(r) / dist.Count:F1}%")))}");
         Console.WriteLine($"  handed over: {(dist.Count == 0 ? "-" : $"swap {100.0 * swapped / dist.Count:F1}%, no contact {100.0 * noContact / dist.Count:F1}%")}");
+        Console.WriteLine($"  launch solve: adjust deg {F(adjust)}   drift m (crossed Z minus aimed Z, {drift.Count} crossed the line): {F(drift)}   |drift| {F(absDrift)}");
         Console.WriteLine($"  no shot: {(noShot.Count == 0 ? "none" : string.Join(", ", noShot.Select(kv => $"{kv.Key} {kv.Value}")))}");
         Console.WriteLine($"  distance to goal at strike m: {F(dist)}");
         Console.WriteLine($"  attacker speed at strike m/s: {F(speed)}");
@@ -119,5 +134,19 @@ static class ShotDiag
         foreach (var kv in factors.OrderBy(kv => kv.Key)) Console.WriteLine($"  factor {kv.Key}: {F(kv.Value)}");
         Console.WriteLine($"  wide {wide}: aimed outside the posts {wideAimOut}, aimed inside and sent wide {wideError}");
         return 0;
+    }
+
+    /// <summary>Where a shot as struck crosses the goal line (Z), flying over the ground alone (no frame, boards or keeper); NaN if it never does.</summary>
+    static float CrossedZ(ShotResult s, Pitch pitch, Tuning t)
+    {
+        var b = new Ball(t.Ball) { Position = s.Origin, Velocity = s.Launch, Spin = s.Spin };
+        for (int i = 0; i < 6 * t.TickRate; i++)
+        {
+            var before = b.Position;
+            b.Step(t.Dt, null, null);
+            if (b.Position.X >= pitch.GoalLineX && b.Position.X > before.X)
+                return before.Z + (b.Position.Z - before.Z) * (pitch.GoalLineX - before.X) / (b.Position.X - before.X);
+        }
+        return float.NaN;
     }
 }

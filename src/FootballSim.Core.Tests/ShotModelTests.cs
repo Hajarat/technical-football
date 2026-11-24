@@ -342,21 +342,6 @@ public class ShotModelTests
     }
 
     [Fact]
-    public void AimAssistPullsATargetJustOutsideTheFrame()
-    {
-        float hw = P.GoalHalfWidth;
-        float inside = hw - 0.6f;
-        Assert.Equal(2f, ShotModel.AssistTargetZ(2f, P, T), 4);                     // inside the frame: untouched
-        float raw = hw + 0.5f;
-        Assert.Equal(raw + 0.3f * (inside - raw), ShotModel.AssistTargetZ(raw, P, T), 4);
-        Assert.Equal(-(raw + 0.3f * (inside - raw)), ShotModel.AssistTargetZ(-raw, P, T), 4);
-        float far = hw + 1.6f;                                                       // outside by more than 1.5 m: untouched
-        Assert.Equal(far, ShotModel.AssistTargetZ(far, P, T), 4);
-        var none = new Tuning { AimAssist = 0f };
-        Assert.Equal(raw, ShotModel.AssistTargetZ(raw, P, none), 4);
-    }
-
-    [Fact]
     public void TargetIsTheStickCastToTheGoalLineAndClamped()
     {
         var ball = new Vector3(40.5f, 0.11f, 0f);
