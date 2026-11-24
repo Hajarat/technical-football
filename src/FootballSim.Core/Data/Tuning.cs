@@ -1905,6 +1905,12 @@ public sealed class DefenderTuning
     public float PressFarAfterS { get; set; } = 1.5f;
     /// <summary>With the carrier within twice his gap, he contains once more than this off his shaded line, metres [0.5 to 2].</summary>
     public float DropOfflineM { get; set; } = 1f;
+    /// <summary>
+    /// A carrier coming on toward goal faster than his jockey pace is inside his gap this many seconds of the excess speed
+    /// sooner, seconds [0 to 3], unless his speed is falling faster than give_ground_brake, m/s per second [0.5 to 5].
+    /// </summary>
+    public float GiveGroundS { get; set; } = 1.5f;
+    public float GiveGroundBrake { get; set; } = 2f;
     /// <summary>Beaten, the point he runs to cut the carrier off is never nearer the goal centre than this, metres [2 to 5].</summary>
     public float RecoverMinGoalM { get; set; } = 4.6f;
     /// <summary>

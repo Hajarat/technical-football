@@ -36,7 +36,11 @@ line" runs from the ball (or, against a team with the ball loose, the anchor) to
 - **The gap.** `contain_gap_m` by jockeying (4.65 m at 1, 2.25 m at 99; 2.91 m for `centre_back`) plus `gap_pace_s` for each
   m/s the carrier runs faster than his sprint-jockey pace, at most `gap_max_m` (`DefenderBot.GapFor`). The carrier is inside
   the gap when he is no more than the gap further from goal than the defender (half a metre more once containing, so he does
-  not flicker).
+  not flicker). A carrier coming on toward goal faster than the defender's jockey pace is inside the gap sooner, by
+  `give_ground_s` (1.5 s) for each m/s of that excess, so the defender is already backing off when a cut comes; not while
+  the carrier's speed is falling faster than `give_ground_brake` (2 m/s per second, smoothed over about 0.08 s), so a
+  carrier who stops still finds him close, and not while the carrier runs within 0.5 m/s of dead straight down the line, so
+  one running straight at him meets him planted, where his auto tackle is surest.
 - **Drop** (the carrier outside the gap). He goes to his spot jockeying, facing the carrier, easing in no faster than he can
   brake from at `jockey_decel`; the sprint-jockey pace only toward a spot nearer goal than he is, and a run (no jockey) only
   to such a spot further than `drop_sprint_distance_m` away. So he never sprints up the pitch, and while the carrier is far
@@ -196,11 +200,11 @@ difficulty (that is the human probe's); the legacy bot is held to its own (strai
 
 | | band | measured (seed 1, 2,000 rounds each) |
 | --- | --- | --- |
-| straight: ball won from the dribble | 85 to 95% | 90.4% |
-| cut: ball won from the dribble | 17 to 27% | 25.6% |
-| skill: ball won from the dribble | 10 to 20% | 15.1% |
-| shots blocked, all four styles' shots together | 29 to 39% | 35.0% |
-| fouls, each style | under 5% of rounds | 1.0 to 3.5% |
+| straight: ball won from the dribble | 85 to 95% | 90.3% |
+| cut: ball won from the dribble | 17 to 27% | 23.8% |
+| skill: ball won from the dribble | 10 to 20% | 11.1% |
+| shots blocked, all four styles' shots together | 29 to 39% | 36.7% |
+| fouls, each style | under 5% of rounds | 0.6 to 1.9% |
 
 The blocked share comes mostly from `shoot` (about 71% of its shots are blocked; the other styles shoot after they
 are past him). `--sweep awareness=1,50,99` (any defending rating) repeats the table per value without the bands;
@@ -248,32 +252,33 @@ containing bot (seed 1, 2,000 rounds per row; seed 2 gives the same to within 0.
 
 | Plan | Attacker | First attack: goal / miss / held / dispossessed / foul | Past | Band (past) |
 | --- | --- | --- | --- | --- |
-| wide_sprint | even | 25.4 / 15.3 / 17.2 / 40.6 / 1.3% | 23.0% | at most 30% (ok) |
-| stop_go | even | 27.4 / 19.9 / 7.2 / 42.5 / 3.0% | 37.0% | at most 35% (MISS) |
-| cut_inside | even | 18.4 / 20.3 / 7.2 / 50.8 / 3.0% | 47.7% | 25 to 45% (MISS) |
-| skill_wide | even | 10.9 / 9.9 / 4.5 / 71.0 / 3.5% | 29.0% | 35 to 55% (MISS) |
-| jog_cut | even | 28.6 / 17.6 / 13.2 / 35.0 / 5.0% | 66.0% | at most 25% (MISS) |
-| stand_burst | even | 13.5 / 9.3 / 2.8 / 73.5 / 0.8% | 30.5% | at most 25% (MISS) |
-| sprint_cut | even | 27.6 / 13.4 / 12.2 / 39.8 / 6.7% | 66.7% | at most 25% (MISS) |
-| wide_sprint | fast | 39.2 / 12.1 / 14.6 / 33.3 / 0.9% | 45.1% | 40 to 60% (ok) |
-| stop_go | fast | 38.1 / 23.9 / 5.7 / 30.7 / 1.5% | 36.0% | at most 60% (ok) |
-| cut_inside | fast | 24.9 / 20.6 / 6.2 / 46.9 / 1.1% | 45.1% | at most 60% (ok) |
-| skill_wide | fast | 21.2 / 9.1 / 2.8 / 64.3 / 2.2% | 36.2% | 45 to 65% (MISS) |
-| jog_cut | fast | 39.6 / 11.9 / 11.9 / 30.6 / 5.7% | 83.5% | at most 45% (MISS) |
-| stand_burst | fast | 17.4 / 4.6 / 2.4 / 75.3 / 0.1% | 27.4% | at most 45% (ok) |
-| sprint_cut | fast | 42.9 / 9.9 / 8.5 / 28.3 / 10.2% | 88.3% | at most 45% (MISS) |
+| wide_sprint | even | 27.2 / 17.8 / 8.7 / 44.9 / 1.4% | 12.9% | at most 30% (ok) |
+| stop_go | even | 27.6 / 20.6 / 5.6 / 43.5 / 2.7% | 37.2% | at most 35% (MISS) |
+| cut_inside | even | 20.4 / 19.2 / 8.2 / 50.4 / 1.8% | 42.2% | 25 to 45% (ok) |
+| skill_wide | even | 11.3 / 9.2 / 3.4 / 72.0 / 3.9% | 28.9% | 35 to 55% (MISS) |
+| jog_cut | even | 26.4 / 18.3 / 10.8 / 37.6 / 6.6% | 62.5% | at most 25% (MISS) |
+| stand_burst | even | 14.1 / 9.4 / 2.0 / 73.7 / 0.7% | 30.5% | at most 25% (MISS) |
+| sprint_cut | even | 26.1 / 12.2 / 10.7 / 43.0 / 7.9% | 54.7% | at most 25% (MISS) |
+| wide_sprint | fast | 38.0 / 18.8 / 7.4 / 35.0 / 0.7% | 11.7% | 40 to 60% (MISS) |
+| stop_go | fast | 38.6 / 23.6 / 5.0 / 31.1 / 1.4% | 36.0% | at most 60% (ok) |
+| cut_inside | fast | 20.7 / 14.7 / 3.8 / 60.2 / 0.5% | 33.0% | at most 60% (ok) |
+| skill_wide | fast | 20.6 / 8.8 / 2.7 / 64.5 / 3.0% | 35.2% | 45 to 65% (MISS) |
+| jog_cut | fast | 31.6 / 10.8 / 7.2 / 48.0 / 2.2% | 55.7% | at most 45% (MISS) |
+| stand_burst | fast | 17.6 / 4.8 / 1.9 / 75.3 / 0.1% | 27.4% | at most 45% (ok) |
+| sprint_cut | fast | 40.2 / 9.9 / 9.4 / 27.4 / 12.8% | 83.5% | at most 45% (MISS) |
 
 | All four plans | Even: measured (band) | Fast: measured (band) |
 | --- | --- | --- |
-| first-attack goals of the best plan | 27.4%, stop_go (12 to 22%, MISS) | 39.2%, wide_sprint (25 to 38%, MISS) |
-| median time to get past, rounds that got past | 2.61 s (3.0 s or more, MISS) | 2.31 s (2.5 s or more, MISS) |
-| tackles (lunges and slides) tried per round | 0.75 (0.5 or more, ok) | 0.67 (0.5 or more, ok) |
-| fouls | 2.7% (under 6%, ok) | 1.5% (under 6%, ok) |
+| first-attack goals of the best plan | 27.5%, stop_go (12 to 22%, MISS) | 38.6%, stop_go (25 to 38%, MISS) |
+| median time to get past, rounds that got past | 3.12 s (3.0 s or more, ok) | 2.58 s (2.5 s or more, ok) |
+| tackles (lunges and slides) tried per round | 0.67 (0.5 or more, ok) | 0.68 (0.5 or more, ok) |
+| fouls | 2.5% (under 6%, ok) | 1.4% (under 6%, ok) |
 
-The burst plans still get past a defender who waits on his engage line: the carrier reaches him at 6 to 7 m/s and turns
-sideways while he is still flat-footed. Making him give ground earlier (with the carrier a fraction of a second further off)
-holds those bursts but leaves the 12 m shot free in front of him and stops pace beating him on the outside, which the other
-rows do not allow.
+Giving ground early holds pace on the outside (wide_sprint) and part of the cuts, but the burst plans still get past: a jog
+or a standing start is slower than his jockey pace, so he waits flat-footed for jog_cut and stand_burst, and sprint_cut's
+carrier comes dead straight until he turns. Giving ground more, or for those too, leaves the 12 m shot free in front of
+him (he wins fewer loose touches back there, and stop_go's and cut_inside's goals rise), and against a straight run it loses
+the planted auto tackle that the defender probe's straight row needs.
 
 With `--brain legacy` (the same seeds) the legacy bot measures: past 77.8 / 25.6 / 71.0 / 52.7% (even) and 78.7 / 27.1 / 65.3 /
 57.8% (fast) for the four plans in this order, goals of the best plan 32.0% and 43.5%, median time past 2.03 s and 2.06 s,

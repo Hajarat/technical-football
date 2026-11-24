@@ -588,6 +588,37 @@ public class DefenderContainTests
         Assert.Equal(DefenderMode.Drop, w.DefenderBot.Mode);
     }
 
+    [Theory]
+    [InlineData(1.2f, false, DefenderMode.Contain)]
+    [InlineData(0f, false, DefenderMode.Drop)]
+    [InlineData(1.2f, true, DefenderMode.Drop)]
+    public void ACarrierComingOnFastAcrossHisLineIsInsideHisGapSoonerUnlessHeRunsDeadStraightOrBrakes(float across, bool brake, DefenderMode expect)
+    {
+        var w = Live(tuning: NoWin);
+        GiveAttackerTheBall(w);
+        var a = w.Attacker;
+        var d = w.Defender!;
+        var k = T.Defender;
+        var v = new Vector3(7f, 0f, across);
+        float slowJ = Movement.JockeyTopSpeed(CentreBack, 0f, T);
+        float gap = DefenderBot.GapFor(CentreBack, v.Length(), T);
+        float early = (v.X - slowJ) * k.GiveGroundS;
+        Assert.True(early > 2f, $"early {early}");
+        // The carrier two metres beyond the gap at seven metres a second, the defender still on his engage line: the carrier's
+        // pace held for a few ticks (or cut by a fifth for the last three), each tick put back at the same depth.
+        float back = k.EngageLineM + gap + 2f;
+        for (int i = 0; i < 9; i++)
+        {
+            Place(w, DuelPitch.GoalLineX - back, 0f);
+            a.Velocity = brake && i >= 6 ? v * 0.8f : v;
+            d.Position = new Vector3(DuelPitch.GoalLineX - k.EngageLineM, 0f, 0f);
+            d.Velocity = Vector3.Zero;
+            Step(w, new TickIntent { MoveX = 1f, Sprint = 1f });
+            Assert.Same(a, w.BallController);
+        }
+        Assert.Equal(expect, w.DefenderBot!.Mode);
+    }
+
     // ---- replays ----
 
     [Theory]
