@@ -502,6 +502,59 @@ public class KeeperBrainTests
         Assert.InRange((12 + waited) * Dt, 0.2f - 1.5f * Dt, 0.2f + 1.5f * Dt);
     }
 
+    // ---- no jump as a save starts ----
+
+    /// <summary>Steps the brain until his dive is over (or a cap), returning the largest move of his feet in one tick beyond what his velocity carries.</summary>
+    static float LargestJump(KeeperBrain brain, PlayerState keeper, Ball ball, out bool dived)
+    {
+        float most = 0f;
+        dived = false;
+        for (int i = 0; i < 240; i++)
+        {
+            var p0 = keeper.Position;
+            brain.Update(Dt, ball, new SimRng(5));
+            dived |= keeper.KeeperAction == KeeperAction.Diving;
+            var step = new Vector2(keeper.Position.X - p0.X, keeper.Position.Z - p0.Z).Length();
+            most = MathF.Max(most, step - new Vector2(keeper.Velocity.X, keeper.Velocity.Z).Length() * Dt);
+            if (dived && keeper.KeeperAction != KeeperAction.Diving) break;
+        }
+        return most;
+    }
+
+    [Theory]
+    [InlineData(1.6f)]     // a dive to his side
+    [InlineData(0.45f)]    // a ball inside his hand span: at his hands already
+    public void ASetKeepersBodyDoesNotJumpAsHisDiveStarts(float side)
+    {
+        var (brain, keeper, ball) = Rig(Wall(), new Vector3(P.GoalLineX - 11f, 0.11f, 0f));
+        ball.Position = new Vector3(keeper.Position.X - 11f, 0.9f, keeper.Position.Z);
+        ball.Velocity = new Vector3(22f, 0.6f, side * 2f);
+        ball.Spin = Vector3.Zero;
+        brain.OnStrike(new SimRng(3), ball);
+        float jump = LargestJump(brain, keeper, ball, out bool dived);
+        Assert.True(dived);
+        Assert.True(jump < 0.01f, $"his feet moved {jump:F3} m further in one tick than his velocity carries them");
+    }
+
+    [Fact]
+    public void StruckAtWhileDownHisSaveStartsFromWhereHeIsWhenHeGetsGoing()
+    {
+        var (brain, keeper, ball) = Diving(new Vector3(0f, 1.0f, 2.0f));
+        ball.Position = new Vector3(P.GoalLineX - 20f, 0.11f, 0f);
+        int ticks = 0;
+        while (keeper.KeeperAction != KeeperAction.Grounded && ticks++ < 400) brain.Update(Dt, ball, new SimRng(1));
+        // A shot while he lies: he reacts only 0.2 s into getting up, long after his reaction to it would have come.
+        ball.Position = new Vector3(keeper.Position.X - 9f, 0.6f, keeper.Position.Z);
+        ball.Velocity = new Vector3(6f, 0.5f, 2.2f);
+        ball.Spin = Vector3.Zero;
+        brain.OnStrike(new SimRng(2), ball);
+        while (keeper.KeeperAction is KeeperAction.Grounded or KeeperAction.GettingUp && ticks++ < 800) brain.Update(Dt, ball, new SimRng(1));
+        float jump = LargestJump(brain, keeper, ball, out bool dived);
+        Assert.True(dived);
+        Assert.True(jump < 0.01f, $"his feet moved {jump:F3} m further in one tick than his velocity carries them");
+        Assert.True(brain.Report.ReactionS >= T.Keeper.GroundedSeconds, $"his reaction is reported at {brain.Report.ReactionS:F2} s, before he got going");
+    }
+
     // ---- the penalty: holding the line ----
 
     [Fact]

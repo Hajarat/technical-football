@@ -332,6 +332,55 @@ public sealed class FigureStats
         return s[Math.Min(s.Count - 1, (int)Math.Ceiling(0.99 * s.Count) - 1)];
     }
 
+    /// <summary>
+    /// BODY_JUMP, per body (0 the keeper, 1 the defender): on every tick, the shown hips' move over the ground since the previous
+    /// tick against the simulation's player's own move. A pop is the shown hips moving more than <see cref="BodyPopM"/> further than
+    /// the player did (a snap of the drawn body onto him, or a clip switch that moves the hips); a simulation jump is the player himself
+    /// moving more than <see cref="SimJumpM"/> in one tick (faster than anyone runs). Each with its count, largest and worst tick.
+    /// </summary>
+    public const float BodyPopM = 0.05f, SimJumpM = 0.1f;
+    /// <summary>The first this many pops of each body are also printed one by one (BODY_POP: tick, moves, action, what is drawn).</summary>
+    const int BodyPopLines = 40;
+    static readonly string[] BodyNames = { "keeper", "defender" };
+    readonly (bool Have, Vector3 Shown, Vector3 Sim)[] _bodyPrev = new (bool, Vector3, Vector3)[2];
+    readonly int[] _bodyN = new int[2], _bodyPops = new int[2], _bodySimJumps = new int[2];
+    readonly (int Tick, float M, string What)[] _bodyPopWorst = new (int, float, string)[2], _bodySimWorst = new (int, float, string)[2];
+    readonly float[] _bodyShownMax = new float[2];
+
+    /// <summary>One tick of a body for BODY_JUMP: the shown hips and the simulation's position (world), and what he is doing.</summary>
+    public void AddBodyJump(int body, Vector3 shownHips, Vector3 sim, string what, Func<string>? drawn = null)
+    {
+        var p = _bodyPrev[body];
+        _bodyPrev[body] = (true, shownHips, sim);
+        if (!p.Have) return;
+        float shown = new Vector2(shownHips.X - p.Shown.X, shownHips.Z - p.Shown.Z).Length();
+        float own = new Vector2(sim.X - p.Sim.X, sim.Z - p.Sim.Z).Length();
+        _bodyN[body]++;
+        _bodyShownMax[body] = Math.Max(_bodyShownMax[body], shown);
+        if (shown - own > BodyPopM)
+        {
+            _bodyPops[body]++;
+            if (shown - own > _bodyPopWorst[body].M) _bodyPopWorst[body] = (Tick, shown - own, what);
+            if (_bodyPops[body] <= BodyPopLines)
+                GD.Print($"BODY_POP who={BodyNames[body]} tick={Tick} shown_m={shown:F3} sim_m={own:F3} at={what} drawn={drawn?.Invoke() ?? "-"} off_m={new Vector2(shownHips.X - sim.X, shownHips.Z - sim.Z).Length():F3}");
+        }
+        if (own > SimJumpM) { _bodySimJumps[body]++; if (own > _bodySimWorst[body].M) _bodySimWorst[body] = (Tick, own, what); }
+    }
+
+    /// <summary>A jump of the whole scene (round reset, seek): the next tick of each body starts its history again.</summary>
+    public void ResetBodyJump() { _bodyPrev[0].Have = false; _bodyPrev[1].Have = false; }
+
+    public IEnumerable<string> BodyJumpLines()
+    {
+        for (int i = 0; i < 2; i++)
+        {
+            if (_bodyN[i] == 0) continue;
+            var pw = _bodyPopWorst[i]; var sw = _bodySimWorst[i];
+            yield return $"BODY_JUMP who={BodyNames[i]} n={_bodyN[i]} shown_max_m={_bodyShownMax[i]:F3} pops={_bodyPops[i]} pop_max_m={pw.M:F3} pop_tick={pw.Tick} pop_at={(pw.What ?? "-")}" +
+                $" sim_jumps={_bodySimJumps[i]} sim_max_m={sw.M:F3} sim_tick={sw.Tick} sim_at={(sw.What ?? "-")}";
+        }
+    }
+
     public string ContactLine() => Line("FOOT_CONTACT", Contact);
     public string ContactTouchLine() => Line("FOOT_CONTACT_TOUCH", ContactTouch);
     public string ContactStrikeLine() => Line("FOOT_CONTACT_STRIKE", ContactStrike);
@@ -408,6 +457,9 @@ public partial class PlayerFigure : Node3D
 
     /// <summary>True while a skinned body replaces the primitive meshes.</summary>
     public bool IsSkinned => _body != null;
+
+    /// <summary>The hips as shown this tick (world): the skinned body's hips bone, else the figure's pelvis.</summary>
+    public Vector3 ShownHips => _body != null ? _body.DrivenBoneWorld(0) : _joints.Pelvis;
 
     /// <summary>Replaces the primitive meshes with the rigged model at <paramref name="path"/>; on failure the primitives stay and the reason is returned.</summary>
     public bool TryUseSkinned(string path, out string error)

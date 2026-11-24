@@ -187,7 +187,8 @@ public sealed partial class DefenderBot
             {
                 HoldSpot = spotIn;
                 _fastFor = want.Length() > k.RunWithFactor * fastJ ? _fastFor + dt : 0f;
-                if (free && _fastFor >= k.RunWithAfterS) { Mode = DefenderMode.RunWith; it = RunWith(w, d, dp, cp, vc, u); }
+                // (not while the carrier comes on toward goal slower than his jockey pace: that ends a run with at once)
+                if (free && _fastFor >= k.RunWithAfterS && Vector2.Dot(vc, u) >= slowJ) { Mode = DefenderMode.RunWith; it = RunWith(w, d, dp, cp, vc, u); }
                 else it = JockeyAt(want, slowJ, fastJ);
             }
         }

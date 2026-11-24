@@ -113,7 +113,7 @@ public sealed class DefenderAnimator
     public void Teleport()
     {
         _motion.Teleport();
-        _set = null; _setTime = 0f; _moving = false; _returnT = 1e9f; _footW = 0f; Showing = false;
+        _set = null; _setTime = 0f; _moving = false; _returnT = 1e9f; _footW = 0f; _footSet = null; _footHandOver = false; Showing = false;
     }
 
     /// <summary>
@@ -229,8 +229,17 @@ public sealed class DefenderAnimator
         {
             want = rem > 0f ? Math.Max(0f, 1f - rem / FootRampSeconds) : -rem <= hold ? 1f : Math.Max(0f, 1f - (-rem - hold) / ReleaseSeconds);
             if (set == DefenderChooser.Block) want *= 0.85f;
-            _footSide = side; _footAt = ModelSpace.FromWorld(new NVec3(footAt.X, footAt.Y, footAt.Z)) / scale;
-            _footW = want;
+            // (a new reach while the last one's foot is still out, a lunge into a block or the block's side changing as the ball
+            // crosses him: that foot is let go first, as a set left mid-reach is, and the new reach's weight then rises from there
+            // no faster than a reach's ramp; switched at once, the body the foot holds toward its point would jump with it)
+            if ((_footSet != set || _footSide != side) && _footW > 1e-4f) { _footW = Math.Max(0f, _footW - dt / ReleaseSeconds); _footHandOver = true; }
+            else
+            {
+                _footSet = set;
+                _footSide = side; _footAt = ModelSpace.FromWorld(new NVec3(footAt.X, footAt.Y, footAt.Z)) / scale;
+                _footW = _footHandOver ? Math.Min(want, _footW + dt / FootRampSeconds) : want;
+                if (_footW >= want) _footHandOver = false;
+            }
         }
         else if (_footW > 0f) _footW = Math.Max(0f, _footW - dt / ReleaseSeconds);   // the set left mid-reach: let go where it was
         if (_footW > 1e-4f)
@@ -241,6 +250,8 @@ public sealed class DefenderAnimator
     }
 
     NVec3 _footAt;
+    string? _footSet;      // the set whose reach the foot's IK holds
+    bool _footHandOver;    // a reach let go for another: the new one's weight is rising to it
 
     /// <summary>Whether the foot (0 = left) is held planted by the foot lock this tick.</summary>
     public bool FootPlanted(int foot) => _motion.FootLock.Locked(foot);

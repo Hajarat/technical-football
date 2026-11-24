@@ -372,6 +372,7 @@ public partial class Match
         _intent = default; _looseSince = int.MinValue;
         Ball.Teleport(G(World.Ball.Position));
         Ball.SetPossession(false);
+        FootStats.ResetBodyJump();
         Attacker.Teleport(AttackerFrame(World.Attacker), World.Attacker.InPossession);
         Keeper.Teleport(KeeperFrame(World.Keeper));
         if (World.Defender is { } def) Defender.Teleport(DefenderFrame(def), false);
@@ -428,6 +429,11 @@ public partial class Match
         Keeper.Apply(KeeperFrame(w.Keeper));
         ulong pt2 = Time.GetTicksUsec(); long a2 = GC.GetAllocatedBytesForCurrentThread();
         if (w.Defender is { } def) Defender.Apply(DefenderFrame(def), def.InPossession);
+        if (_replay != null)
+        {
+            FootStats.AddBodyJump(0, Keeper.Figure.ShownHips, G(w.Keeper.Position), w.Keeper.KeeperAction.ToString(), () => Keeper.Figure.KeeperAnim?.Describe() ?? "figure");
+            if (w.Defender is { } dj) FootStats.AddBodyJump(1, Defender.Figure.ShownHips, G(dj.Position), dj.DefenderAction.ToString(), () => Defender.Figure.DefenderAnim?.Describe() ?? "figure");
+        }
         _perf?.Section(PerfProbe.AttackerSlot, pt1 - pt0, a1 - a0);
         _perf?.Section(PerfProbe.KeeperSlot, pt2 - pt1, a2 - a1);
         _perf?.Section(PerfProbe.DefenderSlot, Time.GetTicksUsec() - pt2, GC.GetAllocatedBytesForCurrentThread() - a2);

@@ -169,4 +169,36 @@ public class KeeperMotionTests
         b.Step(new Vector2(1.2f, 0), 0f, Vector2.Zero, "stance");
         Assert.InRange(b.OutP[0].X - x0, 1.15f, 1.25f);   // 0.9 m away: snapped
     }
+
+    /// <summary>A clip whose root walks off at 5 m/s while the simulation stands still, for the root's drift.</summary>
+    static readonly PoseDatabase Drift = new(new ClipLibrary(Sk, new[]
+    {
+        new ClipEntry(TestKit.Walk(Sk, "drift", 600, 5f, 1.6f, loop: true), "drift", "left", ClipVerdict.Keep),
+    }), new[] { "drift" });
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(30)]
+    [InlineData(60)]    // after a free root (a save) has carried it 1.25 m away
+    public void AFollowingRootNeverJumpsWhileTheSimulationStandsStill(int freeTicks)
+    {
+        var m = new KeeperMotion(Drift);
+        var procR = Enumerable.Repeat(Quaternion.Identity, Sk.Count).ToArray();
+        var procP = Sk.Offsets.ToArray();
+        var outR = new Quaternion[Sk.Count]; var outP = new Vector3[Sk.Count];
+        Vector2? last = null;
+        float most = 0f, off = 0f;
+        for (int i = 0; i < 360; i++)
+        {
+            var input = new MotionInput { Set = "drift", Scale = 1f, Dt = Dt, Root = i < freeTicks ? RootMode.Free : RootMode.Follow };
+            m.Step(input, procR, procP, outR, outP);
+            var root = m.RootPosition;
+            if (last is Vector2 l && i != freeTicks) most = MathF.Max(most, (root - l).Length());
+            last = root;
+            if (i >= freeTicks + 120) off = MathF.Max(off, root.Length());
+        }
+        // (the clip's own step is 5 m/s / 120 Hz = 0.042 m: anything much more is a jump he never made)
+        Assert.True(most < 0.06f, $"the drawn root moved {most:F3} m in one tick");
+        Assert.True(off <= m.SnapDistance + 1e-3f, $"it drifted {off:F3} m from him");
+    }
 }

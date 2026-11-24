@@ -17,6 +17,7 @@ public sealed partial class KeeperBrain
     float _difficulty;          // the current save's difficulty
     Vector3 _home;              // hands' rest point when the save started
     Vector3 _feet0;             // feet when the save started
+    Vector3 _handsFrom;         // the near hand's set position when a set keeper's dive started (the home keeper's hands go from there)
     Vector2 _carry0;            // ground velocity when the save started
     Vector3 _target;
     float _targetT;             // seconds after the save's start the ball was predicted at the target
@@ -210,6 +211,9 @@ public sealed partial class KeeperBrain
         _since = elapsed;
         _reaction = Keeper.ReactionAtStrike(_k.Sheet, _t, rng, speed);
         _reflexTime = Keeper.DrawReflex(_k.Sheet, _t, rng, _reaction);
+        // The home keeper struck at while down reacts once he is up to it, not before: his save starts now, so his reach grows from
+        // now rather than as if he had been diving since his reaction (the legacy keeper's goes on from his reaction after the strike).
+        if (HomeBrain && elapsed > 0f) { _reaction = MathF.Max(_reaction, elapsed); _reflexTime = MathF.Max(_reflexTime, elapsed); }
         if (elapsed > 0f) _ready = 0f;
         _span = Keeper.StanceStart(_t, _ready, still: speed <= _t.Keeper.StillSpeed && elapsed <= 0f);
         Report.ReactionS = _reaction;
@@ -407,6 +411,7 @@ public sealed partial class KeeperBrain
             : !plan.Found ? SaveType.FailedAttempt
             : hands && ExpectsCatch(plan) ? SaveType.Catch : SaveType.Parry;
         SetAction(KeeperAction.Diving, _dive);
+        _handsFrom = HandRest(Vector2.Dot(new Vector2(_target.X - _home.X, _target.Z - _home.Z), SideAxis) >= 0f ? 1f : -1f);
         StepDive(0f);
     }
 
@@ -491,9 +496,19 @@ public sealed partial class KeeperBrain
                 float f = lateral <= _limbStart ? 1f : Math.Clamp((reach - _limbStart) / (lateral - _limbStart), 0f, 1f);
                 _hands = Vector3.Lerp(limbFrom, _target, f);
             }
+            else if (_span > 0f && HomeBrain)
+            {
+                // From the near hand's set position out to the target as the reach grows past the span, at the target once his
+                // reach is, but no sooner than the reach's growth covers the way from that position: the hand never crosses it in
+                // a tick (a target just beyond the span, or inside it, not straight out to the side).
+                float way = MathF.Max(dist - _span, Vector3.Distance(_handsFrom, _target));
+                float f = way > 1e-4f ? Math.Clamp((reach - _span) / way, 0f, 1f) : 1f;
+                _hands = Vector3.Lerp(_handsFrom, _target, f);
+            }
             else if (_span > 0f)
             {
-                // From the near hand's set position out to the target as the reach grows past the span.
+                // (the legacy keeper's: from the near hand's set position out to the target as the reach grows past the span, so
+                // at the target once his reach is)
                 Vector3 from = HandRest(Vector2.Dot(new Vector2(to.X, to.Z), SideAxis) >= 0f ? 1f : -1f);
                 float f = dist <= _span ? 1f : Math.Clamp((reach - _span) / (dist - _span), 0f, 1f);
                 _hands = Vector3.Lerp(from, _target, f);
@@ -501,7 +516,9 @@ public sealed partial class KeeperBrain
             else _hands = dist > 1e-4f ? _home + to / dist * MathF.Min(reach, dist) : _home;
         }
 
-        // The body follows the hands sideways (a reflex's limb only a little: a short lunge), carrying any speed it had.
+        // The body follows the hands sideways (a reflex's limb only a little: a short lunge), carrying any speed it had. It follows
+        // their travel from where they started: the home keeper's set hands start a span out to the side, so his body sets off from
+        // his feet with them (the legacy keeper's body follows them from his chest, so it starts a share of the span out at once).
         float tc = MathF.Max(0f, _since - SaveStart);
         float v0 = _carry0.Length();
         float stopT = v0 / k.PlantDecel;
@@ -509,7 +526,7 @@ public sealed partial class KeeperBrain
         Vector2 carry = v0 > 1e-4f ? _carry0 / v0 * (v0 * tt - 0.5f * k.PlantDecel * tt * tt) : Vector2.Zero;
         bool standing = _reflex || _dive is KeeperDive.Catch or KeeperDive.Feet;
         float follow = _reflex ? k.ReflexBodyFollow : standing ? 0.5f * k.BodyFollow : k.BodyFollow;
-        Vector3 moved = _reflex ? _hands - limbFrom : _hands - _home;
+        Vector3 moved = _reflex ? _hands - limbFrom : _hands - (HomeBrain && _span > 0f ? _handsFrom : _home);
         var old = _k.Position;
         var pos = new Vector3(_feet0.X + carry.X + follow * moved.X, 0f, _feet0.Z + carry.Y + follow * moved.Z);
         var vel = Vector3.Zero;

@@ -47,7 +47,8 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
   goal centre than `arc_min_from_line`, never behind the line `arc_min_from_line` in front of his goal line; a ball on the goal
   centre gives the line straight out. He moves there (`move_accel`, slowing to arrive) at up to `mirror_speed` (positioning)
   across the line from the goal centre to him and `backpedal_speed` toward goal (`KeeperMode.Mirror` while moving, shown as
-  `Shuffle` or `Backpedal`).
+  `Shuffle` or `Backpedal`: moving from above `still_speed` until he is under 0.2 m/s, so a speed at the limit does not flip
+  his stance).
 - **Pounce.** Set (braking into it or mirroring), with the ball low in his penalty area, he pounces at the first point on the
   ball's predicted path (from the forecast published that tick, up to the attacker's next touch or `rush_lookahead`) that is
   below `slide_max_height`, in his area, within `pounce_reach_m` (diving) of his hull (`hull_radius` from his centre), and
@@ -126,7 +127,12 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
   reach gets to in time (`arm_sweep` over `arm_sweep_time`, then `dive_speed` once the save's execution time has passed, up to
   `stretch`), after a random delay up to `save_time_jitter_easy`..`_hard` by its difficulty; if none, at the point he gets
   closest to (`FailedAttempt`). A ball that will hit his standing body anyway is blocked standing. He goes for a catch when the
-  ball's speed and the time he will have put the target inside his catch range, else a parry.
+  ball's speed and the time he will have put the target inside his catch range, else a parry. A set keeper's hands
+  start at their set position: both keepers' reach the target once his reach does, the home keeper's no sooner than his reach's
+  growth past the span covers the way from their set position to it (so they never cross it in a tick), the legacy keeper's at
+  once for a target inside the span. His body follows `body_follow` of the hands' travel sideways (half of it in a standing save), carrying the
+  speed he had: the home keeper's from where his hands start, so a set keeper's body sets off from his feet, the legacy
+  keeper's from his chest, so a set keeper's body starts a share of the span out at once.
 - **Difficulty.** A save's difficulty is the lateral range it needs as a fraction of his stretch through `difficulty_low`,
   `difficulty_mid` or `difficulty_high` by the ball's height (linear between `difficulty_*_height`), plus
   `counter_momentum_penalty` by his speed away from it (moving the wrong way). It sets the execution time (`save_execution_easy`
@@ -153,7 +159,9 @@ geometry in `Keeper.cs` (the save model's in `Keeper.Save.cs`), and every number
   goal) that tips it over the bar or, below `backpedal_catch_factor` of his diving catch speed, catches it. No dive target is
   above his leap.
 - **Recover.** After a dive or smother he lies for `grounded_seconds`, then gets up in `get_up_seconds`; a new save can start
-  `get_up_save_after` into getting up.
+  `get_up_save_after` into getting up. The home keeper's reaction and reflex to a shot struck while he was down count from that
+  moment at the earliest, so his reach grows from when he moves (the legacy keeper's from his reaction after the strike, as if
+  he had been diving since).
 
 ## The legacy keeper
 
@@ -264,18 +272,18 @@ points (same attacker); `feint_round` 25 to 40%; over all four plans the p90 of 
 carrier has the ball more than 8 m from him, at most 6.5 m, and the median time from taken round to back on the line, at most
 1.5 s (a keeper taken round who is not back before the first attack ends counts as slower than any who is; the probe plays on
 0.5 s after the first attack ends, then stops). `shoot_set` has no band. Measured with the shipped tuning (seed 1; `--seed 2`
-gives the same table, since the rounds' seeds are the run's seed plus 0 to 1,999):
+gives the same table to within 0.1 point, since the rounds' seeds are the run's seed plus 0 to 1,999):
 
 | Plan | Attacker | First attack: goal / miss / held | Band (goals) |
 | --- | --- | --- | --- |
-| shoot_set | even | 61.5 / 23.2 / 13.9% | - |
-| round | even | 9.1 / 43.5 / 47.5% | at most 58.5% (ok) |
-| round_close | even | 15.8 / 1.8 / 82.3% | at most 58.5% (ok) |
-| feint_round | even | 38.0 / 21.0 / 41.0% | 25 to 40% (ok) |
-| shoot_set | fast | 77.9 / 10.8 / 10.3% | - |
-| round | fast | 13.5 / 20.1 / 66.5% | at most 74.9% (ok) |
-| round_close | fast | 20.4 / 3.5 / 76.0% | at most 74.9% (ok) |
-| feint_round | fast | 24.3 / 25.4 / 50.2% | 25 to 40% (MISS) |
+| shoot_set | even | 62.5 / 21.8 / 14.6% | - |
+| round | even | 8.6 / 43.5 / 47.9% | at most 59.5% (ok) |
+| round_close | even | 15.8 / 1.8 / 82.5% | at most 59.5% (ok) |
+| feint_round | even | 37.1 / 21.1 / 41.7% | 25 to 40% (ok) |
+| shoot_set | fast | 77.6 / 11.1 / 10.4% | - |
+| round | fast | 13.3 / 19.9 / 66.8% | at most 74.6% (ok) |
+| round_close | fast | 20.3 / 3.5 / 76.2% | at most 74.6% (ok) |
+| feint_round | fast | 24.9 / 25.1 / 50.1% | 25 to 40% (MISS) |
 
 | All four plans | Even: measured (band) | Fast: measured (band) |
 | --- | --- | --- |
@@ -286,7 +294,7 @@ He sets about 6 to 7 m from the carrier, about 4 to 5 m off his line, and mirror
 traced `round` rounds (even, seeds 1 to 40) he pounced on a sprint touch in about a third, and in most of the rest the carrier
 was run wide and shot from a tight angle. The shot from 11 to 13 m scores far more often than against the legacy keeper, who
 met the shooter about 3 m out. A step-over inside 4 m that draws his pounce leaves him on the ground and the goal open. The fast
-attacker's `feint_round` is just under its band (24.3%).
+attacker's `feint_round` is just under its band (24.9%).
 
 The legacy keeper (`--brain legacy`, seed 1) charged a carrier he could reach and was then taken round with the goal open:
 `shoot_set` 13.8 / 21.8% (even / fast), `round` 95.1 / 88.0%, `round_close` 39.8 / 9.6%, `feint_round` 97.2 / 92.7%; his

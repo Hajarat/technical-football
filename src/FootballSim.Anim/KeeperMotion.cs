@@ -51,7 +51,11 @@ public struct MotionInput
 /// <summary>How the drawn root follows the simulation's position.</summary>
 public enum RootMode
 {
-    /// <summary>Pulled to it every tick (critically damped, <see cref="KeeperMotion.RootHalfLife"/>; snapped beyond <see cref="KeeperMotion.SnapDistance"/>).</summary>
+    /// <summary>
+    /// Pulled to it every tick (critically damped, <see cref="KeeperMotion.RootHalfLife"/>). The clip's own travel carries it no further
+    /// from the simulation's position than <see cref="KeeperMotion.SnapDistance"/> (or than it already was when this mode began); it
+    /// snaps only when the simulation's position itself moves further than that in one tick.
+    /// </summary>
     Follow,
     /// <summary>Not pulled: a save (its pelvis path stretched toward the save point) and lying where it took him; the root moves and turns with the clip.</summary>
     Free,
@@ -94,7 +98,7 @@ public sealed class KeeperMotion
     public const int SearchInterval = 12;
     /// <summary>A save's pelvis path is stretched by at most this much either way (spec appendix E).</summary>
     public const float PathScaleMin = 0.6f, PathScaleMax = 1.5f;
-    /// <summary>Beyond this distance (world metres) a free or returning root snaps to the simulation's (a jump the save never made).</summary>
+    /// <summary>Beyond this distance (world metres) the root snaps to the simulation's in any mode (a jump the save never made).</summary>
     public float FreeSnapDistance = 3f;
     /// <summary>Half-life (seconds) of the root's way back to the simulation's position as he gets up.</summary>
     public float ReturnHalfLife = 0.25f;
@@ -102,6 +106,10 @@ public sealed class KeeperMotion
     public const float ChestTolerance = 5f * MathF.PI / 180f;
     /// <summary>Half-life (seconds) of the chest correction's and the stance layer's weights as states come and go.</summary>
     public const float LayerHalfLife = 0.1f;
+    /// <summary>
+    /// Half-lives (seconds) of the query trajectory and of the following root's pull; &lt;c&gt;SnapDistance&lt;/c&gt; (world metres): the furthest
+    /// a following root drifts from the simulation's position, and the move of that position in one tick that it snaps to.
+    /// </summary>
     public float TrajectoryHalfLife = 0.15f, RootHalfLife = 0.1f, SnapDistance = 0.5f;
     /// <summary>A best frame this close (seconds) to the playing one in the same clip does not cause a jump.</summary>
     public float NearSeconds = 0.25f;
@@ -130,6 +138,8 @@ public sealed class KeeperMotion
     float _t;           // seconds into it
 
     Vector2 _root, _rootErrVel;
+    Vector2 _simPos;      // the simulation's position on the previous tick
+    float _rootErrLast;   // the drawn root's distance from it after the previous tick's pull (model units)
     float _yaw, _yawErrVel;
     Vector2 _simVel, _simAcc;
     float _rate = 1f;
@@ -253,17 +263,31 @@ public sealed class KeeperMotion
             // (getting up he turns only to the simulation's facing: the clip's own turning as it rolls over is left out, so he rises facing play)
             if (input.Root != RootMode.Return) _yaw = Spring.WrapPi(_yaw + Spring.WrapPi(y1 - y0));
         }
-        // ... and the simulation's position and facing pull it (they are authoritative)
+        // ... and the simulation's position and facing pull it (they are authoritative). It snaps onto him on a teleport, beyond
+        // FreeSnapDistance, and following when he himself jumped (moved further than SnapDistance in one tick: shown as it happened). Following,
+        // the clip's own travel may carry it no further from him than SnapDistance (or than it already was, handed over from a free
+        // or returning root), and from there the pull brings it back (as slowly as a returning root's from beyond SnapDistance): it
+        // is never snapped for drifting, which would draw a jump he never made.
         Vector2 err = _root - input.Position;
-        float snap = input.Root == RootMode.Follow ? SnapDistance : FreeSnapDistance;
-        if (err.Length() * input.Scale > snap || _first) { _root = input.Position; _rootErrVel = Vector2.Zero; }
+        float scale = input.Scale > 0f ? input.Scale : 1f;
+        bool simJumped = !_first && input.Root == RootMode.Follow && (input.Position - _simPos).Length() * scale > SnapDistance;
+        _simPos = input.Position;
+        if (_first || simJumped || err.Length() * scale > FreeSnapDistance) { _root = input.Position; _rootErrVel = Vector2.Zero; }
         else if (input.Root == RootMode.Free) _rootErrVel = Vector2.Zero;
         else
         {
+            if (input.Root == RootMode.Follow)
+            {
+                float most = MathF.Max(SnapDistance / scale, _rootErrLast), len = err.Length();
+                if (len > most) err *= most / len;
+            }
             var e3 = new Vector3(err.X, 0, err.Y); var v3 = new Vector3(_rootErrVel.X, 0, _rootErrVel.Y);
-            Spring.Decay(ref e3, ref v3, input.Root == RootMode.Return ? ReturnHalfLife : RootHalfLife, dt);
+            // (further off than a following root drifts, handed over that way, it comes back as slowly as a returning one)
+            bool far = input.Root == RootMode.Return || err.Length() * scale > SnapDistance + 1e-4f;
+            Spring.Decay(ref e3, ref v3, far ? ReturnHalfLife : RootHalfLife, dt);
             _root = input.Position + new Vector2(e3.X, e3.Z); _rootErrVel = new Vector2(v3.X, v3.Z);
         }
+        _rootErrLast = (_root - input.Position).Length();
         // the facing too, except in a free root: a save and lying turn the body as the clip does (a smother lies along the ground)
         if (input.Root == RootMode.Free) _yawErrVel = 0f;
         else

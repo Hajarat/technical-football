@@ -43,9 +43,11 @@ line" runs from the ball (or, against a team with the ball loose, the anchor) to
   off he waits on his engage line.
 - **Contain** (inside the gap). The velocity he asks for is the carrier's velocity along the line plus `gap_gain` times the
   distance from him to his spot, jockeying at whatever share of the sprint-jockey pace that needs.
-- **Run with.** Once that velocity has been above `run_with_factor` of his sprint-jockey pace for `run_with_after_s`, he lets
-  go of jockey and runs at a point `run_with_inside_m` goal-side of the carrier on the line, matching the carrier's velocity
-  (the same gain). He contains again once the carrier's speed toward goal is under his jockey pace.
+- **Run with.** Once that velocity has been above `run_with_factor` of his sprint-jockey pace for `run_with_after_s`, with
+  the carrier's speed toward goal at least his jockey pace, he lets go of jockey and runs at a point `run_with_inside_m`
+  goal-side of the carrier on the line, matching the carrier's velocity (the same gain). He contains again once the carrier's
+  speed toward goal is under his jockey pace (so a carrier slower than that toward goal is contained however far off his spot
+  the defender is, never run with for a tick and dropped).
 - **Win.** He goes for the ball on any of three triggers, checked while he is on his feet:
   - *loose*: the dribbled ball, rolled on as it goes (the bot's own copy of the ball, stepped at 60 Hz), reaches a spot his
     foot (his lunge reach) gets to first, no later than `win_horizon_s` ahead and at least `win_margin_s` (by awareness:
@@ -189,11 +191,11 @@ difficulty (that is the human probe's); the legacy bot is held to its own (strai
 
 | | band | measured (seed 1, 2,000 rounds each) |
 | --- | --- | --- |
-| straight: ball won from the dribble | 85 to 95% | 90.2% |
-| cut: ball won from the dribble | 17 to 27% | 21.5% |
-| skill: ball won from the dribble | 10 to 20% | 14.9% |
-| shots blocked, all four styles' shots together | 29 to 39% | 34.2% |
-| fouls, each style | under 5% of rounds | 0.9 to 2.6% |
+| straight: ball won from the dribble | 85 to 95% | 90.4% |
+| cut: ball won from the dribble | 17 to 27% | 24.8% |
+| skill: ball won from the dribble | 10 to 20% | 15.1% |
+| shots blocked, all four styles' shots together | 29 to 39% | 34.8% |
+| fouls, each style | under 5% of rounds | 1.0 to 3.5% |
 
 The blocked share comes mostly from `shoot` (about 71% of its shots are blocked; the other styles shoot after they
 are past him). `--sweep awareness=1,50,99` (any defending rating) repeats the table per value without the bands;
@@ -231,21 +233,21 @@ containing bot (seed 1, 2,000 rounds per row; seed 2 gives the same to within 0.
 
 | Plan | Attacker | First attack: goal / miss / held / dispossessed / foul | Past | Band (past) |
 | --- | --- | --- | --- | --- |
-| wide_sprint | even | 25.0 / 15.8 / 17.1 / 40.6 / 1.4% | 24.0% | at most 30% (ok) |
-| stop_go | even | 27.4 / 19.8 / 7.3 / 42.2 / 3.2% | 36.9% | at most 35% (MISS) |
-| cut_inside | even | 18.4 / 19.6 / 7.2 / 51.4 / 3.4% | 47.8% | 25 to 45% (MISS) |
-| skill_wide | even | 11.1 / 9.5 / 5.0 / 70.5 / 3.8% | 28.7% | 35 to 55% (MISS) |
-| wide_sprint | fast | 39.4 / 11.9 / 15.7 / 31.9 / 1.1% | 44.9% | 40 to 60% (ok) |
-| stop_go | fast | 37.8 / 23.6 / 5.6 / 31.2 / 1.7% | 36.0% | at most 60% (ok) |
-| cut_inside | fast | 29.5 / 27.1 / 6.8 / 35.0 / 1.6% | 61.0% | at most 60% (MISS) |
-| skill_wide | fast | 20.8 / 9.3 / 3.1 / 64.4 / 2.1% | 36.4% | 45 to 65% (MISS) |
+| wide_sprint | even | 26.1 / 14.6 / 16.9 / 41.0 / 1.3% | 23.6% | at most 30% (ok) |
+| stop_go | even | 27.5 / 19.8 / 7.0 / 42.5 / 3.3% | 36.6% | at most 35% (MISS) |
+| cut_inside | even | 18.2 / 20.2 / 7.5 / 50.9 / 3.0% | 48.0% | 25 to 45% (MISS) |
+| skill_wide | even | 11.1 / 9.8 / 4.2 / 71.2 / 3.6% | 28.5% | 35 to 55% (MISS) |
+| wide_sprint | fast | 39.2 / 12.3 / 14.1 / 33.2 / 1.1% | 44.9% | 40 to 60% (ok) |
+| stop_go | fast | 37.9 / 23.9 / 5.5 / 30.9 / 1.8% | 36.1% | at most 60% (ok) |
+| cut_inside | fast | 29.4 / 27.1 / 6.6 / 35.7 / 1.1% | 60.5% | at most 60% (MISS) |
+| skill_wide | fast | 21.1 / 9.3 / 3.0 / 64.2 / 2.1% | 36.2% | 45 to 65% (MISS) |
 
 | All four plans | Even: measured (band) | Fast: measured (band) |
 | --- | --- | --- |
-| first-attack goals of the best plan | 27.4%, stop_go (12 to 22%, MISS) | 39.4%, wide_sprint (25 to 38%, MISS) |
-| median time to get past, rounds that got past | 2.61 s (3.0 s or more, MISS) | 2.30 s (2.5 s or more, MISS) |
+| first-attack goals of the best plan | 27.5%, stop_go (12 to 22%, MISS) | 39.2%, wide_sprint (25 to 38%, MISS) |
+| median time to get past, rounds that got past | 2.60 s (3.0 s or more, MISS) | 2.30 s (2.5 s or more, MISS) |
 | tackles (lunges and slides) tried per round | 0.75 (0.5 or more, ok) | 0.69 (0.5 or more, ok) |
-| fouls | 2.9% (under 6%, ok) | 1.6% (under 6%, ok) |
+| fouls | 2.8% (under 6%, ok) | 1.5% (under 6%, ok) |
 
 With `--brain legacy` (the same seeds) the legacy bot measures: past 77.8 / 25.6 / 71.0 / 52.7% (even) and 78.7 / 27.1 / 65.3 /
 57.8% (fast) for the four plans in this order, goals of the best plan 32.0% and 43.5%, median time past 2.03 s and 2.06 s,

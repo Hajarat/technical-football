@@ -462,6 +462,28 @@ public class DefenderContainTests
         Assert.True(w.Tick > struck);
     }
 
+    [Fact]
+    public void HeNeverRunsWithTheCarrierForASingleTick()
+    {
+        // (a run with that the next tick ends at once draws him out of his stance and back: the straight attacker used to cause one
+        // in most rounds)
+        int spells = 0;
+        for (ulong seed = 1; seed <= 40; seed++)
+        {
+            var w = Live(seed: seed);
+            var script = new ScriptedAttacker { Style = ScriptedAttacker.AttackStyle.Straight };
+            var modes = new List<DefenderMode>();
+            TestData.Play(w, script, stopWhen: x => { modes.Add(x.DefenderBot!.Mode); return false; });
+            for (int i = 1; i + 1 < modes.Count; i++)
+            {
+                if (modes[i] != DefenderMode.RunWith || modes[i - 1] == DefenderMode.RunWith) continue;
+                spells++;
+                Assert.False(modes[i + 1] == DefenderMode.Contain, $"seed {seed}: a one-tick run with at tick {i}");
+            }
+        }
+        Assert.True(spells > 0, "no run with in these rounds");
+    }
+
     // ---- the keeper's yield ----
 
     [Fact]

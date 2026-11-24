@@ -349,6 +349,7 @@ public partial class Match : Node3D
             GD.Print(FootStats.TouchMissLine());
             if (Attacker.Figure.IsSkinned) GD.Print(FootStats.SkinLine());
             foreach (var line in FootStats.JumpLines()) GD.Print(line);
+            foreach (var line in FootStats.BodyJumpLines()) GD.Print(line);
             GD.Print(ShotClipLayer.Summary());
         }
         _perf?.Summary();

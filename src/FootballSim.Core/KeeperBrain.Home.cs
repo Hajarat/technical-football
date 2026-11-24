@@ -10,6 +10,9 @@ public sealed partial class KeeperBrain
     /// <summary>The home keeper plays (keeper.brain is not "legacy").</summary>
     bool HomeBrain => _t.Keeper.Brain != "legacy";
 
+    /// <summary>Mirroring, he shows as still again once under this speed, m/s (he starts moving above still_speed).</summary>
+    const float SetStillAgain = 0.2f;
+
     bool _set;                  // set on the carrier: braking into his stance, then mirroring him
     bool _settled;              // set and under set_speed once: from then on he mirrors
     bool _pounce;               // the smother under way is a pounce
@@ -96,7 +99,7 @@ public sealed partial class KeeperBrain
     /// Set on the carrier: he brakes at <c>plant_decel</c> to under <c>set_speed</c>, then mirrors him: each tick he moves to
     /// <see cref="MirrorSpot"/> at up to <c>mirror_speed</c> (positioning) sideways (across the goal) and
     /// <c>backpedal_speed</c> toward his line. Shown as Set (Spread within <c>pre_spread_range</c>) while still, Shuffle or
-    /// Backpedal while moving.
+    /// Backpedal while moving (from above <c>still_speed</c> until under <see cref="SetStillAgain"/>).
     /// </summary>
     KeeperMode StepSet(float dt, Vector2 ball, Vector2 feet, float toBall)
     {
@@ -133,7 +136,8 @@ public sealed partial class KeeperBrain
         float speed = v.Length();
         var face = new Vector2(MathF.Cos(_k.Facing), MathF.Sin(_k.Facing));
         bool backpedal = Vector2.Dot(v, face) < -k.BackpedalShowSpeed;
-        _shuffling = speed > k.StillSpeed;
+        // (moving from over still_speed until he is under SetStillAgain, so a speed at the limit does not flip his stance every tick)
+        _shuffling = _shuffling ? speed >= SetStillAgain : speed > k.StillSpeed;
         SetAction(backpedal ? KeeperAction.Backpedal : _shuffling ? KeeperAction.Shuffle
             : toBall < k.PreSpreadRange ? KeeperAction.Spread : KeeperAction.Set);
         return _shuffling ? KeeperMode.Mirror : KeeperMode.Set;
